@@ -21,6 +21,7 @@ tags are clean `vX.Y.Z` names. Installers for every version are on the
   real-world plug-ins. A deterministic VST3 module guards bundle loading and
   teardown, float/double audio, state restore, native HWND attachment,
   plug-in-requested resizing, high-DPI scaling, and GUI-to-audio automation.
+  ([#1](https://github.com/ripDZL/EqualizerAPO-XT/pull/1))
 - Backend hot-path optimizations; output is bit-identical to before (the
   audio regression references did not change). Stereo — and any channels
   left over from a SIMD group — now run through a dual-chain biquad kernel
