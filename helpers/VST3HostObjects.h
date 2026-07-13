@@ -20,8 +20,15 @@ class AttributeList final : public IAttributeList
 public:
 	tresult PLUGIN_API queryInterface(const TUID iid, void** obj) override
 	{
-		QUERY_INTERFACE(iid, obj, FUnknown::iid, IAttributeList)
-		QUERY_INTERFACE(iid, obj, IAttributeList::iid, IAttributeList)
+		if (obj == nullptr)
+			return kInvalidArgument;
+		if (FUnknownPrivate::iidEqual(iid, FUnknown::iid)
+			|| FUnknownPrivate::iidEqual(iid, IAttributeList::iid))
+		{
+			*obj = static_cast<IAttributeList*>(this);
+			addRef();
+			return kResultOk;
+		}
 		*obj = nullptr;
 		return kNoInterface;
 	}
@@ -132,8 +139,15 @@ public:
 
 	tresult PLUGIN_API queryInterface(const TUID iid, void** obj) override
 	{
-		QUERY_INTERFACE(iid, obj, FUnknown::iid, IMessage)
-		QUERY_INTERFACE(iid, obj, IMessage::iid, IMessage)
+		if (obj == nullptr)
+			return kInvalidArgument;
+		if (FUnknownPrivate::iidEqual(iid, FUnknown::iid)
+			|| FUnknownPrivate::iidEqual(iid, IMessage::iid))
+		{
+			*obj = static_cast<IMessage*>(this);
+			addRef();
+			return kResultOk;
+		}
 		*obj = nullptr;
 		return kNoInterface;
 	}
