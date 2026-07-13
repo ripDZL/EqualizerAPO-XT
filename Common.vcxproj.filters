@@ -167,6 +167,9 @@
     <ClInclude Include="helpers\VSTPluginInstanceInternal.h">
       <Filter>helpers</Filter>
     </ClInclude>
+    <ClInclude Include="helpers\VST3HostObjects.h">
+      <Filter>helpers</Filter>
+    </ClInclude>
     <ClInclude Include="helpers\VSTPluginLibrary.h">
       <Filter>helpers</Filter>
     </ClInclude>

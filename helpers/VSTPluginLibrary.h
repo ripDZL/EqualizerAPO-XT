@@ -33,6 +33,7 @@ class VSTPluginLibrary : public AbstractLibrary
 public:
 	static std::shared_ptr<VSTPluginLibrary> getInstance(const std::wstring& libPath);
 	static std::wstring getDefaultPluginPath();
+	~VSTPluginLibrary() override;
 
 	std::wstring getLibPath() override;
 	std::wstring getLoadPath() override;
@@ -58,5 +59,13 @@ private:
 	std::wstring loadPath;
 	bool vst3 = false;
 	Steinberg::IPluginFactory* factory = NULL;
+	Steinberg::FUnknown* vst3FactoryHostContext = NULL;
+	// InitDll/ExitDll are plain C exports in Steinberg's Windows module ABI.
+	// PLUGIN_API is __stdcall on Win32 and would leave the caller and plug-in
+	// disagreeing about stack cleanup there (x64 masks that mismatch).
+	typedef bool (* vst3ModuleEntryFunc)();
+	vst3ModuleEntryFunc InitDll = nullptr;
+	vst3ModuleEntryFunc ExitDll = nullptr;
+	bool vst3ModuleInitialized = false;
 	Steinberg::PClassInfo vst3ClassInfo;
 };

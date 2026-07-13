@@ -43,6 +43,7 @@ void runLoudnessCorrectionCommandTests();
 void runStageCommandTests();
 void runVSTPluginCommandTests();
 void runVstHostTests();
+void runVst3HostTests();
 void runParserTests();
 void runParserPreampTests();
 void runMultiConvolutionTests();
@@ -314,6 +315,7 @@ int main()
 	// Runtime VST2 host load/state/audio test. Soft-skips if the
 	// companion TestVst2Plugin.dll is not next to this executable.
 	runVstHostTests();
+	runVst3HostTests();
 	runParserTests();
 	runParserPreampTests();
 	runMultiConvolutionTests();

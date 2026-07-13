@@ -24,7 +24,7 @@ EqualizerAPO-XT는 Windows용 시스템 전체 이퀄라이저인 [Equalizer APO
 - 오디오를 내부에서 double 정밀도로 처리해 복잡한 필터 체인에서도 정밀도를 잃지 않습니다.
 - Convolution, GraphicEQ, 파라메트릭 EQ, VST2/VST3와 기존 Equalizer APO 필터를 지원합니다.
 - 트루 스테레오와 BRIR(Binaural Room Impulse Response) 재생을 위한 MultiConvolution 필터가 있습니다. `MultiConvolution: L=0+1 R=2+3 brir.wav`처럼 각 채널 자신의 신호를 매핑된 파일 채널들과 컨볼루션해 합산하며, Channel 명령과 무관하게 동작합니다. 제자리 처리만 하는 기존 Convolution 필터가 표현하지 못하는 분기·합산 패턴이 한 줄로 끝나고, 파일 채널마다 Copy와 같은 문법으로 배율을 붙일 수 있습니다(`L=0.5*0+1`, `-1`은 역위상, `-6dB`도 가능). Editor에서는 스킨마다 다른 라우팅 화면으로 매핑을 편집합니다.
-- Steinberg VST3 SDK(MIT 라이선스 pluginterfaces)로 VST3를 네이티브 호스팅하며, 플러그인이 지원하면 64비트(double)로 처리합니다.
+- Steinberg VST3 SDK(MIT 라이선스 pluginterfaces)로 VST3를 네이티브 호스팅합니다. 플러그인 편집기의 크기 조절과 고해상도 표시, 저장 상태 동기화, GUI 자동화의 오디오 전달을 지원하며, 플러그인이 지원하면 64비트(double)로 처리합니다.
 - SIMD 커널은 [Google Highway](https://github.com/google/highway)로 한 번만 작성해 변형별로 컴파일합니다. x64는 SSE2, AVX, AVX2, AVX-512, AVX10.1, ARM64는 NEON입니다.
 - Qt Editor를 현대화했습니다. 카드 기반 필터 UI와 행 chrome·노브 렌더링·Copy 라우팅 렌더러까지 서로 다른 5종 스킨([docs/skin-integration-report.md](docs/skin-integration-report.md)), 내장 폰트, 고해상도(High-DPI) 대응이 들어 있습니다.
 - Editor가 새 릴리스를 백그라운드에서 내려받아 종료할 때 적용하는 자동 업데이트가 들어 있습니다. 알림만 하는 UpdateChecker 도구도 따로 있습니다.
@@ -91,4 +91,4 @@ Qt 도구는 CI에서도, 문서화된 로컬 설정에서도 qmake로 빌드합
 
 ## 테스트
 
-`Tests/`에는 프로젝트 다섯 개가 있습니다. `EditorLogicTests`와 `HybridConvTests`(단위 테스트), `EngineOrchestrationTests`(엔진 라우팅과 설정 교체 동작), `AudioRegressionTests`(엔진 출력을 커밋된 참조 데이터와 비교하며, CI에서는 SIMD 변형별로도 실행), `TestVst2Plugin`(VST2 호스트를 런타임에 시험하기 위한 자체 빌드 플러그인)입니다. 변형별 테스트 정책은 [docs/SimdBuildMatrix.md](docs/SimdBuildMatrix.md)에 함께 있습니다.
+`Tests/`에는 프로젝트 여섯 개가 있습니다. `EditorLogicTests`와 `HybridConvTests`(단위 테스트), `EngineOrchestrationTests`(엔진 라우팅과 설정 교체 동작), `AudioRegressionTests`(엔진 출력을 커밋된 참조 데이터와 비교하며, CI에서는 SIMD 변형별로도 실행), 그리고 두 호스트를 런타임에 시험하기 위한 자체 빌드 모듈 `TestVst2Plugin`과 `TestVst3Plugin`입니다. 변형별 테스트 정책은 [docs/SimdBuildMatrix.md](docs/SimdBuildMatrix.md)에 함께 있습니다.

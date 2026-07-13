@@ -24,7 +24,7 @@ Current work areas:
 - Double-precision internal audio processing for complex filter chains.
 - Convolution, GraphicEQ, parametric EQ, VST2/VST3, and standard Equalizer APO filter support.
 - MultiConvolution filter for true-stereo and BRIR (Binaural Room Impulse Response) playback: `MultiConvolution: L=0+1 R=2+3 brir.wav` convolves each channel's own signal with its mapped channels of one multichannel impulse response and sums them back, independent of the Channel command - the fan-out/sum pattern the in-place Convolution filter cannot express, in one line. Each mapped channel takes an optional factor with Copy's grammar (`L=0.5*0+1`; `-1` inverts the phase, `-6dB` works too). The Editor edits the mapping in every skin's routing view.
-- Native VST3 hosting through the Steinberg VST3 SDK (MIT-licensed pluginterfaces), with 64-bit (double) processing where the plug-in supports it.
+- Native VST3 hosting through the Steinberg VST3 SDK (MIT-licensed pluginterfaces), including native plug-in editors with resize and high-DPI support, saved-state synchronization, GUI automation delivery to audio, and 64-bit (double) processing where the plug-in supports it.
 - Portable SIMD kernels written once with [Google Highway](https://github.com/google/highway) and compiled per variant: SSE2, AVX, AVX2, AVX-512, and AVX10.1 on x64, NEON on ARM64.
 - Modernized Qt Editor: card-based filter UI and five fully differentiated visual skins — each with its own row chrome, knob rendering, and Copy routing renderer ([docs/skin-integration-report.md](docs/skin-integration-report.md)) — plus embedded fonts and high-DPI scaling.
 - Automatic updates: the Editor downloads new releases in the background and applies them on exit. A standalone UpdateChecker tool provides notify-only checks.
@@ -91,4 +91,4 @@ Qt tools are built through qmake in CI and in the documented local setup. A full
 
 ## Tests
 
-`Tests/` holds five projects: `EditorLogicTests` and `HybridConvTests` (unit tests), `EngineOrchestrationTests` (engine routing and config-swap behavior), `AudioRegressionTests` (engine output compared against committed references, also run across SIMD variants in CI), and `TestVst2Plugin` (a self-built plug-in used to test the VST2 host at runtime). Test policy per variant is part of [docs/SimdBuildMatrix.md](docs/SimdBuildMatrix.md).
+`Tests/` holds six projects: `EditorLogicTests` and `HybridConvTests` (unit tests), `EngineOrchestrationTests` (engine routing and config-swap behavior), `AudioRegressionTests` (engine output compared against committed references, also run across SIMD variants in CI), and the self-built `TestVst2Plugin` and `TestVst3Plugin` modules used to test both plug-in hosts at runtime. Test policy per variant is part of [docs/SimdBuildMatrix.md](docs/SimdBuildMatrix.md).

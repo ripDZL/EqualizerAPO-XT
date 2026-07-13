@@ -48,6 +48,7 @@ bool VSTPluginInstance::initializeVST3()
 		LogF(L"Could not initialize IComponent of VST3 plugin %s.", library->getLibPath().c_str());
 		return false;
 	}
+	vst3ComponentInitialized = true;
 
 	TUID processorIid;
 	IAudioProcessor::iid.toTUID(processorIid);
@@ -57,23 +58,32 @@ bool VSTPluginInstance::initializeVST3()
 		return false;
 	}
 
-	TUID controllerClassId;
-	memset(controllerClassId, 0, sizeof(controllerClassId));
-	if (vst3Component->getControllerClassId(controllerClassId) == kResultOk)
-	{
-		TUID controllerIid;
-		IEditController::iid.toTUID(controllerIid);
-		library->getFactory()->createInstance(controllerClassId, controllerIid, (void**)&vst3Controller);
-	}
+	TUID controllerIid;
+	IEditController::iid.toTUID(controllerIid);
+	// A single-component plug-in exposes IEditController from the same object as
+	// IComponent. That object has already been initialized above and must not be
+	// initialized or terminated a second time.
+	vst3Component->queryInterface(controllerIid, (void**)&vst3Controller);
 	if (vst3Controller == NULL)
 	{
-		TUID controllerIid;
-		IEditController::iid.toTUID(controllerIid);
-		vst3Component->queryInterface(controllerIid, (void**)&vst3Controller);
+		TUID controllerClassId;
+		memset(controllerClassId, 0, sizeof(controllerClassId));
+		if (vst3Component->getControllerClassId(controllerClassId) == kResultOk
+			&& library->getFactory()->createInstance(controllerClassId, controllerIid, (void**)&vst3Controller) == kResultOk
+			&& vst3Controller != NULL)
+		{
+			if (vst3Controller->initialize(static_cast<IHostApplication*>(vst3HostContext)) == kResultOk)
+				vst3ControllerInitializedSeparately = true;
+			else
+			{
+				LogF(L"Could not initialize IEditController of VST3 plugin %s.", library->getLibPath().c_str());
+				vst3Controller->release();
+				vst3Controller = NULL;
+			}
+		}
 	}
 	if (vst3Controller != NULL)
 	{
-		vst3Controller->initialize(static_cast<IHostApplication*>(vst3HostContext));
 		vst3Controller->setComponentHandler(vst3HostContext);
 
 		VST3MemoryStream* stream = new VST3MemoryStream();
@@ -86,7 +96,8 @@ bool VSTPluginInstance::initializeVST3()
 
 		TUID connectionPointIid;
 		Steinberg::Vst::IConnectionPoint::iid.toTUID(connectionPointIid);
-		if (vst3Component->queryInterface(connectionPointIid, (void**)&vst3ComponentConnection) == kResultOk
+		if (vst3ControllerInitializedSeparately
+			&& vst3Component->queryInterface(connectionPointIid, (void**)&vst3ComponentConnection) == kResultOk
 			&& vst3Controller->queryInterface(connectionPointIid, (void**)&vst3ControllerConnection) == kResultOk)
 		{
 			vst3ComponentConnection->connect(vst3ControllerConnection);
@@ -140,10 +151,12 @@ void VSTPluginInstance::releaseVST3()
 	}
 	if (vst3Controller != NULL)
 	{
-		vst3Controller->terminate();
+		if (vst3ControllerInitializedSeparately)
+			vst3Controller->terminate();
 		vst3Controller->release();
 		vst3Controller = NULL;
 	}
+	vst3ControllerInitializedSeparately = false;
 	if (vst3Processor != NULL)
 	{
 		vst3Processor->release();
@@ -151,10 +164,12 @@ void VSTPluginInstance::releaseVST3()
 	}
 	if (vst3Component != NULL)
 	{
-		vst3Component->terminate();
+		if (vst3ComponentInitialized)
+			vst3Component->terminate();
 		vst3Component->release();
 		vst3Component = NULL;
 	}
+	vst3ComponentInitialized = false;
 	if (vst3HostContext != NULL)
 	{
 		vst3HostContext->release();

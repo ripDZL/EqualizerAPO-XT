@@ -73,7 +73,11 @@ int AbstractLibrary::initialize()
 
 		int res = customInitialize();
 		if (res < 0)
+		{
+			FreeLibrary(module);
+			module = nullptr;
 			return res;
+		}
 
 		TraceF(L"Loaded library %s", libPath.c_str());
 

@@ -14,6 +14,13 @@ tags are clean `vX.Y.Z` names. Installers for every version are on the
 
 ## Unreleased
 
+- VST3 plug-ins now load with their native editors, restore matching audio and
+  GUI state, and send GUI parameter edits safely to the processor even while
+  audio is stopped. The host now follows the Windows module, factory, messaging,
+  resize, DPI, component-handler, and interface-support contracts used by
+  real-world plug-ins. A deterministic VST3 module guards bundle loading and
+  teardown, float/double audio, state restore, native HWND attachment,
+  plug-in-requested resizing, high-DPI scaling, and GUI-to-audio automation.
 - Backend hot-path optimizations; output is bit-identical to before (the
   audio regression references did not change). Stereo — and any channels
   left over from a SIMD group — now run through a dual-chain biquad kernel

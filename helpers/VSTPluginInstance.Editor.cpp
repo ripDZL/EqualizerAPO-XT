@@ -96,7 +96,8 @@ bool VSTPluginInstance::startEditing(HWND hWnd, short* width, short* height, dou
 		}
 
 		ViewRect rect;
-		if (vst3View->getSize(&rect) == kResultOk)
+		const bool hasAttachedSize = vst3View->getSize(&rect) == kResultOk;
+		if (hasAttachedSize)
 		{
 			physWidth = max<int32>(1, rect.getWidth());
 			physHeight = max<int32>(1, rect.getHeight());
@@ -125,6 +126,7 @@ bool VSTPluginInstance::startEditing(HWND hWnd, short* width, short* height, dou
 			stopEditing();
 			return false;
 		}
+		vst3ViewAttached = true;
 		if (vst3View->getSize(&rect) == kResultOk)
 		{
 			physWidth = max<int32>(1, rect.getWidth());
@@ -133,9 +135,10 @@ bool VSTPluginInstance::startEditing(HWND hWnd, short* width, short* height, dou
 				*width = toLogical(physWidth);
 			if (height != NULL)
 				*height = toLogical(physHeight);
-			vst3View->onSize(&rect);
 		}
 		SetWindowPos(vst3EditorHostWindow, NULL, 0, 0, physWidth, physHeight, SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+		if (hasAttachedSize)
+			vst3View->onSize(&rect);
 		EnumChildWindows(vst3EditorHostWindow, showChildWindow, 0);
 		return true;
 	}
@@ -184,7 +187,9 @@ void VSTPluginInstance::stopEditing()
 	{
 		if (vst3View != NULL)
 		{
-			vst3View->removed();
+			if (vst3ViewAttached)
+				vst3View->removed();
+			vst3ViewAttached = false;
 			vst3View->setFrame(NULL);
 			vst3View->release();
 			vst3View = NULL;
