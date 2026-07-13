@@ -38,8 +38,15 @@ class VST3FactoryHostContext final : public IHostApplication
 public:
 	tresult PLUGIN_API queryInterface(const TUID iid, void** obj) override
 	{
-		QUERY_INTERFACE(iid, obj, FUnknown::iid, IHostApplication)
-		QUERY_INTERFACE(iid, obj, IHostApplication::iid, IHostApplication)
+		if (obj == nullptr)
+			return kInvalidArgument;
+		if (FUnknownPrivate::iidEqual(iid, FUnknown::iid)
+			|| FUnknownPrivate::iidEqual(iid, IHostApplication::iid))
+		{
+			*obj = static_cast<IHostApplication*>(this);
+			addRef();
+			return kResultOk;
+		}
 		*obj = NULL;
 		return kNoInterface;
 	}
