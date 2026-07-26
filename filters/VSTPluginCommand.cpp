@@ -19,8 +19,9 @@
 
 #include "stdafx.h"
 
+#include <cerrno>
 #include <cstdio>
-#include <cwctype>
+#include <cstdlib>
 
 #include "helpers/StringHelper.h"
 #include "helpers/VSTPluginLibrary.h"
@@ -28,6 +29,24 @@
 
 using std::vector;
 using std::wstring;
+
+namespace
+{
+bool parseFloatToken(const wstring& token, float& value)
+{
+	if (token.empty())
+		return false;
+
+	wchar_t* end = nullptr;
+	errno = 0;
+	const float parsed = wcstof(token.c_str(), &end);
+	if (end == token.c_str() || *end != L'\0' || errno == ERANGE)
+		return false;
+
+	value = parsed;
+	return true;
+}
+}
 
 VSTPluginCommand VSTPluginCommand::parse(const wstring& /*configPath*/, const wstring& parameters)
 {
@@ -74,20 +93,15 @@ VSTPluginCommand VSTPluginCommand::parse(const wstring& /*configPath*/, const ws
 		}
 		else
 		{
-			if (value.empty() || !std::iswdigit(value[0]))
+			float f = 0.0f;
+			if (!parseFloatToken(value, f))
 			{
 				size_t x = (size_t)i + 2;
-				if (x < parts.size())
-				{
-					float f = wcstof(parts[x].c_str(), nullptr);
+				if (x < parts.size() && parseFloatToken(parts[x], f))
 					cmd.paramMap[value.c_str()] = f;
-				}
 			}
 			else
-			{
-				float f = wcstof(value.c_str(), nullptr);
 				cmd.paramMap[key] = f;
-			}
 		}
 	}
 

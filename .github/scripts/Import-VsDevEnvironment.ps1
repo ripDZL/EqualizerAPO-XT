@@ -13,6 +13,19 @@
     Qt qmake/nmake build steps) and setup-build.ps1, so the vswhere/VsDevCmd
     lookup is written exactly once.
 #>
+function Set-VsDevEnvironmentVariable {
+  param(
+    [Parameter(Mandatory)] [string]$Name,
+    [AllowEmptyString()] [string]$Value
+  )
+
+  Get-ChildItem Env: |
+    Where-Object { $_.Name -ieq $Name -and $_.Name -cne $Name } |
+    ForEach-Object { Remove-Item -LiteralPath "Env:$($_.Name)" -ErrorAction SilentlyContinue }
+
+  Set-Item -Path "Env:$Name" -Value $Value
+}
+
 function Import-VsDevEnvironment {
   param([string]$Arch)
 
@@ -42,7 +55,7 @@ function Import-VsDevEnvironment {
 
   foreach ($line in $environment) {
     if ($line -match "^(.*?)=(.*)$") {
-      Set-Item -Path "Env:$($matches[1])" -Value $matches[2]
+      Set-VsDevEnvironmentVariable -Name $matches[1] -Value $matches[2]
     }
   }
 

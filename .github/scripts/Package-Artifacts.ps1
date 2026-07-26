@@ -12,7 +12,11 @@ $requiredFiles = @(
     "Benchmark\$Platform\Release\Benchmark.exe",
     "VoicemeeterClient\$Platform\Release\VoicemeeterClient.exe"
 )
-$excludeExtensions = @(".obj", ".res", ".log", ".tlog", ".iobj", ".ipdb", ".ilk", ".pdb")
+$excludeExtensions = @(
+    ".obj", ".res", ".log", ".tlog", ".iobj", ".ipdb", ".ilk", ".pdb",
+    ".pch", ".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx",
+    ".qrc", ".lib", ".exp", ".idb", ".lastbuildstate"
+)
 $plan = [pscustomobject]@{
     ArtifactName = $artifactName
     RequiredFiles = $requiredFiles
@@ -22,6 +26,9 @@ if ($PlanOnly) { return $plan }
 
 $ErrorActionPreference = "Stop"
 $artifactPath = Join-Path $WorkspaceRoot "artifacts\$artifactName"
+if (Test-Path -LiteralPath $artifactPath) {
+    Remove-Item -LiteralPath $artifactPath -Recurse -Force
+}
 New-Item -ItemType Directory -Force -Path $artifactPath | Out-Null
 foreach ($relative in $requiredFiles) {
     $source = Join-Path $WorkspaceRoot $relative

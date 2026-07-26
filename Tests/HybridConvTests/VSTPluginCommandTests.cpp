@@ -109,13 +109,29 @@ void testIdParams()
 	harness.expectEqual(paramValue(cmd.paramMap, L"12", "id-params 12"), 0.9f, "id-params: id 12 value");
 }
 
+void testSignedAndLeadingDecimalParams()
+{
+	// The parser must classify the whole token as a float, not just ask whether
+	// the first character is a digit. Signed and leading-decimal values are valid
+	// numeric tokens and must not be mistaken for the legacy named-token branch.
+	VSTPluginCommand cmd = VSTPluginCommand::parse(
+		L"", L"Library C:\\plugins\\reverb.dll Gain -0.5 Mix +.25 Depth .75");
+	harness.expectEqual(cmd.paramMap.size(), (size_t)3, "signed-decimal: three params");
+	harness.expectEqual(paramValue(cmd.paramMap, L"Gain", "signed-decimal Gain"), -0.5f,
+		"signed-decimal: negative value");
+	harness.expectEqual(paramValue(cmd.paramMap, L"Mix", "signed-decimal Mix"), 0.25f,
+		"signed-decimal: signed leading decimal");
+	harness.expectEqual(paramValue(cmd.paramMap, L"Depth", "signed-decimal Depth"), 0.75f,
+		"signed-decimal: leading decimal");
+}
+
 void testNonNumericValueBranch()
 {
-	// Covers the other side of the isdigit branch verbatim: when a value token is
-	// not numeric, the parser treats that token as the parameter name and reads the
-	// token two slots further on as its value. This is an edge of the original
-	// grammar, asserted here only to lock the verbatim behaviour (store() never
-	// emits such a line, so it is not part of the round-trip set).
+	// Covers the legacy branch verbatim: when a value token is not numeric, the
+	// parser treats that token as the parameter name and reads the token two
+	// slots further on as its value. This is an edge of the original grammar,
+	// asserted here only to lock the verbatim behaviour (store() never emits
+	// such a line, so it is not part of the round-trip set).
 	VSTPluginCommand cmd = VSTPluginCommand::parse(L"", L"Library C:\\plugins\\reverb.dll ParamName SomeText 0.5");
 	harness.expectEqual(cmd.paramMap.size(), (size_t)1, "non-numeric: one param");
 	harness.expectEqual(paramValue(cmd.paramMap, L"SomeText", "non-numeric value"), 0.5f, "non-numeric: mapped value");
@@ -205,6 +221,7 @@ void runVSTPluginCommandTests()
 	testNamedParams();
 	testQuotedName();
 	testIdParams();
+	testSignedAndLeadingDecimalParams();
 	testNonNumericValueBranch();
 	testSerializeRoundTrip();
 	testStereoInput();

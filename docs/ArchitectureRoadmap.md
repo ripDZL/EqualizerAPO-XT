@@ -152,9 +152,8 @@ S4 가 없앤 것은 조용한 실패입니다. 스킨을 하나 추가하려면
 - `helpers/VSTPluginLibrary.h` 가 공개 헤더에서 `aeffectx.h`(98KB)를 노출합니다.
   Editor 의 6개 TU 가 그것을 통과시키면서 실제로는 멤버 4개만 씁니다.
   얇은 정면 인터페이스를 두고 원래 헤더를 호스트 TU 전용으로 감추면 컴파일 시간이 실제로 줄어듭니다.
-- `HybridConvTests.vcxproj` 는 Release 세 구성에만 `/WHOLEARCHIVE` 가 있고 Debug 에는 없습니다.
-  `FilterFactoryRegistryTests` 가 어휘 비어 있음을 `require` 로 막으므로 Debug 실행이 그 지점에서 멈춥니다.
-  CI 는 Release 만 빌드하므로 파이프라인에는 영향이 없지만 Debug 로 디버깅하는 사람에게는 걸림돌입니다.
+- `HybridConvTests.vcxproj` 는 Debug/Release 모든 구성에서 `/WHOLEARCHIVE` 를 사용합니다.
+  `FilterFactoryRegistryTests` 가 self-registering factory 누락을 계속 감지합니다.
 
 ## 건드리지 않기로 한 것
 
