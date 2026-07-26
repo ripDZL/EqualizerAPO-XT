@@ -42,8 +42,15 @@ class VST3FactoryHostContext : public Steinberg::Vst::IHostApplication
 public:
 	Steinberg::tresult PLUGIN_API queryInterface(const Steinberg::TUID iid, void** obj) override
 	{
-		QUERY_INTERFACE(iid, obj, Steinberg::FUnknown::iid, Steinberg::Vst::IHostApplication)
-		QUERY_INTERFACE(iid, obj, Steinberg::Vst::IHostApplication::iid, Steinberg::Vst::IHostApplication)
+		if (obj == NULL)
+			return Steinberg::kInvalidArgument;
+		if (Steinberg::FUnknownPrivate::iidEqual(iid, Steinberg::FUnknown::iid)
+			|| Steinberg::FUnknownPrivate::iidEqual(iid, Steinberg::Vst::IHostApplication::iid))
+		{
+			*obj = static_cast<Steinberg::Vst::IHostApplication*>(this);
+			addRef();
+			return Steinberg::kResultOk;
+		}
 		*obj = NULL;
 		return Steinberg::kNoInterface;
 	}
