@@ -73,6 +73,12 @@ VSTPluginFilterGUI::VSTPluginFilterGUI(std::shared_ptr<VSTPluginLibrary> library
 	stereoInputAction->setToolTip(tr("Use for upmixers that expand a stereo signal to multichannel."));
 	connect(stereoInputAction, &QAction::toggled, this, &VSTPluginFilterGUI::stereoInputToggled);
 	menu->addAction(stereoInputAction);
+	livePreviewAction = new QAction(tr("Live analyzer feed"), this);
+	livePreviewAction->setCheckable(true);
+	livePreviewAction->setChecked(true);
+	livePreviewAction->setToolTip(tr("Feed system playback into the open plugin panel so analyzer graphs can animate."));
+	connect(livePreviewAction, &QAction::toggled, this, &VSTPluginFilterGUI::livePreviewToggled);
+	menu->addAction(livePreviewAction);
 	ui->optionsButton->setMenu(menu);
 
 	// Frozen legacy row: it stays functional under every skin, so it consults
@@ -87,6 +93,7 @@ VSTPluginFilterGUI::VSTPluginFilterGUI(std::shared_ptr<VSTPluginLibrary> library
 
 VSTPluginFilterGUI::~VSTPluginFilterGUI()
 {
+	livePreview.stop();
 	if (effect != nullptr)
 	{
 		if (embedded)
@@ -126,9 +133,16 @@ void VSTPluginFilterGUI::stereoInputToggled(bool checked)
 	updateModel();
 }
 
+void VSTPluginFilterGUI::livePreviewToggled(bool checked)
+{
+	livePreview.setEnabled(checked);
+	updateLivePreview();
+}
+
 void VSTPluginFilterGUI::loadPreferences(const QVariantMap& prefs)
 {
 	autoApplyDialog = prefs.value("autoApplyDialog").toBool();
+	livePreviewAction->setChecked(prefs.value("liveAnalyzerFeed", true).toBool());
 
 	if (prefs.value("embed").toBool())
 		// will also call initPlugin
@@ -141,6 +155,7 @@ void VSTPluginFilterGUI::storePreferences(QVariantMap& prefs)
 {
 	prefs.insert("embed", ui->embedAction->isChecked());
 	prefs.insert("autoApplyDialog", autoApplyDialog);
+	prefs.insert("liveAnalyzerFeed", livePreviewAction->isChecked());
 }
 
 void VSTPluginFilterGUI::on_openPanelButton_clicked()
@@ -156,12 +171,16 @@ void VSTPluginFilterGUI::on_openPanelButton_clicked()
 		connect(dialog.getAutoApplyCheckBox(), SIGNAL(toggled(bool)), SLOT(autoApplyToggled(bool)));
 		connect(QAbstractEventDispatcher::instance(), SIGNAL(aboutToBlock()), SLOT(on_idle()));
 
+		panelDialogOpen = true;
+		updateLivePreview();
 		if (dialog.exec() == QDialog::Accepted)
 		{
 			effect->readFromEffect(chunkData, paramMap);
 			updateModel();
 			updatePermissionWarning();
 		}
+		panelDialogOpen = false;
+		updateLivePreview();
 		disconnect(QAbstractEventDispatcher::instance(), SIGNAL(aboutToBlock()), this, SLOT(on_idle()));
 	}
 }
@@ -256,6 +275,7 @@ void VSTPluginFilterGUI::on_pathLineEdit_editingFinished()
 			oldId = effect->uniqueID();
 			if (ui->embedAction->isChecked())
 				on_embedAction_toggled(false);
+			livePreview.stop();
 			effect.reset();
 		}
 
@@ -333,12 +353,14 @@ void VSTPluginFilterGUI::on_embedAction_toggled(bool checked)
 			{
 				effect->setSizeWindowFunc(bind(&VSTPluginFilterGUI::onSizeWindow, this, _1, _2));
 				connect(QAbstractEventDispatcher::instance(), SIGNAL(aboutToBlock()), SLOT(on_idle()));
+				updateLivePreview();
 			}
 			else
 			{
 				embedded = false;
 				ui->frame->setVisible(false);
 				ui->statusLabel->setVisible(true);
+				livePreview.stop();
 
 				QPalette palette = ui->statusLabel->palette();
 				palette.setColor(QPalette::Active, QPalette::WindowText, Qt::red);
@@ -351,6 +373,7 @@ void VSTPluginFilterGUI::on_embedAction_toggled(bool checked)
 		{
 			if (effect != nullptr)
 			{
+				livePreview.stop();
 				effect->stopEditing();
 				effect->setSizeWindowFunc(nullptr);
 			}
@@ -423,6 +446,12 @@ bool VSTPluginFilterGUI::embedPlugin()
 	}
 
 	return result;
+}
+
+void VSTPluginFilterGUI::updateLivePreview()
+{
+	livePreview.update(effect.get(), livePreviewAction != nullptr && livePreviewAction->isChecked()
+		&& (embedded || panelDialogOpen));
 }
 
 void VSTPluginFilterGUI::updatePermissionWarning()

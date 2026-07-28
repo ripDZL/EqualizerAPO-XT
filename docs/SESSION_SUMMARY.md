@@ -1,0 +1,48 @@
+# Session Summary
+
+- User requested a Matrix-from-ReBoot Codex pet via the hatch-pet skill.
+- Reference stored at `pet-runs/matrix/references/Matrix_with_Gun.webp`.
+- `codex_app__load_workspace_dependencies` returned no configured runtime.
+- Hatch-pet requires that bundled Python/Pillow runtime and prohibits bare system Python.
+- Resume by loading/configuring workspace dependencies, then run `prepare_pet_run.py`.
+- Retry on 2026-07-13 returned the same `No bundled workspace runtime dependencies are configured yet` result.
+- Correction: no documented user-facing Codex setting enables this internal runtime; earlier instruction to enable it was inaccurate.
+- VST3 compatibility commit `9e2ed30` pushed to `agent/vst3-host-editor-compatibility`.
+- Draft PR: `https://github.com/ripDZL/EqualizerAPO-XT/pull/1`.
+- Validation: VST3 43 checks; editor 323; engine 617; audio 20/20; x64 and Win32 builds passed.
+- CI run `29259180253` passed; cppcheck and Windows x64 build are green.
+- On 2026-07-21, fork `main` was behind upstream by 30 commits.
+- Direct merge of upstream into old VST3 feature branch conflicted across VST3 host/test files.
+- Aborted merge; fast-forwarded fork `main` to upstream `a19f777`.
+- Current checkout: `main`; old VST3 feature branch remains available but superseded by upstream VST3 work.
+- Built current `main` x64 AVX2 on 2026-07-21.
+- Local toolchain issue: upstream wants `v145`; this machine built with VS 2022 `v143` override and VS Community ATL.
+- Bundle: `artifacts/EqualizerAPO-XT-x64-avx2-a19f777-dragdrop`.
+- Zip: `artifacts/EqualizerAPO-XT-x64-avx2-a19f777-dragdrop.zip`.
+- Validation: `Tests/HybridConvTests/x64/Release/HybridConvTests.exe` passed 1632 checks, including 62 VST3 host checks.
+- On 2026-07-26, fork `main` was behind upstream by 148 commits.
+- Fast-forwarded fork `main` to upstream `4aaeddd` and pushed.
+- Created `codex/upstream-main-review-fixes-20260726` from synced `main`.
+- Commit `5ecf01a`: VST parser float-token fix, package artifact hygiene, VS env casing fix, HybridConvTests Debug whole-archive.
+- Validation: `git diff --check`; direct package simulation; VS env normalizer checks; `pwsh .github/scripts/Test-SourceSync.ps1`; Common + HybridConvTests rebuild with `v143`; `HybridConvTests.exe` passed 1635 checks including 62 VST3 host checks.
+- Local Pester module is 3.4.0 and cannot run repo tests that use Pester 5-style `Should -Be`.
+- User wants only two long-lived fork branches: stable `main`/master and integration `beta`.
+- Pushed `beta` at `5ecf01a`; do not delete other remote branches without explicit approval.
+- Audited `agent/vst3-host-editor-compatibility` unique commits against `beta`.
+- Large VST3/editor work is already in beta via upstream port commits; only missing useful hunk was `VST3FactoryHostContext::queryInterface`.
+- Commit `7eca352`: explicit factory host `queryInterface`; removed obsolete `helpers/VSTPluginLibrary.cpp` cppcheck suppression.
+- Validation: `git diff --check`; `pwsh .github/scripts/Test-SourceSync.ps1`; Common/TestVst3Plugin/HybridConvTests rebuild with `v143`; `HybridConvTests.exe` passed 1635 checks including 62 VST3 host checks.
+- Standards/spec review passes found no issues.
+- Pushed `beta` at `7eca352`.
+- Deleted superseded remote branches `codex/upstream-main-review-fixes-20260726` and `agent/vst3-host-editor-compatibility`.
+- GitHub Actions workflow `Build EqualizerAPO` manually dispatched on `beta` at `7eca352`.
+- Run `30209856962` passed: pester, prepare-matrix, cppcheck, all six build variants, cross-variant compare; release creation skipped because this was not a main push.
+- Downloaded installable x64 AVX2 artifact to `artifacts/github-run-30209856962/EqualizerAPO-x64-avx2`.
+- On 2026-07-28, added Editor-side VST live analyzer preview feed on `beta`.
+- New helper: `Editor/helpers/VSTPluginLivePreview.*`.
+- UI wiring: legacy `VSTPluginFilterGUI` and modern `VSTCardEditor` get Options > `Live analyzer feed`, default on.
+- Behavior: while plugin panel is open/embedded, WASAPI loopback captures default system playback and feeds copied blocks through the visible editor-owned plugin instance; output is discarded.
+- Local build: Qt Editor x64 AVX2 succeeded at `build-Editor-x64-live-preview/release/Editor.exe`.
+- Validation: `git diff --check`; `pwsh .github/scripts/Test-SourceSync.ps1`; `Editor.exe --selftest-vst`; `HybridConvTests.exe`; `EditorLogicTests.exe`; `EngineOrchestrationTests.exe`.
+- Validation caveat: `AudioRegressionTests.exe` could not complete because local reference `.raw` fixtures are missing.
+- Remaining manual test: install/push a build and verify ReaFIR panel animation with live audio; extend beyond render loopback if exact mic/capture-source feedback is required.

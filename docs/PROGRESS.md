@@ -1,0 +1,42 @@
+# Progress
+
+- [x] Received and inspected the Matrix reference image.
+- [x] Copied the reference into the project run folder.
+- [ ] Preparation paused because bundled workspace dependencies remain unavailable after retry on 2026-07-13.
+- [x] VST3 host/editor compatibility committed and pushed.
+- [x] Draft PR #1 opened with 43 VST3 integration checks passing.
+- [x] PR #1 CI passed after replacing cppcheck-opaque VST3 interface macros.
+- [x] Fork `main` fast-forwarded to upstream `115dkk/main` at `a19f777`.
+- [x] Preserved staged local context/pet files after sync.
+- [x] Built x64 AVX2 runtime from synced `main` at `a19f777`.
+- [x] Built/deployed Qt apps: Editor, DeviceSelector, UpdateChecker.
+- [x] Packaged drag/drop bundle and zip under `artifacts/`.
+- [x] `HybridConvTests.exe` passed: 1632 checks; VST3 host: 62 checks.
+- [x] Fork `main` fast-forwarded to upstream `115dkk/main` at `4aaeddd`.
+- [x] Pushed synced fork `main`.
+- [x] Created review/fix branch `codex/upstream-main-review-fixes-20260726`.
+- [x] Fixed package artifact stale-file/build-junk leakage.
+- [x] Fixed VSTPlugin parser for signed/leading-decimal float values.
+- [x] Fixed VS dev environment `PATH`/`Path` case collision in repo helper.
+- [x] Added Debug `/WHOLEARCHIVE:Common.lib` coverage for HybridConvTests.
+- [x] `HybridConvTests.exe` passed: 1635 checks; VST3 host: 62 checks.
+- [x] `pwsh .github/scripts/Test-SourceSync.ps1` passed.
+- [x] Pushed review/fix branch commit `5ecf01a`.
+- [x] Created and pushed `beta` at `5ecf01a`.
+- [x] Established branch policy: stable `main`/master plus integration `beta`.
+- [x] Audited `agent/vst3-host-editor-compatibility` against `beta`.
+- [x] Confirmed upstream `5aad7a7`, `60e20f7`, and `d0c0993` carry the large VST3/editor port and tests.
+- [x] Ported remaining factory host explicit `queryInterface` cleanup into `beta` as `7eca352`.
+- [x] Removed obsolete `helpers/VSTPluginLibrary.cpp` cppcheck `unknownMacro` suppression.
+- [x] `HybridConvTests.exe` passed after `7eca352`: 1635 checks; VST3 host: 62 checks.
+- [x] Pushed `beta` at `7eca352`.
+- [x] Triggered GitHub Actions `Build EqualizerAPO` workflow on `beta` at `7eca352`.
+- [x] GitHub Actions run `30209856962` passed: pester, prepare-matrix, cppcheck, six build variants, cross-variant compare.
+- [x] Downloaded GitHub x64 AVX2 artifact to `artifacts/github-run-30209856962/EqualizerAPO-x64-avx2`.
+- [x] Added Editor-side VST live analyzer preview feed on `beta`.
+- [x] Built Qt Editor x64 AVX2 locally: `build-Editor-x64-live-preview/release/Editor.exe`.
+- [x] `Editor.exe --selftest-vst` passed.
+- [x] `HybridConvTests.exe` passed: 1623 checks, including VST2/VST3 host tests.
+- [x] `EditorLogicTests.exe` passed: 2520 checks.
+- [x] `EngineOrchestrationTests.exe` passed: 617 checks.
+- [ ] `AudioRegressionTests.exe` local run blocked by missing `x64/Release/references/*.raw` fixtures.

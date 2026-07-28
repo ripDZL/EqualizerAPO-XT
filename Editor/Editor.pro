@@ -207,6 +207,7 @@ SOURCES += main.cpp\
 	guis/LoudnessCorrectionFilterGUIDialog.cpp \
 	helpers/CrashHandler.cpp \
 	helpers/QtSndfileHandle.cpp \
+	helpers/VSTPluginLivePreview.cpp \
 	SkinGallery.cpp \
 	SkinManager.cpp \
 	skins/ISkin.cpp \
@@ -457,6 +458,7 @@ HEADERS  += \
 	diagnostics/ToolbarPixelProbe.h \
 	diagnostics/SkinSwitchStorm.h \
 	helpers/QtSndfileHandle.h \
+	helpers/VSTPluginLivePreview.h \
 	SkinGallery.h \
 	SkinTokens.h \
 	SkinManager.h \

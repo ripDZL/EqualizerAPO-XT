@@ -24,6 +24,7 @@
 #include <QElapsedTimer>
 
 #include "Editor/IFilterGUI.h"
+#include "Editor/helpers/VSTPluginLivePreview.h"
 #include "helpers/VSTPluginLibrary.h"
 
 class QToolButton;
@@ -55,11 +56,13 @@ private slots:
 	void selectFile();
 	void embedToggled(bool checked);
 	void stereoInputToggled(bool checked);
+	void livePreviewToggled(bool checked);
 	void onIdle();
 
 private:
 	void initPlugin();
 	bool embedPlugin();
+	void updateLivePreview();
 	void updateReferenceState();
 	void updatePermissionWarning();
 	void onAutomate();
@@ -70,8 +73,10 @@ private:
 	std::wstring chunkData;
 	std::unordered_map<std::wstring, float> paramMap;
 	bool embedded = false;
+	bool panelDialogOpen = false;
 	bool autoApplyDialog = false;
 	bool stereoInput = false;
+	VSTPluginLivePreview livePreview;
 	QElapsedTimer lastReadTimer;
 
 	FileReferenceController* reference = nullptr;
@@ -85,6 +90,7 @@ private:
 	QToolButton* optionsButton = nullptr;
 	QAction* embedAction = nullptr;
 	QAction* stereoInputAction = nullptr;
+	QAction* livePreviewAction = nullptr;
 	QFrame* frame = nullptr;
 	QPlainTextEdit* warningTextEdit = nullptr;
 };
