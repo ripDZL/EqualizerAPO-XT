@@ -1,0 +1,474 @@
+/*
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+
+	See VSTPluginLivePreview.h for the design boundary.
+*/
+
+#include "VSTPluginLivePreview.h"
+
+#include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
+#include <cstdint>
+#include <deque>
+#include <mutex>
+#include <thread>
+
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <audioclient.h>
+#include <mmdeviceapi.h>
+#include <mmreg.h>
+#include <QObject>
+
+#include "platform/windows/ComPtr.h"
+#include "vst/VSTPluginInstance.h"
+
+namespace
+{
+constexpr REFERENCE_TIME previewBufferDuration = 1000000; // 100 ms
+constexpr int previewTimerIntervalMs = 15;
+constexpr int maxBufferedSeconds = 2;
+
+struct CapturedFormat
+{
+	int sampleRate = 48000;
+	int channelCount = 2;
+	int bitsPerSample = 32;
+	int bytesPerSample = 4;
+	int blockAlign = 8;
+	bool floatingPoint = true;
+	bool pcm = false;
+};
+
+WORD extensibleSubFormatTag(const GUID& guid)
+{
+	static constexpr GUID tagBase = { 0x00000000, 0x0000, 0x0010, { 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 } };
+	if (guid.Data2 != tagBase.Data2 || guid.Data3 != tagBase.Data3)
+		return 0;
+	for (int i = 0; i < 8; i++)
+	{
+		if (guid.Data4[i] != tagBase.Data4[i])
+			return 0;
+	}
+	return guid.Data1 <= 0xffff ? static_cast<WORD>(guid.Data1) : 0;
+}
+
+CapturedFormat parseFormat(const WAVEFORMATEX& waveFormat)
+{
+	CapturedFormat result;
+	result.sampleRate = static_cast<int>(waveFormat.nSamplesPerSec);
+	result.channelCount = std::max<int>(1, waveFormat.nChannels);
+	result.bitsPerSample = std::max<int>(8, waveFormat.wBitsPerSample);
+	result.bytesPerSample = std::max<int>(1, result.bitsPerSample / 8);
+	result.blockAlign = std::max<int>(result.bytesPerSample * result.channelCount, waveFormat.nBlockAlign);
+
+	WORD tag = waveFormat.wFormatTag;
+	if (waveFormat.wFormatTag == WAVE_FORMAT_EXTENSIBLE
+		&& waveFormat.cbSize >= sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX))
+	{
+		const auto& extensible = reinterpret_cast<const WAVEFORMATEXTENSIBLE&>(waveFormat);
+		tag = extensibleSubFormatTag(extensible.SubFormat);
+		result.bitsPerSample = std::max<int>(8, extensible.Format.wBitsPerSample);
+		result.bytesPerSample = std::max<int>(1, result.bitsPerSample / 8);
+		result.blockAlign = std::max<int>(result.bytesPerSample * result.channelCount, extensible.Format.nBlockAlign);
+	}
+
+	result.floatingPoint = tag == WAVE_FORMAT_IEEE_FLOAT;
+	result.pcm = tag == WAVE_FORMAT_PCM;
+	return result;
+}
+
+float pcm24ToFloat(const BYTE* sample)
+{
+	int32_t value = static_cast<int32_t>(sample[0])
+		| (static_cast<int32_t>(sample[1]) << 8)
+		| (static_cast<int32_t>(sample[2]) << 16);
+	if ((value & 0x00800000) != 0)
+		value |= static_cast<int32_t>(0xff000000);
+	return static_cast<float>(value / 8388608.0);
+}
+
+float readSample(const BYTE* frame, int channel, const CapturedFormat& format)
+{
+	const BYTE* sample = frame + channel * format.bytesPerSample;
+	if (format.floatingPoint)
+	{
+		if (format.bitsPerSample == 64)
+			return static_cast<float>(*reinterpret_cast<const double*>(sample));
+		return *reinterpret_cast<const float*>(sample);
+	}
+	if (!format.pcm)
+		return 0.0f;
+
+	switch (format.bitsPerSample)
+	{
+	case 8:
+		return (static_cast<int>(*sample) - 128) / 128.0f;
+	case 16:
+		return *reinterpret_cast<const int16_t*>(sample) / 32768.0f;
+	case 24:
+		return pcm24ToFloat(sample);
+	case 32:
+		return *reinterpret_cast<const int32_t*>(sample) / 2147483648.0f;
+	default:
+		return 0.0f;
+	}
+}
+}
+
+class VSTPluginLivePreview::LoopbackCapture
+{
+public:
+	~LoopbackCapture()
+	{
+		stop();
+	}
+
+	bool start()
+	{
+		if (worker.joinable())
+			return readyState && !failedState;
+
+		stopRequested.store(false, std::memory_order_release);
+		{
+			std::lock_guard<std::mutex> lock(mutex);
+			readyState = false;
+			failedState = false;
+			bufferedSamples.clear();
+		}
+
+		worker = std::thread([this] { run(); });
+
+		std::unique_lock<std::mutex> lock(mutex);
+		readyCondition.wait_for(lock, std::chrono::milliseconds(800), [this] {
+			return readyState || failedState;
+		});
+		return readyState && !failedState;
+	}
+
+	void stop()
+	{
+		stopRequested.store(true, std::memory_order_release);
+		if (worker.joinable())
+			worker.join();
+
+		std::lock_guard<std::mutex> lock(mutex);
+		readyState = false;
+		failedState = false;
+		bufferedSamples.clear();
+	}
+
+	int sampleRate() const
+	{
+		std::lock_guard<std::mutex> lock(mutex);
+		return format.sampleRate;
+	}
+
+	void pop(float** output, int outputChannels, int frames)
+	{
+		popImpl(output, outputChannels, frames);
+	}
+
+	void pop(double** output, int outputChannels, int frames)
+	{
+		popImpl(output, outputChannels, frames);
+	}
+
+private:
+	template<typename Sample>
+	void popImpl(Sample** output, int outputChannels, int frames)
+	{
+		if (outputChannels <= 0 || frames <= 0)
+			return;
+
+		std::lock_guard<std::mutex> lock(mutex);
+		const int sourceChannels = std::max(1, format.channelCount);
+		for (int frame = 0; frame < frames; frame++)
+		{
+			const bool hasSourceFrame = bufferedSamples.size() >= static_cast<size_t>(sourceChannels);
+			for (int channel = 0; channel < outputChannels; channel++)
+			{
+				float value = 0.0f;
+				if (hasSourceFrame)
+				{
+					if (outputChannels == 1 && sourceChannels > 1)
+					{
+						for (int source = 0; source < sourceChannels; source++)
+							value += bufferedSamples[source];
+						value /= static_cast<float>(sourceChannels);
+					}
+					else if (channel < sourceChannels)
+					{
+						value = bufferedSamples[channel];
+					}
+				}
+				output[channel][frame] = static_cast<Sample>(value);
+			}
+			if (hasSourceFrame)
+			{
+				for (int source = 0; source < sourceChannels; source++)
+					bufferedSamples.pop_front();
+			}
+		}
+	}
+
+	void signalFailure()
+	{
+		std::lock_guard<std::mutex> lock(mutex);
+		failedState = true;
+		readyCondition.notify_all();
+	}
+
+	void signalReady(const CapturedFormat& capturedFormat)
+	{
+		std::lock_guard<std::mutex> lock(mutex);
+		format = capturedFormat;
+		readyState = true;
+		readyCondition.notify_all();
+	}
+
+	void append(const BYTE* data, UINT32 frameCount, DWORD flags, const CapturedFormat& capturedFormat)
+	{
+		if (frameCount == 0)
+			return;
+
+		std::lock_guard<std::mutex> lock(mutex);
+		const bool silent = (flags & AUDCLNT_BUFFERFLAGS_SILENT) != 0;
+		const int channels = std::max(1, capturedFormat.channelCount);
+		const size_t maxSamples = static_cast<size_t>(std::max(1, capturedFormat.sampleRate))
+			* static_cast<size_t>(channels) * maxBufferedSeconds;
+		for (UINT32 frame = 0; frame < frameCount; frame++)
+		{
+			const BYTE* frameData = silent ? nullptr : data + static_cast<size_t>(frame) * capturedFormat.blockAlign;
+			for (int channel = 0; channel < channels; channel++)
+			{
+				bufferedSamples.push_back(silent
+					? 0.0f : readSample(frameData, channel, capturedFormat));
+			}
+		}
+		while (bufferedSamples.size() > maxSamples)
+			bufferedSamples.pop_front();
+	}
+
+	void run()
+	{
+		winutil::ComApartment com(COINIT_MULTITHREADED);
+		if (!com.isUsable())
+		{
+			signalFailure();
+			return;
+		}
+
+		winutil::ComPtr<IMMDeviceEnumerator> enumerator;
+		HRESULT hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
+			IID_PPV_ARGS(enumerator.put()));
+		if (FAILED(hr))
+		{
+			signalFailure();
+			return;
+		}
+
+		winutil::ComPtr<IMMDevice> device;
+		hr = enumerator->GetDefaultAudioEndpoint(eRender, eConsole, device.put());
+		if (FAILED(hr))
+		{
+			signalFailure();
+			return;
+		}
+
+		winutil::ComPtr<IAudioClient> audioClient;
+		hr = device->Activate(__uuidof(IAudioClient), CLSCTX_INPROC_SERVER, nullptr,
+			reinterpret_cast<void**>(audioClient.put()));
+		if (FAILED(hr))
+		{
+			signalFailure();
+			return;
+		}
+
+		winutil::CoTaskMem<WAVEFORMATEX> mixFormat;
+		hr = audioClient->GetMixFormat(mixFormat.put());
+		if (FAILED(hr) || !mixFormat)
+		{
+			signalFailure();
+			return;
+		}
+		const CapturedFormat capturedFormat = parseFormat(*mixFormat.get());
+
+		hr = audioClient->Initialize(AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK,
+			previewBufferDuration, 0, mixFormat.get(), nullptr);
+		if (FAILED(hr))
+		{
+			signalFailure();
+			return;
+		}
+
+		winutil::ComPtr<IAudioCaptureClient> captureClient;
+		hr = audioClient->GetService(__uuidof(IAudioCaptureClient),
+			reinterpret_cast<void**>(captureClient.put()));
+		if (FAILED(hr))
+		{
+			signalFailure();
+			return;
+		}
+
+		hr = audioClient->Start();
+		if (FAILED(hr))
+		{
+			signalFailure();
+			return;
+		}
+		signalReady(capturedFormat);
+
+		while (!stopRequested.load(std::memory_order_acquire))
+		{
+			UINT32 packetFrames = 0;
+			hr = captureClient->GetNextPacketSize(&packetFrames);
+			if (FAILED(hr))
+				break;
+			while (packetFrames > 0)
+			{
+				BYTE* data = nullptr;
+				UINT32 frameCount = 0;
+				DWORD flags = 0;
+				hr = captureClient->GetBuffer(&data, &frameCount, &flags, nullptr, nullptr);
+				if (FAILED(hr))
+					break;
+				append(data, frameCount, flags, capturedFormat);
+				captureClient->ReleaseBuffer(frameCount);
+				hr = captureClient->GetNextPacketSize(&packetFrames);
+				if (FAILED(hr))
+					break;
+			}
+			Sleep(5);
+		}
+
+		audioClient->Stop();
+	}
+
+	mutable std::mutex mutex;
+	std::condition_variable readyCondition;
+	std::thread worker;
+	std::atomic<bool> stopRequested{ false };
+	CapturedFormat format;
+	bool readyState = false;
+	bool failedState = false;
+	std::deque<float> bufferedSamples;
+};
+
+VSTPluginLivePreview::VSTPluginLivePreview()
+	: capture(std::make_unique<LoopbackCapture>())
+{
+	timer.setInterval(previewTimerIntervalMs);
+	QObject::connect(&timer, &QTimer::timeout, &timer, [this] { processBlock(); });
+}
+
+VSTPluginLivePreview::~VSTPluginLivePreview()
+{
+	stop();
+}
+
+void VSTPluginLivePreview::setEnabled(bool value)
+{
+	enabled = value;
+	if (!enabled)
+		stop();
+}
+
+bool VSTPluginLivePreview::isEnabled() const
+{
+	return enabled;
+}
+
+void VSTPluginLivePreview::update(VSTPluginInstance* targetEffect, bool panelVisible)
+{
+	if (!enabled || !panelVisible || targetEffect == nullptr)
+	{
+		stop();
+		return;
+	}
+	start(targetEffect);
+}
+
+void VSTPluginLivePreview::start(VSTPluginInstance* targetEffect)
+{
+	if (active && effect == targetEffect)
+		return;
+	stop();
+
+	effect = targetEffect;
+	inputChannelCount = std::max(0, effect->numInputs());
+	outputChannelCount = std::max(0, effect->numOutputs());
+	if (inputChannelCount == 0 && outputChannelCount == 0)
+	{
+		effect = nullptr;
+		return;
+	}
+	if (!capture->start())
+	{
+		effect = nullptr;
+		return;
+	}
+
+	allocateBuffers(inputChannelCount, outputChannelCount);
+	effect->prepareForProcessing(static_cast<float>(capture->sampleRate()), blockSize);
+	effect->startProcessing();
+	active = true;
+	timer.start();
+}
+
+void VSTPluginLivePreview::stop()
+{
+	timer.stop();
+	if (active && effect != nullptr)
+		effect->stopProcessingSafely();
+	active = false;
+	effect = nullptr;
+	capture->stop();
+}
+
+void VSTPluginLivePreview::allocateBuffers(int inputChannels, int outputChannels)
+{
+	floatInputs.assign(inputChannels, std::vector<float>(blockSize, 0.0f));
+	floatOutputs.assign(outputChannels, std::vector<float>(blockSize, 0.0f));
+	floatInputPtrs.resize(inputChannels);
+	floatOutputPtrs.resize(outputChannels);
+	for (int i = 0; i < inputChannels; i++)
+		floatInputPtrs[i] = floatInputs[i].data();
+	for (int i = 0; i < outputChannels; i++)
+		floatOutputPtrs[i] = floatOutputs[i].data();
+
+	doubleInputs.assign(inputChannels, std::vector<double>(blockSize, 0.0));
+	doubleOutputs.assign(outputChannels, std::vector<double>(blockSize, 0.0));
+	doubleInputPtrs.resize(inputChannels);
+	doubleOutputPtrs.resize(outputChannels);
+	for (int i = 0; i < inputChannels; i++)
+		doubleInputPtrs[i] = doubleInputs[i].data();
+	for (int i = 0; i < outputChannels; i++)
+		doubleOutputPtrs[i] = doubleOutputs[i].data();
+}
+
+void VSTPluginLivePreview::processBlock()
+{
+	if (!active || effect == nullptr)
+		return;
+
+	if (effect->canDoubleReplacing())
+	{
+		capture->pop(doubleInputPtrs.data(), inputChannelCount, blockSize);
+		for (auto& output : doubleOutputs)
+			std::fill(output.begin(), output.end(), 0.0);
+		effect->processDoubleReplacing(doubleInputPtrs.data(), doubleOutputPtrs.data(), blockSize);
+	}
+	else
+	{
+		capture->pop(floatInputPtrs.data(), inputChannelCount, blockSize);
+		for (auto& output : floatOutputs)
+			std::fill(output.begin(), output.end(), 0.0f);
+		if (effect->canReplacing())
+			effect->processReplacing(floatInputPtrs.data(), floatOutputPtrs.data(), blockSize);
+		else
+			effect->process(floatInputPtrs.data(), floatOutputPtrs.data(), blockSize);
+	}
+}

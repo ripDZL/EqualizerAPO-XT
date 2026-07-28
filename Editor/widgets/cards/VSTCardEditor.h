@@ -26,6 +26,7 @@
 #include <QElapsedTimer>
 
 #include "Editor/IFilterGUI.h"
+#include "Editor/helpers/VSTPluginLivePreview.h"
 #include "Editor/widgets/cards/ReferenceCardView.h"
 #include "Editor/widgets/cards/VSTBusModel.h"
 #include "vst/VSTPluginInstance.h"
@@ -68,11 +69,13 @@ private slots:
 	void embedToggled(bool checked);
 	void busLayoutsPicked(VST3BusLayout input, VST3BusLayout output);
 	void removeBusLayouts();
+	void livePreviewToggled(bool checked);
 	void onIdle();
 
 private:
 	void initPlugin();
 	bool embedPlugin();
+	void updateLivePreview();
 	void updateReferenceState();
 	void updateBusControls();
 	void updatePermissionWarning();
@@ -84,6 +87,7 @@ private:
 	std::wstring chunkData;
 	std::unordered_map<std::wstring, float> paramMap;
 	bool embedded = false;
+	bool panelDialogOpen = false;
 	bool autoApplyDialog = false;
 	VSTBusModel busModel;
 	// The active device's channel names, for Auto-direction negotiation
@@ -94,6 +98,7 @@ private:
 	// updateBusControls, consumed by updateReferenceState.
 	QString busStatusText;
 	ReferenceCardState::Severity busStatusSeverity = ReferenceCardState::Severity::None;
+	VSTPluginLivePreview livePreview;
 	QElapsedTimer lastReadTimer;
 
 	FileReferenceController* reference = nullptr;
@@ -111,6 +116,7 @@ private:
 	QAction* embedAction = nullptr;
 	QAction* removeBusAction = nullptr;
 	VSTBusStrip* busStrip = nullptr;
+	QAction* livePreviewAction = nullptr;
 	QFrame* frame = nullptr;
 	QPlainTextEdit* warningTextEdit = nullptr;
 };

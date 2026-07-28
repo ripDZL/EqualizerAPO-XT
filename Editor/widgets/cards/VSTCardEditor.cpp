@@ -130,6 +130,11 @@ VSTCardEditor::VSTCardEditor(shared_ptr<VSTPluginLibrary> library, const wstring
 	removeBusAction->setToolTip(tr("Deletes the saved VST3 bus layouts from this line."));
 	removeBusAction->setEnabled(false);
 	connect(removeBusAction, SIGNAL(triggered()), this, SLOT(removeBusLayouts()));
+	livePreviewAction = menu->addAction(tr("Live analyzer feed"));
+	livePreviewAction->setCheckable(true);
+	livePreviewAction->setChecked(true);
+	livePreviewAction->setToolTip(tr("Feed system playback into the open plugin panel so analyzer graphs can animate."));
+	connect(livePreviewAction, SIGNAL(toggled(bool)), this, SLOT(livePreviewToggled(bool)));
 	optionsButton->setMenu(menu);
 	view->addActionButton(ReferenceCardView::ActionRole::Options, optionsButton);
 
@@ -173,6 +178,7 @@ VSTCardEditor::VSTCardEditor(shared_ptr<VSTPluginLibrary> library, const wstring
 
 VSTCardEditor::~VSTCardEditor()
 {
+	livePreview.stop();
 	if (effect != nullptr)
 	{
 		if (embedded)
@@ -228,9 +234,16 @@ void VSTCardEditor::removeBusLayouts()
 	updateModel();
 }
 
+void VSTCardEditor::livePreviewToggled(bool checked)
+{
+	livePreview.setEnabled(checked);
+	updateLivePreview();
+}
+
 void VSTCardEditor::loadPreferences(const QVariantMap& prefs)
 {
 	autoApplyDialog = prefs.value("autoApplyDialog").toBool();
+	livePreviewAction->setChecked(prefs.value("liveAnalyzerFeed", true).toBool());
 
 	if (prefs.value("embed").toBool())
 		embedAction->setChecked(true);   // will also call initPlugin via embedToggled
@@ -244,6 +257,7 @@ void VSTCardEditor::storePreferences(QVariantMap& prefs)
 {
 	prefs.insert("embed", embedAction->isChecked());
 	prefs.insert("autoApplyDialog", autoApplyDialog);
+	prefs.insert("liveAnalyzerFeed", livePreviewAction->isChecked());
 }
 
 void VSTCardEditor::openPanel()
@@ -267,12 +281,16 @@ void VSTCardEditor::openPanel()
 		connect(dialog.getAutoApplyCheckBox(), SIGNAL(toggled(bool)), SLOT(autoApplyToggled(bool)));
 		connect(QAbstractEventDispatcher::instance(), SIGNAL(aboutToBlock()), SLOT(onIdle()));
 
+		panelDialogOpen = true;
+		updateLivePreview();
 		if (dialog.exec() == QDialog::Accepted)
 		{
 			effect->readFromEffect(chunkData, paramMap);
 			updateModel();
 			updatePermissionWarning();
 		}
+		panelDialogOpen = false;
+		updateLivePreview();
 		disconnect(QAbstractEventDispatcher::instance(), SIGNAL(aboutToBlock()), this, SLOT(onIdle()));
 	}
 }
@@ -555,6 +573,7 @@ void VSTCardEditor::pathCommitted(const QString& text)
 			oldId = effect->uniqueID();
 			if (embedAction->isChecked())
 				embedToggled(false);
+			livePreview.stop();
 			effect.reset();
 		}
 
@@ -652,11 +671,13 @@ void VSTCardEditor::embedToggled(bool checked)
 			{
 				effect->setSizeWindowFunc([this](int w, int h) { onSizeWindow(w, h); });
 				connect(QAbstractEventDispatcher::instance(), SIGNAL(aboutToBlock()), SLOT(onIdle()));
+				updateLivePreview();
 			}
 			else
 			{
 				embedded = false;
 				frame->setVisible(false);
+				livePreview.stop();
 
 				initErrorText = tr("Plugin crashed when opening panel.");
 				updateReferenceState();
@@ -666,6 +687,7 @@ void VSTCardEditor::embedToggled(bool checked)
 		{
 			if (effect != nullptr)
 			{
+				livePreview.stop();
 				effect->stopEditing();
 				effect->setSizeWindowFunc(nullptr);
 			}
@@ -749,6 +771,12 @@ bool VSTCardEditor::embedPlugin()
 		result = false;
 	}
 	return result;
+}
+
+void VSTCardEditor::updateLivePreview()
+{
+	livePreview.update(effect.get(), livePreviewAction != nullptr && livePreviewAction->isChecked()
+		&& (embedded || panelDialogOpen));
 }
 
 // The chunk-referenced-files warning. The library's own readability verdict

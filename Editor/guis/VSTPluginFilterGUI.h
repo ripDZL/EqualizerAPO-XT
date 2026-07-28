@@ -23,6 +23,7 @@
 #include <optional>
 #include <QElapsedTimer>
 #include "Editor/IFilterGUI.h"
+#include "Editor/helpers/VSTPluginLivePreview.h"
 #include "vst/VSTPluginInstance.h"
 #include "vst/VSTPluginLibrary.h"
 
@@ -53,11 +54,13 @@ private slots:
 	void on_selectButton_clicked();
 	void on_embedAction_toggled(bool checked);
 	void stereoInputToggled(bool checked);
+	void livePreviewToggled(bool checked);
 	void on_idle();
 
 private:
 	void initPlugin();
 	bool embedPlugin();
+	void updateLivePreview();
 	void updatePermissionWarning();
 
 	std::unique_ptr<Ui::VSTPluginFilterGUI> ui;
@@ -66,10 +69,13 @@ private:
 	std::wstring chunkData;
 	std::unordered_map<std::wstring, float> paramMap;
 	bool embedded = false;
+	bool panelDialogOpen = false;
 	bool autoApplyDialog = false;
 	bool stereoInput = false;
 	// Preserved opaquely until the dedicated Input/Output controls land.
 	std::optional<VST3BusContract> busContract;
+	VSTPluginLivePreview livePreview;
 	QAction* stereoInputAction = nullptr;
+	QAction* livePreviewAction = nullptr;
 	QElapsedTimer lastReadTimer;
 };
