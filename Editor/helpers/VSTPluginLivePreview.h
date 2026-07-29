@@ -3,7 +3,7 @@
 
 	Editor-side live preview feed for VST plugin panels. The audio service owns
 	the real processing instances; the editor owns a separate instance for the
-	visible plug-in GUI. This helper feeds copied system-playback audio into that
+	visible plug-in GUI. This helper feeds copied endpoint audio into that
 	visible instance so analyzer-style plug-in UIs can animate while the panel is
 	open, without routing the preview audio back to the device.
 */
@@ -29,13 +29,15 @@ public:
 	void stop();
 
 private:
-	class LoopbackCapture;
+	class WasapiCapture;
 
 	void start(VSTPluginInstance* effect);
 	void processBlock();
 	void allocateBuffers(int inputChannels, int outputChannels);
 
-	std::unique_ptr<LoopbackCapture> capture;
+	std::unique_ptr<WasapiCapture> inputCapture;
+	std::unique_ptr<WasapiCapture> communicationsInputCapture;
+	std::unique_ptr<WasapiCapture> playbackCapture;
 	QTimer timer;
 	VSTPluginInstance* effect = nullptr;
 	bool enabled = true;

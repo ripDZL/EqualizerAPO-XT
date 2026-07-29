@@ -14,5 +14,6 @@
 - [ ] Decide whether `codex/upstream-main-review-fixes-20260726` should be merged into stable `main` now or kept beta-only.
 - [ ] Overlay `artifacts/github-run-30209856962/EqualizerAPO-x64-avx2` onto local install and test real VST3 GUI.
 - [ ] Install a build containing the live analyzer preview feed and test ReaFIR panel animation with live audio.
-- [ ] If mic/capture-device analyzers must animate from the exact capture source, extend preview feed beyond default render loopback.
+- [x] Extend live analyzer preview beyond default render loopback for mic/capture-device analyzers.
+- [ ] If the mic still stays static, add selected-device-aware capture instead of default console/communications capture.
 - [ ] Revoke temporary GitHub token when the user ends the session.
