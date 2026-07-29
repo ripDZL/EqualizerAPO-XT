@@ -48,9 +48,10 @@ using std::placeholders::_1;
 using std::placeholders::_2;
 
 VSTPluginFilterGUI::VSTPluginFilterGUI(std::shared_ptr<VSTPluginLibrary> library, const std::wstring& chunkData, const std::unordered_map<std::wstring, float>& paramMap,
-	bool stereoInput, const std::optional<VST3BusContract>& busContract)
+	bool stereoInput, const std::optional<VST3BusContract>& busContract,
+	const VSTPreviewEndpoint& previewEndpoint)
 	: ui(std::make_unique<Ui::VSTPluginFilterGUI>()), library(library), chunkData(chunkData), paramMap(paramMap),
-	stereoInput(stereoInput), busContract(busContract)
+	stereoInput(stereoInput), busContract(busContract), previewEndpoint(previewEndpoint)
 {
 	ui->setupUi(this);
 	ui->frame->setVisible(false);
@@ -78,7 +79,7 @@ VSTPluginFilterGUI::VSTPluginFilterGUI(std::shared_ptr<VSTPluginLibrary> library
 	livePreviewAction = new QAction(tr("Live analyzer feed"), this);
 	livePreviewAction->setCheckable(true);
 	livePreviewAction->setChecked(true);
-	livePreviewAction->setToolTip(tr("Feed system playback into the open plugin panel so analyzer graphs can animate."));
+	livePreviewAction->setToolTip(tr("Feed endpoint audio into the open plugin panel so analyzer graphs can animate."));
 	connect(livePreviewAction, &QAction::toggled, this, &VSTPluginFilterGUI::livePreviewToggled);
 	menu->addAction(livePreviewAction);
 	ui->optionsButton->setMenu(menu);
@@ -476,7 +477,7 @@ bool VSTPluginFilterGUI::embedPlugin()
 void VSTPluginFilterGUI::updateLivePreview()
 {
 	livePreview.update(effect.get(), livePreviewAction != nullptr && livePreviewAction->isChecked()
-		&& (embedded || panelDialogOpen));
+		&& (embedded || panelDialogOpen), previewEndpoint);
 }
 
 void VSTPluginFilterGUI::updatePermissionWarning()

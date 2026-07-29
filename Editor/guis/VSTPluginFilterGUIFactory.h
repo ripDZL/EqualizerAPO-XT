@@ -20,11 +20,17 @@
 
 #include "Editor/IFilterGUIFactory.h"
 
+class FilterTable;
+
 class VSTPluginFilterGUIFactory : public IFilterGUIFactory
 {
 	Q_OBJECT
 
 public:
+	void initialize(FilterTable* filterTable) override;
 	QList<FilterTemplate> createFilterTemplates() override;
 	IFilterGUI* createFilterGUI(QString& command, QString& parameters) override;
+
+private:
+	FilterTable* filterTable = nullptr;
 };

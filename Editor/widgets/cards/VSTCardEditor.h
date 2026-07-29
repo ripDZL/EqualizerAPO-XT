@@ -27,6 +27,7 @@
 
 #include "Editor/IFilterGUI.h"
 #include "Editor/helpers/VSTPluginLivePreview.h"
+#include "Editor/helpers/VSTPreviewEndpoint.h"
 #include "Editor/widgets/cards/ReferenceCardView.h"
 #include "Editor/widgets/cards/VSTBusModel.h"
 #include "vst/VSTPluginInstance.h"
@@ -51,7 +52,7 @@ public:
 		const std::optional<VST3BusContract>& busContract = std::nullopt,
 		std::vector<std::wstring> deviceChannelNames = std::vector<std::wstring>(),
 		FilterTable* filterTable = nullptr,
-		QWidget* parent = nullptr);
+		const VSTPreviewEndpoint& previewEndpoint = {}, QWidget* parent = nullptr);
 	~VSTCardEditor();
 
 	void store(QString& command, QString& parameters) override;
@@ -98,6 +99,7 @@ private:
 	// updateBusControls, consumed by updateReferenceState.
 	QString busStatusText;
 	ReferenceCardState::Severity busStatusSeverity = ReferenceCardState::Severity::None;
+	VSTPreviewEndpoint previewEndpoint;
 	VSTPluginLivePreview livePreview;
 	QElapsedTimer lastReadTimer;
 

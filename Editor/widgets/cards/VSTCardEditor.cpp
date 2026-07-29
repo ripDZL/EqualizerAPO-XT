@@ -33,7 +33,9 @@
 #include "Editor/helpers/GUIHelper.h"
 #include "Editor/helpers/VstChunkScan.h"
 #include "Editor/FilterTable.h"
+#include "Editor/helpers/VSTPreviewEndpoint.h"
 #include "Editor/SkinManager.h"
+#include "Editor/FilterTable.h"
 #include "Editor/skins/ISkin.h"
 #include "Editor/MainWindow.h"
 #include "Editor/guis/VSTPluginFilterGUIDialog.h"
@@ -68,10 +70,11 @@ QString layoutName(VST3BusLayout layout)
 VSTCardEditor::VSTCardEditor(shared_ptr<VSTPluginLibrary> library, const wstring& chunkData,
 	const unordered_map<wstring, float>& paramMap, bool stereoInput,
 	const std::optional<VST3BusContract>& busContract,
-	std::vector<std::wstring> deviceChannelNames, FilterTable* filterTable, QWidget* parent)
+	std::vector<std::wstring> deviceChannelNames, FilterTable* filterTable,
+	const VSTPreviewEndpoint& previewEndpoint, QWidget* parent)
 	: IFilterGUI(parent), library(library), chunkData(chunkData), paramMap(paramMap),
 	busModel(busContract, stereoInput), deviceChannelNames(std::move(deviceChannelNames)),
-	filterTable(filterTable)
+	filterTable(filterTable), previewEndpoint(previewEndpoint)
 {
 	setObjectName(QStringLiteral("VSTCardEditor"));
 	setAttribute(Qt::WA_StyledBackground, true);
@@ -133,7 +136,7 @@ VSTCardEditor::VSTCardEditor(shared_ptr<VSTPluginLibrary> library, const wstring
 	livePreviewAction = menu->addAction(tr("Live analyzer feed"));
 	livePreviewAction->setCheckable(true);
 	livePreviewAction->setChecked(true);
-	livePreviewAction->setToolTip(tr("Feed system playback into the open plugin panel so analyzer graphs can animate."));
+	livePreviewAction->setToolTip(tr("Feed endpoint audio into the open plugin panel so analyzer graphs can animate."));
 	connect(livePreviewAction, SIGNAL(toggled(bool)), this, SLOT(livePreviewToggled(bool)));
 	optionsButton->setMenu(menu);
 	view->addActionButton(ReferenceCardView::ActionRole::Options, optionsButton);
@@ -776,7 +779,7 @@ bool VSTCardEditor::embedPlugin()
 void VSTCardEditor::updateLivePreview()
 {
 	livePreview.update(effect.get(), livePreviewAction != nullptr && livePreviewAction->isChecked()
-		&& (embedded || panelDialogOpen));
+		&& (embedded || panelDialogOpen), previewEndpoint);
 }
 
 // The chunk-referenced-files warning. The library's own readability verdict
@@ -820,6 +823,8 @@ REGISTER_FILTER_CARD_EDITOR(VSTPlugin, [](FilterTable* filterTable, const QStrin
 	// Parse the line into the engine's VST filter (no plugin DLL is loaded
 	// for configPath == L""), then hand the opaque state to the card editor.
 	// The store()/parse round-trip is verified lossless (--selftest-vst).
+	const VSTPreviewEndpoint previewEndpoint = vstPreviewEndpointForSelectedDevice(
+		filterTable != nullptr ? filterTable->getSelectedDevice() : nullptr);
 	VSTPluginFilterFactory factory;
 	std::wstring commandWStr = L"VSTPlugin";
 	std::wstring paramWStr = parameters.toStdWString();
@@ -831,12 +836,12 @@ REGISTER_FILTER_CARD_EDITOR(VSTPlugin, [](FilterTable* filterTable, const QStrin
 		editor = new VSTCardEditor(filter->getLibrary(), filter->getChunkData(), filter->getParamMap(),
 			filter->getStereoInput(), filter->getBusContract(),
 			filterTable != nullptr ? filterTable->getChannelNames() : std::vector<std::wstring>(),
-			filterTable);
+			filterTable, previewEndpoint);
 	}
 	else
 	{
 		editor = new VSTCardEditor(VSTPluginLibrary::getInstance(L""), L"", std::unordered_map<std::wstring, float>(),
-			false, std::nullopt, std::vector<std::wstring>(), filterTable);
+			false, std::nullopt, std::vector<std::wstring>(), filterTable, previewEndpoint);
 	}
 	return editor;
 })
