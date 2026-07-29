@@ -43,3 +43,13 @@
 - [x] Extended VST live analyzer preview to include default mic/capture endpoints after ReaFIR/TDR Nova stayed static on a mic chain.
 - [x] Rebuilt Qt Editor x64 AVX2 after mic-feed change.
 - [x] Re-ran `Editor.exe --selftest-vst`, `HybridConvTests.exe`, `EditorLogicTests.exe`, and `EngineOrchestrationTests.exe`.
+- [x] Downloaded the matching AVX-512 artifact from GitHub Actions run `30449825813`.
+- [x] Backed up the installed AVX-512 `current` folder under `artifacts/install-backups/`.
+- [x] Overlaid and hash-verified the AVX-512 artifact, restarted Windows Audio, and passed the installed Editor `--selftest-vst`.
+- [x] Added selected-endpoint preview capture: selected `FilterTable` device GUID is normalized to a WASAPI endpoint ID and preferred before default fallbacks.
+- [x] Added `EditorLogicTests.exe` coverage for raw/full endpoint ID selection.
+- [x] Review fix: reset a selected endpoint capture that fails/times out before using default fallback sources.
+- [x] Rebuilt Qt Editor x64 AVX2 after selected-endpoint capture.
+- [x] Re-ran `git diff --check`, `Test-SourceSync.ps1`, `Editor.exe --selftest-vst`, `HybridConvTests.exe`, `EditorLogicTests.exe`, and `EngineOrchestrationTests.exe`.
+- [ ] `AudioRegressionTests.exe` still blocked by missing `x64/Release/references/*.raw` fixtures; equivalence checks passed before fixture failures.
+- [ ] Verify ReaFIR and TDR Nova graph movement while speaking into the configured microphone.

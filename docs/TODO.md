@@ -13,7 +13,9 @@
 - [x] If approved, delete superseded remote branches; do not delete without explicit user approval.
 - [ ] Decide whether `codex/upstream-main-review-fixes-20260726` should be merged into stable `main` now or kept beta-only.
 - [ ] Overlay `artifacts/github-run-30209856962/EqualizerAPO-x64-avx2` onto local install and test real VST3 GUI.
-- [ ] Install a build containing the live analyzer preview feed and test ReaFIR panel animation with live audio.
+- [x] Install a build containing the live analyzer preview feed.
+- [ ] Test ReaFIR and TDR Nova panel animation with the configured microphone.
 - [x] Extend live analyzer preview beyond default render loopback for mic/capture-device analyzers.
-- [ ] If the mic still stays static, add selected-device-aware capture instead of default console/communications capture.
+- [x] Add selected-device-aware capture instead of relying only on default console/communications capture.
+- [ ] Build/push/download/install a selected-endpoint artifact for manual ReaFIR/TDR Nova testing.
 - [ ] Revoke temporary GitHub token when the user ends the session.

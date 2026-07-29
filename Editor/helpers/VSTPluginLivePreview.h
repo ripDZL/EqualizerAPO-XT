@@ -15,6 +15,8 @@
 
 #include <QTimer>
 
+#include "Editor/helpers/VSTPreviewEndpoint.h"
+
 class VSTPluginInstance;
 
 class VSTPluginLivePreview
@@ -25,21 +27,23 @@ public:
 
 	void setEnabled(bool enabled);
 	bool isEnabled() const;
-	void update(VSTPluginInstance* effect, bool panelVisible);
+	void update(VSTPluginInstance* effect, bool panelVisible, const VSTPreviewEndpoint& previewEndpoint = {});
 	void stop();
 
 private:
 	class WasapiCapture;
 
-	void start(VSTPluginInstance* effect);
+	void start(VSTPluginInstance* effect, const VSTPreviewEndpoint& previewEndpoint);
 	void processBlock();
 	void allocateBuffers(int inputChannels, int outputChannels);
 
+	std::unique_ptr<WasapiCapture> selectedEndpointCapture;
 	std::unique_ptr<WasapiCapture> inputCapture;
 	std::unique_ptr<WasapiCapture> communicationsInputCapture;
 	std::unique_ptr<WasapiCapture> playbackCapture;
 	QTimer timer;
 	VSTPluginInstance* effect = nullptr;
+	VSTPreviewEndpoint activeEndpoint;
 	bool enabled = true;
 	bool active = false;
 	int inputChannelCount = 0;

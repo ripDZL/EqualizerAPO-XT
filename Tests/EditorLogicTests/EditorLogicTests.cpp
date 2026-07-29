@@ -34,6 +34,7 @@
 #include "Benchmark/BatchPlan.h"
 #include "Editor/helpers/AnalysisWorkerRecovery.h"
 #include "Editor/helpers/ConvolutionPathHelper.h"
+#include "Editor/helpers/VSTPreviewEndpoint.h"
 #include "Editor/import/ConfigDependencyScanner.h"
 #include "Editor/import/ImportExecutor.h"
 #include "Editor/import/ImportManifest.h"
@@ -51,6 +52,7 @@
 #include "Editor/widgets/routing/StudioRoutingModel.h"
 #include "helpers/MemoryHelper.h"
 #include "helpers/OwnedBackgroundTask.h"
+#include "AbstractAPOInfo.h"
 #include "filters/FilterFactoryRegistry.h"
 #include "helpers/StringHelper.h"
 #include "helpers/Win32Resource.h"
@@ -1308,6 +1310,73 @@ void testDeviceSelectionModel()
 	expectEqual(model.serialize(), "all", "All overrides individual selections");
 }
 
+namespace
+{
+class PreviewEndpointTestAPOInfo : public AbstractAPOInfo
+{
+public:
+	PreviewEndpointTestAPOInfo(bool input, const std::wstring& guid)
+		: input(input), guid(guid)
+	{
+	}
+
+	std::wstring getConnectionName() const override { return L""; }
+	std::wstring getDeviceName() const override { return L""; }
+	std::wstring getDeviceGuid() const override { return guid; }
+	std::wstring getDeviceString() const override { return guid; }
+	unsigned getChannelCount() const override { return 0; }
+	unsigned getSampleRate() const override { return 0; }
+	unsigned long getChannelMask() const override { return 0; }
+	bool isInput() const override { return input; }
+	bool isInstalled() const override { return true; }
+	bool canBeUpgraded() const override { return false; }
+	bool hasChanges() const override { return false; }
+	bool isExperimental() const override { return false; }
+	bool isEnhancementsDisabled() const override { return false; }
+	bool isDefaultDevice() const override { return false; }
+	bool isDisabled() const override { return false; }
+	bool isUnplugged() const override { return false; }
+	void install() override {}
+	void uninstall() override {}
+	void reinstall() override {}
+
+private:
+	bool input;
+	std::wstring guid;
+};
+}
+
+void testVSTPreviewEndpointSelection()
+{
+	const std::wstring rawGuid = L"{dddddddd-1111-2222-3333-444444444444}";
+	const VSTPreviewEndpoint inputEndpoint = vstPreviewEndpointFromDeviceGuid(true, rawGuid);
+	expectTrue(inputEndpoint.flow == VSTPreviewEndpointFlow::Capture,
+		"raw input GUID resolves to a capture endpoint");
+	expectTrue(inputEndpoint.deviceId == L"{0.0.1.00000000}." + rawGuid,
+		"raw input GUID gets the capture endpoint prefix");
+
+	const VSTPreviewEndpoint outputEndpoint = vstPreviewEndpointFromDeviceGuid(false, rawGuid);
+	expectTrue(outputEndpoint.flow == VSTPreviewEndpointFlow::Render,
+		"raw output GUID resolves to a render endpoint");
+	expectTrue(outputEndpoint.deviceId == L"{0.0.0.00000000}." + rawGuid,
+		"raw output GUID gets the render endpoint prefix");
+
+	const std::wstring fullCaptureId = L"{0.0.1.00000000}.{eeeeeeee-1111-2222-3333-444444444444}";
+	const VSTPreviewEndpoint preserved = vstPreviewEndpointFromDeviceGuid(true, fullCaptureId);
+	expectTrue(preserved.flow == VSTPreviewEndpointFlow::Capture,
+		"full capture endpoint id resolves as capture");
+	expectTrue(preserved.deviceId == fullCaptureId,
+		"full endpoint id is not prefixed again");
+
+	const auto selectedMic = std::make_shared<PreviewEndpointTestAPOInfo>(true, rawGuid);
+	expectTrue(vstPreviewEndpointForSelectedDevice(selectedMic) == inputEndpoint,
+		"selected input device becomes the preferred preview capture endpoint");
+	expectFalse(vstPreviewEndpointForSelectedDevice(nullptr).isValid(),
+		"no selected device leaves preview capture on defaults");
+	expectFalse(vstPreviewEndpointFromDeviceGuid(true, L"").isValid(),
+		"empty endpoint GUID leaves preview capture on defaults");
+}
+
 void testMultiConvolutionRoutingAdapter()
 {
 	// MultiConvolutionRoutingAdapter: mappings <-> the routing views'
@@ -1717,6 +1786,7 @@ int main(int argc, char** argv)
 		testLegacyMigrationScanAndPolicy();
 		testChannelSelectionModel();
 		testDeviceSelectionModel();
+		testVSTPreviewEndpointSelection();
 		testMultiConvolutionRoutingAdapter();
 		testStageSelectionModel();
 		testStudioRoutingModel();

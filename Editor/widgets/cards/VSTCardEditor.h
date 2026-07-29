@@ -41,7 +41,8 @@ class VSTCardEditor : public IFilterGUI
 
 public:
 	VSTCardEditor(std::shared_ptr<VSTPluginLibrary> library, const std::wstring& chunkData,
-		const std::unordered_map<std::wstring, float>& paramMap, bool stereoInput = false, QWidget* parent = nullptr);
+		const std::unordered_map<std::wstring, float>& paramMap, bool stereoInput = false,
+		const VSTPreviewEndpoint& previewEndpoint = {}, QWidget* parent = nullptr);
 	~VSTCardEditor();
 
 	void store(QString& command, QString& parameters) override;
@@ -76,6 +77,7 @@ private:
 	bool panelDialogOpen = false;
 	bool autoApplyDialog = false;
 	bool stereoInput = false;
+	VSTPreviewEndpoint previewEndpoint;
 	VSTPluginLivePreview livePreview;
 	QElapsedTimer lastReadTimer;
 

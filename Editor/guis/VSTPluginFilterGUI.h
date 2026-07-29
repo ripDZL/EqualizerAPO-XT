@@ -35,7 +35,7 @@ class VSTPluginFilterGUI : public IFilterGUI
 
 public:
 	explicit VSTPluginFilterGUI(std::shared_ptr<VSTPluginLibrary> library, const std::wstring& chunkData, const std::unordered_map<std::wstring, float>& paramMap,
-		bool stereoInput = false);
+		bool stereoInput = false, const VSTPreviewEndpoint& previewEndpoint = {});
 	~VSTPluginFilterGUI() override;
 
 	void store(QString& command, QString& parameters) override;
@@ -70,6 +70,7 @@ private:
 	bool panelDialogOpen = false;
 	bool autoApplyDialog = false;
 	bool stereoInput = false;
+	VSTPreviewEndpoint previewEndpoint;
 	VSTPluginLivePreview livePreview;
 	QAction* stereoInputAction = nullptr;
 	QAction* livePreviewAction = nullptr;

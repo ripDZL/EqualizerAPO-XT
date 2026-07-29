@@ -2,7 +2,7 @@
 
 - Active task: EqualizerAPO-XT VST plugin GUI live analyzer feedback on `beta`.
 - Current change: Editor-side live analyzer preview feed for open VST plugin panels.
-- Approach: capture default console/communications mic endpoints plus default system playback, mix copied blocks into the visible editor-owned plugin instance, and discard output.
+- Approach: prefer the selected EAPO endpoint for WASAPI preview capture, fall back to default console/communications mic endpoints plus default system playback, mix copied blocks into the visible editor-owned plugin instance, and discard output.
 - Scope note: this animates analyzer-style plugin GUIs while the panel is open; real APO audio processing remains in the service-owned instance.
 
 ## Matrix pet backlog
@@ -40,3 +40,7 @@
 - 2026-07-28 validation note: `AudioRegressionTests.exe` could not complete locally because reference `.raw` files are missing from `x64/Release/references`.
 - 2026-07-29 mic analyzer follow-up: preview feed now includes default capture endpoints (`eCapture/eConsole` and `eCapture/eCommunications`) in addition to render loopback.
 - 2026-07-29 validation: Qt Editor x64 AVX2 rebuild passed; Editor `--selftest-vst` passed; `HybridConvTests.exe` passed 1623 checks; `EditorLogicTests.exe` passed 2520 checks; `EngineOrchestrationTests.exe` passed 617 checks.
+- 2026-07-29 install checkpoint: downloaded matching AVX-512 artifact from GitHub Actions run `30449825813`, backed up the installed `current` folder, overlaid and hash-verified all bundle files, restarted Windows Audio, and passed the installed Editor `--selftest-vst`.
+- 2026-07-29 selected-endpoint follow-up: `VSTPluginLivePreview` now prefers the selected EAPO endpoint ID before default-device fallbacks; both VST UI paths pass the current `FilterTable` selected device.
+- 2026-07-29 validation: red/green `EditorLogicTests.exe` endpoint-selector coverage; Qt Editor x64 AVX2 rebuild; `Editor.exe --selftest-vst`; `HybridConvTests.exe`; `EngineOrchestrationTests.exe`.
+- Acceptance gate: install a selected-endpoint artifact, then manually verify ReaFIR and TDR Nova graph movement while speaking into the configured microphone.

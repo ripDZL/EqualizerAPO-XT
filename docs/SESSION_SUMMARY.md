@@ -51,3 +51,12 @@
 - Follow-up fix: `VSTPluginLivePreview` now starts default console capture, default communications capture, and default render loopback; available samples are mixed into the preview block before calling the visible plugin instance.
 - Local validation after mic-feed fix: `git diff --check`; Qt Editor x64 AVX2 rebuild; `pwsh .github/scripts/Test-SourceSync.ps1`; `Editor.exe --selftest-vst`; `HybridConvTests.exe`; `EditorLogicTests.exe`; `EngineOrchestrationTests.exe`.
 - Remaining manual test: install the next beta artifact and retest ReaFIR/TDR Nova on the mic. If still static, next likely fix is selected-device-aware capture rather than default capture endpoints.
+- Downloaded the matching AVX-512 artifact from passing GitHub Actions run `30449825813` to `artifacts/github-run-30449825813-avx512`.
+- Backed up the installed AVX-512 folder to `artifacts/install-backups/EqualizerAPO-XT-x64-avx512-pre-c0bc96c-20260729`.
+- Overlaid and hash-verified the artifact after restarting Windows Audio to release the loaded APO DLL.
+- Installed Editor `--selftest-vst` passed; the Editor is open for the manual ReaFIR/TDR Nova microphone test.
+- Selected-device follow-up implemented: `VSTPreviewEndpoint` normalizes raw/full endpoint IDs, VST legacy/card editors pass the selected `FilterTable` device, and `VSTPluginLivePreview` prefers that endpoint before default fallbacks.
+- Review fix: if selected endpoint capture fails/times out, it is stopped/reset before default fallback sources run.
+- Validation after selected-device follow-up: `git diff --check`; `pwsh .github/scripts/Test-SourceSync.ps1`; Qt Editor x64 AVX2 rebuild; `Editor.exe --selftest-vst`; `HybridConvTests.exe` 1635 checks; `EditorLogicTests.exe` 2529 checks; `EngineOrchestrationTests.exe` 1160 checks.
+- `AudioRegressionTests.exe` still cannot complete because `.raw` reference fixtures are missing; 11 equivalence checks passed before fixture errors.
+- Remaining manual test: push/build/install selected-endpoint artifact, then retest ReaFIR/TDR Nova on the configured microphone.

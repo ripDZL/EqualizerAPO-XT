@@ -36,6 +36,11 @@ bool isInputFlow(EDataFlow flow)
 	return flow == eCapture;
 }
 
+EDataFlow flowForPreviewEndpoint(VSTPreviewEndpointFlow flow)
+{
+	return flow == VSTPreviewEndpointFlow::Capture ? eCapture : eRender;
+}
+
 struct CapturedFormat
 {
 	int sampleRate = 48000;
@@ -128,6 +133,13 @@ class VSTPluginLivePreview::WasapiCapture
 public:
 	WasapiCapture(EDataFlow flow, ERole role)
 		: flow(flow), role(role)
+	{
+	}
+
+	explicit WasapiCapture(const VSTPreviewEndpoint& endpoint)
+		: flow(flowForPreviewEndpoint(endpoint.flow)),
+		role(eConsole),
+		endpointDeviceId(endpoint.deviceId)
 	{
 	}
 
@@ -290,7 +302,10 @@ private:
 		}
 
 		winutil::ComPtr<IMMDevice> device;
-		hr = enumerator->GetDefaultAudioEndpoint(flow, role, device.put());
+		if (!endpointDeviceId.empty())
+			hr = enumerator->GetDevice(endpointDeviceId.c_str(), device.put());
+		else
+			hr = enumerator->GetDefaultAudioEndpoint(flow, role, device.put());
 		if (FAILED(hr))
 		{
 			signalFailure();
@@ -369,6 +384,7 @@ private:
 
 	const EDataFlow flow;
 	const ERole role;
+	const std::wstring endpointDeviceId;
 	mutable std::mutex mutex;
 	std::condition_variable readyCondition;
 	std::thread worker;
@@ -380,7 +396,8 @@ private:
 };
 
 VSTPluginLivePreview::VSTPluginLivePreview()
-	: inputCapture(std::make_unique<WasapiCapture>(eCapture, eConsole)),
+	: selectedEndpointCapture(nullptr),
+	inputCapture(std::make_unique<WasapiCapture>(eCapture, eConsole)),
 	communicationsInputCapture(std::make_unique<WasapiCapture>(eCapture, eCommunications)),
 	playbackCapture(std::make_unique<WasapiCapture>(eRender, eConsole))
 {
@@ -405,23 +422,24 @@ bool VSTPluginLivePreview::isEnabled() const
 	return enabled;
 }
 
-void VSTPluginLivePreview::update(VSTPluginInstance* targetEffect, bool panelVisible)
+void VSTPluginLivePreview::update(VSTPluginInstance* targetEffect, bool panelVisible, const VSTPreviewEndpoint& previewEndpoint)
 {
 	if (!enabled || !panelVisible || targetEffect == nullptr)
 	{
 		stop();
 		return;
 	}
-	start(targetEffect);
+	start(targetEffect, previewEndpoint);
 }
 
-void VSTPluginLivePreview::start(VSTPluginInstance* targetEffect)
+void VSTPluginLivePreview::start(VSTPluginInstance* targetEffect, const VSTPreviewEndpoint& previewEndpoint)
 {
-	if (active && effect == targetEffect)
+	if (active && effect == targetEffect && activeEndpoint == previewEndpoint)
 		return;
 	stop();
 
 	effect = targetEffect;
+	activeEndpoint = previewEndpoint;
 	inputChannelCount = std::max(0, effect->numInputs());
 	outputChannelCount = std::max(0, effect->numOutputs());
 	if (inputChannelCount == 0 && outputChannelCount == 0)
@@ -429,17 +447,36 @@ void VSTPluginLivePreview::start(VSTPluginInstance* targetEffect)
 		effect = nullptr;
 		return;
 	}
-	const bool inputReady = inputCapture->start();
-	const bool communicationsInputReady = communicationsInputCapture->start();
-	const bool playbackReady = playbackCapture->start();
-	if (!inputReady && !communicationsInputReady && !playbackReady)
+	bool selectedEndpointReady = false;
+	if (activeEndpoint.isValid())
+	{
+		selectedEndpointCapture = std::make_unique<WasapiCapture>(activeEndpoint);
+		selectedEndpointReady = selectedEndpointCapture->start();
+		if (!selectedEndpointReady)
+		{
+			selectedEndpointCapture->stop();
+			selectedEndpointCapture.reset();
+		}
+	}
+
+	bool inputReady = false;
+	bool communicationsInputReady = false;
+	bool playbackReady = false;
+	if (!selectedEndpointReady)
+	{
+		inputReady = inputCapture->start();
+		communicationsInputReady = communicationsInputCapture->start();
+		playbackReady = playbackCapture->start();
+	}
+	if (!selectedEndpointReady && !inputReady && !communicationsInputReady && !playbackReady)
 	{
 		effect = nullptr;
 		return;
 	}
 
 	allocateBuffers(inputChannelCount, outputChannelCount);
-	const int previewSampleRate = inputReady ? inputCapture->sampleRate()
+	const int previewSampleRate = selectedEndpointReady ? selectedEndpointCapture->sampleRate()
+		: inputReady ? inputCapture->sampleRate()
 		: communicationsInputReady ? communicationsInputCapture->sampleRate()
 		: playbackCapture->sampleRate();
 	effect->prepareForProcessing(static_cast<float>(previewSampleRate), blockSize);
@@ -455,6 +492,10 @@ void VSTPluginLivePreview::stop()
 		effect->stopProcessingSafely();
 	active = false;
 	effect = nullptr;
+	activeEndpoint = {};
+	if (selectedEndpointCapture != nullptr)
+		selectedEndpointCapture->stop();
+	selectedEndpointCapture.reset();
 	inputCapture->stop();
 	communicationsInputCapture->stop();
 	playbackCapture->stop();
@@ -491,12 +532,17 @@ void VSTPluginLivePreview::processBlock()
 		for (auto& input : doubleInputs)
 			std::fill(input.begin(), input.end(), 0.0);
 		int sourceCount = 0;
-		if (inputCapture->popAdd(doubleInputPtrs.data(), inputChannelCount, blockSize))
+		if (selectedEndpointCapture != nullptr && selectedEndpointCapture->popAdd(doubleInputPtrs.data(), inputChannelCount, blockSize))
 			sourceCount++;
-		if (communicationsInputCapture->popAdd(doubleInputPtrs.data(), inputChannelCount, blockSize))
-			sourceCount++;
-		if (playbackCapture->popAdd(doubleInputPtrs.data(), inputChannelCount, blockSize))
-			sourceCount++;
+		else
+		{
+			if (inputCapture->popAdd(doubleInputPtrs.data(), inputChannelCount, blockSize))
+				sourceCount++;
+			if (communicationsInputCapture->popAdd(doubleInputPtrs.data(), inputChannelCount, blockSize))
+				sourceCount++;
+			if (playbackCapture->popAdd(doubleInputPtrs.data(), inputChannelCount, blockSize))
+				sourceCount++;
+		}
 		if (sourceCount > 1)
 		{
 			const double scale = 1.0 / sourceCount;
@@ -515,12 +561,17 @@ void VSTPluginLivePreview::processBlock()
 		for (auto& input : floatInputs)
 			std::fill(input.begin(), input.end(), 0.0f);
 		int sourceCount = 0;
-		if (inputCapture->popAdd(floatInputPtrs.data(), inputChannelCount, blockSize))
+		if (selectedEndpointCapture != nullptr && selectedEndpointCapture->popAdd(floatInputPtrs.data(), inputChannelCount, blockSize))
 			sourceCount++;
-		if (communicationsInputCapture->popAdd(floatInputPtrs.data(), inputChannelCount, blockSize))
-			sourceCount++;
-		if (playbackCapture->popAdd(floatInputPtrs.data(), inputChannelCount, blockSize))
-			sourceCount++;
+		else
+		{
+			if (inputCapture->popAdd(floatInputPtrs.data(), inputChannelCount, blockSize))
+				sourceCount++;
+			if (communicationsInputCapture->popAdd(floatInputPtrs.data(), inputChannelCount, blockSize))
+				sourceCount++;
+			if (playbackCapture->popAdd(floatInputPtrs.data(), inputChannelCount, blockSize))
+				sourceCount++;
+		}
 		if (sourceCount > 1)
 		{
 			const float scale = 1.0f / sourceCount;

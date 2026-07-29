@@ -30,7 +30,9 @@
 #include "helpers/AudioEngineAccess.h"
 #include "filters/VSTPluginCommand.h"
 #include "Editor/helpers/GUIHelper.h"
+#include "Editor/helpers/VSTPreviewEndpoint.h"
 #include "Editor/SkinManager.h"
+#include "Editor/FilterTable.h"
 #include "Editor/skins/ISkin.h"
 #include "Editor/MainWindow.h"
 #include "Editor/guis/VSTPluginFilterGUIDialog.h"
@@ -57,8 +59,9 @@ QString displayPathForLibrary(const wstring& libPath)
 }
 
 VSTCardEditor::VSTCardEditor(shared_ptr<VSTPluginLibrary> library, const wstring& chunkData,
-	const unordered_map<wstring, float>& paramMap, bool stereoInput, QWidget* parent)
-	: IFilterGUI(parent), library(library), chunkData(chunkData), paramMap(paramMap), stereoInput(stereoInput)
+	const unordered_map<wstring, float>& paramMap, bool stereoInput, const VSTPreviewEndpoint& previewEndpoint, QWidget* parent)
+	: IFilterGUI(parent), library(library), chunkData(chunkData), paramMap(paramMap), stereoInput(stereoInput),
+	previewEndpoint(previewEndpoint)
 {
 	setObjectName(QStringLiteral("VSTCardEditor"));
 	setAttribute(Qt::WA_StyledBackground, true);
@@ -107,7 +110,7 @@ VSTCardEditor::VSTCardEditor(shared_ptr<VSTPluginLibrary> library, const wstring
 	livePreviewAction = menu->addAction(tr("Live analyzer feed"));
 	livePreviewAction->setCheckable(true);
 	livePreviewAction->setChecked(true);
-	livePreviewAction->setToolTip(tr("Feed system playback into the open plugin panel so analyzer graphs can animate."));
+	livePreviewAction->setToolTip(tr("Feed endpoint audio into the open plugin panel so analyzer graphs can animate."));
 	connect(livePreviewAction, SIGNAL(toggled(bool)), this, SLOT(livePreviewToggled(bool)));
 	optionsButton->setMenu(menu);
 	view->addActionButton(ReferenceCardView::ActionRole::Options, optionsButton);
@@ -522,7 +525,7 @@ bool VSTCardEditor::embedPlugin()
 void VSTCardEditor::updateLivePreview()
 {
 	livePreview.update(effect.get(), livePreviewAction != nullptr && livePreviewAction->isChecked()
-		&& (embedded || panelDialogOpen));
+		&& (embedded || panelDialogOpen), previewEndpoint);
 }
 
 void VSTCardEditor::updatePermissionWarning()
@@ -590,10 +593,12 @@ void VSTCardEditor::updatePermissionWarning()
 #include "filters/VSTPluginFilterFactory.h"
 #include "helpers/VSTPluginLibrary.h"
 
-REGISTER_FILTER_CARD_EDITOR(VSTPlugin, [](FilterTable*, const QString&, const QString& parameters) -> IFilterGUI* {
+REGISTER_FILTER_CARD_EDITOR(VSTPlugin, [](FilterTable* filterTable, const QString&, const QString& parameters) -> IFilterGUI* {
 	// Parse the line into the engine's VST filter (no plugin DLL is loaded
 	// for configPath == L""), then hand the opaque state to the card editor.
 	// The store()/parse round-trip is verified lossless (--selftest-vst).
+	const VSTPreviewEndpoint previewEndpoint = vstPreviewEndpointForSelectedDevice(
+		filterTable != nullptr ? filterTable->getSelectedDevice() : nullptr);
 	VSTPluginFilterFactory factory;
 	std::wstring commandWStr = L"VSTPlugin";
 	std::wstring paramWStr = parameters.toStdWString();
@@ -602,11 +607,11 @@ REGISTER_FILTER_CARD_EDITOR(VSTPlugin, [](FilterTable*, const QString&, const QS
 	if (!filters.empty())
 	{
 		VSTPluginFilter* filter = static_cast<VSTPluginFilter*>(filters[0].get());
-		editor = new VSTCardEditor(filter->getLibrary(), filter->getChunkData(), filter->getParamMap(), filter->getStereoInput());
+		editor = new VSTCardEditor(filter->getLibrary(), filter->getChunkData(), filter->getParamMap(), filter->getStereoInput(), previewEndpoint);
 	}
 	else
 	{
-		editor = new VSTCardEditor(VSTPluginLibrary::getInstance(L""), L"", std::unordered_map<std::wstring, float>());
+		editor = new VSTCardEditor(VSTPluginLibrary::getInstance(L""), L"", std::unordered_map<std::wstring, float>(), false, previewEndpoint);
 	}
 	return editor;
 })
