@@ -40,3 +40,6 @@
 - [x] `EditorLogicTests.exe` passed: 2520 checks.
 - [x] `EngineOrchestrationTests.exe` passed: 617 checks.
 - [ ] `AudioRegressionTests.exe` local run blocked by missing `x64/Release/references/*.raw` fixtures.
+- [x] Extended VST live analyzer preview to include default mic/capture endpoints after ReaFIR/TDR Nova stayed static on a mic chain.
+- [x] Rebuilt Qt Editor x64 AVX2 after mic-feed change.
+- [x] Re-ran `Editor.exe --selftest-vst`, `HybridConvTests.exe`, `EditorLogicTests.exe`, and `EngineOrchestrationTests.exe`.

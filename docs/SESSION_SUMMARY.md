@@ -46,3 +46,8 @@
 - Validation: `git diff --check`; `pwsh .github/scripts/Test-SourceSync.ps1`; `Editor.exe --selftest-vst`; `HybridConvTests.exe`; `EditorLogicTests.exe`; `EngineOrchestrationTests.exe`.
 - Validation caveat: `AudioRegressionTests.exe` could not complete because local reference `.raw` fixtures are missing.
 - Remaining manual test: install/push a build and verify ReaFIR panel animation with live audio; extend beyond render loopback if exact mic/capture-source feedback is required.
+- On 2026-07-29, user reported ReaFIR and TDR Nova animate in OBS but stay static in EAPO when opening the mic.
+- Diagnosis: previous preview feed only used default render loopback, so mic-chain analyzers still received silence.
+- Follow-up fix: `VSTPluginLivePreview` now starts default console capture, default communications capture, and default render loopback; available samples are mixed into the preview block before calling the visible plugin instance.
+- Local validation after mic-feed fix: `git diff --check`; Qt Editor x64 AVX2 rebuild; `pwsh .github/scripts/Test-SourceSync.ps1`; `Editor.exe --selftest-vst`; `HybridConvTests.exe`; `EditorLogicTests.exe`; `EngineOrchestrationTests.exe`.
+- Remaining manual test: install the next beta artifact and retest ReaFIR/TDR Nova on the mic. If still static, next likely fix is selected-device-aware capture rather than default capture endpoints.

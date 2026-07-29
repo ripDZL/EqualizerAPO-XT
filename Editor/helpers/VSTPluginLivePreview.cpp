@@ -31,6 +31,11 @@ constexpr REFERENCE_TIME previewBufferDuration = 1000000; // 100 ms
 constexpr int previewTimerIntervalMs = 15;
 constexpr int maxBufferedSeconds = 2;
 
+bool isInputFlow(EDataFlow flow)
+{
+	return flow == eCapture;
+}
+
 struct CapturedFormat
 {
 	int sampleRate = 48000;
@@ -118,10 +123,15 @@ float readSample(const BYTE* frame, int channel, const CapturedFormat& format)
 }
 }
 
-class VSTPluginLivePreview::LoopbackCapture
+class VSTPluginLivePreview::WasapiCapture
 {
 public:
-	~LoopbackCapture()
+	WasapiCapture(EDataFlow flow, ERole role)
+		: flow(flow), role(role)
+	{
+	}
+
+	~WasapiCapture()
 	{
 		stop();
 	}
@@ -166,28 +176,36 @@ public:
 		return format.sampleRate;
 	}
 
-	void pop(float** output, int outputChannels, int frames)
+	bool isReady() const
 	{
-		popImpl(output, outputChannels, frames);
+		std::lock_guard<std::mutex> lock(mutex);
+		return readyState && !failedState;
 	}
 
-	void pop(double** output, int outputChannels, int frames)
+	bool popAdd(float** output, int outputChannels, int frames)
 	{
-		popImpl(output, outputChannels, frames);
+		return popAddImpl(output, outputChannels, frames);
+	}
+
+	bool popAdd(double** output, int outputChannels, int frames)
+	{
+		return popAddImpl(output, outputChannels, frames);
 	}
 
 private:
 	template<typename Sample>
-	void popImpl(Sample** output, int outputChannels, int frames)
+	bool popAddImpl(Sample** output, int outputChannels, int frames)
 	{
 		if (outputChannels <= 0 || frames <= 0)
-			return;
+			return false;
 
 		std::lock_guard<std::mutex> lock(mutex);
 		const int sourceChannels = std::max(1, format.channelCount);
+		bool consumedAny = false;
 		for (int frame = 0; frame < frames; frame++)
 		{
 			const bool hasSourceFrame = bufferedSamples.size() >= static_cast<size_t>(sourceChannels);
+			consumedAny = consumedAny || hasSourceFrame;
 			for (int channel = 0; channel < outputChannels; channel++)
 			{
 				float value = 0.0f;
@@ -204,7 +222,7 @@ private:
 						value = bufferedSamples[channel];
 					}
 				}
-				output[channel][frame] = static_cast<Sample>(value);
+				output[channel][frame] += static_cast<Sample>(value);
 			}
 			if (hasSourceFrame)
 			{
@@ -212,6 +230,7 @@ private:
 					bufferedSamples.pop_front();
 			}
 		}
+		return consumedAny;
 	}
 
 	void signalFailure()
@@ -271,7 +290,7 @@ private:
 		}
 
 		winutil::ComPtr<IMMDevice> device;
-		hr = enumerator->GetDefaultAudioEndpoint(eRender, eConsole, device.put());
+		hr = enumerator->GetDefaultAudioEndpoint(flow, role, device.put());
 		if (FAILED(hr))
 		{
 			signalFailure();
@@ -296,7 +315,8 @@ private:
 		}
 		const CapturedFormat capturedFormat = parseFormat(*mixFormat.get());
 
-		hr = audioClient->Initialize(AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK,
+		const DWORD streamFlags = isInputFlow(flow) ? 0 : AUDCLNT_STREAMFLAGS_LOOPBACK;
+		hr = audioClient->Initialize(AUDCLNT_SHAREMODE_SHARED, streamFlags,
 			previewBufferDuration, 0, mixFormat.get(), nullptr);
 		if (FAILED(hr))
 		{
@@ -347,6 +367,8 @@ private:
 		audioClient->Stop();
 	}
 
+	const EDataFlow flow;
+	const ERole role;
 	mutable std::mutex mutex;
 	std::condition_variable readyCondition;
 	std::thread worker;
@@ -358,7 +380,9 @@ private:
 };
 
 VSTPluginLivePreview::VSTPluginLivePreview()
-	: capture(std::make_unique<LoopbackCapture>())
+	: inputCapture(std::make_unique<WasapiCapture>(eCapture, eConsole)),
+	communicationsInputCapture(std::make_unique<WasapiCapture>(eCapture, eCommunications)),
+	playbackCapture(std::make_unique<WasapiCapture>(eRender, eConsole))
 {
 	timer.setInterval(previewTimerIntervalMs);
 	QObject::connect(&timer, &QTimer::timeout, &timer, [this] { processBlock(); });
@@ -405,14 +429,20 @@ void VSTPluginLivePreview::start(VSTPluginInstance* targetEffect)
 		effect = nullptr;
 		return;
 	}
-	if (!capture->start())
+	const bool inputReady = inputCapture->start();
+	const bool communicationsInputReady = communicationsInputCapture->start();
+	const bool playbackReady = playbackCapture->start();
+	if (!inputReady && !communicationsInputReady && !playbackReady)
 	{
 		effect = nullptr;
 		return;
 	}
 
 	allocateBuffers(inputChannelCount, outputChannelCount);
-	effect->prepareForProcessing(static_cast<float>(capture->sampleRate()), blockSize);
+	const int previewSampleRate = inputReady ? inputCapture->sampleRate()
+		: communicationsInputReady ? communicationsInputCapture->sampleRate()
+		: playbackCapture->sampleRate();
+	effect->prepareForProcessing(static_cast<float>(previewSampleRate), blockSize);
 	effect->startProcessing();
 	active = true;
 	timer.start();
@@ -425,7 +455,9 @@ void VSTPluginLivePreview::stop()
 		effect->stopProcessingSafely();
 	active = false;
 	effect = nullptr;
-	capture->stop();
+	inputCapture->stop();
+	communicationsInputCapture->stop();
+	playbackCapture->stop();
 }
 
 void VSTPluginLivePreview::allocateBuffers(int inputChannels, int outputChannels)
@@ -456,14 +488,48 @@ void VSTPluginLivePreview::processBlock()
 
 	if (effect->canDoubleReplacing())
 	{
-		capture->pop(doubleInputPtrs.data(), inputChannelCount, blockSize);
+		for (auto& input : doubleInputs)
+			std::fill(input.begin(), input.end(), 0.0);
+		int sourceCount = 0;
+		if (inputCapture->popAdd(doubleInputPtrs.data(), inputChannelCount, blockSize))
+			sourceCount++;
+		if (communicationsInputCapture->popAdd(doubleInputPtrs.data(), inputChannelCount, blockSize))
+			sourceCount++;
+		if (playbackCapture->popAdd(doubleInputPtrs.data(), inputChannelCount, blockSize))
+			sourceCount++;
+		if (sourceCount > 1)
+		{
+			const double scale = 1.0 / sourceCount;
+			for (auto& input : doubleInputs)
+			{
+				for (double& sample : input)
+					sample *= scale;
+			}
+		}
 		for (auto& output : doubleOutputs)
 			std::fill(output.begin(), output.end(), 0.0);
 		effect->processDoubleReplacing(doubleInputPtrs.data(), doubleOutputPtrs.data(), blockSize);
 	}
 	else
 	{
-		capture->pop(floatInputPtrs.data(), inputChannelCount, blockSize);
+		for (auto& input : floatInputs)
+			std::fill(input.begin(), input.end(), 0.0f);
+		int sourceCount = 0;
+		if (inputCapture->popAdd(floatInputPtrs.data(), inputChannelCount, blockSize))
+			sourceCount++;
+		if (communicationsInputCapture->popAdd(floatInputPtrs.data(), inputChannelCount, blockSize))
+			sourceCount++;
+		if (playbackCapture->popAdd(floatInputPtrs.data(), inputChannelCount, blockSize))
+			sourceCount++;
+		if (sourceCount > 1)
+		{
+			const float scale = 1.0f / sourceCount;
+			for (auto& input : floatInputs)
+			{
+				for (float& sample : input)
+					sample *= scale;
+			}
+		}
 		for (auto& output : floatOutputs)
 			std::fill(output.begin(), output.end(), 0.0f);
 		if (effect->canReplacing())
