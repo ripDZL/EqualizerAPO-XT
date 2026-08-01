@@ -42,6 +42,7 @@ void testSkinTokensCarryExplicitMode();
 void testTokenSubstitutionOffersAnAlphaForm();
 void testEverySkinSheetResolvesAllThemeTokens();
 void testThemePreviewStyleSheetUsesCustomTokens();
+void testCustomThemeStoreRoundTripsTokensAndJson();
 void testSkinMaterialEffectHelpersStayFixedBlackAndWhite();
 void testSkinScopeGutterLayoutKeepsIfBranchesOnMemberRails();
 void testSkinAnalysisGraphLayoutKeepsAxisMathShared();

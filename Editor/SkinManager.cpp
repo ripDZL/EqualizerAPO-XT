@@ -3,10 +3,13 @@
 #include <QApplication>
 #include <QDebug>
 #include <QFile>
+#include <QSettings>
 #include <QWidget>
 
 #include "helpers/LogHelper.h"
+#include "helpers/RegistryHelper.h"
 #include "Editor/helpers/CrashHandler.h"
+#include "skins/CustomThemeStore.h"
 #include "skins/ISkin.h"
 #include "skins/Skins.h"
 #include "skins/SkinThemeData.h"
@@ -98,16 +101,23 @@ void SkinManager::applyHeritage()
 
 void SkinManager::applySkin(const QString& newSkinId, bool dark)
 {
+	QSettings settings(QString::fromWCharArray(EDITOR_REGPATH), QSettings::NativeFormat);
+	CustomThemeStore::Theme customTheme;
+	const bool isCustomTheme =
+		CustomThemeStore::findTheme(settings, newSkinId, &customTheme);
+	const QString targetSkinId = isCustomTheme ? customTheme.skinId() : Skins::byId(newSkinId)->id();
+	const bool targetDark = isCustomTheme ? customTheme.dark : dark;
+
 	// Re-dressing the app with the identical sheet is not free: Qt re-resolves
 	// the stylesheet against every live widget. At startup this used to run
 	// three times (main(), loadPreferences() before and after the open-files
 	// restore); the post-restore pass alone re-polished every filter card and
 	// took seconds on a large config.
-	if (sheetApplied && !previewMode && !heritageMode && darkMode == dark
-		&& Skins::byId(newSkinId)->id() == skinId)
+	if (sheetApplied && !previewMode && !heritageMode && darkMode == targetDark
+		&& targetSkinId == skinId)
 	{
 		LogFStatic(L"Skin %s (dark=%d) already active, skipping re-apply",
-			reinterpret_cast<const wchar_t*>(skinId.utf16()), dark ? 1 : 0);
+			reinterpret_cast<const wchar_t*>(skinId.utf16()), targetDark ? 1 : 0);
 		return;
 	}
 
@@ -116,19 +126,43 @@ void SkinManager::applySkin(const QString& newSkinId, bool dark)
 	// Breadcrumb + unconditional log line: a skin-switch crash reported from
 	// the field must identify the dying skin in the crash report and in
 	// %TEMP%\EqualizerAPO.log.
-	CrashHandler::setBreadcrumb(QStringLiteral("applySkin %1 dark=%2").arg(newSkinId).arg(dark).toStdWString());
-	LogFStatic(L"Applying skin %s (dark=%d)", reinterpret_cast<const wchar_t*>(newSkinId.utf16()), dark ? 1 : 0);
+	CrashHandler::setBreadcrumb(QStringLiteral("applySkin %1 dark=%2").arg(targetSkinId).arg(targetDark).toStdWString());
+	LogFStatic(L"Applying skin %s (dark=%d)", reinterpret_cast<const wchar_t*>(targetSkinId.utf16()), targetDark ? 1 : 0);
 
 	// Skins::byId applies legacy aliases (glassy->studio, industrial->rack) and
 	// falls back to the studio skin for unknown ids.
-	activeSkin = Skins::byId(newSkinId);
-	skinId = activeSkin->id();
-	darkMode = dark;
-	currentTokens = activeSkin->tokens(darkMode);
+	if (isCustomTheme)
+	{
+		activeSkin = Skins::byId(customTheme.baseTheme);
+		skinId = customTheme.skinId();
+		darkMode = customTheme.dark;
+		currentTokens = CustomThemeStore::tokensForTheme(customTheme);
 
-	// The process-wide QSS/palette/font contract is shared with companion
-	// executables. The Editor keeps its CustomStyle, so Fusion is not reset.
-	SkinThemeData::applyToApplication(*qApp, skinId, darkMode, false, true);
+		SkinThemeData::registerBundledFonts(true);
+		const SkinThemeData::ResolvedStyleSheet sheet =
+			SkinThemeData::styleSheetForTokens(customTheme.baseTheme, darkMode, currentTokens);
+		if (!sheet.loaded)
+			qWarning("Custom skin stylesheet %s could not be loaded", qPrintable(sheet.resourcePath));
+		else if (sheet.usedStudioFallback)
+			qWarning("Custom skin stylesheet for %s could not be loaded; using %s",
+				qPrintable(customTheme.baseTheme), qPrintable(sheet.resourcePath));
+		if (!sheet.unresolvedTokens.isEmpty())
+			qWarning("Custom skin stylesheet %s has unresolved tokens: %s",
+				qPrintable(sheet.resourcePath), qPrintable(sheet.unresolvedTokens.join(QStringLiteral(", "))));
+		qApp->setPalette(SkinThemeData::palette(currentTokens, darkMode));
+		qApp->setStyleSheet(sheet.qss);
+	}
+	else
+	{
+		activeSkin = Skins::byId(newSkinId);
+		skinId = activeSkin->id();
+		darkMode = dark;
+		currentTokens = activeSkin->tokens(darkMode);
+
+		// The process-wide QSS/palette/font contract is shared with companion
+		// executables. The Editor keeps its CustomStyle, so Fusion is not reset.
+		SkinThemeData::applyToApplication(*qApp, skinId, darkMode, false, true);
+	}
 
 	sheetApplied = true;
 	emit skinChanged(currentTokens);

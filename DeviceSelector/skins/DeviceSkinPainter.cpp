@@ -61,6 +61,12 @@ void DeviceSkinPainter::setActiveTheme(const QString& skinId, bool dark)
 	activeTheme().tokens = SkinThemeData::tokens(skinId, dark);
 }
 
+void DeviceSkinPainter::setActiveThemeTokens(const QString& skinId, const SkinTokens& tokens)
+{
+	activeTheme().painter = forSkin(skinId);
+	activeTheme().tokens = tokens;
+}
+
 void DeviceSkinPainter::setHeritageTheme()
 {
 	static const DeviceSkinPainter neutral;

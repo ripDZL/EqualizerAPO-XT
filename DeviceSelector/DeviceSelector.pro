@@ -21,6 +21,7 @@ PRECOMPILED_HEADER = stdafx.h
 
 SOURCES += \
 	../Editor/helpers/QtAppBootstrap.cpp \
+	../Editor/skins/CustomThemeStore.cpp \
 	../Editor/skins/SkinThemeData.cpp \
 	main.cpp \
 	DeviceListDelegate.cpp \
@@ -46,6 +47,7 @@ SOURCES += \
 
 HEADERS += \
 	../Editor/helpers/QtAppBootstrap.h \
+	../Editor/skins/CustomThemeStore.h \
 	../Editor/skins/SkinThemeData.h \
 	DeviceListDelegate.h \
 	DeviceSelector.h \

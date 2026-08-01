@@ -222,6 +222,7 @@ SOURCES += main.cpp\
 	skins/ISkin.cpp \
 	skins/pickers/MatrixFilterPicker.cpp \
 	skins/RackChrome.cpp \
+	skins/CustomThemeStore.cpp \
 	skins/SkinDisplayNames.cpp \
 	skins/Skins.cpp \
 	skins/SkinFileIcons.cpp \
@@ -488,6 +489,7 @@ HEADERS  += \
 	skins/ISkin.h \
 	skins/pickers/MatrixFilterPicker.h \
 	skins/RackChrome.h \
+	skins/CustomThemeStore.h \
 	skins/SkinDisplayNames.h \
 	skins/Skins.h \
 	skins/SkinFileIcons.h \

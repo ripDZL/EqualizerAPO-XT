@@ -32,6 +32,7 @@
 #include "FilterTable.h"
 #include "MainWindow.h"
 #include "SkinManager.h"
+#include "skins/CustomThemeStore.h"
 #include "skins/SkinDisplayNames.h"
 #include "skins/SkinThemeData.h"
 #include "ui_MainWindow.h"
@@ -253,6 +254,19 @@ void MainWindow::setupRedesignActions()
 			action->setShortcut(QKeySequence(QStringLiteral("Ctrl+Alt+%1").arg(shortcutNumber)));
 		skinActionGroup->addAction(action);
 	}
+	QSettings customThemeSettings(QString::fromWCharArray(EDITOR_REGPATH), QSettings::NativeFormat);
+	const QList<CustomThemeStore::Theme> customThemes = CustomThemeStore::themes(customThemeSettings);
+	if (!customThemes.isEmpty())
+	{
+		interfaceMenu->addSeparator();
+		for (const CustomThemeStore::Theme& theme : customThemes)
+		{
+			QAction* action = interfaceMenu->addAction(tr("Custom: %1").arg(theme.name));
+			action->setCheckable(true);
+			action->setData(theme.skinId());
+			skinActionGroup->addAction(action);
+		}
+	}
 	connect(skinActionGroup, SIGNAL(triggered(QAction*)), this, SLOT(skinSelected(QAction*)));
 
 	darkThemeAction = interfaceMenu->addAction(tr("Dark theme"));
@@ -286,6 +300,12 @@ void MainWindow::setupRedesignActions()
 					skinPersistenceSuppressed = wasSuppressed;
 				}
 				SkinManager::instance()->applyTokenPreview(resolvedId, dark, tokens);
+			});
+		connect(&dialog, &ThemeEditorDialog::customThemeRequested, this,
+			[this](const QString& id) {
+				skinId = id;
+				applySkinAndRebuild();
+				applyRedesignPreferences();
 			});
 		dialog.exec();
 	});
@@ -397,6 +417,7 @@ void MainWindow::applyRedesignPreferences()
 	{
 		SkinManager::instance()->applySkin(skinId, skinDark);
 		skinId = SkinManager::instance()->currentSkinId();
+		skinDark = SkinManager::instance()->isDark();
 		// The toolbar/menu dressing must not depend on applySkin actually
 		// running: a same-skin re-apply is skipped (no skinChanged signal),
 		// which used to leave the toolbar on the .ui's legacy .ico icons and

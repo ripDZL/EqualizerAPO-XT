@@ -345,6 +345,18 @@ token at partial alpha instead of writing the palette value out by hand.
 that did not, and all shipped skins reached for `SkinManager::instance()->tokens()`
 inside it instead.
 
+## Custom Theme Lab themes
+
+Saved Theme Lab themes live in the Editor settings under
+`interface/customThemes`. Their active skin id is `custom:<id>`, while
+`baseTheme` chooses the shipped QSS/paint grammar and the saved colour map
+overrides token values before `finishTokens()` derives the secondary colours.
+
+`Editor/skins/CustomThemeStore.*` owns the storage, JSON import/export shape, id
+normalization, and token construction. The Editor and Device Selector both read
+that store, so a custom theme selected in the Editor also dresses Device Selector.
+New custom themes appear in the Interface menu after the next Editor startup.
+
 ## Adding a skin
 
 Six files, and the first one is the only list of which skins exist.

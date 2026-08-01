@@ -36,6 +36,7 @@
 #include "skins/DeviceSkinPainter.h"
 #include "Editor/helpers/QtAppBootstrap.h"
 #include "Editor/helpers/EditorSettings.h"
+#include "Editor/skins/CustomThemeStore.h"
 #include "Editor/skins/SkinThemeData.h"
 #include "helpers/ApoRegistration.h"
 #include "helpers/InstallDiagnostics.h"
@@ -62,6 +63,19 @@ void applyEditorTheme(QApplication& app)
 
 	const bool systemDark = QGuiApplication::styleHints()->colorScheme() == Qt::ColorScheme::Dark;
 	const EditorSettings::SkinChoice choice = EditorSettings::readSkinChoice(settings, systemDark);
+	CustomThemeStore::Theme customTheme;
+	if (CustomThemeStore::findTheme(settings, choice.id, &customTheme))
+	{
+		const SkinTokens tokens = CustomThemeStore::tokensForTheme(customTheme);
+		SkinThemeData::registerBundledFonts(false);
+		app.setStyle(QStyleFactory::create(QStringLiteral("fusion")));
+		const SkinThemeData::ResolvedStyleSheet sheet =
+			SkinThemeData::styleSheetForTokens(customTheme.baseTheme, customTheme.dark, tokens);
+		app.setPalette(SkinThemeData::palette(tokens, customTheme.dark));
+		app.setStyleSheet(sheet.qss);
+		DeviceSkinPainter::setActiveThemeTokens(customTheme.baseTheme, tokens);
+		return;
+	}
 	SkinThemeData::applyToApplication(app, choice.id, choice.dark);
 	DeviceSkinPainter::setActiveTheme(choice.id, choice.dark);
 }

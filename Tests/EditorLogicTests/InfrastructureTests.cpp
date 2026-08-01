@@ -9,12 +9,15 @@
 #include <QSet>
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonObject>
 #include <QLocale>
+#include <QSettings>
 #include <QTemporaryDir>
 
 #include "Benchmark/BatchPlan.h"
 #include "Editor/skins/SkinPaint.h"
 #include "Editor/skins/SkinSupport.h"
+#include "Editor/skins/CustomThemeStore.h"
 #include "Editor/skins/SkinThemeData.h"
 #include "Editor/widgets/EditableValueText.h"
 #include "Editor/widgets/cards/FileReferenceController.h"
@@ -254,6 +257,82 @@ void testThemePreviewStyleSheetUsesCustomTokens()
 		"theme preview substitutes edited token values");
 	expectTrue(sheet.unresolvedTokens.isEmpty(),
 		"theme preview leaves no unresolved @TOKEN@ sentinels");
+}
+
+void testCustomThemeStoreRoundTripsTokensAndJson()
+{
+	QTemporaryDir dir;
+	requireTrue(dir.isValid(), "custom theme store test has a temporary directory");
+	QSettings settings(dir.filePath(QStringLiteral("themes.ini")), QSettings::IniFormat);
+
+	CustomThemeStore::Theme theme;
+	theme.name = QStringLiteral("Night Lab");
+	theme.id = CustomThemeStore::uniqueIdForName(settings, theme.name);
+	theme.baseTheme = QStringLiteral("midnight");
+	theme.dark = true;
+	theme.colors.insert(QStringLiteral("background"), QStringLiteral("#010203"));
+	theme.colors.insert(QStringLiteral("accent"), QStringLiteral("#123456"));
+	theme.colors.insert(QStringLiteral("danger"), QStringLiteral("#fedcba"));
+
+	expectTrue(CustomThemeStore::saveTheme(settings, theme),
+		"custom theme saves to settings");
+	expectTrue(CustomThemeStore::isCustomThemeId(theme.skinId()),
+		"custom theme skin ids carry the custom prefix");
+	expectEqual(CustomThemeStore::storageId(theme.skinId()), theme.id,
+		"custom theme storage ids strip the custom prefix");
+
+	CustomThemeStore::Theme loaded;
+	expectTrue(CustomThemeStore::findTheme(settings, theme.skinId(), &loaded),
+		"custom theme loads by custom skin id");
+	expectFalse(CustomThemeStore::findTheme(settings, theme.id, nullptr),
+		"bare storage ids do not hijack built-in skin resolution");
+	expectEqual(loaded.name, theme.name, "custom theme name round-trips");
+	expectEqual(loaded.baseTheme, QStringLiteral("midnight"), "custom theme base skin round-trips");
+	expectTrue(loaded.dark, "custom theme dark mode round-trips");
+
+	const SkinTokens tokens = CustomThemeStore::tokensForTheme(loaded);
+	expectEqual(tokens.background, QStringLiteral("#010203"),
+		"custom theme overrides background token");
+	expectEqual(tokens.accent, QStringLiteral("#123456"),
+		"custom theme overrides accent token");
+	expectEqual(tokens.danger, QStringLiteral("#FEDCBA"),
+		"custom theme normalizes imported colour values");
+	expectTrue(tokens.dark, "custom theme tokens preserve dark mode");
+
+	const QJsonObject exported = CustomThemeStore::toJsonObject(loaded);
+	CustomThemeStore::Theme parsed;
+	QString error;
+	expectTrue(CustomThemeStore::fromJsonObject(exported, &parsed, &error),
+		"exported custom theme JSON imports again");
+	expectEqual(parsed.name, loaded.name, "custom theme JSON carries the name");
+	expectEqual(parsed.baseTheme, loaded.baseTheme, "custom theme JSON carries the base skin");
+	expectEqual(parsed.colors.value(QStringLiteral("accent")), QStringLiteral("#123456"),
+		"custom theme JSON carries edited colors");
+
+	QJsonObject legacyColors;
+	legacyColors.insert(QStringLiteral("accent"), QStringLiteral("#abcdef"));
+	QJsonObject legacyExport;
+	legacyExport.insert(QStringLiteral("baseTheme"), QStringLiteral("solar"));
+	legacyExport.insert(QStringLiteral("dark"), false);
+	legacyExport.insert(QStringLiteral("colors"), legacyColors);
+	CustomThemeStore::Theme legacyTheme;
+	expectTrue(CustomThemeStore::fromJsonObject(legacyExport, &legacyTheme, &error),
+		"transient Theme Lab v1 JSON without name/id still imports");
+	expectTrue(legacyTheme.id.isEmpty(), "legacy Theme Lab JSON does not invent an id");
+	expectFalse(legacyTheme.dark, "legacy Theme Lab JSON carries light mode");
+	expectEqual(CustomThemeStore::tokensForTheme(legacyTheme).accent, QStringLiteral("#ABCDEF"),
+		"legacy Theme Lab JSON colors normalize into tokens");
+	expectEqual(CustomThemeStore::uniqueIdForName(settings, QStringLiteral("Studio")), QStringLiteral("studio-2"),
+		"custom theme ids reserve built-in skin ids");
+	CustomThemeStore::Theme builtInCollision = theme;
+	builtInCollision.id = QStringLiteral("studio");
+	expectFalse(CustomThemeStore::saveTheme(settings, builtInCollision),
+		"custom theme store rejects direct built-in id collisions");
+
+	expectTrue(CustomThemeStore::removeTheme(settings, theme.skinId()),
+		"custom theme can be deleted");
+	expectFalse(CustomThemeStore::findTheme(settings, theme.skinId(), nullptr),
+		"deleted custom theme is no longer found");
 }
 
 void testSkinMaterialEffectHelpersStayFixedBlackAndWhite()

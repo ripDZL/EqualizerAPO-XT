@@ -1884,6 +1884,7 @@ int main(int argc, char** argv)
 		testTokenSubstitutionOffersAnAlphaForm();
 		testEverySkinSheetResolvesAllThemeTokens();
 		testThemePreviewStyleSheetUsesCustomTokens();
+		testCustomThemeStoreRoundTripsTokensAndJson();
 		testSkinMaterialEffectHelpersStayFixedBlackAndWhite();
 		testSkinScopeGutterLayoutKeepsIfBranchesOnMemberRails();
 		testSkinAnalysisGraphLayoutKeepsAxisMathShared();

@@ -14,18 +14,24 @@
 #include <QDir>
 #include <QFile>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QHBoxLayout>
 #include <QHeaderView>
+#include <QInputDialog>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonParseError>
 #include <QLabel>
+#include <QLineEdit>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSignalBlocker>
+#include <QSettings>
 #include <QTableWidget>
 #include <QTableWidgetItem>
 #include <QVBoxLayout>
 
+#include "helpers/RegistryHelper.h"
 #include "Editor/skins/SkinDisplayNames.h"
 #include "Editor/skins/SkinSupport.h"
 #include "Editor/skins/SkinThemeData.h"
@@ -69,6 +75,13 @@ QString normalizeColor(const QString& value)
 	return color.name(QColor::HexRgb).toUpper();
 }
 
+QString defaultThemeName(const QComboBox* skinComboBox)
+{
+	if (skinComboBox == nullptr)
+		return QStringLiteral("Custom Theme");
+	return QStringLiteral("%1 Custom").arg(skinComboBox->currentText());
+}
+
 void setItemValid(QTableWidgetItem* item, bool valid)
 {
 	if (item == nullptr)
@@ -83,20 +96,46 @@ ThemeEditorDialog::ThemeEditorDialog(const QString& skinId, bool dark, QWidget* 
 	setWindowTitle(tr("Theme Lab"));
 	setMinimumSize(760, 520);
 
+	QSettings settings(QString::fromWCharArray(EDITOR_REGPATH), QSettings::NativeFormat);
+	CustomThemeStore::Theme initialCustomTheme;
+	const bool initialThemeIsCustom =
+		CustomThemeStore::findTheme(settings, skinId, &initialCustomTheme);
+	const QString initialBaseTheme = initialThemeIsCustom
+		? initialCustomTheme.baseTheme
+		: SkinThemeData::resolveId(skinId);
+	const bool initialDark = initialThemeIsCustom ? initialCustomTheme.dark : dark;
+
 	skinComboBox = new QComboBox(this);
 	const QStringList ids = SkinThemeData::ids();
 	for (const QString& id : ids)
 		skinComboBox->addItem(SkinDisplayNames::displayName(id), id);
-	const int selectedIndex = qMax(0, skinComboBox->findData(SkinThemeData::resolveId(skinId)));
+	const int selectedIndex = qMax(0, skinComboBox->findData(initialBaseTheme));
 	skinComboBox->setCurrentIndex(selectedIndex);
 
 	darkCheckBox = new QCheckBox(tr("Dark"), this);
-	darkCheckBox->setChecked(dark);
+	darkCheckBox->setChecked(initialDark);
 
 	QHBoxLayout* chooserLayout = new QHBoxLayout;
 	chooserLayout->addWidget(new QLabel(tr("Base theme:"), this));
 	chooserLayout->addWidget(skinComboBox, 1);
 	chooserLayout->addWidget(darkCheckBox);
+
+	savedThemeComboBox = new QComboBox(this);
+	savedThemeComboBox->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+	QPushButton* loadSavedButton = new QPushButton(tr("Load"), this);
+	QPushButton* applySavedButton = new QPushButton(tr("Apply"), this);
+	QPushButton* saveButton = new QPushButton(tr("Save as..."), this);
+	QPushButton* importButton = new QPushButton(tr("Import JSON..."), this);
+	QPushButton* deleteButton = new QPushButton(tr("Delete"), this);
+
+	QHBoxLayout* savedLayout = new QHBoxLayout;
+	savedLayout->addWidget(new QLabel(tr("Saved theme:"), this));
+	savedLayout->addWidget(savedThemeComboBox, 1);
+	savedLayout->addWidget(loadSavedButton);
+	savedLayout->addWidget(applySavedButton);
+	savedLayout->addWidget(saveButton);
+	savedLayout->addWidget(importButton);
+	savedLayout->addWidget(deleteButton);
 
 	colorTable = new QTableWidget(this);
 	colorTable->setColumnCount(3);
@@ -137,12 +176,18 @@ ThemeEditorDialog::ThemeEditorDialog(const QString& skinId, bool dark, QWidget* 
 
 	QVBoxLayout* mainLayout = new QVBoxLayout(this);
 	mainLayout->addLayout(chooserLayout);
+	mainLayout->addLayout(savedLayout);
 	mainLayout->addLayout(bodyLayout, 1);
 	mainLayout->addLayout(buttonLayout);
 
 	connect(skinComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(reloadFromBase()));
 	connect(darkCheckBox, SIGNAL(toggled(bool)), this, SLOT(reloadFromBase()));
 	connect(colorTable, SIGNAL(itemChanged(QTableWidgetItem*)), this, SLOT(updatePreviewPanel()));
+	connect(loadSavedButton, SIGNAL(clicked()), this, SLOT(loadSavedTheme()));
+	connect(applySavedButton, SIGNAL(clicked()), this, SLOT(applySavedTheme()));
+	connect(saveButton, SIGNAL(clicked()), this, SLOT(saveTheme()));
+	connect(importButton, SIGNAL(clicked()), this, SLOT(importJson()));
+	connect(deleteButton, SIGNAL(clicked()), this, SLOT(deleteSavedTheme()));
 	connect(previewButton, SIGNAL(clicked()), this, SLOT(previewInApplication()));
 	connect(resetButton, SIGNAL(clicked()), this, SLOT(resetActiveTheme()));
 	connect(copyButton, SIGNAL(clicked()), this, SLOT(copyJson()));
@@ -150,6 +195,12 @@ ThemeEditorDialog::ThemeEditorDialog(const QString& skinId, bool dark, QWidget* 
 	connect(closeButton, SIGNAL(clicked()), this, SLOT(accept()));
 
 	reloadFromBase();
+	reloadSavedThemes(initialThemeIsCustom ? initialCustomTheme.skinId() : QString());
+	if (initialThemeIsCustom)
+	{
+		populateTable(CustomThemeStore::tokensForTheme(initialCustomTheme));
+		updatePreviewPanel();
+	}
 }
 
 QString ThemeEditorDialog::currentSkinId() const
@@ -269,52 +320,220 @@ void ThemeEditorDialog::previewInApplication()
 	emit themePreviewRequested(currentSkinId(), darkCheckBox->isChecked(), tokens);
 }
 
+CustomThemeStore::Theme ThemeEditorDialog::themeFromTable(const QString& name) const
+{
+	bool ok = false;
+	const SkinTokens tokens = tokensFromTable(&ok);
+	Q_UNUSED(ok);
+
+	CustomThemeStore::Theme theme;
+	theme.name = name.trimmed().isEmpty() ? defaultThemeName(skinComboBox) : name.trimmed();
+	theme.baseTheme = currentSkinId();
+	theme.dark = darkCheckBox->isChecked();
+	for (const ColorRow& spec : colorRows())
+		theme.colors.insert(QString::fromLatin1(spec.key), tokens.*(spec.field));
+	return theme;
+}
+
+void ThemeEditorDialog::reloadSavedThemes(const QString& selectSkinId)
+{
+	if (savedThemeComboBox == nullptr)
+		return;
+
+	const QSignalBlocker blocker(savedThemeComboBox);
+	savedThemeComboBox->clear();
+
+	QSettings settings(QString::fromWCharArray(EDITOR_REGPATH), QSettings::NativeFormat);
+	const QList<CustomThemeStore::Theme> savedThemes = CustomThemeStore::themes(settings);
+	for (const CustomThemeStore::Theme& theme : savedThemes)
+		savedThemeComboBox->addItem(theme.name, theme.skinId());
+
+	if (savedThemeComboBox->count() == 0)
+	{
+		savedThemeComboBox->addItem(tr("No saved themes"), QString());
+		savedThemeComboBox->setEnabled(false);
+		return;
+	}
+
+	savedThemeComboBox->setEnabled(true);
+	if (!selectSkinId.isEmpty())
+	{
+		const int index = savedThemeComboBox->findData(selectSkinId);
+		if (index >= 0)
+			savedThemeComboBox->setCurrentIndex(index);
+	}
+}
+
+bool ThemeEditorDialog::selectedSavedTheme(CustomThemeStore::Theme* theme) const
+{
+	if (savedThemeComboBox == nullptr || !savedThemeComboBox->isEnabled())
+		return false;
+
+	const QString skinId = savedThemeComboBox->currentData().toString();
+	if (skinId.isEmpty())
+		return false;
+
+	QSettings settings(QString::fromWCharArray(EDITOR_REGPATH), QSettings::NativeFormat);
+	return CustomThemeStore::findTheme(settings, skinId, theme);
+}
+
+void ThemeEditorDialog::loadSavedTheme()
+{
+	CustomThemeStore::Theme theme;
+	if (!selectedSavedTheme(&theme))
+		return;
+
+	{
+		const QSignalBlocker skinBlocker(skinComboBox);
+		const QSignalBlocker darkBlocker(darkCheckBox);
+		const int index = skinComboBox->findData(SkinThemeData::resolveId(theme.baseTheme));
+		if (index >= 0)
+			skinComboBox->setCurrentIndex(index);
+		darkCheckBox->setChecked(theme.dark);
+	}
+	populateTable(CustomThemeStore::tokensForTheme(theme));
+	updatePreviewPanel();
+}
+
+void ThemeEditorDialog::applySavedTheme()
+{
+	CustomThemeStore::Theme theme;
+	if (selectedSavedTheme(&theme))
+		emit customThemeRequested(theme.skinId());
+}
+
+void ThemeEditorDialog::saveTheme()
+{
+	bool ok = false;
+	tokensFromTable(&ok);
+	if (!ok)
+	{
+		QMessageBox::warning(this, tr("Theme Lab"), tr("Fix invalid colors before saving."));
+		return;
+	}
+
+	QString defaultName = defaultThemeName(skinComboBox);
+	CustomThemeStore::Theme selectedTheme;
+	if (selectedSavedTheme(&selectedTheme))
+		defaultName = selectedTheme.name;
+
+	const QString name = QInputDialog::getText(this, tr("Save theme"),
+		tr("Theme name:"), QLineEdit::Normal, defaultName, &ok).trimmed();
+	if (!ok || name.isEmpty())
+		return;
+
+	QSettings settings(QString::fromWCharArray(EDITOR_REGPATH), QSettings::NativeFormat);
+	CustomThemeStore::Theme theme = themeFromTable(name);
+	theme.id = CustomThemeStore::uniqueIdForName(settings, name);
+	if (!CustomThemeStore::saveTheme(settings, theme))
+	{
+		QMessageBox::warning(this, tr("Theme Lab"), tr("Could not save the theme."));
+		return;
+	}
+	reloadSavedThemes(theme.skinId());
+}
+
+void ThemeEditorDialog::importJson()
+{
+	const QString path = QFileDialog::getOpenFileName(this, tr("Import theme JSON"),
+		QString(), tr("Theme JSON (*.json)"));
+	if (path.isEmpty())
+		return;
+
+	QFile file(path);
+	if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+	{
+		QMessageBox::warning(this, tr("Theme Lab"),
+			tr("Could not read %1").arg(QDir::toNativeSeparators(path)));
+		return;
+	}
+
+	QJsonParseError parseError;
+	const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &parseError);
+	if (parseError.error != QJsonParseError::NoError || !document.isObject())
+	{
+		QMessageBox::warning(this, tr("Theme Lab"), tr("The selected file is not valid theme JSON."));
+		return;
+	}
+
+	QString error;
+	CustomThemeStore::Theme theme;
+	if (!CustomThemeStore::fromJsonObject(document.object(), &theme, &error))
+	{
+		QMessageBox::warning(this, tr("Theme Lab"), error);
+		return;
+	}
+	if (theme.name.isEmpty())
+		theme.name = QFileInfo(path).completeBaseName();
+
+	QSettings settings(QString::fromWCharArray(EDITOR_REGPATH), QSettings::NativeFormat);
+	if (theme.id.isEmpty()
+		|| CustomThemeStore::findTheme(settings, theme.skinId(), nullptr)
+		|| SkinThemeData::ids().contains(theme.id))
+	{
+		theme.id = CustomThemeStore::uniqueIdForName(settings, theme.name);
+	}
+
+	if (!CustomThemeStore::saveTheme(settings, theme))
+	{
+		QMessageBox::warning(this, tr("Theme Lab"), tr("Could not import the theme."));
+		return;
+	}
+	reloadSavedThemes(theme.skinId());
+	loadSavedTheme();
+}
+
+void ThemeEditorDialog::deleteSavedTheme()
+{
+	CustomThemeStore::Theme theme;
+	if (!selectedSavedTheme(&theme))
+		return;
+
+	if (QMessageBox::question(this, tr("Delete theme"),
+		tr("Delete saved theme \"%1\"?").arg(theme.name)) != QMessageBox::Yes)
+		return;
+
+	QSettings settings(QString::fromWCharArray(EDITOR_REGPATH), QSettings::NativeFormat);
+	CustomThemeStore::removeTheme(settings, theme.skinId());
+	reloadSavedThemes();
+}
+
 void ThemeEditorDialog::resetActiveTheme()
 {
 	emit builtInThemeRequested(currentSkinId(), darkCheckBox->isChecked());
 }
 
-QString ThemeEditorDialog::themeJson(const SkinTokens& tokens) const
+QString ThemeEditorDialog::themeJson(const CustomThemeStore::Theme& theme) const
 {
-	QJsonObject colors;
-	for (const ColorRow& spec : colorRows())
-		colors.insert(QString::fromLatin1(spec.key), tokens.*(spec.field));
-	colors.insert(QStringLiteral("surfaceRaised"), tokens.surfaceRaised);
-	colors.insert(QStringLiteral("surfaceSunken"), tokens.surfaceSunken);
-	colors.insert(QStringLiteral("graphGridMajor"), tokens.graphGridMajor);
-	colors.insert(QStringLiteral("focusRing"), tokens.focusRing);
-
-	QJsonObject root;
-	root.insert(QStringLiteral("baseTheme"), currentSkinId());
-	root.insert(QStringLiteral("dark"), darkCheckBox->isChecked());
-	root.insert(QStringLiteral("colors"), colors);
-	return QString::fromUtf8(QJsonDocument(root).toJson(QJsonDocument::Indented));
+	return QString::fromUtf8(QJsonDocument(
+		CustomThemeStore::toJsonObject(theme)).toJson(QJsonDocument::Indented));
 }
 
 void ThemeEditorDialog::copyJson()
 {
 	bool ok = false;
-	const SkinTokens tokens = tokensFromTable(&ok);
+	tokensFromTable(&ok);
 	if (!ok)
 	{
 		QMessageBox::warning(this, tr("Theme Lab"), tr("Fix invalid colors before copying."));
 		return;
 	}
-	QApplication::clipboard()->setText(themeJson(tokens));
+	QApplication::clipboard()->setText(themeJson(themeFromTable(defaultThemeName(skinComboBox))));
 }
 
 void ThemeEditorDialog::exportJson()
 {
 	bool ok = false;
-	const SkinTokens tokens = tokensFromTable(&ok);
+	tokensFromTable(&ok);
 	if (!ok)
 	{
 		QMessageBox::warning(this, tr("Theme Lab"), tr("Fix invalid colors before exporting."));
 		return;
 	}
 
+	const CustomThemeStore::Theme theme = themeFromTable(defaultThemeName(skinComboBox));
 	const QString path = QFileDialog::getSaveFileName(this, tr("Export theme JSON"),
-		QStringLiteral("%1-theme.json").arg(currentSkinId()),
+		QStringLiteral("%1-theme.json").arg(CustomThemeStore::suggestedId(theme.name)),
 		tr("Theme JSON (*.json)"));
 	if (path.isEmpty())
 		return;
@@ -326,5 +545,5 @@ void ThemeEditorDialog::exportJson()
 			tr("Could not write %1").arg(QDir::toNativeSeparators(path)));
 		return;
 	}
-	file.write(themeJson(tokens).toUtf8());
+	file.write(themeJson(theme).toUtf8());
 }

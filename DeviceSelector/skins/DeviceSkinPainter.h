@@ -75,6 +75,7 @@ public:
 	// (and per iteration by the preview shot mode). Widgets read these so
 	// promoted .ui widgets need no constructor arguments.
 	static void setActiveTheme(const QString& skinId, bool dark);
+	static void setActiveThemeTokens(const QString& skinId, const SkinTokens& tokens);
 	// The Editor's heritage (legacyRows) escape hatch: neutral base forms in
 	// classic light system colours instead of a skin instrument.
 	static void setHeritageTheme();
