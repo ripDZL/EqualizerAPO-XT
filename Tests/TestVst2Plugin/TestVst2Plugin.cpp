@@ -75,8 +75,8 @@ struct ChunkBlob
 // return.
 struct PluginState
 {
-	float params[kNumParams];
-	ChunkBlob chunkScratch;
+	float params[kNumParams] = {};
+	ChunkBlob chunkScratch = {};
 	vst_host_callback_t host = nullptr;
 	int32_t lastHostProcessLevel = 0;
 	int32_t lastTimeFlags = 0;
@@ -116,7 +116,7 @@ void processGeneric(vst_effect_t* effect, const Sample* const* inputs, Sample** 
 	{
 		mutableState->lastHostProcessLevel = static_cast<int32_t>(
 			mutableState->host(effect, VST_HOST_OPCODE_GET_ACTIVE_THREAD, 0, 0, nullptr, 0.0f));
-		vst_time_info* timeInfo = reinterpret_cast<vst_time_info*>(
+		const vst_time_info* timeInfo = reinterpret_cast<const vst_time_info*>(
 			mutableState->host(effect, VST_HOST_OPCODE_GET_TIME, 0, 0, nullptr, 0.0f));
 		if (timeInfo != nullptr)
 		{

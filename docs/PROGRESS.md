@@ -95,3 +95,4 @@
 - [x] Fine-combed live-preview/VST host paths: locked capture readiness checks, atomic VST2 sample-position frames, per-thread VST2 time-info returns.
 - [x] Fine-combed Studio inline theme material styles: remaining reusable black/white shadow/highlight styles now use material helpers or token colors.
 - [x] Validated beta pass: `git diff --check`; `Test-SourceSync.ps1`; forced `Common`, `HybridConvTests`, `EditorLogicTests`, `EngineOrchestrationTests` rebuilds; `HybridConvTests.exe` 1635 checks; `EditorLogicTests.exe` 2653 checks; `EngineOrchestrationTests.exe` 1160 checks; AVX-512 Editor rebuild; `Editor.exe --selftest-vst`; full skin gallery 492 PNGs at `artifacts\skin-gallery-theme-system-20260801-003249`.
+- [x] Fixed fresh beta CI `cppcheck` findings: static analysis-graph helper, explicit VST2 test plugin state initialization, const host time pointer; local `EditorLogicTests.exe` 2653 checks and `HybridConvTests.exe` 1635 checks passed.

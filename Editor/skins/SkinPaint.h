@@ -256,8 +256,8 @@ struct SkinAnalysisGraphLayout
 		return label;
 	}
 
-	QRect centeredRectClampedToX(int centerX, int top, int width, int height,
-		int minLeft, int maxLeft) const
+	static QRect centeredRectClampedToX(int centerX, int top, int width, int height,
+		int minLeft, int maxLeft)
 	{
 		return QRect(qBound(minLeft, centerX - width / 2, maxLeft), top, width, height);
 	}
