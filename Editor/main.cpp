@@ -430,10 +430,10 @@ int main(int argc, char* argv[])
 	do
 	{
 		// LegacyRows is a whole presentation, not just a row widget: the
-		// heritage editor runs with the platform's native widget style, the
-		// stock ClearType font engine, and system fonts. The skinned mode
-		// keeps the redesign stack below. Read the mode before QApplication
-		// so the font-engine choice follows an in-process restart.
+		// heritage editor keeps the legacy row widgets and stock ClearType font
+		// engine, then applies a compact token palette around the shared chrome.
+		// Read the mode before QApplication so the font-engine choice follows an
+		// in-process restart.
 		bool legacyRowsMode;
 		{
 			QSettings settings(QString::fromWCharArray(EDITOR_REGPATH), QSettings::NativeFormat);
@@ -501,7 +501,8 @@ int main(int argc, char* argv[])
 		QSettings settings(QString::fromWCharArray(EDITOR_REGPATH), QSettings::NativeFormat);
 		if (legacyRowsMode)
 		{
-			SkinManager::instance()->applyHeritage();
+			const EditorSettings::SkinChoice choice = EditorSettings::readSkinChoice(settings, GUIHelper::isDarkMode());
+			SkinManager::instance()->applyHeritage(choice.id, choice.dark);
 		}
 		else
 		{

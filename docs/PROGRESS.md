@@ -106,3 +106,6 @@
 - [x] Merged upstream into `beta` while preserving beta VST analyzer-preview and theming changes.
 - [x] Fixed upstream-merge integration seams: moved `devices/AbstractAPOInfo.h` includes and combined upstream `@TOKEN_RGB@` substitution with beta `@TOKEN_Axx@`.
 - [x] Validated upstream sync: `git diff --check`; `Test-SourceSync.ps1`; `HybridConvTests.exe` 1635 checks; `EditorLogicTests.exe` 2678 checks; `EngineOrchestrationTests.exe` 1167 checks; `AudioRegressionTests.exe` 30/30 with source refs; rebuilt AVX-512 Editor; `Editor.exe --selftest-vst`; skin gallery 1180 PNGs.
+- [x] Pivoted LegacyRows theming without changing row behavior: `SkinManager::applyHeritage(id,dark)` keeps legacy row widgets/factories but applies active built-in/custom tokens, app palette, and heritage QSS to shared editor chrome.
+- [x] Added simple legacy-safe themes: `legacy-slate`, `legacy-blue`, `legacy-forest`, `legacy-bronze`, and `legacy-plum`.
+- [x] Validated LegacyRows pivot: `git diff --check`; `Test-SourceSync.ps1`; `EditorLogicTests.exe` 3137 checks; AVX-512 Editor/DeviceSelector rebuilds; `Editor.exe --selftest-vst`; `Editor.exe --skin-switch-test`; focused LegacyRows gallery 20 PNGs at `artifacts\skin-gallery-legacy-themes-20260801-112049`.

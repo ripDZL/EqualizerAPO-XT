@@ -1,6 +1,7 @@
 #include "SkinManager.h"
 
 #include <QApplication>
+#include <QColor>
 #include <QDebug>
 #include <QFile>
 #include <QSettings>
@@ -13,6 +14,73 @@
 #include "skins/ISkin.h"
 #include "skins/Skins.h"
 #include "skins/SkinThemeData.h"
+
+namespace
+{
+QString heritageStyleSheet(const SkinTokens& tokens)
+{
+	const QColor accent(tokens.accent);
+	const QString selectionText =
+		accent.isValid() && accent.lightness() > 135 ? tokens.background : tokens.surface;
+	return QStringLiteral(
+		"QMainWindow, QWidget#centralWidget, QWidget#WindowChromeHost {"
+		" background: %1; color: %7; font-family: \"%12\"; }"
+		"QWidget#AppTitleBar {"
+		" background: %2; border-bottom: 1px solid %10; }"
+		"QLabel#TitleBarText { color: %7; font-weight: 600; }"
+		"QMenuBar { background: %2; color: %7; border-bottom: 1px solid %10; }"
+		"QMenuBar::item { background: transparent; padding: 4px 8px; }"
+		"QMenuBar::item:selected { background: %4; color: %7; }"
+		"QMenu { background: %3; color: %7; border: 1px solid %10; }"
+		"QMenu::item { padding: 4px 22px 4px 20px; }"
+		"QMenu::item:selected { background: %5; color: %7; }"
+		"QMenu::separator { height: 1px; background: %10; margin: 4px 8px; }"
+		"QToolBar { background: %2; border: 0; border-bottom: 1px solid %10; spacing: 3px; }"
+		"QToolButton { background: transparent; color: %7; border: 1px solid transparent; padding: 2px 4px; }"
+		"QToolButton:hover { background: %4; border-color: %10; }"
+		"QToolButton:pressed, QToolButton:checked { background: %5; border-color: %9; }"
+		"QTabWidget::pane { background: %1; border-top: 1px solid %10; }"
+		"QTabBar::tab { background: %2; color: %8; border: 1px solid %10; padding: 4px 10px; }"
+		"QTabBar::tab:selected { background: %3; color: %7; border-bottom-color: %3; }"
+		"QTabBar::tab:hover { background: %4; color: %7; }"
+		"QDockWidget { background: %1; color: %7; titlebar-close-icon: none; titlebar-normal-icon: none; }"
+		"QDockWidget::title { background: %2; color: %7; padding: 4px 6px; border-top: 1px solid %10; }"
+		"QWidget#dockWidgetContents, QWidget#analysisControlBar { background: %1; color: %7; }"
+		"QFrame#AnalysisStatChip { background: %3; border: 1px solid %10; border-radius: 3px; }"
+		"QLabel#AnalysisFormLabel, QLabel#AnalysisStatLabel { color: %8; }"
+		"QLabel#AnalysisStatValue { color: %7; font-weight: 600; }"
+		"QScrollArea, QAbstractScrollArea, QGraphicsView { background: %1; color: %7; border: 1px solid %10; }"
+		"QScrollArea > QWidget > QWidget { background: %1; }"
+		"QLabel { color: %7; background: transparent; }"
+		"QLineEdit, QTextEdit, QPlainTextEdit, QComboBox, QSpinBox, QDoubleSpinBox {"
+		" background: %6; color: %7; border: 1px solid %10; selection-background-color: %9;"
+		" selection-color: %11; padding: 2px 4px; }"
+		"QLineEdit:disabled, QTextEdit:disabled, QPlainTextEdit:disabled, QComboBox:disabled,"
+		" QSpinBox:disabled, QDoubleSpinBox:disabled { background: %2; color: %8; }"
+		"QPushButton { background: %3; color: %7; border: 1px solid %10; padding: 3px 8px; }"
+		"QPushButton:hover { background: %4; border-color: %9; }"
+		"QPushButton:pressed { background: %5; }"
+		"QPushButton:disabled, QToolButton:disabled, QLabel:disabled { color: %8; }"
+		"QCheckBox, QRadioButton { color: %7; background: transparent; }"
+		"QHeaderView::section { background: %2; color: %7; border: 1px solid %10; padding: 3px; }"
+		"QTableView, QTreeView, QListView { background: %6; color: %7; alternate-background-color: %2;"
+		" gridline-color: %10; selection-background-color: %5; selection-color: %7; }"
+		"QSplitter::handle { background: %10; }"
+		"QStatusBar { background: %2; color: %8; }")
+		.arg(tokens.background,
+			tokens.surface,
+			tokens.card,
+			tokens.cardHover,
+			tokens.cardSelected,
+			tokens.surfaceSunken,
+			tokens.text,
+			tokens.mutedText,
+			tokens.accent,
+			tokens.border,
+			selectionText,
+			tokens.fontFamily);
+}
+}
 
 SkinManager::SkinManager(QObject* parent)
 	: QObject(parent)
@@ -50,44 +118,39 @@ bool SkinManager::isHeritage() const
 	return heritageMode;
 }
 
-void SkinManager::applyHeritage()
+void SkinManager::applyHeritage(const QString& newSkinId, bool dark)
 {
 	CrashHandler::setBreadcrumb(L"applyHeritage (legacy rows)");
 	LogFStatic(L"Applying heritage presentation (legacy rows)");
 
 	heritageMode = true;
 	previewMode = false;
-	// Token donor and the base-class knob painter; nothing of the skin's own
-	// look survives below.
-	activeSkin = Skins::byId(QStringLiteral("studio"));
-	skinId = QStringLiteral("heritage");
-	darkMode = false;
+	CustomThemeStore::Theme customTheme;
+	QSettings settings(QString::fromWCharArray(EDITOR_REGPATH), QSettings::NativeFormat);
+	if (CustomThemeStore::findTheme(settings, newSkinId, &customTheme))
+	{
+		activeSkin = Skins::byId(customTheme.baseTheme);
+		skinId = customTheme.skinId();
+		darkMode = customTheme.dark;
+		currentTokens = CustomThemeStore::tokensForTheme(customTheme);
+	}
+	else
+	{
+		activeSkin = Skins::byId(newSkinId);
+		skinId = activeSkin->id();
+		darkMode = dark;
+		currentTokens = activeSkin->tokens(darkMode);
+	}
 
-	// Classic light values for the custom painters that consume tokens. The
-	// widget chrome itself comes from the native style, untouched by QSS.
-	SkinTokens tokens = activeSkin->tokens(false);
-	tokens.dark = false;
-	tokens.background = QStringLiteral("#f0f0f0");
-	tokens.surface = QStringLiteral("#ffffff");
-	tokens.surfaceRaised = QStringLiteral("#f5f5f5");
-	tokens.surfaceSunken = QStringLiteral("#e8e8e8");
-	tokens.card = QStringLiteral("#ffffff");
-	tokens.cardHover = QStringLiteral("#f0f6fc");
-	tokens.text = QStringLiteral("#000000");
-	tokens.mutedText = QStringLiteral("#606060");
-	tokens.border = QStringLiteral("#adadad");
-	tokens.graph = QStringLiteral("#ffffff");
-	tokens.graphGridMajor = QStringLiteral("#c8c8c8");
-	tokens.graphGridMinor = QStringLiteral("#e4e4e4");
-	tokens.accent = QStringLiteral("#0078d7");
-	tokens.accent2 = QStringLiteral("#2b88d8");
-	tokens.focusRing = QStringLiteral("#0078d7");
-	tokens.fontFamily = QStringLiteral("Segoe UI");
-	tokens.monoFontFamily = QStringLiteral("Consolas");
-	currentTokens = tokens;
-
-	qApp->setStyleSheet(QString());
-	qApp->setPalette(qApp->style()->standardPalette());
+	// Legacy rows keep their original widgets and factory chain. Only the Qt
+	// palette/QSS layer changes, so graph, menu, tab and toolbar chrome no
+	// longer stay light while the row list is dark.
+	currentTokens.fontFamily = QStringLiteral("Segoe UI");
+	currentTokens.monoFontFamily = QStringLiteral("Consolas");
+	SkinThemeData::registerBundledFonts(false);
+	qApp->setPalette(SkinThemeData::palette(currentTokens, darkMode));
+	qApp->setStyleSheet(heritageStyleSheet(currentTokens));
+	sheetApplied = true;
 
 	emit skinChanged(currentTokens);
 	for (QWidget* widget : qApp->allWidgets())
@@ -305,6 +368,11 @@ ReferenceCardView* SkinManager::createReferenceCardView(const QString& kind, QWi
 
 void SkinManager::paintTitleBarChrome(QPainter& painter, const QRect& rect) const
 {
+	if (heritageMode)
+	{
+		activeSkin->ISkin::paintTitleBarChrome(painter, rect, currentTokens);
+		return;
+	}
 	activeSkin->paintTitleBarChrome(painter, rect, currentTokens);
 }
 

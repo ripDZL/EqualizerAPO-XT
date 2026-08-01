@@ -1351,34 +1351,43 @@ int renderSkin(const QDir& outDir, const QString& skinId, const QString& configP
 
 namespace SkinGallery
 {
-// Heritage (legacy rows) verification: the mode is a single unskinned
-// presentation, so instead of the per-skin per-row matrix it renders two
-// whole-table dumps (active and commented rows) for eyeball regression checks.
-// Triggered by EAPO_GALLERY_LEGACY=1, used by the local runner scripts.
-int renderHeritage(const QDir& outDir, const QString& configPath)
+// Heritage (legacy rows) verification: instead of the per-row card matrix it
+// renders whole-table dumps, one active and one commented, for each requested
+// legacy-safe theme. Triggered by EAPO_GALLERY_LEGACY=1.
+int renderHeritage(const QDir& outDir, const QString& configPath, const QStringList& skinIds)
 {
-	SkinManager::instance()->applyHeritage();
-
 	int failures = 0;
-	for (int commented = 0; commented <= 1; commented++)
+	for (const QString& rawSkinId : skinIds)
 	{
-		QList<QString> lines;
-		for (const GalleryRow& row : galleryRows())
-			lines.append(commented ? QStringLiteral("# ") + row.line : row.line);
-
-		QScrollArea scrollArea;
-		scrollArea.resize(960, 720);
-		buildRows(scrollArea, configPath, lines);
-		scrollArea.show();
-		QCoreApplication::processEvents();
-
-		QPixmap dump = scrollArea.widget()->grab();
-		const QString fileName = outDir.filePath(QStringLiteral("heritage_%1.png")
-				.arg(commented ? QStringLiteral("disabled") : QStringLiteral("normal")));
-		if (dump.isNull() || !dump.save(fileName))
+		const QString skinId = rawSkinId.trimmed();
+		for (int darkIndex = 0; darkIndex < 2; darkIndex++)
 		{
-			qWarning("SkinGallery: could not write %s", qPrintable(fileName));
-			failures++;
+			const bool dark = darkIndex == 0;
+			SkinManager::instance()->applyHeritage(skinId, dark);
+
+			for (int commented = 0; commented <= 1; commented++)
+			{
+				QList<QString> lines;
+				for (const GalleryRow& row : galleryRows())
+					lines.append(commented ? QStringLiteral("# ") + row.line : row.line);
+
+				QScrollArea scrollArea;
+				scrollArea.resize(960, 720);
+				buildRows(scrollArea, configPath, lines);
+				scrollArea.show();
+				QCoreApplication::processEvents();
+
+				QPixmap dump = scrollArea.widget()->grab();
+				const QString fileName = outDir.filePath(QStringLiteral("heritage_%1_%2_%3.png")
+						.arg(SkinManager::instance()->currentSkinId(),
+							dark ? QStringLiteral("dark") : QStringLiteral("light"),
+							commented ? QStringLiteral("disabled") : QStringLiteral("normal")));
+				if (dump.isNull() || !dump.save(fileName))
+				{
+					qWarning("SkinGallery: could not write %s", qPrintable(fileName));
+					failures++;
+				}
+			}
 		}
 	}
 	return failures;
@@ -1589,6 +1598,37 @@ int runSwitchTest(const QStringList& arguments)
 	QApplication::processEvents();
 	failures += checkToolbar(QStringLiteral("baseline (before any switch)"));
 	{
+		SkinManager::instance()->applyHeritage(QStringLiteral("legacy-bronze"), true);
+		SkinManager::instance()->styleMainToolbar(probeToolBar);
+		QApplication::processEvents();
+		const SkinTokens& tokens = SkinManager::instance()->tokens();
+		if (SkinManager::instance()->currentSkinId() != QLatin1String("legacy-bronze")
+			|| !SkinManager::instance()->isDark())
+		{
+			qWarning("SkinSwitchTest: heritage theme did not resolve to legacy-bronze/dark");
+			failures++;
+		}
+		if (qApp->palette().color(QPalette::Window) != QColor(tokens.background))
+		{
+			qWarning("SkinSwitchTest: heritage palette did not reach the application window role");
+			failures++;
+		}
+		const QString heritageSheet = qApp->styleSheet();
+		for (const QString& selector : { QStringLiteral("QMainWindow"),
+			QStringLiteral("QWidget#AppTitleBar"), QStringLiteral("QMenuBar"),
+			QStringLiteral("QToolBar"), QStringLiteral("QDockWidget"),
+			QStringLiteral("QGraphicsView") })
+		{
+			if (!heritageSheet.contains(selector))
+			{
+				qWarning("SkinSwitchTest: heritage stylesheet is missing %s",
+					qPrintable(selector));
+				failures++;
+			}
+		}
+		failures += checkToolbar(QStringLiteral("heritage legacy-bronze/dark"));
+	}
+	{
 		// LegacyRows still uses CopyFilterGUI. Its QGraphicsView does not own
 		// the scene, so the GUI must parent it explicitly; allWidgets() cannot
 		// detect this leak because QGraphicsScene is not a QWidget.
@@ -1790,9 +1830,7 @@ int run(const QStringList& arguments)
 	int failures = 0;
 	if (qEnvironmentVariableIsSet("EAPO_GALLERY_LEGACY"))
 	{
-		// Heritage mode is skin-independent; render its two dumps and exit
-		// through the same no-teardown path below.
-		failures += renderHeritage(outDir, configPath);
+		failures += renderHeritage(outDir, configPath, skinIds);
 		const int status = failures == 0 ? 0 : 1;
 		std::fflush(nullptr);
 		std::_Exit(status);

@@ -312,10 +312,8 @@ void MainWindow::setupRedesignActions()
 
 	if (SkinManager::instance()->isHeritage())
 	{
-		// Heritage is unskinned by definition; the choices come back with the
-		// modern presentation.
-		skinActionGroup->setEnabled(false);
-		darkThemeAction->setEnabled(false);
+		// LegacyRows accepts the built-in skin/dark palette, but Theme Lab's
+		// live preview still targets the modern skin path.
 		themeEditorAction->setEnabled(false);
 	}
 
@@ -408,12 +406,14 @@ void MainWindow::dressSkinChrome()
 
 void MainWindow::applyRedesignPreferences()
 {
-	// Heritage is a whole presentation, not a skin: re-applying a skin here
-	// would stomp applyHeritage's empty stylesheet and native palette with
-	// the registry's last skin, mixing modern chrome around legacy rows.
-	// Keeping skinId untouched also keeps the saved interface/skin from
-	// being clobbered by a heritage session.
-	if (!SkinManager::instance()->isHeritage())
+	if (currentRenderMode == FilterTable::LegacyRows)
+	{
+		SkinManager::instance()->applyHeritage(skinId, skinDark);
+		skinId = SkinManager::instance()->currentSkinId();
+		skinDark = SkinManager::instance()->isDark();
+		dressSkinChrome();
+	}
+	else
 	{
 		SkinManager::instance()->applySkin(skinId, skinDark);
 		skinId = SkinManager::instance()->currentSkinId();

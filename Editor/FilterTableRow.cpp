@@ -32,6 +32,7 @@
 
 #include "Editor/helpers/GUIHelper.h"
 #include "FilterTableRow.h"
+#include "SkinManager.h"
 #include "ui_FilterTableRow.h"
 
 FilterTableRow::FilterTableRow(FilterTable* table, int number, FilterTable::Item* item, IFilterGUI* gui)
@@ -104,28 +105,29 @@ void FilterTableRow::paintEvent(QPaintEvent*)
 	QRectF r = rect();
 	r = r.marginsAdded(QMarginsF(-1.5, -1.5, -1.5, -0.5));
 
-	bool dark = GUIHelper::isDarkMode();
+	const SkinTokens& tokens = SkinManager::instance()->tokens();
+	const bool dark = SkinManager::instance()->isDark();
 
 	QColor color;
 	if (table->getSelectedItems().contains(item))
 	{
 		if (table->getFocusedItem() == item)
-			color = dark ? QColor(44, 111, 222) : QColor(64, 136, 255);
+			color = QColor(tokens.accent);
 		else
-			color = dark ? QColor(34, 86, 171) : QColor(97, 143, 219);
+			color = QColor(tokens.accent).darker(dark ? 135 : 115);
 	}
 	else
 	{
 		if (table->getFocusedItem() == item)
-			color = dark ? QColor(100, 100, 100) : QColor(160, 160, 160);
+			color = QColor(tokens.border).lighter(dark ? 135 : 92);
 		else
-			color = dark ? QColor(80, 80, 80) : QColor(180, 180, 180);
+			color = QColor(tokens.border);
 	}
 	painter.setPen(color);
 
 	QLinearGradient gradient(r.topLeft(), r.bottomLeft());
-	gradient.setColorAt(0, dark ? QColor(70,70,70) : QColor(255, 255, 255));
-	gradient.setColorAt(1, dark ? QColor(45,45,45) : QColor(230, 230, 230));
+	gradient.setColorAt(0, QColor(tokens.cardHover));
+	gradient.setColorAt(1, QColor(tokens.card));
 	painter.setBrush(gradient);
 	painter.drawRoundedRect(r, 5, 5);
 
@@ -133,8 +135,8 @@ void FilterTableRow::paintEvent(QPaintEvent*)
 	r2.setRight(ui->labelNumber->geometry().right() - 0.5);
 
 	QLinearGradient gradient2(r2.topLeft(), r2.bottomLeft());
-	gradient2.setColorAt(0, dark ? color.darker(170) : color.darker(110));
-	gradient2.setColorAt(1, dark ? color.darker(220) : color.darker(150));
+	gradient2.setColorAt(0, color.darker(dark ? 140 : 105));
+	gradient2.setColorAt(1, color.darker(dark ? 185 : 135));
 	painter.setBrush(gradient2);
 	painter.drawRoundedRect(r2, 5, 5);
 }

@@ -185,8 +185,9 @@ unresolved `@TOKEN@` sentinels. The `ISkin` classes delegate their
 `tokens()`/`qssResource()` here, so the tables cannot drift. DeviceSelector
 compiles this one unit plus the aliased `.qss`/font resources
 (`DeviceSelector/DeviceSelectorSkins.qrc`) and wears the Editor's stored
-skin (`interface/skin`, default studio; heritage mode keeps the native
-look).
+skin (`interface/skin`, default studio). The Editor's LegacyRows path applies a
+small heritage palette/style layer around the old row widgets rather than asking
+the whole process to stay native.
 
 ## Reference-card view hook
 
@@ -302,12 +303,13 @@ each for the toolbar, title bar, menu bar and an open menu, two for the
 add-card row (`addrow` normal/hover), one for the insertion seam's hover
 reveal (`seam`) and one for the update toast (`toast`). Output names are
 stable: `<skin>_<dark|light>_<row>_<state>.png`,
-10 × 2 × 118 = 2360 PNGs
-for a full run; the run self-checks the count, so adding a gallery row needs
-no external count update. A row shot fails the render (non-zero exit) if a
-visible horizontal scrollbar is found inside the row — rows must fit the
-960px gallery viewport in every skin. Exit code 0 means every PNG was
-written; unknown skin ids fail loudly instead of falling back to studio.
+`SkinThemeData::ids().size() × 2 × (galleryRows().size() × 3
++ fixedScenarioShotCount())` PNGs for a full run; the run self-checks the
+count, so adding a gallery row or skin needs no external count update. A row
+shot fails the render (non-zero exit) if a visible horizontal scrollbar is
+found inside the row — rows must fit the 960px gallery viewport in every skin.
+Exit code 0 means every PNG was written; unknown skin ids fail loudly instead
+of falling back to studio.
 
 CI runs the gallery on the primary x64-avx2 variant and uploads the PNGs as
 the `skin-gallery` artifact, so a PR's visual state can be reviewed without a
@@ -375,6 +377,33 @@ The second-wave dark variants also adjust material tokens, not just colour:
 Obsidian rounds Studio glass chrome, Aurora deepens the Soft radius/spacing,
 Forge tightens Rack metal, Nebula thickens Matrix rails, and Noir keeps a compact
 striped precision layout.
+
+## LegacyRows heritage themes
+
+LegacyRows stays a compatibility mode: it keeps the original row widgets,
+filter factories, promoted controls, and plugin/graph behavior. The heritage
+path only dresses the shared Qt chrome and token-consuming painters so the
+window, menus, tabs, toolbar, scroll areas, row frames, and analysis dock do not
+fall back to a half-native light theme.
+
+`SkinManager::applyHeritage(id, dark)` resolves the selected built-in or custom
+theme, derives the same `SkinTokens` as the modern path, then applies a compact
+heritage QSS/palette layer. It deliberately does not call any skin-specific row
+factory or card rebuild logic. The custom title bar remains enabled unless the
+explicit `interface/nativeTitleBar` escape hatch is set, because a native
+Windows title bar cannot be coloured by Qt stylesheets.
+
+Five shipped `legacy-*` variants are simple token palettes for this mode:
+
+- `legacy-slate`
+- `legacy-blue`
+- `legacy-forest`
+- `legacy-bronze`
+- `legacy-plum`
+
+They all reuse the Minimal/Precision QSS and painter grammar when used in
+modern mode. In LegacyRows, they provide stable colours for the heritage layer
+without changing how legacy rows construct or execute.
 
 ## Adding a skin
 

@@ -115,3 +115,7 @@
 - Upstream-sync validation: `git diff --check`; `Test-SourceSync.ps1`; `HybridConvTests.exe` passed 1635 checks; `EditorLogicTests.exe` passed 2678 checks; `EngineOrchestrationTests.exe` passed 1167 checks; `AudioRegressionTests.exe --config-dir Tests/AudioRegressionTests/configs --ref-dir Tests/AudioRegressionTests/references` passed 30/30; AVX-512 `Editor.exe --selftest-vst` passed.
 - Skin gallery after merge: 1180 PNGs under `artifacts\skin-gallery-upstream-merge-final-20260801-062442`.
 - Note: the upstream AudioRegression project still does not copy `references` into `x64\Release`; use source `--ref-dir` locally unless that project file is fixed.
+- User pivoted to modernizing LegacyRows theming after screenshot showed dark mode covering rows but not title/menu/tabs/graph chrome.
+- Fix: LegacyRows no longer clears the skin layer; `applyHeritage(id,dark)` resolves selected/custom tokens, applies a heritage palette/QSS layer, and uses the custom title strip unless the explicit native-titlebar setting is enabled.
+- Added five simple LegacyRows-safe themes: Legacy Slate, Legacy Blue, Legacy Forest, Legacy Bronze, Legacy Plum.
+- Validation: `git diff --check`; `Test-SourceSync.ps1`; `EditorLogicTests.exe` passed 3137 checks; AVX-512 Editor/DeviceSelector rebuilt; `Editor.exe --selftest-vst`; `Editor.exe --skin-switch-test`; focused LegacyRows gallery wrote 20 PNGs to `artifacts\skin-gallery-legacy-themes-20260801-112049`.

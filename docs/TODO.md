@@ -31,5 +31,6 @@
 - [x] Extract Rack brushing/grain helper while preserving each current alpha/ink law at the call site.
 - [x] Extend Rack LED primitive for glow/halo variants while preserving picker/reference-card state laws.
 - [x] Package the current theming cleanup into the beta update.
+- [x] Clean LegacyRows dark-window theming and add simple legacy-safe themes.
 - [x] Run `Editor --skin-gallery` after alpha-token QSS conversion.
 - [ ] Revoke temporary GitHub token when the user ends the session.
