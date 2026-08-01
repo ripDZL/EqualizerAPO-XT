@@ -18,6 +18,7 @@
 #include "FilterTableRow.h"
 #include "FilterTableMimeData.h"
 #include "Editor/helpers/GUIHelper.h"
+#include "Editor/helpers/VSTPreviewEndpoint.h"
 #include "helpers/StringHelper.h"
 #include "helpers/LogHelper.h"
 #include "helpers/ChannelHelper.h"
@@ -326,6 +327,34 @@ const QList<shared_ptr<AbstractAPOInfo>>& FilterTable::getInputDevices() const
 shared_ptr<AbstractAPOInfo> FilterTable::getSelectedDevice() const
 {
 	return selectedDevice;
+}
+
+shared_ptr<AbstractAPOInfo> FilterTable::getPreviewDeviceContext() const
+{
+	if (previewContextItem == nullptr)
+		return selectedDevice;
+
+	const int rowIndex = model.items().indexOf(previewContextItem);
+	if (rowIndex < 0)
+		return selectedDevice;
+
+	vector<wstring> lines;
+	lines.reserve(static_cast<size_t>(model.items().size()));
+	for (Item* item : model.items())
+		lines.push_back(item->text.toStdWString());
+
+	vector<shared_ptr<AbstractAPOInfo>> outputs;
+	outputs.reserve(static_cast<size_t>(outputDevices.size()));
+	for (const shared_ptr<AbstractAPOInfo>& device : outputDevices)
+		outputs.push_back(device);
+
+	vector<shared_ptr<AbstractAPOInfo>> inputs;
+	inputs.reserve(static_cast<size_t>(inputDevices.size()));
+	for (const shared_ptr<AbstractAPOInfo>& device : inputDevices)
+		inputs.push_back(device);
+
+	return vstPreviewDeviceForRow(lines, static_cast<size_t>(rowIndex),
+		outputs, inputs, selectedDevice);
 }
 
 int FilterTable::getSelectedChannelMask() const

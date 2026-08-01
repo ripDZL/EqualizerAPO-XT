@@ -1,12 +1,13 @@
 /*
 	This file is part of EqualizerAPO-XT, a system-wide equalizer.
 
-	See RackFilterPicker.h. The small screw/LED painters are deliberately
-	local re-creations of RackChrome's idiom (that file's helpers are
-	private to it); they stay visually consistent with the card chrome.
+	See RackFilterPicker.h. Shared RackChrome primitives keep the picker in
+	the same hardware grammar as the cards; the hover-fade state stays local
+	because it has a different interaction model.
 */
 
 #include "RackFilterPicker.h"
+#include "Editor/skins/RackChrome.h"
 #include "Editor/skins/SkinPaint.h"
 
 #include <QApplication>
@@ -37,93 +38,6 @@ enum RowKind
 	EntryRow = 0,
 	SectionRow = 1
 };
-
-// Engraved faceplate printing: a contrast pass offset one pixel down (the
-// recess edge catching the light), then the body color on top.
-void engraveText(QPainter& painter, const QRectF& rect, int flags, const QString& text, const QColor& body, bool dark)
-{
-	painter.setPen(dark ? QColor(0, 0, 0, 170) : QColor(255, 255, 255, 200));
-	painter.drawText(rect.translated(0, 1), flags, text);
-	painter.setPen(body);
-	painter.drawText(rect, flags, text);
-}
-
-// A slotted machine screw, same construction as the card faceplates'.
-void paintScrew(QPainter& painter, const QPointF& center, qreal radius, qreal slotDegrees, bool dark)
-{
-	QRadialGradient body(center - QPointF(radius * 0.35, radius * 0.35), radius * 2.1);
-	if (dark)
-	{
-		body.setColorAt(0.0, QColor(0x9A, 0xA4, 0xAC));
-		body.setColorAt(0.55, QColor(0x4E, 0x57, 0x5E));
-		body.setColorAt(1.0, QColor(0x23, 0x28, 0x2C));
-	}
-	else
-	{
-		body.setColorAt(0.0, QColor(0xFF, 0xFF, 0xFC));
-		body.setColorAt(0.55, QColor(0xC4, 0xBD, 0xAE));
-		body.setColorAt(1.0, QColor(0x8E, 0x86, 0x76));
-	}
-	painter.setPen(QPen(dark ? QColor(0, 0, 0, 200) : QColor(0x6B, 0x62, 0x52), 1));
-	painter.setBrush(body);
-	painter.drawEllipse(center, radius, radius);
-
-	const qreal rad = qDegreesToRadians(slotDegrees);
-	const QPointF dir(qCos(rad), qSin(rad));
-	const QPointF a = center - dir * (radius - 1.2);
-	const QPointF b = center + dir * (radius - 1.2);
-	painter.setPen(QPen(dark ? QColor(10, 12, 14, 230) : QColor(60, 54, 44, 220), 1.4, Qt::SolidLine, Qt::RoundCap));
-	painter.drawLine(a, b);
-	painter.setPen(QPen(QColor(255, 255, 255, dark ? 60 : 170), 0.8, Qt::SolidLine, Qt::RoundCap));
-	painter.drawLine(a + QPointF(0, 1), b + QPointF(0, 1));
-}
-
-// A panel LED in a bezel ring; glow scales 0..1 so the hover lamp can sit
-// between fully dark and fully lit. Unlit lamps recede one step (thinner
-// bezel ink, translucent dome, fainter specular dot) so a column of module
-// slots never reads as bullet spam.
-void paintLed(QPainter& painter, const QPointF& center, qreal radius, const QColor& litColor, qreal glow, bool dark)
-{
-	const bool unlit = glow <= 0.0;
-	painter.setPen(QPen(dark ? QColor(0, 0, 0, unlit ? 110 : 190) : QColor(70, 62, 50, unlit ? 100 : 190), 1));
-	painter.setBrush(Qt::NoBrush);
-	painter.drawEllipse(center, radius + 1.2, radius + 1.2);
-
-	if (glow > 0.0)
-	{
-		QRadialGradient halo(center, radius * 3.2);
-		halo.setColorAt(0.0, withAlpha(litColor, int(110 * glow)));
-		halo.setColorAt(1.0, withAlpha(litColor, 0));
-		painter.setPen(Qt::NoPen);
-		painter.setBrush(halo);
-		painter.drawEllipse(center, radius * 3.2, radius * 3.2);
-	}
-
-	QRadialGradient dome(center - QPointF(radius * 0.3, radius * 0.3), radius * 1.6);
-	const QColor off = litColor.darker(330);
-	const QColor hot = litColor.lighter(150);
-	auto mix = [glow](const QColor& a, const QColor& b) {
-		return QColor(
-			qRound(a.red() + (b.red() - a.red()) * glow),
-			qRound(a.green() + (b.green() - a.green()) * glow),
-			qRound(a.blue() + (b.blue() - a.blue()) * glow));
-	};
-	QColor domeTop = mix(off.lighter(140), hot);
-	QColor domeEdge = mix(off, litColor.darker(125));
-	if (unlit)
-	{
-		domeTop.setAlpha(140);
-		domeEdge.setAlpha(140);
-	}
-	dome.setColorAt(0.0, domeTop);
-	dome.setColorAt(1.0, domeEdge);
-	painter.setPen(Qt::NoPen);
-	painter.setBrush(dome);
-	painter.drawEllipse(center, radius, radius);
-	painter.setBrush(QColor(255, 255, 255, unlit ? (dark ? 14 : 30)
-		: int((dark ? 28 : 60) + (170 - (dark ? 28 : 60)) * glow)));
-	painter.drawEllipse(center - QPointF(radius * 0.35, radius * 0.35), radius * 0.3, radius * 0.3);
-}
 
 // Paints section plates and labeled slots; the panel behind them belongs to
 // RackFilterPickerView::paintEvent.
@@ -165,15 +79,15 @@ private:
 	{
 		const QRectF plate = QRectF(option.rect).adjusted(2, 5, -2, -3);
 
-		painter->setPen(QPen(QColor(0, 0, 0, dark ? 150 : 70), 1));
-		painter->setBrush(QColor(0, 0, 0, dark ? 52 : 16));
+		painter->setPen(QPen(skinMaterialShadow(dark ? 150 : 70), 1));
+		painter->setBrush(skinMaterialShadow(dark ? 52 : 16));
 		painter->drawRoundedRect(plate, 2, 2);
 		// The lower plate edge catches the work light.
-		painter->setPen(QPen(QColor(255, 255, 255, dark ? 26 : 140), 1));
+		painter->setPen(QPen(skinMaterialHighlight(dark ? 26 : 140), 1));
 		painter->drawLine(QPointF(plate.left() + 2, plate.bottom() + 1), QPointF(plate.right() - 2, plate.bottom() + 1));
 
 		// Rivets at both plate ends, like the VST brass nameplate's.
-		painter->setPen(QPen(dark ? QColor(0, 0, 0, 180) : QColor(0x6B, 0x62, 0x52), 0.8));
+		painter->setPen(QPen(dark ? skinMaterialShadow(180) : QColor(0x6B, 0x62, 0x52), 0.8));
 		painter->setBrush(dark ? QColor(0x6A, 0x74, 0x7C) : QColor(0xD8, 0xCF, 0xBC));
 		painter->drawEllipse(QPointF(plate.left() + 7, plate.center().y()), 1.6, 1.6);
 		painter->drawEllipse(QPointF(plate.right() - 7, plate.center().y()), 1.6, 1.6);
@@ -184,7 +98,7 @@ private:
 		plateFont.setLetterSpacing(QFont::AbsoluteSpacing, 1.6);
 		painter->setFont(plateFont);
 		const QRectF textRect = plate.adjusted(14, 0, -14, 0);
-		engraveText(*painter, textRect, Qt::AlignVCenter | Qt::AlignLeft,
+		RackChrome::engraveText(*painter, textRect, Qt::AlignVCenter | Qt::AlignLeft,
 			index.data(Qt::DisplayRole).toString().toUpper(),
 			withAlpha(QColor(tokens.mutedText), 220), dark);
 	}
@@ -220,7 +134,8 @@ private:
 		}
 
 		const QPointF led(slot.left() + 11.0, slot.center().y());
-		paintLed(*painter, led, 2.8, accent, selected ? 1.0 : (hovered ? 0.55 : 0.0), dark);
+		RackChrome::paintLed(*painter, led, 2.8, accent,
+			selected ? 1.0 : (hovered ? 0.55 : 0.0), dark, 2.8 * 3.2, true);
 
 		QFont labelFont(tokens.fontFamily);
 		labelFont.setPixelSize(12);
@@ -479,33 +394,25 @@ void RackFilterPickerView::paintEvent(QPaintEvent* event)
 	// so DPI scales the grain.
 	{
 		const uint seed = uint(qHash(QStringLiteral("module-select-brush")));
-		const int baseAlpha = 5;
-		QColor grain = dark ? QColor(255, 255, 255) : QColor(96, 84, 64);
-		for (qreal y = r.top() + 2; y < r.bottom() - 1; y += 2)
-		{
-			const uint h = (seed ^ uint(qRound(y * 7.0))) * 2654435761u;
-			const bool polish = (h >> 8) % 11u == 0;
-			grain.setAlpha(baseAlpha + int(h % 7u) + (polish ? 6 : 0));
-			painter.setPen(QPen(grain, 1));
-			painter.drawLine(QPointF(r.left() + 2, y), QPointF(r.right() - 2, y));
-		}
+		RackChrome::paintBrushing(painter, r,
+			dark ? skinMaterialHighlight() : QColor(96, 84, 64), 5, seed);
 	}
 
 	// Machined plate edge: dark outline, lit top bezel, shadowed bottom.
 	painter.setBrush(Qt::NoBrush);
-	painter.setPen(QPen(dark ? QColor(0, 0, 0, 210) : QColor(0x8A, 0x80, 0x6C), 1));
+	painter.setPen(QPen(dark ? skinMaterialShadow(210) : QColor(0x8A, 0x80, 0x6C), 1));
 	painter.drawRoundedRect(r, radius, radius);
-	painter.setPen(QPen(QColor(255, 255, 255, dark ? 36 : 150), 1));
+	painter.setPen(QPen(skinMaterialHighlight(dark ? 36 : 150), 1));
 	painter.drawLine(QPointF(r.left() + radius, r.top() + 1), QPointF(r.right() - radius, r.top() + 1));
-	painter.setPen(QPen(QColor(0, 0, 0, dark ? 140 : 60), 1));
+	painter.setPen(QPen(skinMaterialShadow(dark ? 140 : 60), 1));
 	painter.drawLine(QPointF(r.left() + radius, r.bottom() - 1), QPointF(r.right() - radius, r.bottom() - 1));
 
 	// Four corner screws; fixed slot angles so the faceplate looks hand-set,
 	// not stamped.
-	paintScrew(painter, QPointF(r.left() + 11, r.top() + 11), 3.6, 23.0, dark);
-	paintScrew(painter, QPointF(r.right() - 11, r.top() + 11), 3.6, 117.0, dark);
-	paintScrew(painter, QPointF(r.left() + 11, r.bottom() - 11), 3.6, 64.0, dark);
-	paintScrew(painter, QPointF(r.right() - 11, r.bottom() - 11), 3.6, 158.0, dark);
+	RackChrome::paintScrew(painter, QPointF(r.left() + 11, r.top() + 11), 3.6, 23.0, dark);
+	RackChrome::paintScrew(painter, QPointF(r.right() - 11, r.top() + 11), 3.6, 117.0, dark);
+	RackChrome::paintScrew(painter, QPointF(r.left() + 11, r.bottom() - 11), 3.6, 64.0, dark);
+	RackChrome::paintScrew(painter, QPointF(r.right() - 11, r.bottom() - 11), 3.6, 158.0, dark);
 
 	// Engraved header: the unit designation, with the power LED on the right.
 	QFont titleFont(tokens.fontFamily);
@@ -514,15 +421,16 @@ void RackFilterPickerView::paintEvent(QPaintEvent* event)
 	titleFont.setLetterSpacing(QFont::AbsoluteSpacing, 2.0);
 	painter.setFont(titleFont);
 	const QRectF titleRect(r.left() + 26, r.top() + 6, r.width() - 80, 22);
-	engraveText(painter, titleRect, Qt::AlignVCenter | Qt::AlignLeft,
+	RackChrome::engraveText(painter, titleRect, Qt::AlignVCenter | Qt::AlignLeft,
 		QStringLiteral("MODULE SELECT"), withAlpha(QColor(tokens.mutedText), 230), dark);
-	paintLed(painter, QPointF(r.right() - 28, r.top() + 17), 3.0, QColor(tokens.accent2), 1.0, dark);
+	RackChrome::paintLed(painter, QPointF(r.right() - 28, r.top() + 17), 3.0,
+		QColor(tokens.accent2), 1.0, dark, 3.0 * 3.2, true);
 
 	// Machined groove separating the header from the controls.
 	const qreal grooveY = r.top() + 31;
-	painter.setPen(QPen(QColor(0, 0, 0, dark ? 120 : 60), 1));
+	painter.setPen(QPen(skinMaterialShadow(dark ? 120 : 60), 1));
 	painter.drawLine(QPointF(r.left() + 8, grooveY), QPointF(r.right() - 8, grooveY));
-	painter.setPen(QPen(QColor(255, 255, 255, dark ? 26 : 130), 1));
+	painter.setPen(QPen(skinMaterialHighlight(dark ? 26 : 130), 1));
 	painter.drawLine(QPointF(r.left() + 8, grooveY + 1), QPointF(r.right() - 8, grooveY + 1));
 
 	// A filtered-out catalog: engrave NO SIGNAL where the slots would be.
@@ -533,7 +441,7 @@ void RackFilterPickerView::paintEvent(QPaintEvent* event)
 		emptyFont.setBold(true);
 		emptyFont.setLetterSpacing(QFont::AbsoluteSpacing, 2.0);
 		painter.setFont(emptyFont);
-		engraveText(painter, QRectF(listWidget->geometry()), Qt::AlignCenter,
+		RackChrome::engraveText(painter, QRectF(listWidget->geometry()), Qt::AlignCenter,
 			QStringLiteral("NO SIGNAL"), withAlpha(QColor(tokens.mutedText), 170), dark);
 	}
 
@@ -543,7 +451,7 @@ void RackFilterPickerView::paintEvent(QPaintEvent* event)
 	modelFont.setBold(true);
 	modelFont.setLetterSpacing(QFont::AbsoluteSpacing, 1.2);
 	painter.setFont(modelFont);
-	engraveText(painter, QRectF(r.left() + 26, r.bottom() - 16, r.width() - 52, 12),
+	RackChrome::engraveText(painter, QRectF(r.left() + 26, r.bottom() - 16, r.width() - 52, 12),
 		Qt::AlignVCenter | Qt::AlignHCenter, QStringLiteral("EAPO-XT SERIES"),
 		withAlpha(QColor(tokens.mutedText), 140), dark);
 }

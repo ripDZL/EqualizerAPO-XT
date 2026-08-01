@@ -25,21 +25,36 @@ Editor의 5개 스킨이 각자 무엇을 믿고, 무엇을 금지하며, 새 UI
   철학으로 **따로** 답해야 하며, 통합 시 7개 항목(타입 표시, 호버, 비활성,
   Include 행, VST 행, 모서리/엣지 언어, 위계의 주도자)으로 심사한다. 기준과
   판정 기록은 skin-integration-report.md에 있다.
-- **토큰만 사용.** 색은 `SkinTokens`(코드)와 `@TOKEN@` 치환(QSS)으로만 쓴다.
-  테마(다크/라이트)별 하드코딩은 금지다. 훅은 모드 플래그를 받지 않으므로,
+- **토큰만 사용.** 색은 `SkinTokens`(코드)와 `@TOKEN@` / `@TOKEN_A30@`
+  치환(QSS)으로만 쓴다. 알파 토큰은 정수 퍼센트이며 `rgba()`로 펼쳐진다.
+  QSS 재질 그림자/하이라이트는 고정 `@SHADOW_Axx@` / `@HIGHLIGHT_Axx@`
+  별칭을 쓸 수 있고, C++ paint 에서는 `skinMaterialShadow()` /
+  `skinMaterialHighlight()`를 쓴다. 둘 다 의미 색상으로 쓰면 안 된다.
+  대비 보정용 상태/스킨 잉크는 스킨 문법이면 명시적으로 둔다. 테마(다크/라이트)별
+  하드코딩은 금지다. 훅은 모드 플래그를 받지 않으므로,
   모드 분기가 꼭 필요하면 배경 명도로 추정한다(공유 `skinIsDark` 헬퍼, SkinPaint.h).
 - **중립 기본값 규칙.** `ISkin`에 훅을 추가할 때 기본 구현은 기존 모습과 픽셀
   단위로 동일해야 하고, 갤러리 PNG SHA-256 비교로 **증명**한다(가정하지 않는다).
 - **행 재생성.** 스킨별 chrome·렌더러·픽커는 위젯 생성 시점에 만들어진다. 스킨
   전환은 `FilterTable::updateGuis()`의 행 재생성으로 반영된다. 재칠(update)만으로
-  바뀌리라 기대하지 말 것.
+  바뀌리라 기대하지 말 것. 생성 시점 훅인 `prepareCommandRow`도 다른 훅처럼
+  전달받은 `SkinTokens`를 사용한다.
 - **갤러리가 증거다.** `Editor --skin-gallery <outDir>`가 스킨×다크/라이트로
-  대표 행 6종×상태 3종 + 필터 픽커 3장 + chrome 4장 = 총 250장을 렌더링한다.
+  대표 행 26종×상태 3종 + 고정 chrome 26장 = 총 1040장을 렌더링한다.
   행 안에 가로 스크롤바가 보이면 렌더가 실패한다(960px 뷰포트 준수 게이트).
   외형 변경은 갤러리로 확인하고, 무간섭 주장은 바이트 비교로 증명한다.
 - **상호작용 계층은 공유한다.** 입력 처리(AudioKnob의 드래그/휠/키보드,
   픽커 호스트의 팝업/이벤트 루프, Copy의 파싱/직렬화)는 스킨이 소유하지
   않는다. 스킨은 표현만 바꾼다.
+- **좌표 산술도 공유한다.** If/Else/EndIf 스코프 거터의 레인 위치와 카드 엣지는
+  `SkinScopeGutterLayout`(`SkinPaint.h`)이 계산한다. 분석 그래프의 plot edge,
+  zero/cursor clamp, label/footer rect, grid label thinning 은
+  `SkinAnalysisGraphLayout`이 계산한다. 스킨은 재질과 표현만 결정한다.
+- **같은 스킨 안의 반복 레시피는 스킨의 chrome 모듈로 모은다.** Rack 의 각인,
+  나사, boolean LED, brushing grain 처럼 여러 translation unit 에 반복되는 같은
+  물리 문법은 `RackChrome` helper 를 쓴다. hover-fade LED 나 넓은 halo lamp 처럼
+  상태 모델이나 기하가 다른 변형은 억지로 합치지 않는다. grain 의 ink/base alpha
+  처럼 소재별 결정은 호출부에 남긴다.
 
 ## 카드 추가·삽입의 공유 계약 (2026-07-26 사용자 결정)
 

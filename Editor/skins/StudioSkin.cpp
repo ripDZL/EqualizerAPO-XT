@@ -223,7 +223,7 @@ public:
 
 		// The 1px lighter top edge, quieter than a panel's reflection.
 		painter.fillRect(QRectF(rect.left(), rect.top(), rect.width(), 1.0),
-			QColor(255, 255, 255, dark ? 30 : 235));
+			skinMaterialHighlight(dark ? 30 : 235));
 
 		painter.setRenderHint(QPainter::Antialiasing);
 		const double span = rect.width() * 0.42;
@@ -426,8 +426,8 @@ public:
 
 		const QString background = cssRgba(info.selected ? tokens.cardSelected : tokens.card, 0.88);
 		const QString hoverBackground = cssRgba(info.selected ? tokens.cardSelected : tokens.cardHover, 0.94);
-		const QString topEdge = dark ? QStringLiteral("rgba(255, 255, 255, 0.10)") : QStringLiteral("rgba(255, 255, 255, 0.95)");
-		const QString topEdgeHover = dark ? QStringLiteral("rgba(255, 255, 255, 0.17)") : QStringLiteral("#FFFFFF");
+		const QString topEdge = cssRgba(skinMaterialHighlight(), dark ? 0.10 : 0.95);
+		const QString topEdgeHover = cssRgba(skinMaterialHighlight(), dark ? 0.17 : 1.0);
 
 		if (info.type == QStringLiteral("vst"))
 		{
@@ -482,8 +482,8 @@ public:
 			return QStringLiteral("QWidget#FilterCardHeader { background: transparent; border-top-left-radius: 8px; border-top-right-radius: 8px; }");
 		}
 		const QString sheen = dark
-			? (info.selected ? QStringLiteral("rgba(255, 255, 255, 0.07)") : QStringLiteral("rgba(255, 255, 255, 0.04)"))
-			: (info.selected ? QStringLiteral("rgba(255, 255, 255, 0.75)") : QStringLiteral("rgba(255, 255, 255, 0.55)"));
+			? cssRgba(skinMaterialHighlight(), info.selected ? 0.07 : 0.04)
+			: cssRgba(skinMaterialHighlight(), info.selected ? 0.75 : 0.55);
 		return QStringLiteral("QWidget#FilterCardHeader { background: %1; border-top-left-radius: 8px; border-top-right-radius: 8px; }")
 			.arg(sheen);
 	}
@@ -511,16 +511,16 @@ public:
 		{
 			// Frost sheen in the upper glass.
 			QLinearGradient sheen(pane.topLeft(), QPointF(pane.left(), pane.top() + pane.height() * 0.45));
-			sheen.setColorAt(0.0, QColor(255, 255, 255, info.hovered ? 24 : 15));
-			sheen.setColorAt(1.0, QColor(255, 255, 255, 0));
+			sheen.setColorAt(0.0, skinMaterialHighlight(info.hovered ? 24 : 15));
+			sheen.setColorAt(1.0, skinMaterialHighlight(0));
 			painter.fillPath(panePath, sheen);
 		}
 
 		// Shade pooling at the bottom edge; in light mode this shade carries
 		// the whole glass impression.
 		QLinearGradient depthShade(QPointF(pane.left(), pane.bottom() - pane.height() * 0.38), pane.bottomLeft());
-		depthShade.setColorAt(0.0, QColor(0, 0, 0, 0));
-		depthShade.setColorAt(1.0, dark ? QColor(0, 0, 0, 52) : QColor(24, 32, 51, 26));
+		depthShade.setColorAt(0.0, skinMaterialShadow(0));
+		depthShade.setColorAt(1.0, dark ? skinMaterialShadow(52) : QColor(24, 32, 51, 26));
 		painter.fillPath(panePath, depthShade);
 
 		if (dark)
@@ -528,9 +528,9 @@ public:
 			// Centre-bright reflection just under the border's top edge.
 			const double y = pane.top() + 0.5;
 			QLinearGradient reflection(pane.left(), y, pane.right(), y);
-			reflection.setColorAt(0.0, QColor(255, 255, 255, 0));
-			reflection.setColorAt(0.5, QColor(255, 255, 255, info.hovered ? 84 : 56));
-			reflection.setColorAt(1.0, QColor(255, 255, 255, 0));
+			reflection.setColorAt(0.0, skinMaterialHighlight(0));
+			reflection.setColorAt(0.5, skinMaterialHighlight(info.hovered ? 84 : 56));
+			reflection.setColorAt(1.0, skinMaterialHighlight(0));
 			painter.setPen(QPen(QBrush(reflection), 1.0));
 			painter.drawLine(QPointF(pane.left() + 6.0, y), QPointF(pane.right() - 6.0, y));
 		}
@@ -628,18 +628,13 @@ public:
 	// of dying behind them.
 	bool paintScopeGutter(QPainter& painter, const QSize& size, const CommandRowInfo& info, const SkinTokens& tokens) const override
 	{
-		const bool ifFamily = info.type == QStringLiteral("if");
-		const bool headRow = ifFamily && info.command == QStringLiteral("if");
-		const bool branchRow = ifFamily && (info.command == QStringLiteral("elseif") || info.command == QStringLiteral("else"));
-		const bool tailRow = ifFamily && info.command == QStringLiteral("endif");
-		const int logic = info.logicDepth;
-		if (!headRow && logic <= 0)
+		const SkinScopeGutterLayout layout = skinScopeGutterLayout(
+			info.type, info.command, info.depth, info.logicDepth, tokens, size);
+		if (!layout.shouldPaint)
 			return false;
 
-		const int unit = tokens.channelGroupIndent;
-		const double h = size.height();
-		const double junctionY = 4.0 + tokens.rowHeight / 2.0;
-		const int indentUnits = (ifFamily && !headRow) ? info.depth + 1 : info.depth;
+		const double h = layout.height;
+		const double junctionY = layout.junctionYF;
 
 		const QColor beam(tokens.accent);
 		const bool live = info.enabled && !info.lineSkipped;
@@ -648,7 +643,7 @@ public:
 		painter.setRenderHint(QPainter::Antialiasing, true);
 		painter.setPen(Qt::NoPen);
 
-		const auto bandCenter = [unit](int level) { return 8.0 + level * unit + unit / 2.0; };
+		const auto bandCenter = [&](int level) { return layout.bandCenterF(level); };
 
 		// One run of the beam: a lit run carries the full ladder, a
 		// de-energized run only a faint residual core. A fading run (the
@@ -709,51 +704,47 @@ public:
 			QLinearGradient bar(0, 0, 0, h);
 			bar.setColorAt(0.0, withAlpha(tokens.border, 70));
 			bar.setColorAt(1.0, withAlpha(tokens.border, 16));
-			painter.fillRect(QRectF(8.0 + level * unit + 7.0, 0.0, 3.0, h), bar);
+			painter.fillRect(QRectF(8.0 + level * layout.unit + 7.0, 0.0, 3.0, h), bar);
 		};
 
-		const int ifLevels = headRow ? logic : (branchRow || tailRow) ? logic - 1 : logic;
-		const int channelLevels = qMax(0, indentUnits - ifLevels - ((branchRow || tailRow) ? 1 : 0));
-		for (int level = 0; level < channelLevels; level++)
+		for (int level = 0; level < layout.channelLevels; level++)
 			channelRail(level);
 
-		if (headRow)
+		if (layout.headRow)
 		{
 			// The head sits at its semantic depth, so its block's beam only
 			// peeks out of the bottom margin, under the station's anchor dot.
-			for (int level = channelLevels; level < channelLevels + logic; level++)
+			for (int level = layout.channelLevels; level < layout.channelLevels + layout.logic; level++)
 				beamRun(level, 0.0, h, true, false);
-			const int own = channelLevels + logic;
-			beamRun(own, h - 4.0, h, live && info.branchState != 0, false);
-			anchor(bandCenter(own), h - 2.0, info.branchState == 1, 2.2);
+			beamRun(layout.ownLevel, h - 4.0, h, live && info.branchState != 0, false);
+			anchor(bandCenter(layout.ownLevel), h - 2.0, info.branchState == 1, 2.2);
 		}
-		else if (branchRow)
+		else if (layout.branchRow)
 		{
 			// The chain's beam passes the ElseIf/Else face; the anchor on it
 			// reports this branch. The runs between stations belong to the
 			// member rows, which dim their own swallowed segments.
-			for (int level = channelLevels; level + 1 < channelLevels + logic; level++)
+			for (int level = layout.channelLevels; level + 1 < layout.channelLevels + layout.logic; level++)
 				beamRun(level, 0.0, h, true, false);
-			const int own = channelLevels + logic - 1;
-			beamRun(own, 0.0, h, live, false);
-			anchor(bandCenter(own), junctionY, info.branchState == 1, 3.0);
+			beamRun(layout.ownLevel, 0.0, h, live, false);
+			anchor(bandCenter(layout.ownLevel), junctionY, info.branchState == 1, 3.0);
 		}
-		else if (tailRow)
+		else if (layout.tailRow)
 		{
 			// The beam terminates on the EndIf row: it fades out above the
 			// header line - no cap, no anchor.
-			for (int level = channelLevels; level + 1 < channelLevels + logic; level++)
+			for (int level = layout.channelLevels; level + 1 < layout.channelLevels + layout.logic; level++)
 				beamRun(level, 0.0, h, true, false);
-			beamRun(channelLevels + logic - 1, 0.0, junctionY + 4.0, live, true);
+			beamRun(layout.ownLevel, 0.0, junctionY + 4.0, live, true);
 		}
 		else
 		{
 			// A member card: the innermost lane is its block's beam and takes
 			// the row's own fate - a swallowed line de-energizes only its own
 			// run, the outer lanes stay lit for the rows below.
-			for (int level = channelLevels; level + 1 < channelLevels + logic; level++)
+			for (int level = layout.channelLevels; level + 1 < layout.channelLevels + layout.logic; level++)
 				beamRun(level, 0.0, h, true, false);
-			beamRun(channelLevels + logic - 1, 0.0, h, live, false);
+			beamRun(layout.ownLevel, 0.0, h, live, false);
 		}
 		return true;
 	}
@@ -817,9 +808,9 @@ public:
 				// (the card chrome's line, one step calmer).
 				const double y = frame.top() + 1.5;
 				QLinearGradient reflection(frame.left(), y, frame.right(), y);
-				reflection.setColorAt(0.0, QColor(255, 255, 255, 0));
-				reflection.setColorAt(0.5, QColor(255, 255, 255, state.pressed ? 96 : 72));
-				reflection.setColorAt(1.0, QColor(255, 255, 255, 0));
+				reflection.setColorAt(0.0, skinMaterialHighlight(0));
+				reflection.setColorAt(0.5, skinMaterialHighlight(state.pressed ? 96 : 72));
+				reflection.setColorAt(1.0, skinMaterialHighlight(0));
 				painter.setPen(QPen(QBrush(reflection), 1.0));
 				painter.drawLine(QPointF(frame.left() + 7.0, y), QPointF(frame.right() - 7.0, y));
 			}
@@ -1103,7 +1094,7 @@ public:
 		painter.drawRoundedRect(frame, 8.0, 8.0);
 		painter.setRenderHint(QPainter::Antialiasing, false);
 		painter.fillRect(QRectF(frame.left() + 7.0, frame.top() + 1.0, frame.width() - 14.0, 1.0),
-			dark ? QColor(0, 0, 0, lit ? 140 : 80) : QColor(0, 0, 0, lit ? 30 : 16));
+			dark ? skinMaterialShadow(lit ? 140 : 80) : skinMaterialShadow(lit ? 30 : 16));
 	}
 
 	// The analysis dock's response graph: the GraphicEQ gauge widened into
@@ -1118,9 +1109,11 @@ public:
 	void paintAnalysisGraph(QPainter& painter, const AnalysisGraphState& state, const SkinTokens& tokens) const override
 	{
 		const bool dark = skinIsDark(tokens);
-		const QRectF plot = state.plotRect;
-		const double hover = qBound(0.0, state.hover, 1.0);
 		const bool magnitude = state.metric == AnalysisMetric::MagnitudeDb;
+		const SkinAnalysisGraphLayout layout = skinAnalysisGraphLayout(
+			state.rect, state.plotRect, state.zeroY, state.hover);
+		const QRectF plot = layout.plot;
+		const double hover = layout.hover;
 
 		QPainterStateGuard painterState(&painter);
 		painter.setRenderHint(QPainter::Antialiasing, true);
@@ -1139,8 +1132,8 @@ public:
 		if (dark)
 		{
 			QLinearGradient sheen(frame.topLeft(), QPointF(frame.left(), frame.top() + frame.height() * 0.45));
-			sheen.setColorAt(0.0, QColor(255, 255, 255, qRound(6.0 + 12.0 * hover)));
-			sheen.setColorAt(1.0, QColor(255, 255, 255, 0));
+			sheen.setColorAt(0.0, skinMaterialHighlight(qRound(6.0 + 12.0 * hover)));
+			sheen.setColorAt(1.0, skinMaterialHighlight(0));
 			painter.fillPath(pane, sheen);
 		}
 		else
@@ -1179,7 +1172,7 @@ public:
 			if (line.label.isEmpty() || (!line.major && vSpacing < 30.0))
 				continue;
 			painter.setPen(withAlpha(tokens.mutedText, line.major ? 215 : 140));
-			painter.drawText(QRect(int(line.pos) - 24, int(plot.bottom()) + 2, 48, 11),
+			painter.drawText(layout.truncatedXAxisLabelRect(line.pos, 2, 48, 11),
 				Qt::AlignHCenter | Qt::AlignTop, line.label);
 		}
 		const int hCount = state.horizontal.size();
@@ -1192,7 +1185,7 @@ public:
 				continue;
 			painter.setPen(withAlpha(tokens.mutedText, line.major ? 200 : 130));
 			const double labelY = qBound(plot.top() + 2.0, line.pos - 11.0, plot.bottom() - 12.0);
-			painter.drawText(QRectF(plot.left() + 5.0, labelY, 44.0, 10.0),
+			painter.drawText(layout.leftPlotLabelRectF(5.0, labelY, 44.0, 10.0),
 				Qt::AlignLeft | Qt::AlignVCenter, line.label);
 		}
 
@@ -1202,8 +1195,7 @@ public:
 		{
 			const QFontMetricsF captionMetrics(labelFont);
 			painter.setPen(withAlpha(tokens.mutedText, 190));
-			painter.drawText(QRectF(plot.left(), plot.bottom() + 14.0, plot.width(),
-				qMax(0.0, frame.bottom() - plot.bottom() - 14.0)),
+			painter.drawText(layout.footerRectF(14.0, qMax(0.0, frame.bottom() - plot.bottom() - 14.0)),
 				Qt::AlignHCenter | Qt::AlignTop,
 				captionMetrics.elidedText(state.channelText, Qt::ElideRight, plot.width()));
 		}
@@ -1284,7 +1276,7 @@ public:
 		}
 
 		painter.setRenderHint(QPainter::Antialiasing, true);
-		const double zeroClamped = qBound(plot.top(), state.zeroY, plot.bottom());
+		const double zeroClamped = layout.zeroClamped;
 
 		// Clipping warms the glass above 0 dB: a danger wash dying as it
 		// lands on the anchor.
@@ -1510,7 +1502,7 @@ public:
 		painter.drawRoundedRect(frame, 8.0, 8.0);
 		painter.setRenderHint(QPainter::Antialiasing, false);
 		painter.fillRect(QRectF(frame.left() + 7.0, frame.top() + 1.0, frame.width() - 14.0, 1.0),
-			dark ? QColor(0, 0, 0, 140) : QColor(0, 0, 0, 30));
+			dark ? skinMaterialShadow(140) : skinMaterialShadow(30));
 	}
 
 	// A row of exclusive choices: the knob's track laid flat, with the arc's
@@ -1549,7 +1541,7 @@ public:
 		// wash; in light the text ink's shade carries it, because white glass
 		// cannot brighten (S2).
 		painter.setPen(Qt::NoPen);
-		painter.fillPath(channel, dark ? QColor(0, 0, 0, lit ? 92 : 62) : withAlpha(tokens.text, lit ? 20 : 12));
+		painter.fillPath(channel, dark ? skinMaterialShadow(lit ? 92 : 62) : withAlpha(tokens.text, lit ? 20 : 12));
 
 		QPainterStateGuard channelState(&painter);
 		painter.setClipPath(channel);
@@ -1558,7 +1550,7 @@ public:
 		// graph pane's inner shadow at strip scale. Straight, so AA is off.
 		painter.setRenderHint(QPainter::Antialiasing, false);
 		painter.fillRect(QRectF(frame.left() + 6.0, frame.top() + 1.0, frame.width() - 12.0, 1.0),
-			dark ? QColor(0, 0, 0, 110) : withAlpha(tokens.text, 34));
+			dark ? skinMaterialShadow(110) : withAlpha(tokens.text, 34));
 		painter.setRenderHint(QPainter::Antialiasing, true);
 
 		// Keyboard focus is the outline of the light, not of the shape: a
@@ -1620,9 +1612,9 @@ public:
 				// formula, so the cap is a lit pane and not a coloured tile.
 				const double y = cap.top() + 1.5;
 				QLinearGradient reflection(cap.left(), y, cap.right(), y);
-				reflection.setColorAt(0.0, QColor(255, 255, 255, 0));
-				reflection.setColorAt(0.5, QColor(255, 255, 255, capPointed ? 84 : 56));
-				reflection.setColorAt(1.0, QColor(255, 255, 255, 0));
+				reflection.setColorAt(0.0, skinMaterialHighlight(0));
+				reflection.setColorAt(0.5, skinMaterialHighlight(capPointed ? 84 : 56));
+				reflection.setColorAt(1.0, skinMaterialHighlight(0));
 				painter.setPen(QPen(QBrush(reflection), 1.0));
 				painter.drawLine(QPointF(cap.left() + 5.0, y), QPointF(cap.right() - 5.0, y));
 			}
@@ -1644,7 +1636,7 @@ public:
 			// still on record, as a single neutral alpha step - the disabled
 			// engaged chip's precedent, not a greyed-out accent.
 			painter.setPen(QPen(withAlpha(tokens.border, dark ? 120 : 150), 1.0));
-			painter.setBrush(dark ? QColor(255, 255, 255, 16) : withAlpha(tokens.text, 14));
+			painter.setBrush(dark ? skinMaterialHighlight(16) : withAlpha(tokens.text, 14));
 			painter.drawRoundedRect(cap, capRadius, capRadius);
 		}
 
@@ -1733,7 +1725,7 @@ public:
 	// hooks (knob arcs, signal lamp) all light the row in one colour. The tag
 	// follows the type selector live; repolishing re-evaluates the same rules
 	// cardFrameStyle/typeBadgeStyle returned at construction.
-	void prepareCommandRow(const CommandRowInfo& info, QWidget* card, QWidget* header, QWidget* body) const override
+	void prepareCommandRow(const CommandRowInfo& info, QWidget* card, QWidget* header, QWidget* body, const SkinTokens& tokens) const override
 	{
 		if (body == nullptr)
 			return;
@@ -1752,14 +1744,13 @@ public:
 			QLabel* raw = body->findChild<QLabel*>(QStringLiteral("FilterCardRawText"));
 			if (raw == nullptr)
 				return;
-			const SkinTokens tokens = SkinManager::instance()->tokens();
 			const bool dark = skinIsDark(tokens);
 			const QString fill = dark
 				? (info.enabled ? QStringLiteral("rgba(6, 9, 20, 0.55)") : QStringLiteral("rgba(6, 9, 20, 0.30)"))
 				: (info.enabled ? QStringLiteral("rgba(232, 238, 248, 0.75)") : QStringLiteral("rgba(232, 238, 248, 0.40)"));
 			const QString topEdge = dark
-				? (info.enabled ? QStringLiteral("rgba(0, 0, 0, 0.55)") : QStringLiteral("rgba(0, 0, 0, 0.30)"))
-				: (info.enabled ? QStringLiteral("rgba(0, 0, 0, 0.12)") : QStringLiteral("rgba(0, 0, 0, 0.06)"));
+				? cssRgba(skinMaterialShadow(), info.enabled ? 0.55 : 0.30)
+				: cssRgba(skinMaterialShadow(), info.enabled ? 0.12 : 0.06);
 			raw->setStyleSheet(QStringLiteral(
 				"QLabel#FilterCardRawText { background: %1; color: %2; border: 1px solid %3;"
 				" border-top-color: %4; border-radius: 8px; padding: 6px 10px;"

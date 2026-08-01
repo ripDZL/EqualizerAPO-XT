@@ -62,12 +62,14 @@ appearance-preserving defaults:
   token-driven strings every skin used before (including the
   `tokens.cardRailWidth` accent rail). Override these to give command types
   their own frame/header treatment.
-- `prepareCommandRow(info, card, header, body)` — called once per
+- `prepareCommandRow(info, card, header, body, tokens)` — called once per
   construction. For modern card rows `card`/`header`/`body` are the
   `CommandRowFrame`, the header strip and the body stack. The Include/VST
   card editors and the legacy Include/VST rows also consult the hook with
   only `body` set (and `legacyRow = true` for the legacy pair). Use it to set
-  dynamic properties for QSS or to attach extra chrome widgets.
+  dynamic properties for QSS or to attach extra chrome widgets. It receives
+  the same active `SkinTokens` as the paint/style hooks; do not fetch them
+  from `SkinManager` inside the skin implementation.
 - `paintCardChrome(painter, rect, info, tokens)` — painted decoration drawn
   by `CommandRowFrame` (`Editor/widgets/CommandRowFrame.{h,cpp}`) after the
   QSS background/border and before child widgets. Use for rails, screws,
@@ -86,6 +88,24 @@ appearance-preserving defaults:
 QSS can already target rows per command type without code: the card frame and
 header carry dynamic properties `filterKind` (lower-cased command),
 `filterEnabled`, `selected`, `focused`, `scopeDepth`.
+
+Scope-gutter paint uses shared geometry from `SkinScopeGutterLayout`
+(`Editor/skins/SkinPaint.h`). It classifies If head, ElseIf/Else branch,
+EndIf tail and member rows, computes the channel-vs-If rail split, applies
+the `logicSiblingsIndentAsMembers` branch/tail mount rule, and exposes shared
+rail centers/card edge/junction positions. Skins still own the material
+language of the rail; they should not recalculate the row-model geometry.
+The same header also owns fixed paint material effects:
+`skinMaterialShadow(alpha)` and `skinMaterialHighlight(alpha)`. They mirror QSS
+`@SHADOW_Axx@` / `@HIGHLIGHT_Axx@` for bevels, recesses, sheens and lighting
+math only; do not use them for semantic text, badges or status colours.
+Rack-specific hardware recipes that repeat outside the command-row frame live in
+`RackChrome`: `engraveText`, `paintScrew`, boolean `paintLed`, and
+the glow/halo overload of `paintLed`, plus `paintBrushing`. Use them only for
+Rack widgets with the same physical grammar. For LED variants, keep the
+electrical state law, halo radius and receded-off choice explicit at the call
+site. For brushing, pass the caller's exact ink and base alpha instead of
+hiding those material decisions in the helper.
 
 ## List-chrome hooks (add row, insertion seam)
 
@@ -139,12 +159,29 @@ selected-band readout strip under the plot — `GraphicEQReadout`,
 (X5 paramSelector) and the `GraphicEQActionButton` row above. The frozen
 LegacyRows GraphicEQ GUI keeps the original QGraphicsView stack untouched.
 
+## Analysis graph shared geometry
+
+Analysis-style plugin graph painters still own their skin-specific strokes,
+fills, labels, and glow/material language. Shared axis/cursor math lives in
+`SkinAnalysisGraphLayout` (`Editor/skins/SkinPaint.h`): plot edges, zero-row
+clamping, hover clamping, x/y label rectangles, footer rectangles, and
+grid-label thinning helpers. New analysis graph paint code should use those
+helpers for geometry instead of recalculating label placement per skin.
+
 ## Skin theme data for satellite executables
 
 `Editor/skins/SkinThemeData.{h,cpp}` holds the behaviour-free half of the
 skin system: id aliases (`resolveId`), the five token tables, QSS resource
-paths, the `@TOKEN@` substitution, the token → `QPalette` mapping and the
-Qt 6.10 combo-arrow override. The `ISkin` classes delegate their
+paths, complete style-sheet loading (`styleSheet`), the `@TOKEN@` /
+`@TOKEN_A30@` substitution, unresolved-token reporting, the token → `QPalette`
+mapping and the Qt 6.10 combo-arrow override. Alpha sentinels use integer
+percent opacity (`@ACCENT_A30@` → `rgba(r, g, b, 0.30)`) so QSS no longer has
+to hand-expand token colours for translucent fills. `@SHADOW_Axx@` and
+`@HIGHLIGHT_Axx@` are fixed material-effect aliases for black/white alpha fills,
+not per-skin palette colours. `styleSheet` is the single app-sheet path:
+canonicalize id, load the skin sheet, use the Studio sheet as the missing-QSS
+fallback, substitute tokens, append shared widget overrides, and report any
+unresolved `@TOKEN@` sentinels. The `ISkin` classes delegate their
 `tokens()`/`qssResource()` here, so the tables cannot drift. DeviceSelector
 compiles this one unit plus the aliased `.qss`/font resources
 (`DeviceSelector/DeviceSelectorSkins.qrc`) and wears the Editor's stored
@@ -230,7 +267,7 @@ $env:QT_QPA_PLATFORM = "offscreen"
 .\build-Editor-x64\release\Editor.exe --skin-gallery <outDir> [--skin-gallery-skins studio,rack]
 ```
 
-For every skin × {dark, light} it renders eighteen representative rows — a
+For every skin × {dark, light} it renders 26 representative rows — a
 parametric filter (`Filter 1: ON PK ...`), a high-shelf with its three knobs,
 a peaking filter at 0 dB (bipolar gain at its neutral detent), a `Preamp:`
 row (the bare knob + value scrub pair — the row that shows whether a skin
@@ -264,7 +301,7 @@ each for the toolbar, title bar, menu bar and an open menu, two for the
 add-card row (`addrow` normal/hover), one for the insertion seam's hover
 reveal (`seam`) and one for the update toast (`toast`). Output names are
 stable: `<skin>_<dark|light>_<row>_<state>.png`,
-5 × 2 × (21 × 3 + 12) = 750 PNGs
+5 × 2 × (26 × 3 + 26) = 1040 PNGs
 for a full run; the run self-checks the count, so adding a gallery row needs
 no external count update. A row shot fails the render (non-zero exit) if a
 visible horizontal scrollbar is found inside the row — rows must fit the

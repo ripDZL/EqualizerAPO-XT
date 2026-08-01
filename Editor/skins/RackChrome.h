@@ -10,6 +10,10 @@
 
 #include <QRect>
 
+class QColor;
+class QPointF;
+class QRectF;
+class QString;
 struct CommandRowInfo;
 struct GraphicEQPlotState;
 struct KnobState;
@@ -26,6 +30,18 @@ int earWidth();
 
 // Extra header inset reserved on VST rows for the painted brand nameplate.
 int nameplateReserve();
+
+// Rack-only hardware primitives reused by Rack-specific widgets that need to
+// paint outside CommandRowFrame: engraved printing, slotted screws and panel
+// LEDs. The qreal LED overload shares the bezel/dome machine while callers
+// keep their own glow amount and halo size. These are physical-material
+// recipes, not semantic palette hooks.
+void engraveText(QPainter& painter, const QRectF& rect, int flags, const QString& text, const QColor& body, bool dark);
+void paintScrew(QPainter& painter, const QPointF& center, qreal radius, qreal slotDegrees, bool dark);
+void paintLed(QPainter& painter, const QPointF& center, qreal radius, const QColor& litColor, bool lit, bool dark);
+void paintLed(QPainter& painter, const QPointF& center, qreal radius, const QColor& litColor,
+	qreal glow, bool dark, qreal haloRadius, bool recedeWhenUnlit);
+void paintBrushing(QPainter& painter, const QRectF& rect, const QColor& ink, int baseAlpha, uint seed);
 
 // Faceplate decoration drawn by CommandRowFrame between the QSS background
 // and the child widgets.

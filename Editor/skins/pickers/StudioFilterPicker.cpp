@@ -187,7 +187,7 @@ private:
 		{
 			// Light pooling under the cursor: a faint sheen plus a radial
 			// accent wash that brightens the middle of the strip.
-			painter->fillPath(path, QColor(255, 255, 255, dark ? 8 : 90));
+			painter->fillPath(path, skinMaterialHighlight(dark ? 8 : 90));
 			QRadialGradient pool(rect.center(), rect.width() * 0.46);
 			pool.setColorAt(0.0, withAlpha(t.accent, dark ? 40 : 30));
 			pool.setColorAt(1.0, withAlpha(t.accent, 0));
@@ -260,7 +260,7 @@ StudioFilterPickerView::StudioFilterPickerView(QWidget* parent)
 	const QString sunken = dark ? skinTokens.surfaceSunken : skinTokens.graph;
 	const QString focusBackground = dark ? skinTokens.surface : skinTokens.card;
 	const QString innerShadow = dark
-		? QStringLiteral("rgba(0, 0, 0, 0.55)") : QStringLiteral("rgba(24, 32, 51, 0.16)");
+		? cssRgba(skinMaterialShadow(), 0.55) : cssRgba(skinTokens.text, 0.16);
 	searchEdit->setStyleSheet(QStringLiteral(
 		"QLineEdit#StudioPickerSearch {"
 		" background: %1; color: %2;"
@@ -294,11 +294,11 @@ StudioFilterPickerView::StudioFilterPickerView(QWidget* parent)
 	// floods the shard with accent light.
 	const QColor track = mixColor(QColor(skinTokens.card), QColor(skinTokens.background), dark ? 0.45 : 0.40);
 	const QString shardFill = dark
-		? QStringLiteral("rgba(255, 255, 255, 0.12)") : QStringLiteral("rgba(255, 255, 255, 0.85)");
+		? cssRgba(skinMaterialHighlight(), 0.12) : cssRgba(skinMaterialHighlight(), 0.85);
 	const QString shardBorder = dark
-		? QStringLiteral("rgba(255, 255, 255, 0.10)") : QStringLiteral("rgba(24, 32, 51, 0.20)");
+		? cssRgba(skinMaterialHighlight(), 0.10) : cssRgba(skinTokens.text, 0.20);
 	const QString shardTopEdge = dark
-		? QStringLiteral("rgba(255, 255, 255, 0.32)") : QStringLiteral("rgba(255, 255, 255, 0.95)");
+		? cssRgba(skinMaterialHighlight(), 0.32) : cssRgba(skinMaterialHighlight(), 0.95);
 	listWidget->setStyleSheet(QStringLiteral(
 		"QListWidget#StudioPickerList { background: transparent; border: 0; outline: 0; }"
 		"QListWidget#StudioPickerList::item { border: 0; padding: 0; }"
@@ -500,7 +500,7 @@ void StudioFilterPickerView::paintEvent(QPaintEvent* event)
 	painter.setPen(Qt::NoPen);
 	for (int i = 4; i >= 1; i--)
 	{
-		painter.setBrush(QColor(0, 0, 0, dark ? 26 - i * 4 : 24 - i * 4));
+		painter.setBrush(skinMaterialShadow(dark ? 26 - i * 4 : 24 - i * 4));
 		painter.drawRoundedRect(panel.translated(0, i + 1).adjusted(-i, -i, i, i), radius + i, radius + i);
 	}
 
@@ -527,7 +527,7 @@ void StudioFilterPickerView::paintEvent(QPaintEvent* event)
 	QLinearGradient glass(panel.topLeft(), panel.bottomLeft());
 	if (dark)
 	{
-		glass.setColorAt(0.0, mixColor(card, QColor(255, 255, 255), 0.05));
+		glass.setColorAt(0.0, mixColor(card, skinMaterialHighlight(), 0.05));
 		glass.setColorAt(1.0, mixColor(card, background, 0.30));
 	}
 	else
@@ -557,8 +557,8 @@ void StudioFilterPickerView::paintEvent(QPaintEvent* event)
 
 	// Frost sheen across the upper region: the light caught in the glass.
 	QLinearGradient sheen(panel.topLeft(), QPointF(panel.left(), panel.top() + panel.height() * 0.42));
-	sheen.setColorAt(0.0, QColor(255, 255, 255, dark ? 20 : 150));
-	sheen.setColorAt(1.0, QColor(255, 255, 255, 0));
+	sheen.setColorAt(0.0, skinMaterialHighlight(dark ? 20 : 150));
+	sheen.setColorAt(1.0, skinMaterialHighlight(0));
 	painter.fillPath(panelPath, sheen);
 
 	// 1px border: an icy reflection at the top dissolving into accent light
@@ -566,13 +566,13 @@ void StudioFilterPickerView::paintEvent(QPaintEvent* event)
 	QLinearGradient edge(panel.topLeft(), panel.bottomLeft());
 	if (dark)
 	{
-		edge.setColorAt(0.0, QColor(255, 255, 255, 56));
+		edge.setColorAt(0.0, skinMaterialHighlight(56));
 		edge.setColorAt(0.45, withAlpha(skinTokens.border, 230));
 		edge.setColorAt(1.0, withAlpha(skinTokens.accent, 90));
 	}
 	else
 	{
-		edge.setColorAt(0.0, QColor(255, 255, 255, 240));
+		edge.setColorAt(0.0, skinMaterialHighlight(240));
 		edge.setColorAt(0.45, withAlpha(skinTokens.border, 255));
 		edge.setColorAt(1.0, withAlpha(skinTokens.accent, 110));
 	}

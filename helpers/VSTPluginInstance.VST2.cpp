@@ -18,6 +18,7 @@
 */
 
 #include "stdafx.h"
+#include <cmath>
 #include <inttypes.h>
 #include "../Version.h"
 #include "VSTPluginLibrary.h"
@@ -27,10 +28,42 @@ using namespace std;
 
 #define equalizerApoVSTID VST_FOURCC('E', 'A', 'P', 'O');
 
+namespace
+{
+constexpr int vstTimeTransportPlaying = 1 << 1;
+constexpr int vstTimeNanosValid = 1 << 8;
+constexpr int vstTimePpqPosValid = 1 << 9;
+constexpr int vstTimeTempoValid = 1 << 10;
+constexpr int vstTimeBarsValid = 1 << 11;
+constexpr int vstTimeTimeSigValid = 1 << 13;
+}
+
 vst_time_info* VSTPluginInstance::hostTimeInfo()
 {
-	vstTime.sampleRate = getSampleRate();
-	return &vstTime;
+	thread_local vst_time_info threadVstTime = {};
+	vst_time_info& time = threadVstTime;
+	const double samplePosition = static_cast<double>(
+		vst2SamplePositionFrames.load(memory_order_acquire));
+	const double activeSampleRate = getSampleRate() > 0.0f ? getSampleRate() : 48000.0;
+	constexpr double tempo = 120.0;
+	constexpr double beatsPerBar = 4.0;
+	time.samplePos = samplePosition;
+	time.sampleRate = activeSampleRate;
+	time.nanoSeconds = samplePosition / activeSampleRate * 1000000000.0;
+	time.tempo = tempo;
+	time.ppqPos = samplePosition / activeSampleRate * (tempo / 60.0);
+	time.barStartPos = floor(time.ppqPos / beatsPerBar) * beatsPerBar;
+	time.cycleStartPos = 0.0;
+	time.cycleEndPos = 0.0;
+	time.timeSigNumerator = 4;
+	time.timeSigDenominator = 4;
+	time.flags = vstTimeTransportPlaying
+		| vstTimeNanosValid
+		| vstTimePpqPosValid
+		| vstTimeTempoValid
+		| vstTimeBarsValid
+		| vstTimeTimeSigValid;
+	return &time;
 }
 
 static intptr_t callback(struct vst_effect_t* effect, int32_t opcode, int32_t index, int64_t value, const char* ptr, float opt)
@@ -109,7 +142,8 @@ static intptr_t callback(struct vst_effect_t* effect, int32_t opcode, int32_t in
 			fflush(stdout);
 #endif
 			if (strcmp(s, "startStopProcess") == 0 ||
-				strcmp(s, "sizeWindow") == 0)
+				strcmp(s, "sizeWindow") == 0 ||
+				strcmp(s, "sendVstTimeInfo") == 0)
 				return 1;
 		}
 		return 0;

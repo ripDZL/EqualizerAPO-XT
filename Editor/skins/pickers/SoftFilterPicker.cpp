@@ -594,7 +594,7 @@ void SoftFilterPickerView::paintEvent(QPaintEvent* event)
 	QRectF card(rect());
 	card.adjust(0.5, 0.5, -0.5, -2.5);
 	const QColor stepColor = dark
-		? mixColor(QColor(t.background), QColor(Qt::black), 0.45)
+		? mixColor(QColor(t.background), skinMaterialShadow(), 0.45)
 		: mixColor(QColor(t.background), QColor(t.border), 0.7);
 	painter.setPen(Qt::NoPen);
 	painter.setBrush(stepColor);

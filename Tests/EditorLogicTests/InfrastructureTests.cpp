@@ -10,10 +10,10 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QLocale>
-#include <QRegularExpression>
 #include <QTemporaryDir>
 
 #include "Benchmark/BatchPlan.h"
+#include "Editor/skins/SkinPaint.h"
 #include "Editor/skins/SkinThemeData.h"
 #include "Editor/widgets/EditableValueText.h"
 #include "Editor/widgets/cards/FileReferenceController.h"
@@ -130,24 +130,164 @@ void testEverySkinSheetResolvesAllThemeTokens()
 	QDir repoRoot(QFileInfo(QString::fromUtf8(__FILE__)).absolutePath());
 	requireTrue(repoRoot.cdUp(), "skin-token test reaches the tests directory");
 	requireTrue(repoRoot.cdUp(), "skin-token test reaches the repository root");
+	const QString sourceDirectory = repoRoot.filePath(QStringLiteral("Editor/skins"));
 	const QStringList skinIds = SkinThemeData::ids();
-	const QRegularExpression unresolved(QStringLiteral("@[A-Z_0-9]+@"));
 	for (const QString& skinId : skinIds)
 	{
 		for (bool dark : { false, true })
 		{
-			const QString resource = SkinThemeData::qssResource(skinId, dark);
-			const QString sourcePath = repoRoot.filePath(
-				QStringLiteral("Editor/skins/") + QFileInfo(resource).fileName());
-			QFile file(sourcePath);
-			expectTrue(file.open(QIODevice::ReadOnly | QIODevice::Text),
-				QStringLiteral("loads %1 source sheet").arg(resource));
-			const QString resolved = SkinThemeData::substituteTokens(
-				QString::fromUtf8(file.readAll()), SkinThemeData::tokens(skinId, dark));
-			expectFalse(unresolved.match(resolved).hasMatch(),
-				QStringLiteral("%1 leaves no unresolved @TOKEN@ sentinel").arg(resource));
+			const SkinThemeData::ResolvedStyleSheet sheet =
+				SkinThemeData::styleSheet(skinId, dark, sourceDirectory);
+			expectTrue(sheet.loaded,
+				QStringLiteral("loads %1 source sheet").arg(sheet.resourcePath));
+			expectFalse(sheet.usedStudioFallback,
+				QStringLiteral("%1 uses its own source sheet").arg(skinId));
+			expectTrue(sheet.resolvedId == skinId,
+				QStringLiteral("%1 stays canonical while resolving its sheet").arg(skinId));
+			expectTrue(sheet.resourcePath == SkinThemeData::qssResource(skinId, dark),
+				QStringLiteral("%1 resolves the expected sheet").arg(skinId));
+			expectFalse(sheet.qss.isEmpty(),
+				QStringLiteral("%1 produces a non-empty app stylesheet").arg(sheet.resourcePath));
+			expectTrue(sheet.qss.contains(QStringLiteral("QComboBox::down-arrow")),
+				QStringLiteral("%1 includes the shared combo arrow override").arg(sheet.resourcePath));
+			expectTrue(sheet.qss.contains(QStringLiteral("QFileDialog QToolButton")),
+				QStringLiteral("%1 includes the shared file dialog override").arg(sheet.resourcePath));
+			expectTrue(sheet.unresolvedTokens.isEmpty(),
+				QStringLiteral("%1 leaves no unresolved @TOKEN@ sentinel: %2")
+					.arg(sheet.resourcePath, sheet.unresolvedTokens.join(QStringLiteral(", "))));
 		}
 	}
+
+	const QStringList unresolved = SkinThemeData::unresolvedTokenPlaceholders(
+		QStringLiteral("@ACCENT@ @CUSTOM_2@ @ACCENT@"));
+	expectEqual(unresolved, QStringList({ QStringLiteral("@ACCENT@"), QStringLiteral("@CUSTOM_2@") }),
+		"unresolved token reporting preserves first-seen order without duplicates");
+
+	const QString alphaResolved = SkinThemeData::substituteTokens(
+		QStringLiteral("@ACCENT_A30@ @SURFACE_SUNKEN_A05@ @SHADOW_A55@ @HIGHLIGHT_A95@ @ACCENT_A101@"),
+		SkinThemeData::tokens(QStringLiteral("studio"), false));
+	expectTrue(alphaResolved.contains(QStringLiteral("rgba(47, 107, 255, 0.30)")),
+		"alpha token resolves an opaque token colour into rgba");
+	expectTrue(alphaResolved.contains(QStringLiteral("rgba(246, 247, 251, 0.05)")),
+		"alpha token handles token names with underscores");
+	expectTrue(alphaResolved.contains(QStringLiteral("rgba(0, 0, 0, 0.55)"))
+		&& alphaResolved.contains(QStringLiteral("rgba(255, 255, 255, 0.95)")),
+		"alpha token handles fixed shadow/highlight material effects");
+	expectTrue(SkinThemeData::unresolvedTokenPlaceholders(alphaResolved).contains(QStringLiteral("@ACCENT_A101@")),
+		"invalid alpha tokens stay visible to unresolved-token reporting");
+}
+
+void testSkinMaterialEffectHelpersStayFixedBlackAndWhite()
+{
+	const QColor shadow = skinMaterialShadow(55);
+	expectEqual(shadow.red(), 0, "material shadow keeps fixed black red channel");
+	expectEqual(shadow.green(), 0, "material shadow keeps fixed black green channel");
+	expectEqual(shadow.blue(), 0, "material shadow keeps fixed black blue channel");
+	expectEqual(shadow.alpha(), 55, "material shadow carries caller alpha");
+
+	const QColor highlight = skinMaterialHighlight(95);
+	expectEqual(highlight.red(), 255, "material highlight keeps fixed white red channel");
+	expectEqual(highlight.green(), 255, "material highlight keeps fixed white green channel");
+	expectEqual(highlight.blue(), 255, "material highlight keeps fixed white blue channel");
+	expectEqual(highlight.alpha(), 95, "material highlight carries caller alpha");
+	expectEqual(skinMaterialHighlight().alpha(), 255, "material highlight defaults opaque");
+}
+
+void testSkinScopeGutterLayoutKeepsIfBranchesOnMemberRails()
+{
+	SkinTokens tokens;
+	tokens.channelGroupIndent = 20;
+	tokens.rowHeight = 48;
+	const QSize rowSize(200, 52);
+
+	const SkinScopeGutterLayout head = skinScopeGutterLayout(
+		QStringLiteral("if"), QStringLiteral("if"), 2, 1, tokens, rowSize);
+	expectTrue(head.shouldPaint, "If head rows always paint their starter rail");
+	expectTrue(head.headRow, "If head rows are classified as heads");
+	expectEqual(head.indentUnits, 2, "If head uses its semantic indent");
+	expectEqual(head.ifLevels, 1, "If head exposes one logic rail");
+	expectEqual(head.channelLevels, 1, "If head preserves outer channel rails");
+	expectEqual(head.ownLevel, 2, "If head starter rail sits one band past its live rail");
+	expectEqual(head.cardLeft, 48, "If head card edge follows its semantic indent");
+	expectEqual(head.bandCenter(2), 58, "integer rail centers stay on the existing gutter grid");
+
+	const SkinScopeGutterLayout member = skinScopeGutterLayout(
+		QStringLiteral("biquad"), QStringLiteral("filter"), 3, 2, tokens, rowSize);
+	expectTrue(member.shouldPaint, "members inside an If block paint inherited rails");
+	expectFalse(member.ifFamily, "ordinary rows are not If-family rows");
+	expectEqual(member.indentUnits, 3, "member rows keep their current depth");
+	expectEqual(member.ifLevels, 2, "members keep every inherited logic rail");
+	expectEqual(member.channelLevels, 1, "members preserve channel rails outside inherited If rails");
+	expectEqual(member.ownLevel, 2, "member row's own rail is the innermost inherited logic rail");
+
+	const SkinScopeGutterLayout branch = skinScopeGutterLayout(
+		QStringLiteral("if"), QStringLiteral("else"), 2, 2, tokens, rowSize);
+	expectTrue(branch.branchRow, "Else rows are branch rows");
+	expectTrue(branch.branchOrTail, "Else rows use the branch-or-tail rail rule");
+	expectEqual(branch.indentUnits, 3, "Else rows mount on member rails");
+	expectEqual(branch.ifLevels, 1, "Else rows reserve the current branch rail separately");
+	expectEqual(branch.channelLevels, 1, "Else rows keep channel rails outside inherited If rails");
+	expectEqual(branch.ownLevel, 2, "Else branch marker lands on the active branch rail");
+	expectEqual(branch.cardLeft, 68, "Else card edge follows the mounted member rail");
+
+	const SkinScopeGutterLayout tail = skinScopeGutterLayout(
+		QStringLiteral("if"), QStringLiteral("endif"), 2, 2, tokens, rowSize);
+	expectTrue(tail.tailRow, "EndIf rows are tail rows");
+	expectEqual(tail.indentUnits, branch.indentUnits, "EndIf rows mount with branches");
+	expectEqual(tail.ownLevel, branch.ownLevel, "EndIf cap lands on the same rail as the branch marker");
+	expectEqual(tail.junctionY, 28, "integer junction uses the shared row-center math");
+
+	const SkinScopeGutterLayout flat = skinScopeGutterLayout(
+		QStringLiteral("biquad"), QStringLiteral("filter"), 0, 0, tokens, rowSize);
+	expectFalse(flat.shouldPaint, "flat non-scope rows leave the shared gutter painter in charge");
+}
+
+void testSkinAnalysisGraphLayoutKeepsAxisMathShared()
+{
+	const SkinAnalysisGraphLayout layout = skinAnalysisGraphLayout(
+		QRect(0, 0, 100, 80), QRectF(10.0, 5.0, 80.0, 50.0), 70.0, 1.25);
+
+	expectEqual(layout.plotLeft(), 10, "analysis layout exposes integer plot left");
+	expectEqual(layout.plotRight(), 90, "analysis layout exposes integer plot right");
+	expectEqual(layout.plotTop(), 5, "analysis layout exposes integer plot top");
+	expectEqual(layout.plotBottom(), 55, "analysis layout exposes integer plot bottom");
+	expectEqual(layout.zeroRow(), 70, "analysis layout preserves the unclamped zero row for edge tests");
+	expectTrue(qAbs(layout.zeroClamped - 55.0) < 0.001, "analysis layout clamps zero to the plot edge");
+	expectTrue(qAbs(layout.hover - 1.0) < 0.001, "analysis layout clamps hover to the animation range");
+	expectTrue(layout.truncatedXAxisLabelRect(42.9, 2, 48, 11) == QRect(18, 57, 48, 11),
+		"truncated x-axis label rect preserves Studio/Rack integer placement");
+	expectTrue(layout.roundedXAxisLabelRect(42.9, 2, 48, 12) == QRect(19, 57, 48, 12),
+		"rounded x-axis label rect preserves Soft edge placement");
+
+	const SkinAxisLabelRect left = layout.clampedRoundedXAxisLabelRect(3.0, 2, 48, 12, 8);
+	expectEqual(left.rect.left(), 8, "clamped x-axis labels stay inside the left edge inset");
+	expectTrue((left.alignment & Qt::AlignLeft) != 0, "left-clamped x-axis labels switch to left alignment");
+	const SkinAxisLabelRect right = layout.clampedRoundedXAxisLabelRect(98.0, 2, 48, 12, 8);
+	expectEqual(right.rect.right(), 91, "clamped x-axis labels stay inside the right edge inset");
+	expectTrue((right.alignment & Qt::AlignRight) != 0, "right-clamped x-axis labels switch to right alignment");
+
+	expectTrue(layout.centeredRectClampedToX(4, 7, 20, 5, 2, 40) == QRect(2, 7, 20, 5),
+		"centered cells clamp their left edge to the minimum x");
+	expectTrue(layout.centeredRectClampedToX(80, 7, 20, 5, 2, 40) == QRect(40, 7, 20, 5),
+		"centered cells clamp their left edge to the maximum x");
+	expectTrue(layout.footerRectF(3.0, 18.0) == QRectF(10.0, 58.0, 80.0, 18.0),
+		"footer rects are anchored under the plot");
+
+	struct TestGridLine
+	{
+		double pos = 0.0;
+		bool major = false;
+	};
+	const QVector<TestGridLine> lines = {
+		{ 10.0, false },
+		{ 22.0, true },
+		{ 40.0, false }
+	};
+	expectTrue(qAbs(skinMinimumAdjacentGridGap(lines, 1000.0) - 12.0) < 0.001,
+		"grid gap helper finds the closest adjacent rules");
+	expectEqual(skinFirstMajorGridIndex(lines), 1, "grid major helper finds the first major rule");
+	expectEqual(skinLabelStrideForGap(5.0, 16.0), 4, "grid stride helper thins crowded labels");
+	expectEqual(skinLabelStrideForGap(0.3, 16.0), 1, "grid stride helper keeps a safe fallback for degenerate gaps");
 }
 
 void testEditableValueTextUsesDisplayedDecimalFormatFirst()

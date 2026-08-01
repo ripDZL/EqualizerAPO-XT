@@ -9,9 +9,14 @@
 #include "SkinThemeData.h"
 
 #include <QApplication>
+#include <QColor>
+#include <QDebug>
+#include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QFont>
 #include <QFontDatabase>
+#include <QRegularExpression>
 #include <QStyleFactory>
 
 // finishTokens; header-only, no link dependency on the skin classes.
@@ -19,6 +24,110 @@
 
 namespace
 {
+struct TokenSubstitution
+{
+	const char* name = nullptr;
+	QString value;
+};
+
+QVector<TokenSubstitution> tokenSubstitutions(const SkinTokens& tokens)
+{
+	return {
+		{ "BG", tokens.background },
+		{ "SURFACE", tokens.surface },
+		{ "SURFACE_RAISED", tokens.surfaceRaised },
+		{ "SURFACE_SUNKEN", tokens.surfaceSunken },
+		{ "CARD", tokens.card },
+		{ "CARD_HOVER", tokens.cardHover },
+		{ "CARD_SELECTED", tokens.cardSelected },
+		{ "TEXT", tokens.text },
+		{ "MUTED", tokens.mutedText },
+		{ "BORDER", tokens.border },
+		{ "GRAPH", tokens.graph },
+		{ "GRID_MAJOR", tokens.graphGridMajor },
+		{ "GRID_MINOR", tokens.graphGridMinor },
+		{ "ACCENT", tokens.accent },
+		{ "ACCENT2", tokens.accent2 },
+		{ "SUCCESS", tokens.success },
+		{ "WARNING", tokens.warning },
+		{ "DANGER", tokens.danger },
+		{ "FOCUS", tokens.focusRing },
+		// Fixed QSS material effects: black shadow and white highlight. They
+		// are not palette colours; the alpha suffix controls their strength.
+		{ "SHADOW", QStringLiteral("#000000") },
+		{ "HIGHLIGHT", QStringLiteral("#FFFFFF") },
+		{ "FONT", tokens.fontFamily },
+		{ "MONO", tokens.monoFontFamily }
+	};
+}
+
+QString colorWithAlpha(const QString& value, int alphaPercent)
+{
+	if (alphaPercent < 0 || alphaPercent > 100)
+		return QString();
+
+	const QColor color(value);
+	if (!color.isValid())
+		return QString();
+
+	return QStringLiteral("rgba(%1, %2, %3, %4)")
+		.arg(color.red())
+		.arg(color.green())
+		.arg(color.blue())
+		.arg(QString::number(alphaPercent / 100.0, 'f', 2));
+}
+
+QString alphaTokenValue(const QVector<TokenSubstitution>& table, const QString& name, int alphaPercent)
+{
+	for (const TokenSubstitution& token : table)
+	{
+		if (name == QLatin1String(token.name))
+			return colorWithAlpha(token.value, alphaPercent);
+	}
+	return QString();
+}
+
+QString substituteAlphaTokens(QString qss, const QVector<TokenSubstitution>& table)
+{
+	static const QRegularExpression alphaToken(QStringLiteral("@([A-Z0-9_]+)_A([0-9]{1,3})@"));
+	int offset = 0;
+	while (offset < qss.size())
+	{
+		const QRegularExpressionMatch match = alphaToken.match(qss, offset);
+		if (!match.hasMatch())
+			break;
+
+		const QString replacement = alphaTokenValue(
+			table,
+			match.captured(1),
+			match.captured(2).toInt());
+		if (replacement.isEmpty())
+		{
+			offset = match.capturedEnd(0);
+			continue;
+		}
+
+		qss.replace(match.capturedStart(0), match.capturedLength(0), replacement);
+		offset = match.capturedStart(0) + replacement.size();
+	}
+	return qss;
+}
+
+QString readQss(const QString& resourcePath, const QString& sourceDirectory, bool& loaded)
+{
+	const QString filePath = sourceDirectory.isEmpty()
+		? resourcePath
+		: QDir(sourceDirectory).filePath(QFileInfo(resourcePath).fileName());
+	QFile sheet(filePath);
+	if (!sheet.open(QIODevice::ReadOnly | QIODevice::Text))
+	{
+		loaded = false;
+		return QString();
+	}
+	loaded = true;
+	return QString::fromUtf8(sheet.readAll());
+}
+
 // Constitution: docs/skins/studio.md
 SkinTokens studioTokens(bool dark)
 {
@@ -371,18 +480,18 @@ void applyToApplication(QApplication& app, const QString& skinId, bool dark,
 	if (setFusionStyle)
 		app.setStyle(QStyleFactory::create(QStringLiteral("fusion")));
 
-	const QString resolvedId = resolveId(skinId);
-	const SkinTokens themeTokens = tokens(resolvedId, dark);
-	QString styleSheet;
-	QFile sheet(qssResource(resolvedId, dark));
-	if (!sheet.open(QFile::ReadOnly) && resolvedId != QLatin1String("studio"))
-		sheet.setFileName(qssResource(QStringLiteral("studio"), dark));
-	if (sheet.isOpen() || sheet.open(QFile::ReadOnly))
-		styleSheet = QString::fromUtf8(sheet.readAll());
-
+	const SkinTokens themeTokens = tokens(skinId, dark);
+	const ResolvedStyleSheet sheet = styleSheet(skinId, dark);
+	if (!sheet.loaded)
+		qWarning("Skin stylesheet %s could not be loaded", qPrintable(sheet.resourcePath));
+	else if (sheet.usedStudioFallback)
+		qWarning("Skin stylesheet for %s could not be loaded; using %s",
+			qPrintable(resolveId(skinId)), qPrintable(sheet.resourcePath));
+	if (!sheet.unresolvedTokens.isEmpty())
+		qWarning("Skin stylesheet %s has unresolved tokens: %s",
+			qPrintable(sheet.resourcePath), qPrintable(sheet.unresolvedTokens.join(QStringLiteral(", "))));
 	app.setPalette(palette(themeTokens, dark));
-	app.setStyleSheet(substituteTokens(styleSheet, themeTokens)
-		+ comboArrowOverride() + fileDialogOverride());
+	app.setStyleSheet(sheet.qss);
 }
 
 SkinTokens tokens(const QString& id, bool dark)
@@ -396,39 +505,55 @@ QString qssResource(const QString& id, bool dark)
 		.arg(entry(id).qssBaseName, dark ? QStringLiteral("dark") : QStringLiteral("light"));
 }
 
+ResolvedStyleSheet styleSheet(const QString& id, bool dark, const QString& sourceDirectory)
+{
+	ResolvedStyleSheet result;
+	result.resolvedId = resolveId(id);
+	result.resourcePath = qssResource(result.resolvedId, dark);
+	result.dark = dark;
+
+	bool loaded = false;
+	QString qss = readQss(result.resourcePath, sourceDirectory, loaded);
+	if (!loaded && result.resolvedId != QLatin1String("studio"))
+	{
+		result.usedStudioFallback = true;
+		result.resourcePath = qssResource(QStringLiteral("studio"), dark);
+		qss = readQss(result.resourcePath, sourceDirectory, loaded);
+	}
+
+	const SkinTokens themeTokens = tokens(result.resolvedId, dark);
+	result.loaded = loaded;
+	result.qss = substituteTokens(qss, themeTokens)
+		+ comboArrowOverride() + fileDialogOverride();
+	result.unresolvedTokens = unresolvedTokenPlaceholders(result.qss);
+	return result;
+}
+
 QString substituteTokens(QString qss, const SkinTokens& tokens)
 {
 	// Token sentinels intentionally use the @TOKEN@ form so they survive Qt's
 	// style sheet parser intact (a literal '@' is not meaningful in QSS) and
 	// stand out in the source files. Order does not matter because every
 	// sentinel is unique.
-	struct Substitution { const char* placeholder = nullptr; QString value; };
-	const Substitution table[] = {
-		{ "@BG@", tokens.background },
-		{ "@SURFACE@", tokens.surface },
-		{ "@SURFACE_RAISED@", tokens.surfaceRaised },
-		{ "@SURFACE_SUNKEN@", tokens.surfaceSunken },
-		{ "@CARD@", tokens.card },
-		{ "@CARD_HOVER@", tokens.cardHover },
-		{ "@CARD_SELECTED@", tokens.cardSelected },
-		{ "@TEXT@", tokens.text },
-		{ "@MUTED@", tokens.mutedText },
-		{ "@BORDER@", tokens.border },
-		{ "@GRAPH@", tokens.graph },
-		{ "@GRID_MAJOR@", tokens.graphGridMajor },
-		{ "@GRID_MINOR@", tokens.graphGridMinor },
-		{ "@ACCENT@", tokens.accent },
-		{ "@ACCENT2@", tokens.accent2 },
-		{ "@SUCCESS@", tokens.success },
-		{ "@WARNING@", tokens.warning },
-		{ "@DANGER@", tokens.danger },
-		{ "@FOCUS@", tokens.focusRing },
-		{ "@FONT@", tokens.fontFamily },
-		{ "@MONO@", tokens.monoFontFamily }
-	};
-	for (const Substitution& s : table)
-		qss.replace(QLatin1String(s.placeholder), s.value);
+	const QVector<TokenSubstitution> table = tokenSubstitutions(tokens);
+	qss = substituteAlphaTokens(qss, table);
+	for (const TokenSubstitution& token : table)
+		qss.replace(QStringLiteral("@%1@").arg(QLatin1String(token.name)), token.value);
 	return qss;
+}
+
+QStringList unresolvedTokenPlaceholders(const QString& qss)
+{
+	static const QRegularExpression unresolved(QStringLiteral("@[A-Z_0-9]+@"));
+	QStringList result;
+	QRegularExpressionMatchIterator matches = unresolved.globalMatch(qss);
+	while (matches.hasNext())
+	{
+		const QString token = matches.next().captured(0);
+		if (!result.contains(token))
+			result.append(token);
+	}
+	return result;
 }
 
 QString comboArrowOverride()

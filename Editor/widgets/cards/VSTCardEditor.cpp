@@ -598,7 +598,7 @@ REGISTER_FILTER_CARD_EDITOR(VSTPlugin, [](FilterTable* filterTable, const QStrin
 	// for configPath == L""), then hand the opaque state to the card editor.
 	// The store()/parse round-trip is verified lossless (--selftest-vst).
 	const VSTPreviewEndpoint previewEndpoint = vstPreviewEndpointForSelectedDevice(
-		filterTable != nullptr ? filterTable->getSelectedDevice() : nullptr);
+		filterTable != nullptr ? filterTable->getPreviewDeviceContext() : nullptr);
 	VSTPluginFilterFactory factory;
 	std::wstring commandWStr = L"VSTPlugin";
 	std::wstring paramWStr = parameters.toStdWString();

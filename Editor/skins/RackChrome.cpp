@@ -35,12 +35,15 @@ const qreal kNameplateWidth = 78.0;
 const qreal kNameplateHeight = 22.0;
 
 // is-dark / withAlpha live in the shared SkinPaint.h.
+}
 
+namespace RackChrome
+{
 // Engraved faceplate printing: a contrast pass offset one pixel down (the
 // recess edge catching the light), then the body color on top.
 void engraveText(QPainter& painter, const QRectF& rect, int flags, const QString& text, const QColor& body, bool dark)
 {
-	painter.setPen(dark ? QColor(0, 0, 0, 170) : QColor(255, 255, 255, 200));
+	painter.setPen(dark ? skinMaterialShadow(170) : skinMaterialHighlight(200));
 	painter.drawText(rect.translated(0, 1), flags, text);
 	painter.setPen(body);
 	painter.drawText(rect, flags, text);
@@ -63,7 +66,7 @@ void paintScrew(QPainter& painter, const QPointF& center, qreal radius, qreal sl
 		body.setColorAt(0.55, QColor(0xC4, 0xBD, 0xAE));
 		body.setColorAt(1.0, QColor(0x8E, 0x86, 0x76));
 	}
-	painter.setPen(QPen(dark ? QColor(0, 0, 0, 200) : QColor(0x6B, 0x62, 0x52), 1));
+	painter.setPen(QPen(dark ? skinMaterialShadow(200) : QColor(0x6B, 0x62, 0x52), 1));
 	painter.setBrush(body);
 	painter.drawEllipse(center, radius, radius);
 
@@ -73,33 +76,93 @@ void paintScrew(QPainter& painter, const QPointF& center, qreal radius, qreal sl
 	const QPointF b = center + dir * (radius - 1.2);
 	painter.setPen(QPen(dark ? QColor(10, 12, 14, 230) : QColor(60, 54, 44, 220), 1.4, Qt::SolidLine, Qt::RoundCap));
 	painter.drawLine(a, b);
-	painter.setPen(QPen(QColor(255, 255, 255, dark ? 60 : 170), 0.8, Qt::SolidLine, Qt::RoundCap));
+	painter.setPen(QPen(skinMaterialHighlight(dark ? 60 : 170), 0.8, Qt::SolidLine, Qt::RoundCap));
 	painter.drawLine(a + QPointF(0, 1), b + QPointF(0, 1));
 }
 
-// A panel LED in a bezel ring: lit = glowing dome with a specular dot,
-// unlit = the same dome gone dark.
-void paintLed(QPainter& painter, const QPointF& center, qreal radius, const QColor& litColor, bool lit, bool dark)
+// A panel LED in a bezel ring. Callers own the electrical state: bool for the
+// ordinary on/off lamp, or glow/halo parameters for Rack-only variants like
+// hover-fade selector lamps and the reference card's wider health lamp.
+void paintLed(QPainter& painter, const QPointF& center, qreal radius, const QColor& litColor,
+	qreal glow, bool dark, qreal haloRadius, bool recedeWhenUnlit)
 {
-	painter.setPen(QPen(dark ? QColor(0, 0, 0, 190) : QColor(70, 62, 50, 190), 1));
+	const qreal clampedGlow = qBound<qreal>(0.0, glow, 1.0);
+	const bool unlit = clampedGlow <= 0.0;
+
+	if (recedeWhenUnlit)
+	{
+		painter.setPen(QPen(dark ? skinMaterialShadow(unlit ? 110 : 190) : QColor(70, 62, 50, unlit ? 100 : 190), 1));
+		painter.setBrush(Qt::NoBrush);
+		painter.drawEllipse(center, radius + 1.2, radius + 1.2);
+
+		if (clampedGlow > 0.0)
+		{
+			const qreal effectiveHaloRadius = haloRadius > 0.0 ? haloRadius : radius * 3.2;
+			QRadialGradient halo(center, effectiveHaloRadius);
+			halo.setColorAt(0.0, withAlpha(litColor, int(110 * clampedGlow)));
+			halo.setColorAt(1.0, withAlpha(litColor, 0));
+			painter.setPen(Qt::NoPen);
+			painter.setBrush(halo);
+			painter.drawEllipse(center, effectiveHaloRadius, effectiveHaloRadius);
+		}
+
+		QRadialGradient dome(center - QPointF(radius * 0.3, radius * 0.3), radius * 1.6);
+		const QColor off = litColor.darker(330);
+		const QColor hot = litColor.lighter(150);
+		auto mix = [clampedGlow](const QColor& a, const QColor& b) {
+			return QColor(
+				qRound(a.red() + (b.red() - a.red()) * clampedGlow),
+				qRound(a.green() + (b.green() - a.green()) * clampedGlow),
+				qRound(a.blue() + (b.blue() - a.blue()) * clampedGlow));
+		};
+		QColor domeTop = mix(off.lighter(140), hot);
+		QColor domeEdge = mix(off, litColor.darker(125));
+		if (unlit)
+		{
+			domeTop.setAlpha(140);
+			domeEdge.setAlpha(140);
+		}
+		dome.setColorAt(0.0, domeTop);
+		dome.setColorAt(1.0, domeEdge);
+		painter.setPen(Qt::NoPen);
+		painter.setBrush(dome);
+		painter.drawEllipse(center, radius, radius);
+		painter.setBrush(skinMaterialHighlight(unlit ? (dark ? 14 : 30)
+			: int((dark ? 28 : 60) + (170 - (dark ? 28 : 60)) * clampedGlow)));
+		painter.drawEllipse(center - QPointF(radius * 0.35, radius * 0.35), radius * 0.3, radius * 0.3);
+		return;
+	}
+
+	const bool lit = clampedGlow > 0.0;
+	painter.setPen(QPen(dark ? skinMaterialShadow(190) : QColor(70, 62, 50, 190), 1));
 	painter.setBrush(Qt::NoBrush);
 	painter.drawEllipse(center, radius + 1.2, radius + 1.2);
 
 	if (lit)
 	{
-		QRadialGradient halo(center, radius * 3.2);
-		halo.setColorAt(0.0, withAlpha(litColor, 110));
+		const qreal effectiveHaloRadius = haloRadius > 0.0 ? haloRadius : radius * 3.2;
+		QRadialGradient halo(center, effectiveHaloRadius);
+		halo.setColorAt(0.0, withAlpha(litColor, int(110 * clampedGlow)));
 		halo.setColorAt(1.0, withAlpha(litColor, 0));
 		painter.setPen(Qt::NoPen);
 		painter.setBrush(halo);
-		painter.drawEllipse(center, radius * 3.2, radius * 3.2);
+		painter.drawEllipse(center, effectiveHaloRadius, effectiveHaloRadius);
 	}
 
 	QRadialGradient dome(center - QPointF(radius * 0.3, radius * 0.3), radius * 1.6);
 	if (lit)
 	{
-		dome.setColorAt(0.0, litColor.lighter(150));
-		dome.setColorAt(1.0, litColor.darker(125));
+		if (clampedGlow >= 1.0)
+		{
+			dome.setColorAt(0.0, litColor.lighter(150));
+			dome.setColorAt(1.0, litColor.darker(125));
+		}
+		else
+		{
+			const QColor off = litColor.darker(330);
+			dome.setColorAt(0.0, mixColor(off.lighter(140), litColor.lighter(150), clampedGlow));
+			dome.setColorAt(1.0, mixColor(off, litColor.darker(125), clampedGlow));
+		}
 	}
 	else
 	{
@@ -110,27 +173,43 @@ void paintLed(QPainter& painter, const QPointF& center, qreal radius, const QCol
 	painter.setPen(Qt::NoPen);
 	painter.setBrush(dome);
 	painter.drawEllipse(center, radius, radius);
-	painter.setBrush(QColor(255, 255, 255, lit ? 170 : (dark ? 28 : 60)));
+	painter.setBrush(skinMaterialHighlight(clampedGlow >= 1.0 ? 170 : (dark ? 28 : 60)));
 	painter.drawEllipse(center - QPointF(radius * 0.35, radius * 0.35), radius * 0.3, radius * 0.3);
+}
+
+void paintLed(QPainter& painter, const QPointF& center, qreal radius, const QColor& litColor, bool lit, bool dark)
+{
+	paintLed(painter, center, radius, litColor, lit ? 1.0 : 0.0, dark, radius * 3.2, false);
 }
 
 // Horizontal brushing grain: fine strokes whose ink varies
 // deterministically per line, so the metal reads as brushed rather than
 // evenly striped, with sparse brighter polish lines where the abrasive bit
-// deeper. Logical coordinates only - the painter's DPI transform scales the
-// grain, no physical-pixel constants.
-void paintBrushing(QPainter& painter, const QRectF& r, bool dark, uint seed)
+// deeper. Callers choose the ink/base alpha because rack sub-assemblies use
+// the same grain machine on different metals.
+void paintBrushing(QPainter& painter, const QRectF& r, const QColor& ink, int baseAlpha, uint seed)
 {
-	const int baseAlpha = dark ? 4 : 5;
-	QColor ink = dark ? QColor(255, 255, 255) : QColor(96, 84, 64);
+	QColor lineInk = ink;
 	for (qreal y = r.top() + 2; y < r.bottom() - 1; y += 2)
 	{
 		const uint h = (seed ^ uint(qRound(y * 7.0))) * 2654435761u;
 		const bool polish = (h >> 8) % 11u == 0;
-		ink.setAlpha(baseAlpha + int(h % 7u) + (polish ? 6 : 0));
-		painter.setPen(QPen(ink, 1));
+		lineInk.setAlpha(baseAlpha + int(h % 7u) + (polish ? 6 : 0));
+		painter.setPen(QPen(lineInk, 1));
 		painter.drawLine(QPointF(r.left() + 2, y), QPointF(r.right() - 2, y));
 	}
+}
+}
+
+namespace
+{
+// The standard Rack faceplate grain. Logical coordinates only - the painter's
+// DPI transform scales the grain, no physical-pixel constants.
+void paintFaceplateBrushing(QPainter& painter, const QRectF& r, bool dark, uint seed)
+{
+	RackChrome::paintBrushing(painter, r,
+		dark ? skinMaterialHighlight() : QColor(96, 84, 64),
+		dark ? 4 : 5, seed);
 }
 
 // A 1/4" patchbay insert jack: steel flange around a dark sleeve hole.
@@ -149,16 +228,16 @@ void paintJack(QPainter& painter, const QPointF& center, bool dark)
 		flange.setColorAt(0.6, QColor(0xC0, 0xB9, 0xAA));
 		flange.setColorAt(1.0, QColor(0x86, 0x7E, 0x6E));
 	}
-	painter.setPen(QPen(dark ? QColor(0, 0, 0, 210) : QColor(0x60, 0x58, 0x48), 1));
+	painter.setPen(QPen(dark ? skinMaterialShadow(210) : QColor(0x60, 0x58, 0x48), 1));
 	painter.setBrush(flange);
 	painter.drawEllipse(center, 4.6, 4.6);
 
-	painter.setPen(QPen(QColor(0, 0, 0, 220), 1));
+	painter.setPen(QPen(skinMaterialShadow(220), 1));
 	painter.setBrush(QColor(8, 9, 10));
 	painter.drawEllipse(center, 2.1, 2.1);
 
 	painter.setPen(Qt::NoPen);
-	painter.setBrush(QColor(255, 255, 255, dark ? 70 : 150));
+	painter.setBrush(skinMaterialHighlight(dark ? 70 : 150));
 	painter.drawEllipse(center + QPointF(-2.5, -2.7), 0.9, 0.9);
 }
 
@@ -212,27 +291,27 @@ void paintToolbarRail(QPainter& painter, const QRect& rect, const QToolBar* tool
 	QLinearGradient sheen(r.topLeft(), r.bottomLeft());
 	if (dark)
 	{
-		sheen.setColorAt(0.0, QColor(255, 255, 255, 26));
-		sheen.setColorAt(0.14, QColor(255, 255, 255, 10));
-		sheen.setColorAt(0.55, QColor(255, 255, 255, 0));
-		sheen.setColorAt(1.0, QColor(0, 0, 0, 52));
+		sheen.setColorAt(0.0, skinMaterialHighlight(26));
+		sheen.setColorAt(0.14, skinMaterialHighlight(10));
+		sheen.setColorAt(0.55, skinMaterialHighlight(0));
+		sheen.setColorAt(1.0, skinMaterialShadow(52));
 	}
 	else
 	{
-		sheen.setColorAt(0.0, QColor(255, 255, 255, 120));
-		sheen.setColorAt(0.5, QColor(255, 255, 255, 0));
-		sheen.setColorAt(1.0, QColor(0, 0, 0, 30));
+		sheen.setColorAt(0.0, skinMaterialHighlight(120));
+		sheen.setColorAt(0.5, skinMaterialHighlight(0));
+		sheen.setColorAt(1.0, skinMaterialShadow(30));
 	}
 	painter.fillRect(r, sheen);
 
 	// Horizontal brushing grain, same machine as the card faceplates.
-	paintBrushing(painter, r, dark, uint(qHash(QStringLiteral("master-rail-brush"))));
+	paintFaceplateBrushing(painter, r, dark, uint(qHash(QStringLiteral("master-rail-brush"))));
 
 	// Machined edges: lit top chamfer, shadowed groove above the QSS border,
 	// so the strip reads as a milled rail rather than a flat band.
-	painter.setPen(QPen(QColor(255, 255, 255, dark ? 36 : 150), 1));
+	painter.setPen(QPen(skinMaterialHighlight(dark ? 36 : 150), 1));
 	painter.drawLine(QPointF(r.left(), r.top() + 0.5), QPointF(r.right(), r.top() + 0.5));
-	painter.setPen(QPen(QColor(0, 0, 0, dark ? 150 : 70), 1));
+	painter.setPen(QPen(skinMaterialShadow(dark ? 150 : 70), 1));
 	painter.drawLine(QPointF(r.left(), r.bottom() - 0.5), QPointF(r.right(), r.bottom() - 0.5));
 
 	// Rail ears with one mounting screw each, painted at the live geometry of
@@ -254,11 +333,11 @@ void paintToolbarRail(QPainter& painter, const QRect& rect, const QToolBar* tool
 			: QRectF(g.left(), r.top(), r.right() - g.left(), r.height());
 		const qreal grooveX = leftSide ? ear.right() : ear.left();
 		painter.fillRect(ear, earFill);
-		painter.setPen(QPen(QColor(0, 0, 0, dark ? 120 : 60), 1));
+		painter.setPen(QPen(skinMaterialShadow(dark ? 120 : 60), 1));
 		painter.drawLine(QPointF(grooveX, r.top()), QPointF(grooveX, r.bottom()));
-		painter.setPen(QPen(QColor(255, 255, 255, dark ? 26 : 120), 1));
+		painter.setPen(QPen(skinMaterialHighlight(dark ? 26 : 120), 1));
 		painter.drawLine(QPointF(grooveX + (leftSide ? 1 : -1), r.top()), QPointF(grooveX + (leftSide ? 1 : -1), r.bottom()));
-		paintScrew(painter, QPointF(ear.center().x(), r.center().y()), 4.0,
+		RackChrome::paintScrew(painter, QPointF(ear.center().x(), r.center().y()), 4.0,
 			qreal((seed + (leftSide ? 0u : 73u)) % 180u), dark);
 	}
 
@@ -281,7 +360,7 @@ void paintToolbarRail(QPainter& painter, const QRect& rect, const QToolBar* tool
 		painter.setFont(markFont);
 		QColor ink(tokens.mutedText);
 		ink.setAlpha(dark ? 150 : 190);
-		engraveText(painter, QRectF(blank->geometry()), Qt::AlignCenter, marking, ink, dark);
+		RackChrome::engraveText(painter, QRectF(blank->geometry()), Qt::AlignCenter, marking, ink, dark);
 	}
 
 	// The instant-mode power LED, mounted in the well the checkbox's QSS
@@ -290,7 +369,7 @@ void paintToolbarRail(QPainter& painter, const QRect& rect, const QToolBar* tool
 	if (const QCheckBox* box = toolBar->findChild<QCheckBox*>(QStringLiteral("InstantModeCheckBox"), Qt::FindDirectChildrenOnly))
 	{
 		const QRectF g(box->geometry());
-		paintLed(painter, QPointF(g.left() + 10.0, g.center().y()), 3.2, QColor(tokens.accent2),
+		RackChrome::paintLed(painter, QPointF(g.left() + 10.0, g.center().y()), 3.2, QColor(tokens.accent2),
 			box->isChecked() && box->isEnabled(), dark);
 	}
 }
@@ -408,29 +487,29 @@ void paintCardChrome(QPainter& painter, const QRect& rect, const CommandRowInfo&
 	QLinearGradient sheen(r.topLeft(), r.bottomLeft());
 	if (dark)
 	{
-		sheen.setColorAt(0.0, QColor(255, 255, 255, 22));
-		sheen.setColorAt(0.12, QColor(255, 255, 255, 9));
-		sheen.setColorAt(0.55, QColor(255, 255, 255, 0));
-		sheen.setColorAt(1.0, QColor(0, 0, 0, 46));
+		sheen.setColorAt(0.0, skinMaterialHighlight(22));
+		sheen.setColorAt(0.12, skinMaterialHighlight(9));
+		sheen.setColorAt(0.55, skinMaterialHighlight(0));
+		sheen.setColorAt(1.0, skinMaterialShadow(46));
 	}
 	else
 	{
-		sheen.setColorAt(0.0, QColor(255, 255, 255, 110));
-		sheen.setColorAt(0.5, QColor(255, 255, 255, 0));
-		sheen.setColorAt(1.0, QColor(0, 0, 0, 26));
+		sheen.setColorAt(0.0, skinMaterialHighlight(110));
+		sheen.setColorAt(0.5, skinMaterialHighlight(0));
+		sheen.setColorAt(1.0, skinMaterialShadow(26));
 	}
 	painter.fillRect(r, sheen);
 
 	// Per-type finish: Include units wear patchbay black, VST units a warm
 	// charcoal; filters keep the bare aluminium.
 	if (info.type == QLatin1String("include"))
-		painter.fillRect(r, QColor(0, 0, 0, dark ? 64 : 28));
+		painter.fillRect(r, skinMaterialShadow(dark ? 64 : 28));
 	else if (info.type == QLatin1String("vst"))
 		painter.fillRect(r, dark ? QColor(34, 20, 6, 50) : QColor(74, 50, 14, 18));
 
 	// Horizontal brushing grain, seeded per unit so two stacked units never
 	// share the same streak pattern - sheets cut from the same stock.
-	paintBrushing(painter, r, dark, uint(qHash(info.command)));
+	paintFaceplateBrushing(painter, r, dark, uint(qHash(info.command)));
 
 	// Rack ears, separated from the panel by a machined groove.
 	const QRectF leftEar(r.left(), r.top(), kEarWidth, r.height());
@@ -438,10 +517,10 @@ void paintCardChrome(QPainter& painter, const QRect& rect, const CommandRowInfo&
 	const QColor earFill(0, 0, 0, dark ? 52 : 20);
 	painter.fillRect(leftEar, earFill);
 	painter.fillRect(rightEar, earFill);
-	painter.setPen(QPen(QColor(0, 0, 0, dark ? 120 : 60), 1));
+	painter.setPen(QPen(skinMaterialShadow(dark ? 120 : 60), 1));
 	painter.drawLine(QPointF(leftEar.right(), r.top()), QPointF(leftEar.right(), r.bottom()));
 	painter.drawLine(QPointF(rightEar.left(), r.top()), QPointF(rightEar.left(), r.bottom()));
-	painter.setPen(QPen(QColor(255, 255, 255, dark ? 26 : 120), 1));
+	painter.setPen(QPen(skinMaterialHighlight(dark ? 26 : 120), 1));
 	painter.drawLine(QPointF(leftEar.right() + 1, r.top()), QPointF(leftEar.right() + 1, r.bottom()));
 	painter.drawLine(QPointF(rightEar.left() + 1, r.top()), QPointF(rightEar.left() + 1, r.bottom()));
 
@@ -451,15 +530,15 @@ void paintCardChrome(QPainter& painter, const QRect& rect, const CommandRowInfo&
 	// along the bottom and right - so every row reads as its own bolted
 	// unit rather than a list stripe.
 	painter.setBrush(Qt::NoBrush);
-	painter.setPen(QPen(QColor(0, 0, 0, dark ? 90 : 40), 1));
+	painter.setPen(QPen(skinMaterialShadow(dark ? 90 : 40), 1));
 	painter.drawRoundedRect(r.adjusted(0.5, 0.5, -0.5, -0.5), radius, radius);
-	painter.setPen(QPen(QColor(255, 255, 255, dark ? 36 : 150), 1));
+	painter.setPen(QPen(skinMaterialHighlight(dark ? 36 : 150), 1));
 	painter.drawLine(QPointF(r.left() + radius, r.top() + 1.5), QPointF(r.right() - radius, r.top() + 1.5));
-	painter.setPen(QPen(QColor(255, 255, 255, dark ? 16 : 80), 1));
+	painter.setPen(QPen(skinMaterialHighlight(dark ? 16 : 80), 1));
 	painter.drawLine(QPointF(r.left() + 1.5, r.top() + radius), QPointF(r.left() + 1.5, r.bottom() - radius));
-	painter.setPen(QPen(QColor(0, 0, 0, dark ? 140 : 70), 1));
+	painter.setPen(QPen(skinMaterialShadow(dark ? 140 : 70), 1));
 	painter.drawLine(QPointF(r.left() + radius, r.bottom() - 1.5), QPointF(r.right() - radius, r.bottom() - 1.5));
-	painter.setPen(QPen(QColor(0, 0, 0, dark ? 60 : 30), 1));
+	painter.setPen(QPen(skinMaterialShadow(dark ? 60 : 30), 1));
 	painter.drawLine(QPointF(r.right() - 1.5, r.top() + radius), QPointF(r.right() - 1.5, r.bottom() - radius));
 
 	// Module groove under the control strip whenever the unit is opened (the
@@ -467,9 +546,9 @@ void paintCardChrome(QPainter& painter, const QRect& rect, const CommandRowInfo&
 	if (r.height() >= tokens.rowHeight + 26)
 	{
 		const qreal y = r.top() + tokens.rowHeight;
-		painter.setPen(QPen(QColor(0, 0, 0, dark ? 110 : 55), 1));
+		painter.setPen(QPen(skinMaterialShadow(dark ? 110 : 55), 1));
 		painter.drawLine(QPointF(leftEar.right() + 2, y), QPointF(rightEar.left() - 2, y));
-		painter.setPen(QPen(QColor(255, 255, 255, dark ? 24 : 110), 1));
+		painter.setPen(QPen(skinMaterialHighlight(dark ? 24 : 110), 1));
 		painter.drawLine(QPointF(leftEar.right() + 2, y + 1), QPointF(rightEar.left() - 2, y + 1));
 	}
 
@@ -558,7 +637,7 @@ void paintCardChrome(QPainter& painter, const QRect& rect, const CommandRowInfo&
 
 	// Commented-out line: the whole unit is powered down behind a dim film.
 	if (!info.enabled)
-		painter.fillPath(plate, dark ? QColor(0, 0, 0, 80) : QColor(255, 252, 244, 120));
+		painter.fillPath(plate, dark ? skinMaterialShadow(80) : QColor(255, 252, 244, 120));
 
 	// Keyboard focus: a thin amber line along the inner bezel (UI necessity,
 	// kept as small as a hardware unit's rail light).
@@ -629,7 +708,7 @@ void paintKnob(QPainter& painter, const QRect& rect, const KnobState& state, con
 		const QPointF plusAt = pointAt(1.07, scaleRadius - 2.5);
 		const QRectF minusRect(minusAt.x() - 7, minusAt.y() - 7, 14, 14);
 		const QRectF plusRect(plusAt.x() - 7, plusAt.y() - 7, 14, 14);
-		painter.setPen(dark ? QColor(0, 0, 0, 170) : QColor(255, 255, 255, 200));
+		painter.setPen(dark ? skinMaterialShadow(170) : skinMaterialHighlight(200));
 		painter.drawText(minusRect.translated(0, 1), Qt::AlignCenter, QStringLiteral("-"));
 		painter.drawText(plusRect.translated(0, 1), Qt::AlignCenter, QStringLiteral("+"));
 		painter.setPen(withAlpha(inkStrong, inkAlpha));
@@ -653,16 +732,16 @@ void paintKnob(QPainter& painter, const QRect& rect, const KnobState& state, con
 		bodyGrad.setColorAt(0.6, QColor(0xDE, 0xD7, 0xC6));
 		bodyGrad.setColorAt(1.0, QColor(0xA8, 0x9F, 0x8C));
 	}
-	painter.setPen(QPen(dark ? QColor(0, 0, 0, 200) : QColor(0x7E, 0x75, 0x62), 1));
+	painter.setPen(QPen(dark ? skinMaterialShadow(200) : QColor(0x7E, 0x75, 0x62), 1));
 	painter.setBrush(bodyGrad);
 	painter.drawEllipse(center, bodyRadius, bodyRadius);
 
 	// Machined cap step and the specular arc on its top edge.
 	const qreal capRadius = bodyRadius - 3.5;
-	painter.setPen(QPen(QColor(0, 0, 0, dark ? 90 : 50), 1));
+	painter.setPen(QPen(skinMaterialShadow(dark ? 90 : 50), 1));
 	painter.setBrush(Qt::NoBrush);
 	painter.drawEllipse(center, capRadius, capRadius);
-	painter.setPen(QPen(QColor(255, 255, 255, dark ? 70 : 150), 1.2));
+	painter.setPen(QPen(skinMaterialHighlight(dark ? 70 : 150), 1.2));
 	painter.drawArc(QRectF(center.x() - capRadius, center.y() - capRadius, capRadius * 2, capRadius * 2), 60 * 16, 60 * 16);
 
 	// The pointer: a physical painted line. Hover/drag turns it amber (the
@@ -678,7 +757,7 @@ void paintKnob(QPainter& painter, const QRect& rect, const KnobState& state, con
 		pointerColor = dark ? QColor(0xF2, 0xEC, 0xDC) : QColor(0x2E, 0x29, 0x22);
 	const QPointF pointerBase = pointAt(state.ratio, bodyRadius * 0.28);
 	const QPointF pointerTip = pointAt(state.ratio, bodyRadius - 1.8);
-	painter.setPen(QPen(QColor(0, 0, 0, state.enabled ? (dark ? 150 : 90) : 50), 3.6, Qt::SolidLine, Qt::RoundCap));
+	painter.setPen(QPen(skinMaterialShadow(state.enabled ? (dark ? 150 : 90) : 50), 3.6, Qt::SolidLine, Qt::RoundCap));
 	painter.drawLine(pointerBase, pointerTip);
 	painter.setPen(QPen(pointerColor, 2.4, Qt::SolidLine, Qt::RoundCap));
 	painter.drawLine(pointerBase, pointerTip);
@@ -703,7 +782,7 @@ void paintKnob(QPainter& painter, const QRect& rect, const KnobState& state, con
 	if (!state.enabled)
 	{
 		painter.setPen(Qt::NoPen);
-		painter.setBrush(dark ? QColor(0, 0, 0, 90) : QColor(255, 252, 244, 130));
+		painter.setBrush(dark ? skinMaterialShadow(90) : QColor(255, 252, 244, 130));
 		painter.drawEllipse(center, bodyRadius, bodyRadius);
 	}
 
@@ -753,7 +832,7 @@ void paintAddRow(QPainter& painter, const QRect& rect, const ListChromeState& st
 	const QColor railFill(255, 255, 255, dark ? 14 : 24);
 	painter.fillRect(leftRail, railFill);
 	painter.fillRect(rightRail, railFill);
-	painter.setPen(QPen(QColor(0, 0, 0, dark ? 150 : 130), 1));
+	painter.setPen(QPen(skinMaterialShadow(dark ? 150 : 130), 1));
 	painter.drawLine(QPointF(leftRail.right(), r.top()), QPointF(leftRail.right(), r.bottom()));
 	painter.drawLine(QPointF(rightRail.left(), r.top()), QPointF(rightRail.left(), r.bottom()));
 
@@ -762,9 +841,9 @@ void paintAddRow(QPainter& painter, const QRect& rect, const ListChromeState& st
 		// work light - recessed, so the light law is the plate chamfer's
 		// inverse.
 		painter.setPen(Qt::NoPen);
-		painter.setBrush(QColor(0, 0, 0, dark ? 210 : 180));
+		painter.setBrush(skinMaterialShadow(dark ? 210 : 180));
 		painter.drawEllipse(center, 2.6, 2.6);
-		painter.setPen(QPen(QColor(255, 255, 255, dark ? 40 : 70), 1));
+		painter.setPen(QPen(skinMaterialHighlight(dark ? 40 : 70), 1));
 		painter.setBrush(Qt::NoBrush);
 		painter.drawArc(QRectF(center.x() - 2.6, center.y() - 2.6, 5.2, 5.2), 200 * 16, 140 * 16);
 	};
@@ -778,9 +857,9 @@ void paintAddRow(QPainter& painter, const QRect& rect, const ListChromeState& st
 	// The opening's chamfer is the faceplate's inverse: the top inner edge
 	// falls into the overhang's shadow, the lower lip catches the work
 	// light.
-	painter.setPen(QPen(QColor(0, 0, 0, dark ? 170 : 150), 1));
+	painter.setPen(QPen(skinMaterialShadow(dark ? 170 : 150), 1));
 	painter.drawLine(QPointF(r.left() + radius, r.top() + 1.0), QPointF(r.right() - radius, r.top() + 1.0));
-	painter.setPen(QPen(QColor(255, 255, 255, dark ? 26 : 50), 1));
+	painter.setPen(QPen(skinMaterialHighlight(dark ? 26 : 50), 1));
 	painter.drawLine(QPointF(r.left() + radius, r.bottom() - 1.0), QPointF(r.right() - radius, r.bottom() - 1.0));
 
 	// Stencilled marking inside the bay - hardware printing, never
@@ -837,7 +916,7 @@ void paintInsertSeam(QPainter& painter, const QRect& rect, const ListChromeState
 	const qreal y = rect.center().y();
 	const qreal left = rect.left();
 	const qreal right = rect.right();
-	painter.setPen(QPen(QColor(0, 0, 0, dark ? 150 : 90), 1));
+	painter.setPen(QPen(skinMaterialShadow(dark ? 150 : 90), 1));
 	painter.drawLine(QPointF(left, y + 1.5), QPointF(right, y + 1.5));
 
 	QColor amber(tokens.accent);
@@ -1074,8 +1153,8 @@ void paintGraphicEqPlot(QPainter& painter, const GraphicEQPlotState& state, cons
 	// recessed grammar (shadowed top edge, lit lower lip below).
 	painter.setRenderHint(QPainter::Antialiasing, true);
 	QLinearGradient overhang(r.topLeft(), QPointF(r.left(), r.top() + 9.0));
-	overhang.setColorAt(0.0, QColor(0, 0, 0, dark ? 150 : 130));
-	overhang.setColorAt(1.0, QColor(0, 0, 0, 0));
+	overhang.setColorAt(0.0, skinMaterialShadow(dark ? 150 : 130));
+	overhang.setColorAt(1.0, skinMaterialShadow(0));
 	painter.fillRect(QRectF(r.left(), r.top(), r.width(), 9.0), overhang);
 
 	// Bezel frame: the LCD-well border grammar. Focus lights the amber
@@ -1108,21 +1187,21 @@ void paintTitleBarChrome(QPainter& painter, const QRect& rect, const SkinTokens&
 	QLinearGradient sheen(r.topLeft(), r.bottomLeft());
 	if (dark)
 	{
-		sheen.setColorAt(0.0, QColor(255, 255, 255, 26));
-		sheen.setColorAt(0.14, QColor(255, 255, 255, 10));
-		sheen.setColorAt(0.55, QColor(255, 255, 255, 0));
-		sheen.setColorAt(1.0, QColor(0, 0, 0, 52));
+		sheen.setColorAt(0.0, skinMaterialHighlight(26));
+		sheen.setColorAt(0.14, skinMaterialHighlight(10));
+		sheen.setColorAt(0.55, skinMaterialHighlight(0));
+		sheen.setColorAt(1.0, skinMaterialShadow(52));
 	}
 	else
 	{
-		sheen.setColorAt(0.0, QColor(255, 255, 255, 120));
-		sheen.setColorAt(0.5, QColor(255, 255, 255, 0));
-		sheen.setColorAt(1.0, QColor(0, 0, 0, 30));
+		sheen.setColorAt(0.0, skinMaterialHighlight(120));
+		sheen.setColorAt(0.5, skinMaterialHighlight(0));
+		sheen.setColorAt(1.0, skinMaterialShadow(30));
 	}
 	painter.fillRect(r, sheen);
 
 	// Horizontal brushing grain, same machine as the card faceplates.
-	paintBrushing(painter, r, dark, uint(qHash(QStringLiteral("top-panel-brush"))));
+	paintFaceplateBrushing(painter, r, dark, uint(qHash(QStringLiteral("top-panel-brush"))));
 
 	// The caption-button block is the panel's right ear: a slightly recessed
 	// zone behind the three machined caps, set off by a machined groove. The
@@ -1134,18 +1213,18 @@ void paintTitleBarChrome(QPainter& painter, const QRect& rect, const SkinTokens&
 	if (earFits)
 	{
 		painter.fillRect(QRectF(grooveX, r.top(), r.right() - grooveX, r.height()),
-			QColor(0, 0, 0, dark ? 52 : 20));
-		painter.setPen(QPen(QColor(0, 0, 0, dark ? 120 : 60), 1));
+			skinMaterialShadow(dark ? 52 : 20));
+		painter.setPen(QPen(skinMaterialShadow(dark ? 120 : 60), 1));
 		painter.drawLine(QPointF(grooveX, r.top()), QPointF(grooveX, r.bottom()));
-		painter.setPen(QPen(QColor(255, 255, 255, dark ? 26 : 120), 1));
+		painter.setPen(QPen(skinMaterialHighlight(dark ? 26 : 120), 1));
 		painter.drawLine(QPointF(grooveX + 1, r.top()), QPointF(grooveX + 1, r.bottom()));
 	}
 
 	// Machined edges across the full rail (over the ear fill): lit top
 	// chamfer, shadowed bottom groove against the menu bar below.
-	painter.setPen(QPen(QColor(255, 255, 255, dark ? 36 : 150), 1));
+	painter.setPen(QPen(skinMaterialHighlight(dark ? 36 : 150), 1));
 	painter.drawLine(QPointF(r.left(), r.top() + 0.5), QPointF(r.right(), r.top() + 0.5));
-	painter.setPen(QPen(QColor(0, 0, 0, dark ? 150 : 70), 1));
+	painter.setPen(QPen(skinMaterialShadow(dark ? 150 : 70), 1));
 	painter.drawLine(QPointF(r.left(), r.bottom() - 0.5), QPointF(r.right(), r.bottom() - 0.5));
 
 	// Two rail screws bolting the top panel down: one at the left end before
@@ -1192,23 +1271,15 @@ void styleMainToolbar(QToolBar* toolBar, const SkinTokens& tokens)
 
 bool paintScopeGutter(QPainter& painter, const QSize& size, const CommandRowInfo& info, const SkinTokens& tokens)
 {
-	const bool ifFamily = info.type == QStringLiteral("if");
-	const bool headRow = ifFamily && info.command == QStringLiteral("if");
-	const bool branchRow = ifFamily && (info.command == QStringLiteral("elseif") || info.command == QStringLiteral("else"));
-	const bool tailRow = ifFamily && info.command == QStringLiteral("endif");
-	const int logic = info.logicDepth;
-	if (!headRow && logic <= 0)
+	const SkinScopeGutterLayout layout = skinScopeGutterLayout(
+		info.type, info.command, info.depth, info.logicDepth, tokens, size);
+	if (!layout.shouldPaint)
 		return false;
 
 	const bool dark = skinIsDark(tokens);
-	const int unit = tokens.channelGroupIndent;
-	const int h = size.height();
-	const int junctionY = 4 + tokens.rowHeight / 2;
-	// Branch/tail rows are indented with the members (one unit past their
-	// semantic level; logicSiblingsIndentAsMembers). The card edge follows
-	// the same rule.
-	const int indentUnits = (ifFamily && !headRow) ? info.depth + 1 : info.depth;
-	const int cardLeft = 8 + indentUnits * unit;
+	const int h = layout.height;
+	const int junctionY = layout.junctionY;
+	const int cardLeft = layout.cardLeft;
 
 	// The gutter is machined hardware: the bus casing is the rack opening's
 	// dark seam, the core is the amber accent, contact blocks and caps are
@@ -1221,18 +1292,18 @@ bool paintScopeGutter(QPainter& painter, const QSize& size, const CommandRowInfo
 	const QColor lampGreen(tokens.accent2);
 	const QColor lampDanger(tokens.danger);
 	const QColor metal = dark ? QColor(tokens.card).lighter(125) : mixColor(QColor(tokens.card), QColor(tokens.border), 0.35);
-	const QColor metalLight = dark ? QColor(tokens.card).lighter(175) : QColor(Qt::white);
+	const QColor metalLight = dark ? QColor(tokens.card).lighter(175) : skinMaterialHighlight();
 
 	painter.setRenderHint(QPainter::Antialiasing, false);
 	painter.setPen(Qt::NoPen);
 
 	const bool live = info.enabled && !info.lineSkipped;
-	const auto bandCenter = [&](int level) { return 8 + level * unit + unit / 2; };
+	const auto bandCenter = [&](int level) { return layout.bandCenter(level); };
 	const auto busSegment = [&](int level, int y0, int y1, bool segmentLive) {
 		const int cx = bandCenter(level);
 		painter.fillRect(QRect(cx - 3, y0, 7, y1 - y0), seam);
 		painter.fillRect(QRect(cx - 2, y0, 5, y1 - y0), segmentLive ? amber : amberDim);
-		painter.fillRect(QRect(cx - 2, y0, 1, y1 - y0), mixColor(segmentLive ? amber : amberDim, QColor(Qt::white), 0.35));
+		painter.fillRect(QRect(cx - 2, y0, 1, y1 - y0), mixColor(segmentLive ? amber : amberDim, skinMaterialHighlight(), 0.35));
 	};
 	const auto tapStub = [&](int level, bool stubLive) {
 		const int cx = bandCenter(level);
@@ -1264,42 +1335,37 @@ bool paintScopeGutter(QPainter& painter, const QSize& size, const CommandRowInfo
 		painter.setPen(Qt::NoPen);
 	};
 
-	const int ifLevels = headRow ? logic : (branchRow || tailRow) ? logic - 1 : logic;
-	const int channelLevels = qMax(0, indentUnits - ifLevels - ((branchRow || tailRow) ? 1 : 0));
-	for (int level = 0; level < channelLevels; level++)
+	for (int level = 0; level < layout.channelLevels; level++)
 		channelRail(level);
 
-	if (headRow)
+	if (layout.headRow)
 	{
 		// The relay unit feeds the lane below; the bus only peeks out of the
 		// bottom margin, and the lamp on the stub reports the condition.
-		for (int level = channelLevels; level < channelLevels + logic; level++)
+		for (int level = layout.channelLevels; level < layout.channelLevels + layout.logic; level++)
 			busSegment(level, 0, h, true);
-		const int own = channelLevels + logic;
-		busSegment(own, h - 4, h, info.branchState != 0);
+		busSegment(layout.ownLevel, h - 4, h, info.branchState != 0);
 		// A small jewel seated in the mounting seam - the feed point's only
 		// visible face under the full-width relay unit.
-		lamp(bandCenter(own), h - 2.5, info.branchState, 1.4);
+		lamp(bandCenter(layout.ownLevel), h - 2.5, info.branchState, 1.4);
 	}
-	else if (branchRow)
+	else if (layout.branchRow)
 	{
-		for (int level = channelLevels; level + 1 < channelLevels + logic; level++)
+		for (int level = layout.channelLevels; level + 1 < layout.channelLevels + layout.logic; level++)
 			busSegment(level, 0, h, true);
-		const int own = channelLevels + logic - 1;
-		busSegment(own, 0, h, true);
-		tapStub(own, info.branchState == 1);
-		const int cx = bandCenter(own);
+		busSegment(layout.ownLevel, 0, h, true);
+		tapStub(layout.ownLevel, info.branchState == 1);
+		const int cx = bandCenter(layout.ownLevel);
 		contactBlock(QRect(cx - 3, junctionY - 4, 7, 9));
 		lamp(cx, junctionY + 9, info.branchState, 2.2);
 	}
-	else if (tailRow)
+	else if (layout.tailRow)
 	{
-		for (int level = channelLevels; level + 1 < channelLevels + logic; level++)
+		for (int level = layout.channelLevels; level + 1 < layout.channelLevels + layout.logic; level++)
 			busSegment(level, 0, h, true);
-		const int own = channelLevels + logic - 1;
-		busSegment(own, 0, junctionY, true);
-		tapStub(own, false);
-		const int cx = bandCenter(own);
+		busSegment(layout.ownLevel, 0, junctionY, true);
+		tapStub(layout.ownLevel, false);
+		const int cx = bandCenter(layout.ownLevel);
 		contactBlock(QRect(cx - 3, junctionY - 1, 7, 5));
 	}
 	else
@@ -1307,10 +1373,10 @@ bool paintScopeGutter(QPainter& painter, const QSize& size, const CommandRowInfo
 		// A powered unit: tap stub off the innermost bus with a pilot lamp.
 		// A swallowed line de-energizes only its own run; the outer lanes
 		// stay live for the rows below.
-		for (int level = channelLevels; level + 1 < channelLevels + logic; level++)
+		for (int level = layout.channelLevels; level + 1 < layout.channelLevels + layout.logic; level++)
 			busSegment(level, 0, h, true);
-		busSegment(channelLevels + logic - 1, 0, h, live);
-		tapStub(channelLevels + logic - 1, live);
+		busSegment(layout.ownLevel, 0, h, live);
+		tapStub(layout.ownLevel, live);
 		lamp(cardLeft - 6, junctionY, info.lineSkipped ? 0 : (info.enabled ? 1 : -1), 2.0);
 	}
 	return true;

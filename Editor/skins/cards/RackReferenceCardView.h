@@ -3,8 +3,8 @@
 
 	Hardware Rack's reference card (Include / Convolution / MultiConvolution /
 	VSTPlugin row bodies): the unit's service face - status lamp, engraved
-	label strip, recessed LCD readout. RackChrome's grammar is imitated by
-	helpers local to this file pair; the shared RackChrome stays untouched.
+	label strip, recessed LCD readout. Shared RackChrome primitives handle the
+	repeated lamp hardware; this file owns widget state and elidable printing.
 	Constitution: docs/skins/rack.md ("참조 카드" section).
 */
 
@@ -76,8 +76,7 @@ private:
 	Qt::TextElideMode elideMode = Qt::ElideNone;
 };
 
-// A bezel-set panel LED (RackChrome::paintLed's grammar: bezel ring, halo
-// while lit, gradient dome, specular dot). The reference's health is read
+// A bezel-set panel LED painted by RackChrome. The reference's health is read
 // from this lamp: green = resolved, amber = service warning, red = broken
 // reference / unreadable target, dark = empty slot. A powered-down unit
 // (disabled row) always shows the dome gone dark.

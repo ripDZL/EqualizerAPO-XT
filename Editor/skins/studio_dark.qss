@@ -34,7 +34,7 @@ QToolTip {
     background: @CARD@;
     color: @TEXT@;
     border: 1px solid @BORDER@;
-    border-top-color: rgba(255, 255, 255, 0.10);
+    border-top-color: @HIGHLIGHT_A10@;
     border-radius: 6px;
     padding: 6px 10px;
 }
@@ -57,12 +57,12 @@ QMenuBar::item {
 }
 QMenuBar::item:selected {
     background: qradialgradient(cx:0.5, cy:1.0, radius:1.0, fx:0.5, fy:1.0,
-        stop:0 rgba(91, 140, 255, 0.34), stop:0.55 rgba(91, 140, 255, 0.14), stop:1 rgba(91, 140, 255, 0));
+        stop:0 @ACCENT_A34@, stop:0.55 @ACCENT_A14@, stop:1 @ACCENT_A00@);
     color: @TEXT@;
 }
 QMenuBar::item:pressed {
     background: qradialgradient(cx:0.5, cy:1.0, radius:1.0, fx:0.5, fy:1.0,
-        stop:0 rgba(91, 140, 255, 0.48), stop:0.55 rgba(91, 140, 255, 0.20), stop:1 rgba(91, 140, 255, 0));
+        stop:0 @ACCENT_A48@, stop:0.55 @ACCENT_A20@, stop:1 @ACCENT_A00@);
     color: @TEXT@;
 }
 
@@ -71,7 +71,7 @@ QMenu {
     background: rgba(18, 26, 44, 0.97);
     color: @TEXT@;
     border: 1px solid qlineargradient(x1:0, y1:0, x2:0, y2:1,
-        stop:0 rgba(255, 255, 255, 0.16), stop:0.45 @BORDER@, stop:1 rgba(91, 140, 255, 0.38));
+        stop:0 @HIGHLIGHT_A16@, stop:0.45 @BORDER@, stop:1 @ACCENT_A38@);
     border-radius: 8px;
     padding: 8px 6px;
 }
@@ -83,18 +83,18 @@ QMenu::item {
 }
 QMenu::item:selected {
     background: qradialgradient(cx:0.5, cy:0.5, radius:0.7, fx:0.5, fy:0.5,
-        stop:0 rgba(91, 140, 255, 0.40), stop:0.7 rgba(91, 140, 255, 0.16), stop:1 rgba(91, 140, 255, 0.06));
+        stop:0 @ACCENT_A40@, stop:0.7 @ACCENT_A16@, stop:1 @ACCENT_A06@);
     color: @TEXT@;
 }
 QMenu::item:disabled {
     background: transparent;
-    color: rgba(145, 160, 186, 0.45);
+    color: @MUTED_A45@;
 }
 QMenu::separator {
     height: 1px;
     background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-        stop:0 rgba(91, 140, 255, 0), stop:0.35 rgba(91, 140, 255, 0.45),
-        stop:0.7 rgba(166, 108, 255, 0.30), stop:1 rgba(166, 108, 255, 0));
+        stop:0 @ACCENT_A00@, stop:0.35 @ACCENT_A45@,
+        stop:0.7 @ACCENT2_A30@, stop:1 @ACCENT2_A00@);
     margin: 6px 10px;
 }
 QMenu::indicator {
@@ -105,8 +105,8 @@ QMenu::indicator {
 }
 QMenu::indicator:checked {
     background: qradialgradient(cx:0.5, cy:0.5, radius:0.5, fx:0.5, fy:0.5,
-        stop:0 @ACCENT@, stop:0.4 rgba(91, 140, 255, 0.9),
-        stop:0.7 rgba(91, 140, 255, 0.3), stop:1 rgba(91, 140, 255, 0));
+        stop:0 @ACCENT@, stop:0.4 @ACCENT_A90@,
+        stop:0.7 @ACCENT_A30@, stop:1 @ACCENT_A00@);
 }
 QMenu::icon {
     padding-left: 8px;
@@ -140,14 +140,14 @@ QToolButton {
     min-height: 22px;
 }
 QToolButton:hover {
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-top-color: rgba(255, 255, 255, 0.14);
+    background: @HIGHLIGHT_A06@;
+    border: 1px solid @HIGHLIGHT_A08@;
+    border-top-color: @HIGHLIGHT_A14@;
 }
 QToolButton:pressed,
 QToolButton:checked {
-    background: rgba(91, 140, 255, 0.25);
-    border: 1px solid rgba(91, 140, 255, 0.5);
+    background: @ACCENT_A25@;
+    border: 1px solid @ACCENT_A50@;
 }
 QToolButton::menu-indicator {
     image: none;
@@ -169,7 +169,7 @@ QLabel#ToolBarLabel {
 QToolBar#MainToolBar {
     background: @BG@;
     border: 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    border-bottom: 1px solid @HIGHLIGHT_A07@;
     padding: 6px 10px;
     spacing: 8px;
 }
@@ -182,11 +182,11 @@ QToolBar#MainToolBar QToolButton {
 }
 QToolBar#MainToolBar QToolButton:hover {
     background: qradialgradient(cx: 0.5, cy: 1.05, radius: 0.85, fx: 0.5, fy: 1.05,
-        stop: 0 rgba(91, 140, 255, 0.42), stop: 0.4 rgba(91, 140, 255, 0.16), stop: 1 rgba(91, 140, 255, 0));
+        stop: 0 @ACCENT_A42@, stop: 0.4 @ACCENT_A16@, stop: 1 @ACCENT_A00@);
 }
 QToolBar#MainToolBar QToolButton:pressed {
     background: qradialgradient(cx: 0.5, cy: 1.05, radius: 0.9, fx: 0.5, fy: 1.05,
-        stop: 0 rgba(91, 140, 255, 0.62), stop: 0.4 rgba(91, 140, 255, 0.28), stop: 1 rgba(91, 140, 255, 0.02));
+        stop: 0 @ACCENT_A62@, stop: 0.4 @ACCENT_A28@, stop: 1 @ACCENT_A02@);
 }
 
 /* Instant mode: a round signal lamp recast as a switch; the label is lit
@@ -211,12 +211,12 @@ QCheckBox#InstantModeCheckBox::indicator, QCheckBox#AnalysisFormCheck::indicator
     border: 1px solid @BORDER@;
 }
 QCheckBox#InstantModeCheckBox::indicator:hover, QCheckBox#AnalysisFormCheck::indicator:hover {
-    border-color: rgba(91, 140, 255, 0.65);
+    border-color: @ACCENT_A65@;
 }
 QCheckBox#InstantModeCheckBox::indicator:checked, QCheckBox#AnalysisFormCheck::indicator:checked {
     background: qradialgradient(cx: 0.5, cy: 0.42, radius: 0.75, fx: 0.5, fy: 0.36,
-        stop: 0 #E2EBFF, stop: 0.35 @ACCENT@, stop: 1 rgba(91, 140, 255, 0.16));
-    border: 1px solid rgba(91, 140, 255, 0.8);
+        stop: 0 #E2EBFF, stop: 0.35 @ACCENT@, stop: 1 @ACCENT_A16@);
+    border: 1px solid @ACCENT_A80@;
 }
 QCheckBox#InstantModeCheckBox::indicator:checked:disabled, QCheckBox#AnalysisFormCheck::indicator:checked:disabled {
     background: @BORDER@;
@@ -231,14 +231,14 @@ QLabel#DirtyStatusBadge {
     color: @MUTED@;
     background: #08080f;
     border: 1px solid @BORDER@;
-    border-top-color: rgba(0, 0, 0, 0.55);
+    border-top-color: @SHADOW_A55@;
     border-radius: 8px;
     padding: 3px 10px;
 }
 QLabel#DirtyStatusBadge[dirty="true"] {
     color: @TEXT@;
-    background: rgba(245, 158, 11, 0.16);
-    border-color: rgba(245, 158, 11, 0.60);
+    background: @WARNING_A16@;
+    border-color: @WARNING_A60@;
 }
 
 /* Device format readout: same meter window; a warning is an amber lamp
@@ -249,14 +249,14 @@ QLabel#DeviceFormatBadge {
     color: @MUTED@;
     background: #08080f;
     border: 1px solid @BORDER@;
-    border-top-color: rgba(0, 0, 0, 0.55);
+    border-top-color: @SHADOW_A55@;
     border-radius: 8px;
     padding: 3px 10px;
 }
 QLabel#DeviceFormatBadge[severity="warning"] {
     color: @TEXT@;
-    background: rgba(245, 158, 11, 0.16);
-    border-color: rgba(245, 158, 11, 0.60);
+    background: @WARNING_A16@;
+    border-color: @WARNING_A60@;
 }
 
 /* ===== Push Buttons ===== */
@@ -264,18 +264,18 @@ QPushButton {
     background: @CARD@;
     color: @TEXT@;
     border: 1px solid @BORDER@;
-    border-top-color: rgba(255, 255, 255, 0.10);
+    border-top-color: @HIGHLIGHT_A10@;
     border-radius: 8px;
     padding: 6px 14px;
     min-height: 22px;
 }
 QPushButton:hover {
     background: @CARD_HOVER@;
-    border-color: rgba(91, 140, 255, 0.45);
-    border-top-color: rgba(255, 255, 255, 0.16);
+    border-color: @ACCENT_A45@;
+    border-top-color: @HIGHLIGHT_A16@;
 }
 QPushButton:pressed {
-    background: rgba(91, 140, 255, 0.3);
+    background: @ACCENT_A30@;
     border-color: @ACCENT@;
 }
 QPushButton:default {
@@ -297,7 +297,7 @@ QAbstractSpinBox {
     background: #08080f;
     color: @TEXT@;
     border: 1px solid @BORDER@;
-    border-top-color: rgba(0, 0, 0, 0.55);
+    border-top-color: @SHADOW_A55@;
     border-radius: 8px;
     padding: 4px 8px;
     selection-background-color: @ACCENT@;
@@ -338,7 +338,7 @@ QAbstractSpinBox::down-button {
 }
 QAbstractSpinBox::up-button:hover,
 QAbstractSpinBox::down-button:hover {
-    background: rgba(91, 140, 255, 0.22);
+    background: @ACCENT_A22@;
 }
 QAbstractSpinBox::up-arrow {
     image: none;
@@ -370,7 +370,7 @@ QAbstractSpinBox[valueScrub="true"] {
     border-radius: 8px;
 }
 QAbstractSpinBox[valueScrub="true"]:hover {
-    border-color: rgba(91, 140, 255, 0.45);
+    border-color: @ACCENT_A45@;
     background: #0e0e18;
 }
 
@@ -379,14 +379,14 @@ QComboBox {
     background: @CARD@;
     color: @TEXT@;
     border: 1px solid @BORDER@;
-    border-top-color: rgba(255, 255, 255, 0.10);
+    border-top-color: @HIGHLIGHT_A10@;
     border-radius: 8px;
     padding: 4px 28px 4px 10px;
     min-height: 28px;
 }
 QComboBox:hover {
-    border-color: rgba(91, 140, 255, 0.45);
-    border-top-color: rgba(255, 255, 255, 0.16);
+    border-color: @ACCENT_A45@;
+    border-top-color: @HIGHLIGHT_A16@;
     background: @CARD_HOVER@;
 }
 QComboBox:focus,
@@ -416,11 +416,11 @@ QComboBox QAbstractItemView {
     background: @CARD@;
     color: @TEXT@;
     border: 1px solid @BORDER@;
-    border-top-color: rgba(255, 255, 255, 0.10);
+    border-top-color: @HIGHLIGHT_A10@;
     border-radius: 8px;
     padding: 4px;
     outline: 0;
-    selection-background-color: rgba(91, 140, 255, 0.28);
+    selection-background-color: @ACCENT_A28@;
     selection-color: @TEXT@;
 }
 QComboBox QAbstractItemView::item {
@@ -429,7 +429,7 @@ QComboBox QAbstractItemView::item {
     min-height: 24px;
 }
 QComboBox QAbstractItemView::item:selected {
-    background: rgba(91, 140, 255, 0.28);
+    background: @ACCENT_A28@;
     color: @TEXT@;
 }
 
@@ -438,10 +438,10 @@ QComboBox QAbstractItemView::item:selected {
    selector is unlit glass. The name selector keeps the standard raised
    glass with the row title's weight. */
 QComboBox[paramSelector="true"] {
-    background: rgba(255, 255, 255, 0.03);
+    background: @HIGHLIGHT_A03@;
     color: @MUTED@;
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-top-color: rgba(255, 255, 255, 0.12);
+    border: 1px solid @HIGHLIGHT_A07@;
+    border-top-color: @HIGHLIGHT_A12@;
     border-radius: 6px;
     padding: 1px 14px 1px 8px;
     min-height: 20px;
@@ -449,18 +449,18 @@ QComboBox[paramSelector="true"] {
 }
 QComboBox[paramSelector="true"]:hover {
     color: @TEXT@;
-    background: rgba(91, 140, 255, 0.10);
-    border-color: rgba(91, 140, 255, 0.45);
-    border-top-color: rgba(91, 140, 255, 0.45);
+    background: @ACCENT_A10@;
+    border-color: @ACCENT_A45@;
+    border-top-color: @ACCENT_A45@;
 }
 QComboBox[paramSelector="true"]:focus,
 QComboBox[paramSelector="true"]:on {
     border: 1px solid @ACCENT@;
 }
 QComboBox[paramSelector="true"]:disabled {
-    color: rgba(145, 160, 186, 0.45);
+    color: @MUTED_A45@;
     background: transparent;
-    border-color: rgba(255, 255, 255, 0.05);
+    border-color: @HIGHLIGHT_A05@;
 }
 QComboBox[paramSelector="true"]::drop-down {
     width: 16px;
@@ -519,12 +519,12 @@ QScrollBar:vertical {
     border: 0;
 }
 QScrollBar::handle:vertical {
-    background: rgba(255, 255, 255, 0.10);
+    background: @HIGHLIGHT_A10@;
     min-height: 32px;
     border-radius: 4px;
 }
 QScrollBar::handle:vertical:hover {
-    background: rgba(91, 140, 255, 0.45);
+    background: @ACCENT_A45@;
 }
 QScrollBar::handle:vertical:pressed {
     background: @ACCENT@;
@@ -536,12 +536,12 @@ QScrollBar:horizontal {
     border: 0;
 }
 QScrollBar::handle:horizontal {
-    background: rgba(255, 255, 255, 0.10);
+    background: @HIGHLIGHT_A10@;
     min-width: 32px;
     border-radius: 4px;
 }
 QScrollBar::handle:horizontal:hover {
-    background: rgba(91, 140, 255, 0.45);
+    background: @ACCENT_A45@;
 }
 QScrollBar::handle:horizontal:pressed {
     background: @ACCENT@;
@@ -608,7 +608,7 @@ QDockWidget::float-button {
 }
 QDockWidget::close-button:hover,
 QDockWidget::float-button:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: @HIGHLIGHT_A08@;
 }
 
 /* ===== Tab Widget / Tab Bar ===== */
@@ -634,7 +634,7 @@ QTabBar::tab {
 }
 QTabBar::tab:hover {
     color: @TEXT@;
-    background: rgba(255, 255, 255, 0.04);
+    background: @HIGHLIGHT_A04@;
 }
 QTabBar::tab:selected {
     color: @TEXT@;
@@ -653,7 +653,7 @@ QTabBar::close-button {
     subcontrol-position: right;
 }
 QTabBar::close-button:hover {
-    background: rgba(239, 68, 68, 0.35);
+    background: @DANGER_A35@;
 }
 QTabBar QToolButton {
     background: @SURFACE@;
@@ -667,7 +667,7 @@ QGroupBox {
     background: @SURFACE@;
     color: @TEXT@;
     border: 1px solid @BORDER@;
-    border-top-color: rgba(255, 255, 255, 0.10);
+    border-top-color: @HIGHLIGHT_A10@;
     border-radius: 8px;
     margin-top: 14px;
     padding: 14px 12px 10px 12px;
@@ -709,7 +709,7 @@ QTableView {
     border: 1px solid @BORDER@;
     border-radius: 8px;
     alternate-background-color: @SURFACE@;
-    selection-background-color: rgba(91, 140, 255, 0.28);
+    selection-background-color: @ACCENT_A28@;
     selection-color: @TEXT@;
     gridline-color: @BORDER@;
 }
@@ -722,12 +722,12 @@ QTableView::item {
 QTreeView::item:hover,
 QListView::item:hover,
 QTableView::item:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: @HIGHLIGHT_A05@;
 }
 QTreeView::item:selected,
 QListView::item:selected,
 QTableView::item:selected {
-    background: rgba(91, 140, 255, 0.28);
+    background: @ACCENT_A28@;
     color: @TEXT@;
 }
 QTreeView::branch {
@@ -829,7 +829,7 @@ QFrame[frameShape="5"]  /* VLine */ {
 QFrame#analysisControlBar {
     background: @SURFACE@;
     border: 1px solid @BORDER@;
-    border-top-color: rgba(255, 255, 255, 0.10);
+    border-top-color: @HIGHLIGHT_A10@;
     border-radius: 8px;
 }
 QLabel#AnalysisFormLabel {
@@ -855,9 +855,9 @@ QComboBox#AnalysisFormCombo {
     min-width: 80px;
 }
 QFrame#AnalysisStatChip {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-top-color: rgba(255, 255, 255, 0.12);
+    background: @HIGHLIGHT_A04@;
+    border: 1px solid @HIGHLIGHT_A06@;
+    border-top-color: @HIGHLIGHT_A12@;
     border-radius: 8px;
 }
 QLabel#AnalysisStatLabel {
@@ -880,7 +880,7 @@ QLabel#AnalysisStatValue[severity="critical"] { color: @DANGER@; }
 QWidget#ModernAnalysisGraph {
     background: #08080f;
     border: 1px solid @BORDER@;
-    border-top-color: rgba(0, 0, 0, 0.55);
+    border-top-color: @SHADOW_A55@;
     border-radius: 8px;
 }
 
@@ -891,11 +891,11 @@ QWidget#ModernAnalysisGraph {
 QFrame#FilterCardRow {
     background: rgba(18, 26, 44, 0.88);
     border: 1px solid @BORDER@;
-    border-top-color: rgba(255, 255, 255, 0.10);
+    border-top-color: @HIGHLIGHT_A10@;
     border-radius: 8px;
 }
 QWidget#FilterCardHeader {
-    background: rgba(255, 255, 255, 0.04);
+    background: @HIGHLIGHT_A04@;
     border-top-left-radius: 8px;
     border-top-right-radius: 8px;
 }
@@ -904,19 +904,19 @@ QWidget#FilterCardHeader {
    pane and read as one unit. */
 QWidget#FilterCardBody,
 QWidget#FilterCardEditor {
-    background: rgba(255, 255, 255, 0.02);
+    background: @HIGHLIGHT_A02@;
     border-bottom-left-radius: 8px;
     border-bottom-right-radius: 8px;
 }
 QWidget#FilterCardBody {
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    border-top: 1px solid @HIGHLIGHT_A05@;
 }
 /* Disabled (commented-out) rows: the light is off - text recedes with the
    glass instead of staying at full brightness. */
 QFrame#FilterCardRow[filterEnabled="false"] QLabel#FilterCardTitle,
 QFrame#FilterCardRow[filterEnabled="false"] QLabel#FilterCardSummary,
 QFrame#FilterCardRow[filterEnabled="false"] QLabel#FilterCardNumber {
-    color: rgba(145, 160, 186, 0.55);
+    color: @MUTED_A55@;
 }
 QLabel#FilterTypeBadge {
     color: white;
@@ -945,10 +945,10 @@ QLabel#FilterCardNumber {
     font-weight: 700;
 }
 QToolButton#FilterCardIconButton {
-    background: rgba(255, 255, 255, 0.04);
+    background: @HIGHLIGHT_A04@;
     color: @TEXT@;
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-top-color: rgba(255, 255, 255, 0.13);
+    border: 1px solid @HIGHLIGHT_A07@;
+    border-top-color: @HIGHLIGHT_A13@;
     border-radius: 6px;
     min-width: 24px;
     min-height: 24px;
@@ -956,11 +956,11 @@ QToolButton#FilterCardIconButton {
     font-weight: 700;
 }
 QToolButton#FilterCardIconButton:hover {
-    background: rgba(91, 140, 255, 0.20);
-    border-color: rgba(91, 140, 255, 0.4);
+    background: @ACCENT_A20@;
+    border-color: @ACCENT_A40@;
 }
 QToolButton#FilterCardIconButton:checked {
-    background: rgba(91, 140, 255, 0.30);
+    background: @ACCENT_A30@;
     border-color: @ACCENT@;
 }
 QLineEdit#FilterCardRawEditor {
@@ -1001,10 +1001,10 @@ QLabel#PreampCardCaption {
     font-size: 9pt;
 }
 QLabel#EditableValue {
-    background: rgba(255, 255, 255, 0.04);
+    background: @HIGHLIGHT_A04@;
     color: @TEXT@;
     border: 1px solid @BORDER@;
-    border-top-color: rgba(255, 255, 255, 0.12);
+    border-top-color: @HIGHLIGHT_A12@;
     border-radius: 6px;
     padding: 6px 10px;
     font-family: "@MONO@", "Consolas", "Malgun Gothic", monospace;
@@ -1045,7 +1045,7 @@ QLabel#StudioRefName {
 }
 QLabel#StudioRefName[refClickable="true"]:hover:enabled { color: #FFFFFF; }
 QLabel#StudioRefName[refMissing="true"] { color: @MUTED@; }
-QLabel#StudioRefName:disabled { color: rgba(145, 160, 186, 0.60); }
+QLabel#StudioRefName:disabled { color: @MUTED_A60@; }
 QLabel#StudioRefChip {
     color: @MUTED@;
     background: transparent;
@@ -1059,35 +1059,35 @@ QLabel#StudioRefChip {
 }
 QLabel#StudioRefChip[chipRole="format"][chipLit="true"] {
     color: @ACCENT@;
-    background: rgba(91, 140, 255, 0.15);
-    border-color: rgba(91, 140, 255, 0.42);
+    background: @ACCENT_A15@;
+    border-color: @ACCENT_A42@;
 }
 QLabel#StudioRefChip[chipRole="abs"] {
     color: @WARNING@;
-    border-color: rgba(245, 158, 11, 0.38);
+    border-color: @WARNING_A38@;
 }
 QLabel#StudioRefChip[chipRole="missing"] {
     color: @DANGER@;
-    background: rgba(239, 68, 68, 0.15);
-    border-color: rgba(239, 68, 68, 0.42);
+    background: @DANGER_A15@;
+    border-color: @DANGER_A42@;
 }
 QLabel#StudioRefChip[chipRole="format"]:disabled,
 QLabel#StudioRefChip[chipRole="abs"]:disabled,
 QLabel#StudioRefChip[chipRole="missing"]:disabled {
-    color: rgba(145, 160, 186, 0.60);
+    color: @MUTED_A60@;
     background: transparent;
     border-color: rgba(38, 50, 74, 0.55);
 }
 QWidget#StudioRefWindow {
     background: rgba(6, 9, 20, 0.55);
     border: 1px solid @BORDER@;
-    border-top-color: rgba(0, 0, 0, 0.55);
+    border-top-color: @SHADOW_A55@;
     border-radius: 8px;
 }
 QWidget#StudioRefWindow:disabled {
     background: rgba(6, 9, 20, 0.30);
     border-color: rgba(38, 50, 74, 0.55);
-    border-top-color: rgba(0, 0, 0, 0.30);
+    border-top-color: @SHADOW_A30@;
 }
 QLabel#StudioRefLocation,
 QLabel#StudioRefFacts {
@@ -1107,7 +1107,7 @@ QLabel#StudioRefLamp {
 QLabel#StudioRefLamp[lampSeverity="warning"] { color: @WARNING@; }
 QLabel#StudioRefLamp[lampSeverity="critical"] { color: @DANGER@; }
 QLabel#StudioRefLamp[lampSeverity="warning"]:disabled,
-QLabel#StudioRefLamp[lampSeverity="critical"]:disabled { color: rgba(145, 160, 186, 0.60); }
+QLabel#StudioRefLamp[lampSeverity="critical"]:disabled { color: @MUTED_A60@; }
 QLabel#StudioRefStatus {
     color: @MUTED@;
     background: transparent;
@@ -1127,13 +1127,13 @@ QLineEdit#RefPathEdit {
    border while the reference is broken and brightens one step on hover. */
 QToolButton#FilterCardIconButton[studioLocate="true"] {
     color: @TEXT@;
-    background: rgba(91, 140, 255, 0.12);
-    border-color: rgba(91, 140, 255, 0.55);
-    border-top-color: rgba(91, 140, 255, 0.75);
+    background: @ACCENT_A12@;
+    border-color: @ACCENT_A55@;
+    border-top-color: @ACCENT_A75@;
 }
 QToolButton#FilterCardIconButton[studioLocate="true"]:hover {
-    background: rgba(91, 140, 255, 0.24);
-    border-color: rgba(91, 140, 255, 0.85);
+    background: @ACCENT_A24@;
+    border-color: @ACCENT_A85@;
 }
 /* MultiConvolution's channel-mapping strip: the caption is quiet mono ink
    over the glass, the hint reads as an instruction, and the routing graph
@@ -1154,20 +1154,20 @@ QLabel#MultiConvolutionMappingHint {
 /* The frame's gradient border and painted halo come from StudioSkin; the
    panel button is the module's one lit control. */
 QPushButton#VSTCardPanelButton {
-    background: rgba(91, 140, 255, 0.16);
+    background: @ACCENT_A16@;
     color: @TEXT@;
-    border: 1px solid rgba(91, 140, 255, 0.55);
-    border-top-color: rgba(91, 140, 255, 0.80);
+    border: 1px solid @ACCENT_A55@;
+    border-top-color: @ACCENT_A80@;
     border-radius: 8px;
     padding: 5px 14px;
     font-weight: 600;
 }
 QPushButton#VSTCardPanelButton:hover {
-    background: rgba(91, 140, 255, 0.26);
-    border-color: rgba(91, 140, 255, 0.80);
+    background: @ACCENT_A26@;
+    border-color: @ACCENT_A80@;
 }
 QPushButton#VSTCardPanelButton:pressed {
-    background: rgba(91, 140, 255, 0.36);
+    background: @ACCENT_A36@;
     border-color: @ACCENT@;
 }
 QPushButton#VSTCardPanelButton:disabled {
@@ -1181,9 +1181,9 @@ QFrame#VSTCardEmbedFrame {
     border-radius: 8px;
 }
 QPlainTextEdit#VSTCardWarning {
-    background: rgba(245, 158, 11, 0.08);
+    background: @WARNING_A08@;
     color: @WARNING@;
-    border: 1px solid rgba(245, 158, 11, 0.40);
+    border: 1px solid @WARNING_A40@;
     border-radius: 6px;
 }
 
@@ -1216,28 +1216,28 @@ QLabel#GraphicEQReadoutLabel {
     padding-left: 4px;
 }
 QToolButton#GraphicEQActionButton {
-    background: rgba(255, 255, 255, 0.04);
+    background: @HIGHLIGHT_A04@;
     color: @TEXT@;
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-top-color: rgba(255, 255, 255, 0.13);
+    border: 1px solid @HIGHLIGHT_A07@;
+    border-top-color: @HIGHLIGHT_A13@;
     border-radius: 6px;
     min-width: 24px;
     min-height: 24px;
     padding: 3px;
 }
 QToolButton#GraphicEQActionButton:hover {
-    background: rgba(91, 140, 255, 0.20);
-    border-color: rgba(91, 140, 255, 0.40);
+    background: @ACCENT_A20@;
+    border-color: @ACCENT_A40@;
     border-top-color: rgba(123, 162, 255, 0.55);
 }
 QToolButton#GraphicEQActionButton:pressed {
-    background: rgba(91, 140, 255, 0.30);
+    background: @ACCENT_A30@;
     border-color: @ACCENT@;
 }
 QToolButton#GraphicEQActionButton:disabled {
-    background: rgba(255, 255, 255, 0.02);
-    border-color: rgba(255, 255, 255, 0.05);
-    border-top-color: rgba(255, 255, 255, 0.05);
+    background: @HIGHLIGHT_A02@;
+    border-color: @HIGHLIGHT_A05@;
+    border-top-color: @HIGHLIGHT_A05@;
 }
 /* ===== Update toast =====
    The widget paints the pane itself (raised surface, hairline border,
@@ -1261,12 +1261,12 @@ QToolButton#UpdateToastClose {
 QToolButton#UpdateToastClose:hover {
     color: @TEXT@;
     background: qradialgradient(cx:0.5, cy:0.55, radius:0.75, fx:0.5, fy:0.55,
-        stop:0 rgba(91, 140, 255, 0.34), stop:0.6 rgba(91, 140, 255, 0.12), stop:1 rgba(91, 140, 255, 0));
+        stop:0 @ACCENT_A34@, stop:0.6 @ACCENT_A12@, stop:1 @ACCENT_A00@);
 }
 QToolButton#UpdateToastClose:pressed {
     color: @TEXT@;
     background: qradialgradient(cx:0.5, cy:0.55, radius:0.8, fx:0.5, fy:0.55,
-        stop:0 rgba(91, 140, 255, 0.50), stop:0.6 rgba(91, 140, 255, 0.20), stop:1 rgba(91, 140, 255, 0));
+        stop:0 @ACCENT_A50@, stop:0.6 @ACCENT_A20@, stop:1 @ACCENT_A00@);
 }
 
 /* Toolbar/Tab spacers and labels transparent so parent bg shows through */
@@ -1293,19 +1293,19 @@ QToolButton#TitleBarMin, QToolButton#TitleBarMax, QToolButton#TitleBarClose {
 }
 QToolButton#TitleBarMin:hover, QToolButton#TitleBarMax:hover {
     background: qradialgradient(cx:0.5, cy:0.55, radius:0.65, fx:0.5, fy:0.55,
-        stop:0 rgba(91, 140, 255, 0.34), stop:0.6 rgba(91, 140, 255, 0.12), stop:1 rgba(91, 140, 255, 0));
+        stop:0 @ACCENT_A34@, stop:0.6 @ACCENT_A12@, stop:1 @ACCENT_A00@);
 }
 QToolButton#TitleBarMin:pressed, QToolButton#TitleBarMax:pressed {
     background: qradialgradient(cx:0.5, cy:0.55, radius:0.7, fx:0.5, fy:0.55,
-        stop:0 rgba(91, 140, 255, 0.50), stop:0.6 rgba(91, 140, 255, 0.20), stop:1 rgba(91, 140, 255, 0));
+        stop:0 @ACCENT_A50@, stop:0.6 @ACCENT_A20@, stop:1 @ACCENT_A00@);
 }
 QToolButton#TitleBarClose:hover {
     background: qradialgradient(cx:0.5, cy:0.55, radius:0.65, fx:0.5, fy:0.55,
-        stop:0 rgba(239, 68, 68, 0.46), stop:0.6 rgba(239, 68, 68, 0.16), stop:1 rgba(239, 68, 68, 0));
+        stop:0 @DANGER_A46@, stop:0.6 @DANGER_A16@, stop:1 @DANGER_A00@);
 }
 QToolButton#TitleBarClose:pressed {
     background: qradialgradient(cx:0.5, cy:0.55, radius:0.7, fx:0.5, fy:0.55,
-        stop:0 rgba(239, 68, 68, 0.64), stop:0.6 rgba(239, 68, 68, 0.26), stop:1 rgba(239, 68, 68, 0));
+        stop:0 @DANGER_A64@, stop:0.6 @DANGER_A26@, stop:1 @DANGER_A00@);
 }
 
 /* ====================================================================
@@ -1352,10 +1352,10 @@ QScrollArea#FilterCardEditorScroll > QWidget > QWidget {
    Playback vs capture is NOT a chip axis: the deviceInput property is
    deliberately unmatched; the tooltip names the direction. */
 QToolButton#DeviceChip {
-    background: rgba(255, 255, 255, 0.04);
+    background: @HIGHLIGHT_A04@;
     color: @MUTED@;
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    border-top-color: rgba(255, 255, 255, 0.16);
+    border: 1px solid @HIGHLIGHT_A10@;
+    border-top-color: @HIGHLIGHT_A16@;
     border-radius: 8px;
     padding: 4px 10px;
     font-size: 9pt;
@@ -1363,50 +1363,50 @@ QToolButton#DeviceChip {
 /* APO not installed: the endpoint cannot carry signal yet - fainter
    ink, fainter glass. No warning colour. */
 QToolButton#DeviceChip[deviceInstalled="false"] {
-    color: rgba(145, 160, 186, 0.55);
-    background: rgba(255, 255, 255, 0.02);
-    border-color: rgba(255, 255, 255, 0.06);
-    border-top-color: rgba(255, 255, 255, 0.08);
+    color: @MUTED_A55@;
+    background: @HIGHLIGHT_A02@;
+    border-color: @HIGHLIGHT_A06@;
+    border-top-color: @HIGHLIGHT_A08@;
 }
 /* Selected = lit from within: translucent accent fill one notch above
    the static type badge (0.15) because this chip carries a
    hover/pressed ladder a badge does not. */
 QToolButton#DeviceChip:checked:enabled {
-    background: rgba(91, 140, 255, 0.30);
+    background: @ACCENT_A30@;
     color: @TEXT@;
-    border-color: rgba(91, 140, 255, 0.80);
+    border-color: @ACCENT_A80@;
     border-top-color: rgba(123, 162, 255, 0.95);
 }
 /* Selected but not installed: the user meant it - lit one step dimmer;
    the glass is alive, the endpoint stays dark. */
 QToolButton#DeviceChip[deviceInstalled="false"]:checked:enabled {
-    background: rgba(91, 140, 255, 0.20);
+    background: @ACCENT_A20@;
     color: @TEXT@;
-    border-color: rgba(91, 140, 255, 0.60);
+    border-color: @ACCENT_A60@;
     border-top-color: rgba(123, 162, 255, 0.70);
 }
 /* "All devices" master chip: lit, it floods one step hotter than a
    single selected chip. */
 QToolButton#DeviceChip[allDevices="true"]:checked:enabled {
-    background: rgba(91, 140, 255, 0.40);
+    background: @ACCENT_A40@;
     color: @TEXT@;
-    border-color: rgba(91, 140, 255, 0.88);
+    border-color: @ACCENT_A88@;
     border-top-color: rgba(123, 162, 255, 1.0);
 }
 QToolButton#DeviceChip:!checked:hover:enabled {
     background: qradialgradient(cx:0.5, cy:1.05, radius:0.9, fx:0.5, fy:1.05,
-        stop:0 rgba(91, 140, 255, 0.22), stop:0.45 rgba(91, 140, 255, 0.09), stop:1 rgba(91, 140, 255, 0));
+        stop:0 @ACCENT_A22@, stop:0.45 @ACCENT_A09@, stop:1 @ACCENT_A00@);
     color: @TEXT@;
-    border-color: rgba(91, 140, 255, 0.45);
+    border-color: @ACCENT_A45@;
     border-top-color: rgba(123, 162, 255, 0.50);
 }
 QToolButton#DeviceChip:checked:hover:enabled {
-    background: rgba(91, 140, 255, 0.38);
-    border-color: rgba(91, 140, 255, 0.90);
+    background: @ACCENT_A38@;
+    border-color: @ACCENT_A90@;
 }
 QToolButton#DeviceChip[allDevices="true"]:checked:hover:enabled {
-    background: rgba(91, 140, 255, 0.46);
-    border-color: rgba(91, 140, 255, 0.96);
+    background: @ACCENT_A46@;
+    border-color: @ACCENT_A96@;
     border-top-color: rgba(123, 162, 255, 1.0);
 }
 /* Pressing is maximum light (rest < hover < press). A mouse press
@@ -1415,35 +1415,35 @@ QToolButton#DeviceChip[allDevices="true"]:checked:hover:enabled {
    them wins the tie against the four-unit master hover rule. */
 QToolButton#DeviceChip:!checked:pressed:hover:enabled,
 QToolButton#DeviceChip:checked:pressed:hover:enabled {
-    background: rgba(91, 140, 255, 0.44);
+    background: @ACCENT_A44@;
     color: @TEXT@;
-    border-color: rgba(91, 140, 255, 0.95);
+    border-color: @ACCENT_A95@;
     border-top-color: rgba(123, 162, 255, 1.0);
 }
 /* The master chip presses one step past its own hover (0.38 < 0.42);
    attribute + four pseudos outranks everything above. */
 QToolButton#DeviceChip[allDevices="true"]:checked:pressed:hover:enabled {
-    background: rgba(91, 140, 255, 0.50);
+    background: @ACCENT_A50@;
     color: @TEXT@;
-    border-color: rgba(91, 140, 255, 1.0);
+    border-color: @ACCENT_A100@;
     border-top-color: rgba(123, 162, 255, 1.0);
 }
 /* Disabled = switched off. Keep these last in the family: they tie
    with the attribute rules above and must win by order. */
 QToolButton#DeviceChip:disabled {
-    background: rgba(255, 255, 255, 0.02);
-    color: rgba(145, 160, 186, 0.38);
-    border-color: rgba(255, 255, 255, 0.05);
-    border-top-color: rgba(255, 255, 255, 0.05);
+    background: @HIGHLIGHT_A02@;
+    color: @MUTED_A38@;
+    border-color: @HIGHLIGHT_A05@;
+    border-top-color: @HIGHLIGHT_A05@;
 }
 /* A checked chip that went inert (ALL dominating) is EXTINGUISHED:
    no accent fill, no accent border - only a neutral one-step fill so
    the remembered selection stays legible. */
 QToolButton#DeviceChip:checked:disabled {
-    background: rgba(255, 255, 255, 0.05);
-    color: rgba(145, 160, 186, 0.55);
-    border-color: rgba(255, 255, 255, 0.09);
-    border-top-color: rgba(255, 255, 255, 0.09);
+    background: @HIGHLIGHT_A05@;
+    color: @MUTED_A55@;
+    border-color: @HIGHLIGHT_A09@;
+    border-top-color: @HIGHLIGHT_A09@;
 }
 
 /* The reveal toggle is a view control, not a value: the quietest glass
@@ -1452,45 +1452,45 @@ QToolButton#DeviceChip:checked:disabled {
 QToolButton#DeviceChipMore {
     background: transparent;
     color: @MUTED@;
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-top-color: rgba(255, 255, 255, 0.12);
+    border: 1px solid @HIGHLIGHT_A07@;
+    border-top-color: @HIGHLIGHT_A12@;
     border-radius: 8px;
     padding: 4px 10px;
     font-size: 9pt;
 }
 QToolButton#DeviceChipMore:hover:enabled {
     color: @TEXT@;
-    background: rgba(91, 140, 255, 0.10);
-    border-color: rgba(91, 140, 255, 0.45);
-    border-top-color: rgba(91, 140, 255, 0.45);
+    background: @ACCENT_A10@;
+    border-color: @ACCENT_A45@;
+    border-top-color: @ACCENT_A45@;
 }
 QToolButton#DeviceChipMore:checked:enabled {
     color: @TEXT@;
-    background: rgba(255, 255, 255, 0.04);
-    border-color: rgba(255, 255, 255, 0.10);
+    background: @HIGHLIGHT_A04@;
+    border-color: @HIGHLIGHT_A10@;
 }
 /* Three pseudo-classes: a latched reveal toggle still answers the
    cursor (outranks both two-pseudo rules above). */
 QToolButton#DeviceChipMore:checked:hover:enabled {
     color: @TEXT@;
-    background: rgba(91, 140, 255, 0.10);
-    border-color: rgba(91, 140, 255, 0.45);
-    border-top-color: rgba(91, 140, 255, 0.45);
+    background: @ACCENT_A10@;
+    border-color: @ACCENT_A45@;
+    border-top-color: @ACCENT_A45@;
 }
 QToolButton#DeviceChipMore:disabled {
-    color: rgba(145, 160, 186, 0.38);
-    border-color: rgba(255, 255, 255, 0.05);
-    border-top-color: rgba(255, 255, 255, 0.05);
+    color: @MUTED_A38@;
+    border-color: @HIGHLIGHT_A05@;
+    border-top-color: @HIGHLIGHT_A05@;
 }
 
 /* ----- Channel picker - seats of the signal -----
    A channel name is data, so these chips wear the mono face; custom/
    virtual channels are dashed. */
 QToolButton#ChannelChip {
-    background: rgba(255, 255, 255, 0.04);
+    background: @HIGHLIGHT_A04@;
     color: @MUTED@;
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    border-top-color: rgba(255, 255, 255, 0.16);
+    border: 1px solid @HIGHLIGHT_A10@;
+    border-top-color: @HIGHLIGHT_A16@;
     border-radius: 8px;
     padding: 4px 10px;
     font-family: "@MONO@", "Consolas", "Malgun Gothic", monospace;
@@ -1502,68 +1502,68 @@ QToolButton#ChannelChip {
    read as a broken line, so the top edge matches the sides). */
 QToolButton#ChannelChip[customChannel="true"] {
     border-style: dashed;
-    border-top-color: rgba(255, 255, 255, 0.10);
+    border-top-color: @HIGHLIGHT_A10@;
 }
 QToolButton#ChannelChip:checked:enabled {
-    background: rgba(91, 140, 255, 0.30);
+    background: @ACCENT_A30@;
     color: @TEXT@;
-    border-color: rgba(91, 140, 255, 0.80);
+    border-color: @ACCENT_A80@;
     border-top-color: rgba(123, 162, 255, 0.95);
 }
 QToolButton#ChannelChip[customChannel="true"]:checked:enabled {
-    border-top-color: rgba(91, 140, 255, 0.80);
+    border-top-color: @ACCENT_A80@;
 }
 /* ALL master chip (the allChannels property mirrors the device card's
    allDevices - see widget changes). */
 QToolButton#ChannelChip[allChannels="true"]:checked:enabled {
-    background: rgba(91, 140, 255, 0.40);
+    background: @ACCENT_A40@;
     color: @TEXT@;
-    border-color: rgba(91, 140, 255, 0.88);
+    border-color: @ACCENT_A88@;
     border-top-color: rgba(123, 162, 255, 1.0);
 }
 QToolButton#ChannelChip:!checked:hover:enabled {
     background: qradialgradient(cx:0.5, cy:1.05, radius:0.9, fx:0.5, fy:1.05,
-        stop:0 rgba(91, 140, 255, 0.22), stop:0.45 rgba(91, 140, 255, 0.09), stop:1 rgba(91, 140, 255, 0));
+        stop:0 @ACCENT_A22@, stop:0.45 @ACCENT_A09@, stop:1 @ACCENT_A00@);
     color: @TEXT@;
-    border-color: rgba(91, 140, 255, 0.45);
+    border-color: @ACCENT_A45@;
 }
 QToolButton#ChannelChip:checked:hover:enabled {
-    background: rgba(91, 140, 255, 0.38);
-    border-color: rgba(91, 140, 255, 0.90);
+    background: @ACCENT_A38@;
+    border-color: @ACCENT_A90@;
 }
 QToolButton#ChannelChip[allChannels="true"]:checked:hover:enabled {
-    background: rgba(91, 140, 255, 0.46);
-    border-color: rgba(91, 140, 255, 0.96);
+    background: @ACCENT_A46@;
+    border-color: @ACCENT_A96@;
     border-top-color: rgba(123, 162, 255, 1.0);
 }
 /* Pressed = maximum light; four pseudos, after the hover rules (see
    the device family note). */
 QToolButton#ChannelChip:!checked:pressed:hover:enabled,
 QToolButton#ChannelChip:checked:pressed:hover:enabled {
-    background: rgba(91, 140, 255, 0.44);
+    background: @ACCENT_A44@;
     color: @TEXT@;
-    border-color: rgba(91, 140, 255, 0.95);
+    border-color: @ACCENT_A95@;
     border-top-color: rgba(123, 162, 255, 1.0);
 }
 QToolButton#ChannelChip[allChannels="true"]:checked:pressed:hover:enabled {
-    background: rgba(91, 140, 255, 0.50);
+    background: @ACCENT_A50@;
     color: @TEXT@;
-    border-color: rgba(91, 140, 255, 1.0);
+    border-color: @ACCENT_A100@;
     border-top-color: rgba(123, 162, 255, 1.0);
 }
 QToolButton#ChannelChip:disabled {
-    background: rgba(255, 255, 255, 0.02);
-    color: rgba(145, 160, 186, 0.38);
-    border-color: rgba(255, 255, 255, 0.05);
-    border-top-color: rgba(255, 255, 255, 0.05);
+    background: @HIGHLIGHT_A02@;
+    color: @MUTED_A38@;
+    border-color: @HIGHLIGHT_A05@;
+    border-top-color: @HIGHLIGHT_A05@;
 }
 /* Checked but inert (ALL dominating): extinguished - neutral fill
    only, zero accent. */
 QToolButton#ChannelChip:checked:disabled {
-    background: rgba(255, 255, 255, 0.05);
-    color: rgba(145, 160, 186, 0.55);
-    border-color: rgba(255, 255, 255, 0.09);
-    border-top-color: rgba(255, 255, 255, 0.09);
+    background: @HIGHLIGHT_A05@;
+    color: @MUTED_A55@;
+    border-color: @HIGHLIGHT_A09@;
+    border-top-color: @HIGHLIGHT_A09@;
 }
 
 /* The add-a-channel field: an empty slot for a seat that does not
@@ -1573,7 +1573,7 @@ QToolButton#ChannelChip:checked:disabled {
 QLineEdit#ChannelChipAdd {
     background: transparent;
     color: @MUTED@;
-    border: 1px dashed rgba(255, 255, 255, 0.10);
+    border: 1px dashed @HIGHLIGHT_A10@;
     border-radius: 8px;
     padding: 3px 8px;
     font-family: "@MONO@", "Consolas", "Malgun Gothic", monospace;
@@ -1581,7 +1581,7 @@ QLineEdit#ChannelChipAdd {
 }
 QLineEdit#ChannelChipAdd:hover:enabled {
     color: @TEXT@;
-    border-color: rgba(91, 140, 255, 0.40);
+    border-color: @ACCENT_A40@;
 }
 QLineEdit#ChannelChipAdd:focus:enabled {
     background: #08080f;
@@ -1590,8 +1590,8 @@ QLineEdit#ChannelChipAdd:focus:enabled {
 }
 QLineEdit#ChannelChipAdd:disabled {
     background: transparent;
-    color: rgba(145, 160, 186, 0.38);
-    border-color: rgba(255, 255, 255, 0.05);
+    color: @MUTED_A38@;
+    border-color: @HIGHLIGHT_A05@;
 }
 
 /* ----- Stage picker - path segments with their own lamps -----
@@ -1600,68 +1600,68 @@ QLineEdit#ChannelChipAdd:disabled {
    as a colour axis. Inside each rule the border-color shorthand comes
    first and the left/top edge overrides follow - order sensitive. */
 QToolButton#StageChip {
-    background: rgba(255, 255, 255, 0.04);
+    background: @HIGHLIGHT_A04@;
     color: @MUTED@;
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    border-top-color: rgba(255, 255, 255, 0.16);
-    border-left: 3px solid rgba(255, 255, 255, 0.10);
+    border: 1px solid @HIGHLIGHT_A10@;
+    border-top-color: @HIGHLIGHT_A16@;
+    border-left: 3px solid @HIGHLIGHT_A10@;
     border-radius: 8px;
     padding: 4px 10px;
     font-size: 9pt;
     font-weight: 600;
 }
 QToolButton#StageChip:checked:enabled {
-    background: rgba(91, 140, 255, 0.30);
+    background: @ACCENT_A30@;
     color: @TEXT@;
-    border-color: rgba(91, 140, 255, 0.80);
+    border-color: @ACCENT_A80@;
     border-top-color: rgba(123, 162, 255, 0.95);
-    border-left-color: rgba(91, 140, 255, 1.0);
+    border-left-color: @ACCENT_A100@;
 }
 QToolButton#StageChip:!checked:hover:enabled {
     background: qradialgradient(cx:0.5, cy:1.05, radius:0.9, fx:0.5, fy:1.05,
-        stop:0 rgba(91, 140, 255, 0.22), stop:0.45 rgba(91, 140, 255, 0.09), stop:1 rgba(91, 140, 255, 0));
+        stop:0 @ACCENT_A22@, stop:0.45 @ACCENT_A09@, stop:1 @ACCENT_A00@);
     color: @TEXT@;
-    border-color: rgba(91, 140, 255, 0.45);
-    border-left-color: rgba(91, 140, 255, 0.45);
+    border-color: @ACCENT_A45@;
+    border-left-color: @ACCENT_A45@;
 }
 QToolButton#StageChip:checked:hover:enabled {
-    background: rgba(91, 140, 255, 0.38);
-    border-color: rgba(91, 140, 255, 0.90);
-    border-left-color: rgba(91, 140, 255, 1.0);
+    background: @ACCENT_A38@;
+    border-color: @ACCENT_A90@;
+    border-left-color: @ACCENT_A100@;
 }
 /* Pressed = maximum light; four pseudos, after the hover rules (see
    the device family note). */
 QToolButton#StageChip:!checked:pressed:hover:enabled,
 QToolButton#StageChip:checked:pressed:hover:enabled {
-    background: rgba(91, 140, 255, 0.44);
+    background: @ACCENT_A44@;
     color: @TEXT@;
-    border-color: rgba(91, 140, 255, 0.95);
+    border-color: @ACCENT_A95@;
     border-top-color: rgba(123, 162, 255, 1.0);
-    border-left-color: rgba(91, 140, 255, 1.0);
+    border-left-color: @ACCENT_A100@;
 }
 QToolButton#StageChip:disabled {
-    background: rgba(255, 255, 255, 0.02);
-    color: rgba(145, 160, 186, 0.38);
-    border-color: rgba(255, 255, 255, 0.05);
-    border-top-color: rgba(255, 255, 255, 0.05);
-    border-left-color: rgba(255, 255, 255, 0.06);
+    background: @HIGHLIGHT_A02@;
+    color: @MUTED_A38@;
+    border-color: @HIGHLIGHT_A05@;
+    border-top-color: @HIGHLIGHT_A05@;
+    border-left-color: @HIGHLIGHT_A06@;
 }
 /* Checked but inert: extinguished lamp - the left edge falls back to
    a neutral socket one step above the unchecked socket, zero accent. */
 QToolButton#StageChip:checked:disabled {
-    background: rgba(255, 255, 255, 0.05);
-    color: rgba(145, 160, 186, 0.55);
-    border-color: rgba(255, 255, 255, 0.09);
-    border-top-color: rgba(255, 255, 255, 0.09);
-    border-left-color: rgba(255, 255, 255, 0.12);
+    background: @HIGHLIGHT_A05@;
+    color: @MUTED_A55@;
+    border-color: @HIGHLIGHT_A09@;
+    border-top-color: @HIGHLIGHT_A09@;
+    border-left-color: @HIGHLIGHT_A12@;
 }
 /* Tokens the engine does not know: kept verbatim as data (mono) in a
    dashed, switched-off slot. Not an alarm - the row's status text
    explains; the slot merely holds the words. Always disabled. */
 QToolButton#StageChipUnknown {
     background: transparent;
-    color: rgba(145, 160, 186, 0.55);
-    border: 1px dashed rgba(255, 255, 255, 0.10);
+    color: @MUTED_A55@;
+    border: 1px dashed @HIGHLIGHT_A10@;
     border-radius: 8px;
     padding: 4px 10px;
     font-family: "@MONO@", "Consolas", "Malgun Gothic", monospace;
@@ -1690,7 +1690,7 @@ QLabel#StageChainArrow {
    edge. Keep :focus after :hover - equal specificity, later wins
    while both apply. */
 QLabel#CommentCardGlyph {
-    color: rgba(145, 160, 186, 0.80);
+    color: @MUTED_A80@;
     background: transparent;
     font-family: "@MONO@", "Consolas", "Malgun Gothic", monospace;
     font-weight: 700;
@@ -1704,8 +1704,8 @@ QLineEdit#CommentCardText {
 }
 QLineEdit#CommentCardText:hover:enabled {
     background: rgba(6, 9, 20, 0.45);
-    border-color: rgba(255, 255, 255, 0.06);
-    border-top-color: rgba(0, 0, 0, 0.40);
+    border-color: @HIGHLIGHT_A06@;
+    border-top-color: @SHADOW_A40@;
 }
 QLineEdit#CommentCardText:focus:enabled {
     background: #08080f;
@@ -1714,20 +1714,20 @@ QLineEdit#CommentCardText:focus:enabled {
 }
 QLineEdit#CommentCardText:disabled {
     background: transparent;
-    color: rgba(145, 160, 186, 0.45);
+    color: @MUTED_A45@;
     border-color: transparent;
 }
 QLabel#CommentCardGlyph:disabled {
-    color: rgba(145, 160, 186, 0.45);
+    color: @MUTED_A45@;
 }
 /* Light Trace routing overlays: the factor readout and the new-output name
    entry are sunken glass with the accent lighting the focused border (the
    RefPathEdit idiom); mono ink because both hold data. */
 QLineEdit#StudioRoutingFactorEditor,
 QLineEdit#StudioRoutingChannelEditor {
-    background: rgba(0, 0, 0, 0.38);
+    background: @SHADOW_A38@;
     color: @TEXT@;
-    border: 1px solid rgba(91, 140, 255, 0.55);
+    border: 1px solid @ACCENT_A55@;
     border-radius: 6px;
     padding: 1px 6px;
     font-family: "@MONO@", "Consolas", "Malgun Gothic", monospace;

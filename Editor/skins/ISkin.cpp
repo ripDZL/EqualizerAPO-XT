@@ -129,7 +129,7 @@ BadgeTreatment ISkin::badgeTreatment(const CommandRowInfo& info, const QString& 
 	};
 }
 
-void ISkin::prepareCommandRow(const CommandRowInfo&, QWidget*, QWidget*, QWidget*) const
+void ISkin::prepareCommandRow(const CommandRowInfo&, QWidget*, QWidget*, QWidget*, const SkinTokens&) const
 {
 	// Neutral default: rows keep their stock construction.
 }
@@ -299,6 +299,8 @@ void ISkin::paintAnalysisGraph(QPainter& painter, const AnalysisGraphState& stat
 	// the heritage look.
 	painter.setRenderHint(QPainter::Antialiasing, true);
 	painter.setRenderHint(QPainter::TextAntialiasing, true);
+	const SkinAnalysisGraphLayout layout = skinAnalysisGraphLayout(
+		state.rect, state.plotRect, state.zeroY, state.hover);
 
 	const QColor accent(tokens.accent);
 	const QColor muted(tokens.mutedText);
@@ -355,13 +357,13 @@ void ISkin::paintAnalysisGraph(QPainter& painter, const AnalysisGraphState& stat
 	labelFont.setPointSizeF(qMax(7.0, labelFont.pointSizeF() - 1.0));
 	painter.setFont(labelFont);
 	painter.setPen(muted);
-	const QRectF footer(state.plotRect.left(), state.plotRect.bottom() + 3, state.plotRect.width(), 18);
+	const QRectF footer = layout.footerRectF(3.0, 18.0);
 	painter.drawText(footer, Qt::AlignLeft | Qt::AlignVCenter, state.leftFooterText);
 	painter.drawText(footer, Qt::AlignCenter, state.channelText);
 	painter.drawText(footer, Qt::AlignRight | Qt::AlignVCenter, state.rightFooterText);
-	painter.drawText(QRectF(state.plotRect.left() + 4, state.plotRect.top() + 3, 70, 18),
+	painter.drawText(layout.leftPlotLabelRectF(4.0, state.plotRect.top() + 3, 70.0, 18.0),
 		Qt::AlignLeft | Qt::AlignVCenter, state.topValueText);
-	painter.drawText(QRectF(state.plotRect.left() + 4, state.plotRect.bottom() - 21, 70, 18),
+	painter.drawText(layout.leftPlotLabelRectF(4.0, state.plotRect.bottom() - 21, 70.0, 18.0),
 		Qt::AlignLeft | Qt::AlignVCenter, state.bottomValueText);
 
 	if (state.cursorValid)

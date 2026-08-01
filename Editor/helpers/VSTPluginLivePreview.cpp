@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <deque>
 #include <mutex>
+#include <string>
 #include <thread>
 
 #define WIN32_LEAN_AND_MEAN
@@ -20,7 +21,6 @@
 #include <audioclient.h>
 #include <mmdeviceapi.h>
 #include <mmreg.h>
-#include <QObject>
 
 #include "helpers/ComPtr.h"
 #include "helpers/VSTPluginInstance.h"
@@ -28,7 +28,6 @@
 namespace
 {
 constexpr REFERENCE_TIME previewBufferDuration = 1000000; // 100 ms
-constexpr int previewTimerIntervalMs = 15;
 constexpr int maxBufferedSeconds = 2;
 
 bool isInputFlow(EDataFlow flow)
@@ -151,7 +150,7 @@ public:
 	bool start()
 	{
 		if (worker.joinable())
-			return readyState && !failedState;
+			return isReady();
 
 		stopRequested.store(false, std::memory_order_release);
 		{
@@ -401,8 +400,6 @@ VSTPluginLivePreview::VSTPluginLivePreview()
 	communicationsInputCapture(std::make_unique<WasapiCapture>(eCapture, eCommunications)),
 	playbackCapture(std::make_unique<WasapiCapture>(eRender, eConsole))
 {
-	timer.setInterval(previewTimerIntervalMs);
-	QObject::connect(&timer, &QTimer::timeout, &timer, [this] { processBlock(); });
 }
 
 VSTPluginLivePreview::~VSTPluginLivePreview()
@@ -479,15 +476,19 @@ void VSTPluginLivePreview::start(VSTPluginInstance* targetEffect, const VSTPrevi
 		: inputReady ? inputCapture->sampleRate()
 		: communicationsInputReady ? communicationsInputCapture->sampleRate()
 		: playbackCapture->sampleRate();
-	effect->prepareForProcessing(static_cast<float>(previewSampleRate), blockSize);
+	this->previewSampleRate = previewSampleRate;
+	effect->prepareForProcessing(static_cast<float>(this->previewSampleRate), blockSize);
 	effect->startProcessing();
 	active = true;
-	timer.start();
+	processingStopRequested.store(false, std::memory_order_release);
+	processingWorker = std::thread([this] { processLoop(); });
 }
 
 void VSTPluginLivePreview::stop()
 {
-	timer.stop();
+	processingStopRequested.store(true, std::memory_order_release);
+	if (processingWorker.joinable())
+		processingWorker.join();
 	if (active && effect != nullptr)
 		effect->stopProcessingSafely();
 	active = false;
@@ -522,7 +523,24 @@ void VSTPluginLivePreview::allocateBuffers(int inputChannels, int outputChannels
 		doubleOutputPtrs[i] = doubleOutputs[i].data();
 }
 
-void VSTPluginLivePreview::processBlock()
+void VSTPluginLivePreview::processLoop()
+{
+	const double secondsPerBlock = static_cast<double>(blockSize) / std::max(1, previewSampleRate);
+	const auto blockDuration = std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+		std::chrono::duration<double>(secondsPerBlock));
+	auto nextBlock = std::chrono::steady_clock::now();
+	while (!processingStopRequested.load(std::memory_order_acquire))
+	{
+		processOneBlock();
+		nextBlock += blockDuration;
+		const auto now = std::chrono::steady_clock::now();
+		if (nextBlock < now - std::chrono::milliseconds(50))
+			nextBlock = now + blockDuration;
+		std::this_thread::sleep_until(nextBlock);
+	}
+}
+
+void VSTPluginLivePreview::processOneBlock()
 {
 	if (!active || effect == nullptr)
 		return;

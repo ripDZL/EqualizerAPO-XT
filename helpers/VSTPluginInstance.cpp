@@ -422,7 +422,7 @@ float VSTPluginInstance::getSampleRate() const
 
 int VSTPluginInstance::getProcessLevel() const
 {
-	return processLevel;
+	return processLevel.load(memory_order_acquire);
 }
 
 bool VSTPluginInstance::canDoubleReplacing() const
@@ -444,7 +444,7 @@ int VSTPluginInstance::getInitialDelay() const
 
 void VSTPluginInstance::setProcessLevel(int value)
 {
-	processLevel = value;
+	processLevel.store(value, memory_order_release);
 }
 
 int VSTPluginInstance::getLanguage() const
@@ -485,6 +485,9 @@ void VSTPluginInstance::prepareForProcessing(float sampleRate, int blockSize)
 		return;
 
 	this->sampleRate = sampleRate;
+	vst2SamplePositionFrames.store(0, memory_order_release);
+	const intptr_t processPrecision = canDoubleReplacing() ? 1 : 0; // kVstProcessPrecision64/32
+	effect->control(effect.get(), VST_EFFECT_OPCODE_4D, 0, processPrecision, NULL, 0.0f);
 	effect->control(effect.get(), VST_EFFECT_OPCODE_SET_SAMPLE_RATE, 0, 0, NULL, sampleRate);
 	effect->control(effect.get(), VST_EFFECT_OPCODE_SET_BLOCK_SIZE, 0, blockSize, NULL, 0.0f);
 }
@@ -558,7 +561,10 @@ void VSTPluginInstance::processReplacing(float** inputArray, float** outputArray
 	if (effect == NULL)
 		return;
 
+	const int previousProcessLevel = processLevel.exchange(VST_HOST_ACTIVE_THREAD_AUDIO, memory_order_acq_rel);
 	effect->process_float(effect.get(), inputArray, outputArray, frameCount);
+	processLevel.store(previousProcessLevel, memory_order_release);
+	vst2SamplePositionFrames.fetch_add(frameCount, memory_order_acq_rel);
 }
 
 void VSTPluginInstance::processDoubleReplacing(double** inputArray, double** outputArray, int frameCount)
@@ -596,7 +602,10 @@ void VSTPluginInstance::processDoubleReplacing(double** inputArray, double** out
 	if (effect == NULL)
 		return;
 
+	const int previousProcessLevel = processLevel.exchange(VST_HOST_ACTIVE_THREAD_AUDIO, memory_order_acq_rel);
 	effect->process_double(effect.get(), inputArray, outputArray, frameCount);
+	processLevel.store(previousProcessLevel, memory_order_release);
+	vst2SamplePositionFrames.fetch_add(frameCount, memory_order_acq_rel);
 }
 
 void VSTPluginInstance::process(float** inputArray, float** outputArray, int frameCount)
@@ -610,7 +619,10 @@ void VSTPluginInstance::process(float** inputArray, float** outputArray, int fra
 	if (effect == NULL)
 		return;
 
+	const int previousProcessLevel = processLevel.exchange(VST_HOST_ACTIVE_THREAD_AUDIO, memory_order_acq_rel);
 	effect->process(effect.get(), inputArray, outputArray, frameCount);
+	processLevel.store(previousProcessLevel, memory_order_release);
+	vst2SamplePositionFrames.fetch_add(frameCount, memory_order_acq_rel);
 }
 
 void VSTPluginInstance::stopProcessing()

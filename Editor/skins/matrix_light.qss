@@ -58,11 +58,11 @@ QMenuBar::item {
     margin: 4px 4px 4px 0;
 }
 QMenuBar::item:selected {
-    background: rgba(0, 142, 170, 0.08);
+    background: @ACCENT_A08@;
     color: @TEXT@;
 }
 QMenuBar::item:pressed {
-    background: rgba(0, 142, 170, 0.16);
+    background: @ACCENT_A16@;
     border-color: @ACCENT@;
     color: @TEXT@;
 }
@@ -85,7 +85,7 @@ QMenu::item {
     min-width: 168px;
 }
 QMenu::item:selected {
-    background: rgba(0, 142, 170, 0.12);
+    background: @ACCENT_A12@;
     border: 1px solid @ACCENT@;
     color: @TEXT@;
 }
@@ -141,12 +141,12 @@ QToolButton {
     min-height: 22px;
 }
 QToolButton:hover {
-    background: rgba(0, 142, 170, 0.08);
+    background: @ACCENT_A08@;
     border: 1px solid @BORDER@;
 }
 QToolButton:pressed,
 QToolButton:checked {
-    background: rgba(0, 142, 170, 0.16);
+    background: @ACCENT_A16@;
     border: 1px solid @ACCENT@;
 }
 QToolButton::menu-indicator {
@@ -187,11 +187,11 @@ QToolBar#MainToolBar QToolButton {
     max-height: 24px;
 }
 QToolBar#MainToolBar QToolButton:hover {
-    background: rgba(0, 142, 170, 0.08);
+    background: @ACCENT_A08@;
 }
 QToolBar#MainToolBar QToolButton:pressed,
 QToolBar#MainToolBar QToolButton:checked {
-    background: rgba(0, 142, 170, 0.18);
+    background: @ACCENT_A18@;
     border-color: @ACCENT@;
 }
 QToolBar#MainToolBar QToolButton:disabled {
@@ -312,7 +312,7 @@ QPushButton:hover {
     border-color: @ACCENT@;
 }
 QPushButton:pressed {
-    background: rgba(0, 142, 170, 0.16);
+    background: @ACCENT_A16@;
     border-color: @ACCENT@;
 }
 QPushButton:default {
@@ -372,7 +372,7 @@ QAbstractSpinBox::down-button {
 }
 QAbstractSpinBox::up-button:hover,
 QAbstractSpinBox::down-button:hover {
-    background: rgba(0, 142, 170, 0.12);
+    background: @ACCENT_A12@;
 }
 QAbstractSpinBox::up-arrow {
     image: none;
@@ -467,7 +467,7 @@ QComboBox QAbstractItemView {
     border-radius: 0;
     padding: 2px;
     outline: 0;
-    selection-background-color: rgba(0, 142, 170, 0.14);
+    selection-background-color: @ACCENT_A14@;
     selection-color: @TEXT@;
 }
 QComboBox QAbstractItemView::item {
@@ -476,7 +476,7 @@ QComboBox QAbstractItemView::item {
     min-height: 24px;
 }
 QComboBox QAbstractItemView::item:selected {
-    background: rgba(0, 142, 170, 0.14);
+    background: @ACCENT_A14@;
     color: @TEXT@;
 }
 
@@ -491,11 +491,11 @@ QComboBox[paramSelector="true"] {
 }
 QComboBox[paramSelector="true"]:hover {
     color: @TEXT@;
-    background: rgba(0, 142, 170, 0.06);
+    background: @ACCENT_A06@;
 }
 QComboBox[paramSelector="true"]:on {
     color: @TEXT@;
-    background: rgba(0, 142, 170, 0.12);
+    background: @ACCENT_A12@;
 }
 /* A selector with one mode is disabled by the shared GUI: a choice that is
    not currently a choice gets the cancelled grammar (dashed rule), never a
@@ -565,12 +565,12 @@ QScrollBar:vertical {
     border: 0;
 }
 QScrollBar::handle:vertical {
-    background: rgba(16, 36, 47, 0.18);
+    background: @TEXT_A18@;
     min-height: 32px;
     border-radius: 0;
 }
 QScrollBar::handle:vertical:hover {
-    background: rgba(0, 142, 170, 0.45);
+    background: @ACCENT_A45@;
 }
 QScrollBar::handle:vertical:pressed {
     background: @ACCENT@;
@@ -582,12 +582,12 @@ QScrollBar:horizontal {
     border: 0;
 }
 QScrollBar::handle:horizontal {
-    background: rgba(16, 36, 47, 0.18);
+    background: @TEXT_A18@;
     min-width: 32px;
     border-radius: 0;
 }
 QScrollBar::handle:horizontal:hover {
-    background: rgba(0, 142, 170, 0.45);
+    background: @ACCENT_A45@;
 }
 QScrollBar::handle:horizontal:pressed {
     background: @ACCENT@;
@@ -655,7 +655,7 @@ QDockWidget::float-button {
 }
 QDockWidget::close-button:hover,
 QDockWidget::float-button:hover {
-    background: rgba(0, 142, 170, 0.10);
+    background: @ACCENT_A10@;
 }
 
 /* ===== Tab Widget / Tab Bar ===== */
@@ -681,7 +681,7 @@ QTabBar::tab {
 }
 QTabBar::tab:hover {
     color: @TEXT@;
-    background: rgba(0, 142, 170, 0.06);
+    background: @ACCENT_A06@;
 }
 QTabBar::tab:selected {
     color: @TEXT@;
@@ -700,7 +700,7 @@ QTabBar::close-button {
     subcontrol-position: right;
 }
 QTabBar::close-button:hover {
-    background: rgba(220, 38, 38, 0.25);
+    background: @DANGER_A25@;
 }
 QTabBar QToolButton {
     background: @SURFACE@;
@@ -759,7 +759,7 @@ QTableView {
     border: 1px solid @BORDER@;
     border-radius: 0;
     alternate-background-color: @CARD_HOVER@;
-    selection-background-color: rgba(0, 142, 170, 0.14);
+    selection-background-color: @ACCENT_A14@;
     selection-color: @TEXT@;
     gridline-color: @BORDER@;
 }
@@ -772,12 +772,12 @@ QTableView::item {
 QTreeView::item:hover,
 QListView::item:hover,
 QTableView::item:hover {
-    background: rgba(0, 142, 170, 0.06);
+    background: @ACCENT_A06@;
 }
 QTreeView::item:selected,
 QListView::item:selected,
 QTableView::item:selected {
-    background: rgba(0, 142, 170, 0.14);
+    background: @ACCENT_A14@;
     color: @TEXT@;
 }
 QTreeView::branch {
@@ -998,13 +998,13 @@ QWidget#FilterCardHeader[filterEnabled="false"] QLabel#FilterCardSummary {
    dashed rule MatrixSkin::cardFrameStyle lays inline. The rgba values are
    the text/muted tokens at reduced alpha, not new palette entries. */
 QWidget#FilterCardHeader[lineSkipped="true"] QLabel#FilterCardTitle {
-    color: rgba(16, 36, 47, 0.45);
+    color: @TEXT_A45@;
 }
 QWidget#FilterCardHeader[lineSkipped="true"] QLabel#FilterCardSummary {
-    color: rgba(95, 119, 130, 0.60);
+    color: @MUTED_A60@;
 }
 QWidget#FilterCardHeader[lineSkipped="true"] QLabel#FilterCardNumber {
-    color: rgba(95, 119, 130, 0.60);
+    color: @MUTED_A60@;
 }
 QLabel#FilterCardSummary,
 QLabel#FilterCardRawText {
@@ -1038,11 +1038,11 @@ QToolButton#FilterCardIconButton {
     font-weight: 700;
 }
 QToolButton#FilterCardIconButton:hover {
-    background: rgba(0, 142, 170, 0.10);
+    background: @ACCENT_A10@;
     border-color: @ACCENT@;
 }
 QToolButton#FilterCardIconButton:checked {
-    background: rgba(0, 142, 170, 0.16);
+    background: @ACCENT_A16@;
     border-color: @ACCENT@;
 }
 QLineEdit#FilterCardRawEditor {
@@ -1120,11 +1120,11 @@ QToolButton#GraphicEQActionButton {
     max-height: 22px;
 }
 QToolButton#GraphicEQActionButton:hover {
-    background: rgba(0, 142, 170, 0.08);
+    background: @ACCENT_A08@;
     border: 1px solid @BORDER@;
 }
 QToolButton#GraphicEQActionButton:pressed {
-    background: rgba(0, 142, 170, 0.16);
+    background: @ACCENT_A16@;
     border: 1px solid @ACCENT@;
 }
 QToolButton#GraphicEQActionButton:disabled {
@@ -1173,7 +1173,7 @@ QToolButton#UpdateToastClose {
 }
 QToolButton#UpdateToastClose:hover {
     color: @TEXT@;
-    background: rgba(220, 38, 38, 0.12);
+    background: @DANGER_A12@;
     border: 1px solid @DANGER@;
 }
 QToolButton#UpdateToastClose:pressed {
@@ -1400,14 +1400,14 @@ QToolButton#TitleBarMin, QToolButton#TitleBarMax {
     border-right: 0;
 }
 QToolButton#TitleBarMin:hover, QToolButton#TitleBarMax:hover {
-    background: rgba(0, 142, 170, 0.08);
+    background: @ACCENT_A08@;
 }
 QToolButton#TitleBarMin:pressed, QToolButton#TitleBarMax:pressed {
-    background: rgba(0, 142, 170, 0.16);
+    background: @ACCENT_A16@;
     border-color: @ACCENT@;
 }
 QToolButton#TitleBarClose:hover {
-    background: rgba(220, 38, 38, 0.12);
+    background: @DANGER_A12@;
     border-color: @DANGER@;
 }
 QToolButton#TitleBarClose:pressed {
@@ -1475,15 +1475,15 @@ QToolButton#DeviceChip[allDevices="true"] {
 QToolButton#DeviceChip:hover {
     color: @TEXT@;
     border-color: @ACCENT@;
-    background: rgba(0, 142, 170, 0.08);
+    background: @ACCENT_A08@;
 }
 QToolButton#DeviceChip:checked {
-    background: rgba(0, 142, 170, 0.16);
+    background: @ACCENT_A16@;
     border: 1px solid @ACCENT@;
     color: @TEXT@;
 }
 QToolButton#DeviceChip:checked:hover {
-    background: rgba(0, 142, 170, 0.22);
+    background: @ACCENT_A22@;
 }
 /* APO-not-installed endpoint = cancelled departure. */
 QToolButton#DeviceChip[deviceInstalled="false"] {
@@ -1494,16 +1494,16 @@ QToolButton#DeviceChip[deviceInstalled="false"] {
 QToolButton#DeviceChip[deviceInstalled="false"]:hover {
     color: @TEXT@;
     border: 1px dashed @ACCENT@;
-    background: rgba(0, 142, 170, 0.06);
+    background: @ACCENT_A06@;
 }
 QToolButton#DeviceChip[deviceInstalled="false"]:checked {
     color: @ACCENT@;
     border: 1px dashed @ACCENT@;
-    background: rgba(0, 142, 170, 0.10);
+    background: @ACCENT_A10@;
 }
 QToolButton#DeviceChip[allDevices="true"]:checked {
     color: @TEXT@;
-    background: rgba(0, 142, 170, 0.16);
+    background: @ACCENT_A16@;
     border: 1px solid @ACCENT@;
 }
 /* Inert endpoints: cancelled grammar at full specificity (a bare
@@ -1536,7 +1536,7 @@ QToolButton#DeviceChipMore {
 }
 QToolButton#DeviceChipMore:hover {
     color: @TEXT@;
-    background: rgba(0, 142, 170, 0.06);
+    background: @ACCENT_A06@;
     border-color: @BORDER@;
 }
 QToolButton#DeviceChipMore:checked {
@@ -1573,15 +1573,15 @@ QToolButton#ChannelChip[allChannels="true"] {
 QToolButton#ChannelChip:hover {
     color: @TEXT@;
     border-color: @ACCENT@;
-    background: rgba(0, 142, 170, 0.08);
+    background: @ACCENT_A08@;
 }
 QToolButton#ChannelChip:checked {
-    background: rgba(0, 142, 170, 0.16);
+    background: @ACCENT_A16@;
     border: 1px solid @ACCENT@;
     color: @TEXT@;
 }
 QToolButton#ChannelChip:checked:hover {
-    background: rgba(0, 142, 170, 0.22);
+    background: @ACCENT_A22@;
 }
 /* Custom/virtual channel: the Copy grid's dashed virtual grammar. */
 QToolButton#ChannelChip[customChannel="true"] {
@@ -1592,12 +1592,12 @@ QToolButton#ChannelChip[customChannel="true"] {
 QToolButton#ChannelChip[customChannel="true"]:hover {
     color: @TEXT@;
     border: 1px dashed @ACCENT@;
-    background: rgba(0, 142, 170, 0.06);
+    background: @ACCENT_A06@;
 }
 QToolButton#ChannelChip[customChannel="true"]:checked {
     color: @ACCENT@;
     border: 1px dashed @ACCENT@;
-    background: rgba(0, 142, 170, 0.10);
+    background: @ACCENT_A10@;
 }
 /* Inert seats: cancelled grammar at full specificity. */
 QToolButton#ChannelChip:disabled,
@@ -1649,14 +1649,14 @@ QToolButton#StageChip {
     letter-spacing: 1px;
 }
 QToolButton#StageChip:hover {
-    background: rgba(0, 142, 170, 0.08);
+    background: @ACCENT_A08@;
 }
 QToolButton#StageChip:checked {
-    background: rgba(0, 142, 170, 0.18);
+    background: @ACCENT_A18@;
     border-color: @ACCENT@;
 }
 QToolButton#StageChip:checked:hover {
-    background: rgba(0, 142, 170, 0.24);
+    background: @ACCENT_A24@;
 }
 QToolButton#StageChip:disabled,
 QToolButton#StageChip:checked:disabled {

@@ -394,15 +394,17 @@ void paintMinimalAnalysisGraph(QPainter& painter, const AnalysisGraphState& stat
 	// print exactly as it did before phase and group delay existed, so a
 	// branch that is not gated here is a regression, not an improvement.
 	const bool magnitudeSheet = state.metric == AnalysisMetric::MagnitudeDb;
+	const SkinAnalysisGraphLayout layout = skinAnalysisGraphLayout(
+		state.rect, state.plotRect, state.zeroY, state.hover);
 
 	painter.setRenderHint(QPainter::Antialiasing, true);
 	painter.setRenderHint(QPainter::TextAntialiasing, true);
 	painter.fillRect(state.rect, ground);
 
-	const double plotLeft = state.plotRect.left();
-	const double plotRight = state.plotRect.right();
-	const double plotTop = state.plotRect.top();
-	const double plotBottom = state.plotRect.bottom();
+	const double plotLeft = layout.plot.left();
+	const double plotRight = layout.plot.right();
+	const double plotTop = layout.plot.top();
+	const double plotBottom = layout.plot.bottom();
 
 	QFont labelFont(tokens.monoFontFamily);
 	labelFont.setPointSizeF(7.5);
@@ -573,7 +575,7 @@ void paintMinimalAnalysisGraph(QPainter& painter, const AnalysisGraphState& stat
 	// The plotter crosshair: a full-height vertical hairline with a short
 	// horizontal tick at the reading. Its ink rises from the secondary
 	// half-tone to body ink with the hover progress (entry motion).
-	const QColor crosshairInk = mixColor(secondary, bodyInk, qBound(0.0, state.hover, 1.0));
+	const QColor crosshairInk = mixColor(secondary, bodyInk, layout.hover);
 	if (state.cursorValid)
 	{
 		const double cursorX = qFloor(state.cursor.x()) + 0.5;
@@ -922,7 +924,7 @@ public:
 		// the header inherits the frame's background through transparency.
 		return QStringLiteral("QWidget#FilterCardHeader { background: transparent; border-radius: 0; }");
 	}
-	void prepareCommandRow(const CommandRowInfo& info, QWidget* card, QWidget* header, QWidget* body) const override
+	void prepareCommandRow(const CommandRowInfo& info, QWidget* card, QWidget* header, QWidget* body, const SkinTokens& tokens) const override
 	{
 		Q_UNUSED(card);
 		// A raw line (a bare note, or a programmatic command like If/EndIf
@@ -934,11 +936,10 @@ public:
 		if ((info.type == QStringLiteral("text") || info.type == QStringLiteral("if")
 			|| info.type == QStringLiteral("eval") || info.dynamicLine) && body != nullptr)
 		{
-			const SkinTokens& tk = SkinManager::instance()->tokens();
 			if (QLabel* rawText = body->findChild<QLabel*>(QStringLiteral("FilterCardRawText")))
 			{
 				rawText->setStyleSheet(QStringLiteral("QLabel#FilterCardRawText { background: transparent; color: %1; border: 0; border-radius: 0; padding: 2px 0; font-family: \"%2\"; }")
-					.arg(info.enabled ? tk.text : tk.mutedText, tk.monoFontFamily));
+					.arg(info.enabled ? tokens.text : tokens.mutedText, tokens.monoFontFamily));
 			}
 		}
 		// Leading type glyph at the line head. Only modern card rows carry a

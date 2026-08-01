@@ -41,11 +41,11 @@ QMenuBar {
 }
 QMenuBar::item { background: transparent; color: @MUTED@; padding: 5px 12px; border-radius: 2px; }
 QMenuBar::item:selected {
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(182, 106, 0, 0.06), stop:1 rgba(182, 106, 0, 0.18));
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 @ACCENT_A06@, stop:1 @ACCENT_A18@);
     color: #7A4A05;
 }
 QMenuBar::item:pressed {
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(182, 106, 0, 0.14), stop:1 rgba(182, 106, 0, 0.36));
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 @ACCENT_A14@, stop:1 @ACCENT_A36@);
     color: #5C3A00;
 }
 
@@ -67,7 +67,7 @@ QMenu {
 QMenu::item { background: transparent; padding: 6px 26px; border-radius: 2px; min-width: 170px; }
 QMenu::item:selected {
     background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-        stop:0 rgba(182, 106, 0, 0.48), stop:0.07 rgba(182, 106, 0, 0.20), stop:1 rgba(182, 106, 0, 0.05));
+        stop:0 @ACCENT_A48@, stop:0.07 @ACCENT_A20@, stop:1 @ACCENT_A05@);
     color: #4A2E00;
 }
 QMenu::item:disabled { color: #A99F8E; background: transparent; }
@@ -1015,7 +1015,7 @@ QToolButton#ChannelChip[customChannel="true"]:hover {
 /* A taken printed seat (0x121): dashed sides stay printed, the lamp
    under them is real. */
 QToolButton#ChannelChip[customChannel="true"]:checked {
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(182, 106, 0, 0.05), stop:1 rgba(182, 106, 0, 0.14));
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 @ACCENT_A05@, stop:1 @ACCENT_A14@);
     border: 1px dashed #C49A4A;
     border-bottom: 2px solid @ACCENT@;
     color: #4A2E00;

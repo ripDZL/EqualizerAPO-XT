@@ -5,6 +5,7 @@
 */
 
 #include "RackReferenceCardView.h"
+#include "Editor/skins/RackChrome.h"
 #include "Editor/skins/SkinPaint.h"
 
 #include <QAbstractButton>
@@ -212,7 +213,7 @@ void RackEngravedLabel::paintEvent(QPaintEvent*)
 
 	// RackChrome::engraveText's double pass: the recess edge catching the
 	// work light, then the body ink on top.
-	QColor recess = dark ? QColor(0, 0, 0, 170) : QColor(255, 255, 255, 200);
+	QColor recess = dark ? skinMaterialShadow(170) : skinMaterialHighlight(200);
 	if (!isEnabled())
 		recess.setAlpha(recess.alpha() / 2);
 	painter.setPen(recess);
@@ -262,40 +263,10 @@ void RackStatusLamp::paintEvent(QPaintEvent*)
 	// Disabled row = powered-down unit: the lamp is off, the hardware stays.
 	const bool on = lit && isEnabled();
 
-	// RackChrome::paintLed's grammar: bezel ring, halo while lit, gradient
-	// dome, specular dot.
-	painter.setPen(QPen(dark ? QColor(0, 0, 0, 190) : QColor(70, 62, 50, 190), 1));
-	painter.setBrush(Qt::NoBrush);
-	painter.drawEllipse(center, radius + 1.2, radius + 1.2);
-
-	if (on)
-	{
-		const qreal haloRadius = qMin(width(), height()) / 2.0 - 0.5;
-		QRadialGradient halo(center, haloRadius);
-		halo.setColorAt(0.0, withAlpha(litColor, 110));
-		halo.setColorAt(1.0, withAlpha(litColor, 0));
-		painter.setPen(Qt::NoPen);
-		painter.setBrush(halo);
-		painter.drawEllipse(center, haloRadius, haloRadius);
-	}
-
-	QRadialGradient dome(center - QPointF(radius * 0.3, radius * 0.3), radius * 1.6);
-	if (on)
-	{
-		dome.setColorAt(0.0, litColor.lighter(150));
-		dome.setColorAt(1.0, litColor.darker(125));
-	}
-	else
-	{
-		const QColor off = litColor.darker(330);
-		dome.setColorAt(0.0, off.lighter(140));
-		dome.setColorAt(1.0, off);
-	}
-	painter.setPen(Qt::NoPen);
-	painter.setBrush(dome);
-	painter.drawEllipse(center, radius, radius);
-	painter.setBrush(QColor(255, 255, 255, on ? 170 : (dark ? 28 : 60)));
-	painter.drawEllipse(center - QPointF(radius * 0.35, radius * 0.35), radius * 0.3, radius * 0.3);
+	// This widget keeps its wider card-local halo radius so it can fill the
+	// 20px lamp cell without changing the shared card LED size.
+	const qreal haloRadius = qMin(width(), height()) / 2.0 - 0.5;
+	RackChrome::paintLed(painter, center, radius, litColor, on ? 1.0 : 0.0, dark, haloRadius, false);
 }
 
 // ---- RackLcdWindow ---------------------------------------------------------
@@ -355,12 +326,12 @@ void RackLcdWindow::paintEvent(QPaintEvent*)
 	// glass in BOTH modes. Same glass and segment inks as the card's
 	// EditableValue display (rack sheets).
 	const QRectF well = QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5);
-	painter.setPen(QPen(QColor(0, 0, 0, 220), 1));
+	painter.setPen(QPen(skinMaterialShadow(220), 1));
 	painter.setBrush(QColor(10, 14, 11));
 	painter.drawRoundedRect(well, 2, 2);
 	// Recessed depth: the glass top edge falls into the well's shadow, the
 	// bottom bezel lip catches the work light (the valueScrub well's law).
-	painter.setPen(QPen(QColor(0, 0, 0, 160), 1));
+	painter.setPen(QPen(skinMaterialShadow(160), 1));
 	painter.drawLine(QPointF(well.left() + 2, well.top() + 1.5), QPointF(well.right() - 2, well.top() + 1.5));
 	painter.setPen(QPen(dark ? QColor(0x39, 0x42, 0x4A) : QColor(0x6B, 0x63, 0x54), 1));
 	painter.drawLine(QPointF(well.left() + 2.5, well.bottom()), QPointF(well.right() - 2.5, well.bottom()));

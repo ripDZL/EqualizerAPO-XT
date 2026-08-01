@@ -41,6 +41,7 @@
 #include "FilterTableMimeData.h"
 #include "FilterGUIFactoryRegistry.h"
 #include "Editor/helpers/GUIHelper.h"
+#include "Editor/helpers/VSTPreviewEndpoint.h"
 #include "helpers/StringHelper.h"
 #include "helpers/LogHelper.h"
 #include "helpers/ChannelHelper.h"
@@ -197,7 +198,7 @@ void FilterTable::updateGuis()
 				? rowPlans[row].descriptor
 				: FilterCardModel::describeLine(item->text);
 		phaseTimer.start();
-		IFilterGUI* gui = createRowGui(item->text,
+		IFilterGUI* gui = createRowGui(item,
 			renderMode == ModernCards ? &descriptor : nullptr);
 		guiNs += phaseTimer.nsecsElapsed();
 
@@ -341,8 +342,26 @@ void FilterTable::resizeEvent(QResizeEvent* event)
 		insertSeam->setGeometry(0, 0, width(), 10);
 }
 
-IFilterGUI* FilterTable::createRowGui(const QString& line, const FilterCardDescriptor* preparedDescriptor)
+IFilterGUI* FilterTable::createRowGui(Item* item, const FilterCardDescriptor* preparedDescriptor)
 {
+	struct PreviewContextGuard
+	{
+		Item*& slot;
+		Item* previous;
+
+		PreviewContextGuard(Item*& slot, Item* current)
+			: slot(slot), previous(slot)
+		{
+			slot = current;
+		}
+
+		~PreviewContextGuard()
+		{
+			slot = previous;
+		}
+	} previewContextGuard(previewContextItem, item);
+
+	const QString line = item != nullptr ? item->text : QString();
 	FilterCardDescriptor derivedDescriptor;
 	if (renderMode == ModernCards && preparedDescriptor == nullptr)
 	{
@@ -470,7 +489,7 @@ void FilterTable::updateSingleRowGui(Item* item)
 		descriptor.logicDepth = scope.logic;
 		descriptor.scopeChannels = scope.channels;
 	}
-	IFilterGUI* gui = createRowGui(item->text,
+	IFilterGUI* gui = createRowGui(item,
 		renderMode == ModernCards ? &descriptor : nullptr);
 	// Same render-mode and parenting policy as updateGuis().
 	QWidget* rowWidget = renderMode == ModernCards
@@ -605,7 +624,7 @@ void FilterTable::insertRowAt(int index)
 	FilterCardDescriptor descriptor = FilterCardModel::describeLine(item->text, scope.indent);
 	descriptor.logicDepth = scope.logic;
 	descriptor.scopeChannels = scope.channels;
-	IFilterGUI* gui = createRowGui(item->text, &descriptor);
+	IFilterGUI* gui = createRowGui(item, &descriptor);
 	QWidget* rowWidget = new FilterCardRow(this, index + 1, item, gui, std::move(descriptor), this);
 	gridLayout->addWidget(rowWidget, index, 0);
 

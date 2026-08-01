@@ -582,7 +582,7 @@ public:
 	// and the reference bodies (Include / Convolution / MultiConvolution /
 	// VST) speak their board grammar through MatrixReferenceCardView instead
 	// of being decorated here.
-	void prepareCommandRow(const CommandRowInfo& info, QWidget* card, QWidget* header, QWidget* body) const override
+	void prepareCommandRow(const CommandRowInfo& info, QWidget* card, QWidget* header, QWidget* body, const SkinTokens& tokens) const override
 	{
 		if (info.legacyRow)
 			return;
@@ -620,7 +620,6 @@ public:
 		if ((info.type == QStringLiteral("text") || info.type == QStringLiteral("if")
 			|| info.type == QStringLiteral("eval") || info.dynamicLine) && body != nullptr)
 		{
-			const SkinTokens& tokens = SkinManager::instance()->tokens();
 			if (QLabel* glyph = body->findChild<QLabel*>(QStringLiteral("FilterCardRawGlyph")))
 			{
 				glyph->setStyleSheet(QStringLiteral(
@@ -797,53 +796,42 @@ public:
 	// value readouts), never in the gutter.
 	bool paintScopeGutter(QPainter& painter, const QSize& size, const CommandRowInfo& info, const SkinTokens& tokens) const override
 	{
-		const bool ifFamily = info.type == QStringLiteral("if");
-		const bool headRow = ifFamily && info.command == QStringLiteral("if");
-		const bool branchOrTail = ifFamily && !headRow;
-		const bool tailRow = ifFamily && info.command == QStringLiteral("endif");
-		const int logic = info.logicDepth;
-		if (!headRow && logic <= 0)
+		const SkinScopeGutterLayout layout = skinScopeGutterLayout(
+			info.type, info.command, info.depth, info.logicDepth, tokens, size);
+		if (!layout.shouldPaint)
 			return false;
 
 		painter.setRenderHint(QPainter::Antialiasing, false);
 
-		const int unit = tokens.channelGroupIndent;
-		const int h = size.height();
-		// Branch/tail rows mount at member depth (logicSiblingsIndentAsMembers)
-		// so the bracket passes them; the card edge follows the same rule.
-		const int indentUnits = branchOrTail ? info.depth + 1 : info.depth;
-		const int cardLeft = 8 + indentUnits * unit;
-		// Rules sit on the centres of the existing indent bands; the bracket
-		// claims no positions of its own.
-		const auto bandCenter = [&](int level) { return 8 + level * unit + unit / 2; };
+		const int h = layout.height;
+		const int cardLeft = layout.cardLeft;
+		const auto bandCenter = [&](int level) { return layout.bandCenter(level); };
 
 		// The innermost logicDepth bands are If lanes; any bands outside them
 		// are channel groups and keep a quiet 1px border-ink rule, one ink
 		// rank below the bracket, so scope reads above grouping.
-		const int ifLevels = headRow ? logic : branchOrTail ? logic - 1 : logic;
-		const int channelLevels = qMax(0, indentUnits - ifLevels - (branchOrTail ? 1 : 0));
 		painter.setPen(QPen(QColor(tokens.border), 1));
-		for (int level = 0; level < channelLevels; level++)
+		for (int level = 0; level < layout.channelLevels; level++)
 			painter.drawLine(bandCenter(level), 0, bandCenter(level), h);
 
 		painter.setPen(QPen(QColor(tokens.mutedText), 1));
-		const int junctionY = 4 + tokens.rowHeight / 2;
-		if (headRow)
+		const int junctionY = layout.junctionY;
+		if (layout.headRow)
 		{
-			for (int level = channelLevels; level < channelLevels + logic; level++)
+			for (int level = layout.channelLevels; level < layout.channelLevels + layout.logic; level++)
 				painter.drawLine(bandCenter(level), 0, bandCenter(level), h);
 			// The bracket opens under the head: its rule first shows in the
 			// margin below the gate's full-width cell.
-			const int own = bandCenter(channelLevels + logic);
+			const int own = bandCenter(layout.ownLevel);
 			painter.drawLine(own, h - 4, own, h);
 		}
-		else if (tailRow)
+		else if (layout.tailRow)
 		{
-			for (int level = channelLevels; level + 1 < channelLevels + logic; level++)
+			for (int level = layout.channelLevels; level + 1 < layout.channelLevels + layout.logic; level++)
 				painter.drawLine(bandCenter(level), 0, bandCenter(level), h);
 			// The closing L-corner: down to the tail's centre line, then a
 			// half-pitch tick to the EndIf cell's edge.
-			const int own = bandCenter(channelLevels + logic - 1);
+			const int own = bandCenter(layout.ownLevel);
 			painter.drawLine(own, 0, own, junctionY);
 			painter.drawLine(own, junctionY, cardLeft - 1, junctionY);
 		}
@@ -852,7 +840,7 @@ public:
 			// Members and branch rows: every open bracket passes straight
 			// through. ElseIf/Else post their state on their own cells (the
 			// gate lamp), not on the bracket.
-			for (int level = channelLevels; level < channelLevels + logic; level++)
+			for (int level = layout.channelLevels; level < layout.channelLevels + layout.logic; level++)
 				painter.drawLine(bandCenter(level), 0, bandCenter(level), h);
 		}
 		return true;
@@ -1213,7 +1201,9 @@ public:
 		const QColor warnBase(tokens.warning);
 		const QColor hazardInk = darkBoard ? warnBase
 			: QColor::fromHsvF(warnBase.hsvHueF(), warnBase.hsvSaturationF() * 0.82, warnBase.valueF() * 0.62);
-		const QRect plot = state.plotRect.toRect();
+		const SkinAnalysisGraphLayout layout = skinAnalysisGraphLayout(
+			state.rect, state.plotRect, state.zeroY, state.hover);
+		const QRect plot = layout.plotRect();
 
 		painter.setRenderHint(QPainter::Antialiasing, false);
 		painter.fillRect(state.rect, ground);
@@ -1256,7 +1246,7 @@ public:
 		// Hazard zone: the response can clip, so the whole over-bus band
 		// posts thin amber diagonals (AA off - the pixel staircase is
 		// deliberate).
-		const int zeroYpx = int(state.zeroY);
+		const int zeroYpx = layout.zeroRow();
 		if (state.clipping && zeroYpx > plot.top())
 		{
 			const QRect zone(plot.left(), plot.top(), plot.width(), zeroYpx - plot.top());
@@ -1388,11 +1378,11 @@ public:
 			if (line.label.isEmpty())
 				continue;
 			const int tagWidth = tagMetrics.horizontalAdvance(line.label) + 6;
-			int tagX = int(line.pos) - tagWidth / 2;
-			tagX = qBound(state.rect.left() + 1, tagX, state.rect.right() - tagWidth - 1);
-			if (tagX <= lastTagRight + 4)
+			const QRect tagRect = layout.centeredRectClampedToX(int(line.pos),
+				plot.bottom() - tagHeight - 1, tagWidth, tagHeight,
+				state.rect.left() + 1, state.rect.right() - tagWidth - 1);
+			if (tagRect.left() <= lastTagRight + 4)
 				continue;
-			const QRect tagRect(tagX, plot.bottom() - tagHeight - 1, tagWidth, tagHeight);
 			painter.fillRect(tagRect, ground);
 			painter.setPen(line.major ? mutedInk : minorLabelInk);
 			painter.drawText(tagRect, Qt::AlignCenter, line.label);
@@ -1405,22 +1395,9 @@ public:
 		// rule inside the plot (the range extremes at the plot edges) is
 		// dropped, not squeezed - the footer's span readout posts those two
 		// figures, and a tag off its rule would lie about its coordinate.
-		int labelStep = 1;
-		if (state.horizontal.size() >= 2)
-		{
-			const double spacing = qAbs(state.horizontal.at(1).pos - state.horizontal.at(0).pos);
-			if (spacing > 0.5)
-				labelStep = qMax(1, qCeil((tagHeight + 3) / spacing));
-		}
-		int zeroIndex = 0;
-		for (int i = 0; i < state.horizontal.size(); i++)
-		{
-			if (state.horizontal.at(i).major)
-			{
-				zeroIndex = i;
-				break;
-			}
-		}
+		const int labelStep = skinLabelStrideForGap(
+			skinMinimumAdjacentGridGap(state.horizontal), tagHeight + 3);
+		const int zeroIndex = skinFirstMajorGridIndex(state.horizontal);
 		for (int i = 0; i < state.horizontal.size(); i++)
 		{
 			const AnalysisGraphState::GridLine& line = state.horizontal.at(i);
@@ -1519,7 +1496,7 @@ public:
 		{
 			const int scanX = qBound(plot.left(), qRound(state.cursor.x()), plot.right());
 			QColor scanInk(accent);
-			scanInk.setAlpha(90 + qRound(state.hover * 165.0));
+			scanInk.setAlpha(90 + qRound(layout.hover * 165.0));
 			painter.setPen(QPen(scanInk, 1));
 			painter.drawLine(scanX, plot.top(), scanX, plot.bottom());
 
@@ -1540,7 +1517,7 @@ public:
 				const int bracketBottom = crossY + 5;
 				const int leg = 3;
 				QColor reticleInk(accent);
-				reticleInk.setAlpha(140 + qRound(state.hover * 115.0));
+				reticleInk.setAlpha(140 + qRound(layout.hover * 115.0));
 				painter.setPen(QPen(reticleInk, 1));
 				painter.drawLine(bracketLeft, bracketTop, bracketLeft + leg, bracketTop);
 				painter.drawLine(bracketLeft, bracketTop, bracketLeft, bracketTop + leg);
@@ -1559,10 +1536,10 @@ public:
 				probeFont.setBold(true);
 				const QFontMetrics probeMetrics(probeFont);
 				const int probeWidth = probeMetrics.horizontalAdvance(state.cursorText) + 12;
-				int probeX = scanX - probeWidth / 2;
-				probeX = qBound(plot.left() + 2, probeX, plot.right() - probeWidth - 2);
-				const QRect probeRect(probeX, plot.top() + 4, probeWidth, MatrixMetrics::knobCellHeight);
-				painter.setPen(QPen(mixColor(borderInk, accent, state.hover), 1));
+				const QRect probeRect = layout.centeredRectClampedToX(scanX,
+					plot.top() + 4, probeWidth, MatrixMetrics::knobCellHeight,
+					plot.left() + 2, plot.right() - probeWidth - 2);
+				painter.setPen(QPen(mixColor(borderInk, accent, layout.hover), 1));
 				painter.setBrush(QColor(tokens.surfaceSunken));
 				painter.drawRect(probeRect.adjusted(0, 0, -1, -1));
 				painter.setBrush(Qt::NoBrush);
@@ -1621,7 +1598,7 @@ public:
 		painter.drawText(footerRect, Qt::AlignLeft | Qt::AlignVCenter, marker);
 		const int channelX = footerRect.left() + footerMetrics.horizontalAdvance(marker);
 		const int channelAvail = footerRect.right() - footerMetrics.horizontalAdvance(spanText) - 12 - channelX;
-		painter.setPen(mixColor(mutedInk, textInk, state.hover));
+		painter.setPen(mixColor(mutedInk, textInk, layout.hover));
 		painter.drawText(QRect(channelX, footerRect.top(), qMax(0, channelAvail), footerRect.height()),
 			Qt::AlignLeft | Qt::AlignVCenter,
 			footerMetrics.elidedText(state.channelText, Qt::ElideRight, qMax(0, channelAvail)));

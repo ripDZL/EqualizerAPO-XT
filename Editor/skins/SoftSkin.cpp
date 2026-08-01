@@ -595,6 +595,8 @@ public:
 		const QColor border(tokens.border);
 		const QColor well(tokens.surfaceSunken);
 		const QColor warmInk(QStringLiteral("#2B251D"));
+		const SkinAnalysisGraphLayout layout = skinAnalysisGraphLayout(
+			state.rect, state.plotRect, state.zeroY, state.hover);
 
 		QRectF frame = QRectF(state.rect).adjusted(0.5, 0.5, -0.5, -0.5);
 		const qreal wellRound = 14.0;
@@ -750,19 +752,8 @@ public:
 			const AnalysisGraphState::GridLine& line = state.vertical.at(i);
 			if (line.label.isEmpty() || (!line.major && i != 0 && i != state.vertical.size() - 1))
 				continue;
-			QRect labelRect(qRound(line.pos) - 24, int(state.plotRect.bottom()) + 2, 48, 12);
-			int align = Qt::AlignHCenter;
-			if (labelRect.right() > state.rect.right() - 8)
-			{
-				labelRect.setRight(state.rect.right() - 8);
-				align = Qt::AlignRight;
-			}
-			if (labelRect.left() < state.rect.left() + 8)
-			{
-				labelRect.setLeft(state.rect.left() + 8);
-				align = Qt::AlignLeft;
-			}
-			painter.drawText(labelRect, align | Qt::AlignTop, line.label);
+			const SkinAxisLabelRect label = layout.clampedRoundedXAxisLabelRect(line.pos, 2, 48, 12, 8);
+			painter.drawText(label.rect, label.alignment | Qt::AlignTop, line.label);
 		}
 
 		// The value figures rest just above their (unpainted) rows along the
@@ -771,19 +762,9 @@ public:
 		// the kept figures stay symmetric around it. They arrive already
 		// worded for whichever metric is showing, so nothing here spells a
 		// unit.
-		int groundIndex = 0;
-		for (int i = 0; i < state.horizontal.size(); i++)
-		{
-			if (state.horizontal.at(i).major)
-			{
-				groundIndex = i;
-				break;
-			}
-		}
-		qreal rowGap = 0.0;
-		if (state.horizontal.size() >= 2)
-			rowGap = qAbs(state.horizontal.at(1).pos - state.horizontal.at(0).pos);
-		const int labelStride = rowGap > 0.5 ? qMax(1, qCeil(16.0 / rowGap)) : 1;
+		const int groundIndex = skinFirstMajorGridIndex(state.horizontal);
+		const qreal rowGap = skinMinimumAdjacentGridGap(state.horizontal);
+		const int labelStride = skinLabelStrideForGap(rowGap, 16.0);
 		for (int i = 0; i < state.horizontal.size(); i++)
 		{
 			const AnalysisGraphState::GridLine& line = state.horizontal.at(i);
@@ -887,7 +868,7 @@ public:
 		// pastel, and the readout as an ON-pastel stadium pill in the well's
 		// top-right corner. The hover progress floats the whole group in,
 		// the pill drifting down to its resting spot.
-		const double entry = qBound(0.0, state.hover, 1.0);
+		const double entry = layout.hover;
 		if (state.cursorValid && entry > 0.01)
 		{
 			QPainterStateGuard cursorState(&painter);
@@ -1074,7 +1055,7 @@ public:
 	// The plain-text rows (bare note lines and programmatic commands such
 	// as If/EndIf/Eval). FilterCardRow lays these styles inline, so QSS
 	// cannot reach them; construction time is the hook's moment.
-	void prepareCommandRow(const CommandRowInfo& info, QWidget* card, QWidget* header, QWidget* body) const override
+	void prepareCommandRow(const CommandRowInfo& info, QWidget* card, QWidget* header, QWidget* body, const SkinTokens& tokens) const override
 	{
 		Q_UNUSED(card);
 		const bool rawBodyRow = info.type == QStringLiteral("text")
@@ -1114,7 +1095,6 @@ public:
 		if (body == nullptr)
 			return;
 
-		const SkinTokens t = SkinManager::instance()->tokens();
 		if (QLabel* glyph = body->findChild<QLabel*>(QStringLiteral("FilterCardRawGlyph")))
 			glyph->setVisible(false);
 		if (QLabel* raw = body->findChild<QLabel*>(QStringLiteral("FilterCardRawText")))
@@ -1122,7 +1102,8 @@ public:
 			raw->setStyleSheet(QStringLiteral(
 				"QLabel#FilterCardRawText { background:%1; color:%2; border:1px dashed %3; border-radius:16px; padding:8px 14px; font-family:\"%4\"; }"
 				"QLabel#FilterCardRawText:disabled { background:%5; color:%6; }")
-				.arg(t.surfaceSunken, t.text, t.border, t.monoFontFamily, t.background, t.mutedText));
+				.arg(tokens.surfaceSunken, tokens.text, tokens.border, tokens.monoFontFamily,
+					tokens.background, tokens.mutedText));
 		}
 	}
 
@@ -1132,11 +1113,9 @@ public:
 	// innermost logicDepth bands after the depth-logicDepth channel bands.
 	bool paintScopeGutter(QPainter& painter, const QSize& size, const CommandRowInfo& info, const SkinTokens& tokens) const override
 	{
-		const bool ifFamily = info.type == QStringLiteral("if");
-		const bool headRow = ifFamily && info.command == QStringLiteral("if");
-		const bool tailRow = ifFamily && info.command == QStringLiteral("endif");
-		const int logic = info.logicDepth;
-		if (!headRow && logic <= 0)
+		const SkinScopeGutterLayout layout = skinScopeGutterLayout(
+			info.type, info.command, info.depth, info.logicDepth, tokens, size);
+		if (!layout.shouldPaint)
 			return false;
 
 		const QColor card(tokens.card);
@@ -1146,14 +1125,7 @@ public:
 		const QColor arm = mixColor(accent, card, 0.25);
 		const QColor armResting = mixColor(accent, card, 0.78);
 
-		const int unit = tokens.channelGroupIndent;
-		const int h = size.height();
-		// Branch/tail rows mount with the members, one indent unit past
-		// their head (logicSiblingsIndentAsMembers), so the arm passes them
-		// instead of dying behind their full-width faces. The card edge
-		// follows the same rule.
-		const int indentUnits = (ifFamily && !headRow) ? info.depth + 1 : info.depth;
-		const int channelLevels = qMax(0, indentUnits - logic);
+		const int h = layout.height;
 		const bool resting = !info.enabled || info.lineSkipped;
 
 		painter.setRenderHint(QPainter::Antialiasing);
@@ -1163,9 +1135,9 @@ public:
 		// band. The hook sees no per-row type colour (the shared rail tints
 		// by it), so the shade leans on the border token - quieter, same
 		// silhouette.
-		if (channelLevels > 0)
+		if (layout.channelLevels > 0)
 		{
-			const QRectF band(8 + (channelLevels - 1) * unit, 0, unit, h);
+			const QRectF band(8 + (layout.channelLevels - 1) * layout.unit, 0, layout.unit, h);
 			QLinearGradient shade(band.left(), 0, band.right(), 0);
 			shade.setColorAt(0, withAlpha(QColor(tokens.border), 110));
 			shade.setColorAt(1, withAlpha(QColor(tokens.border), 0));
@@ -1176,7 +1148,7 @@ public:
 		// overshoot the row's clip so neighbouring rows tile into one
 		// continuous arm; only the arm's first and last row show a cap.
 		const auto laneX = [&](int level) {
-			return 8.0 + level * unit + unit / 2.0 - 2.0;
+			return layout.bandCenterF(level) - 2.0;
 		};
 		const auto runBar = [&](int level, const QColor& color) {
 			painter.setBrush(color);
@@ -1184,11 +1156,10 @@ public:
 		};
 
 		// Outer scopes hold straight through every row of an inner block.
-		const int ownLevel = channelLevels + logic - (headRow ? 0 : 1);
-		for (int level = channelLevels; level < ownLevel; level++)
+		for (int level = layout.channelLevels; level < layout.ownLevel; level++)
 			runBar(level, arm);
 
-		if (headRow)
+		if (layout.headRow)
 		{
 			// The arm begins BELOW the sentence: a rounded fingertip peeking
 			// out of the row's bottom margin, which the first member row
@@ -1196,21 +1167,21 @@ public:
 			// the sleeping members it announces (branchState is fresh at
 			// paint time by contract).
 			painter.setBrush(resting || info.branchState == 0 ? armResting : arm);
-			painter.drawRoundedRect(QRectF(laneX(ownLevel), h - 4.0, 4.0, 8.0), 2.0, 2.0);
+			painter.drawRoundedRect(QRectF(laneX(layout.ownLevel), h - 4.0, 4.0, 8.0), 2.0, 2.0);
 		}
-		else if (tailRow)
+		else if (layout.tailRow)
 		{
 			// The arm ends here: the bar falls to the row's centre line and
 			// closes with its stadium cap.
-			const qreal capY = 4.0 + tokens.rowHeight / 2.0;
+			const qreal capY = layout.junctionYF;
 			painter.setBrush(resting ? armResting : arm);
-			painter.drawRoundedRect(QRectF(laneX(ownLevel), -4.0, 4.0, capY + 4.0), 2.0, 2.0);
+			painter.drawRoundedRect(QRectF(laneX(layout.ownLevel), -4.0, 4.0, capY + 4.0), 2.0, 2.0);
 		}
 		else
 		{
 			// Members and branch rows: the arm passes at full height; a
 			// swallowed line relaxes only its own stretch.
-			runBar(ownLevel, resting ? armResting : arm);
+			runBar(layout.ownLevel, resting ? armResting : arm);
 		}
 		return true;
 	}

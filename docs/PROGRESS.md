@@ -51,5 +51,47 @@
 - [x] Review fix: reset a selected endpoint capture that fails/times out before using default fallback sources.
 - [x] Rebuilt Qt Editor x64 AVX2 after selected-endpoint capture.
 - [x] Re-ran `git diff --check`, `Test-SourceSync.ps1`, `Editor.exe --selftest-vst`, `HybridConvTests.exe`, `EditorLogicTests.exe`, and `EngineOrchestrationTests.exe`.
+- [x] Committed selected-endpoint preview as `6ae8abf` and pushed `beta`.
+- [x] Triggered GitHub Actions run `30472634359`; downloaded AVX-512 artifact to `artifacts/github-run-30472634359-avx512`.
+- [x] Backed up installed AVX-512 `current` to `artifacts/install-backups/EqualizerAPO-XT-x64-avx512-pre-6ae8abf-20260729`.
+- [x] Overlaid and hash-verified the selected-endpoint AVX-512 artifact, restarted Windows Audio, passed installed Editor `--selftest-vst`, and opened Editor.
 - [ ] `AudioRegressionTests.exe` still blocked by missing `x64/Release/references/*.raw` fixtures; equivalence checks passed before fixture failures.
-- [ ] Verify ReaFIR and TDR Nova graph movement while speaking into the configured microphone.
+- [x] Reproduced live input at WASAPI level: BEHRINGER `IN 1` had non-zero peak/RMS while default console/communications capture were silent.
+- [x] Added row-scoped VST preview endpoint resolution from preceding `Device:` config rows.
+- [x] Added `EditorLogicTests.exe` coverage for VST rows inheriting `Device: IN 1 BEHRINGER ... {cf6bfa75-...}` as a capture endpoint.
+- [x] Built local AVX2 and AVX-512-channel Editors after the row-device fix.
+- [x] Installed AVX-512-channel row-device Editor into `C:\Users\Admin\AppData\Local\EqualizerAPO-XT-x64-avx512\current`; hash matched source; installed self-test exit code 0; Editor reopened.
+- [x] Confirmed ReaFIR sometimes reacts after overlaying the real Program Files Editor path.
+- [x] Moved live preview processing from the GUI timer to a dedicated preview thread at plugin block cadence for smoother analyzer updates.
+- [x] Installed the background-preview Editor to `C:\Program Files\EqualizerAPO\Editor.exe`; hash matched the local AVX-512 build; installed self-test passed; Editor reopened.
+- [ ] Verify ReaFIR, TDR Nova, and heavier analyzer plugins for smooth graph movement while speaking into the configured microphone.
+- [x] Centralized skin QSS loading, Studio fallback, token substitution, shared overrides, unresolved-token reporting, and runtime warnings in `SkinThemeData::styleSheet`.
+- [x] Rebuilt and ran `EditorLogicTests.exe`: 2594 checks.
+- [x] Added `@TOKEN_Axx@` alpha placeholders and converted 621 semantic token RGBA literals across shipped skins.
+- [x] Forced AVX-512 Editor rebuild, ran waited `Editor.exe --selftest-vst`, and generated full skin gallery: 1040 PNGs.
+- [x] Extracted shared scope-gutter rail geometry to `SkinScopeGutterLayout` and rewired Studio, Soft, Matrix, and Rack scope painters to use it.
+- [x] Added editor-logic coverage for If/member/Else/EndIf scope-gutter layout.
+- [x] Validated scope-gutter refactor: `EditorLogicTests.exe` passed 2623 checks; `git diff --check`; `Test-SourceSync.ps1`; AVX-512 Editor rebuild; `Editor.exe --selftest-vst`; skin gallery 1040 PNGs; 20 logic/channelscope PNGs byte-matched the pre-refactor gallery.
+- [x] Extracted shared analysis-graph layout geometry to `SkinAnalysisGraphLayout` and rewired neutral, Studio, Soft, Matrix, Rack, and Minimal graph painters to use it.
+- [x] Added editor-logic coverage for x/y label rectangles, zero-row/cursor clamping, footer rectangles, and grid-label thinning helpers.
+- [x] Validated analysis-graph refactor: `EditorLogicTests.exe` passed 2643 checks; `git diff --check`; `Test-SourceSync.ps1`; AVX-512 Editor rebuild; `Editor.exe --selftest-vst`; skin gallery 1040 PNGs; 80 graph/analysis PNGs byte-matched the previous gallery.
+- [x] Passed active `SkinTokens` through `ISkin::prepareCommandRow` and removed direct token lookups from Studio, Soft, Matrix, Rack, and Minimal hook bodies.
+- [x] Validated command-row token seam: `EditorLogicTests.exe` passed 2643 checks; `git diff --check`; `Test-SourceSync.ps1`; AVX-512 Editor rebuild; `Editor.exe --selftest-vst`; skin gallery 1040 PNGs; 830 non-path-dependent PNGs byte-matched the previous gallery.
+- [x] Added fixed QSS material-effect aliases `@SHADOW_Axx@` and `@HIGHLIGHT_Axx@` for black shadow and white highlight alpha fills.
+- [x] Converted 168 exact black/white QSS `rgba(...)` literals in Studio/Soft sheets to effect aliases.
+- [x] Validated effect-token pass: `EditorLogicTests.exe` passed 2644 checks; `git diff --check`; `Test-SourceSync.ps1`; AVX-512 Editor rebuild; `Editor.exe --selftest-vst`; skin gallery 1040 PNGs; 830 non-path-dependent PNGs byte-matched previous gallery.
+- [x] Added fixed C++ material-effect helpers `skinMaterialShadow()` and `skinMaterialHighlight()` in `SkinPaint.h`.
+- [x] Replaced 130 C++ skin paint material call-sites with the fixed helpers; semantic black/white text/badge fallbacks remain explicit.
+- [x] Kept contrast-tuned status/skin inks literal because they encode per-skin grammar, not shared palette semantics.
+- [x] Validated material-helper pass: `EditorLogicTests.exe` passed 2653 checks; `git diff --check`; `Test-SourceSync.ps1`; AVX-512 Editor rebuild; `Editor.exe --selftest-vst`; skin gallery 1040 PNGs; 1008 stable current-vs-current PNGs byte-matched.
+- [x] Exposed Rack-only `RackChrome::engraveText`, `paintScrew`, and boolean `paintLed` primitives and reused them from Rack picker/monitor paint code.
+- [x] Validated Rack primitive pass: `EditorLogicTests.exe` passed 2653 checks; `git diff --check`; `Test-SourceSync.ps1`; AVX-512 Editor rebuild; `Editor.exe --selftest-vst`; Rack-only gallery 208 PNGs; 206 stable PNGs byte-matched the material-helper gallery.
+- [x] Exposed `RackChrome::paintBrushing` for deterministic Rack grain while keeping caller-specific ink/base-alpha laws explicit.
+- [x] Validated Rack brushing pass: `EditorLogicTests.exe` passed 2653 checks; `git diff --check`; `Test-SourceSync.ps1`; AVX-512 Editor rebuild; `Editor.exe --selftest-vst`; Rack-only gallery 208 PNGs; base-vs-current diffs were inside the current-vs-current dynamic set.
+- [x] Removed temporary `[DEBUG-VSTPREVIEW-0729]` VST live-preview instrumentation.
+- [x] Validated debug-instrumentation removal: `git diff --check`; `Test-SourceSync.ps1`; rebuilt `Tests\EditorLogicTests\EditorLogicTests.vcxproj`; `EditorLogicTests.exe` passed 2653 checks; AVX-512 Editor rebuild; `Editor.exe --selftest-vst`.
+- [x] Extended `RackChrome::paintLed` with glow/halo/receded-off parameters so Rack picker and reference-card lamp variants share the same bezel/dome machine while retaining their local state laws.
+- [x] Validated Rack LED pass: `git diff --check`; `Test-SourceSync.ps1`; `EditorLogicTests.exe` passed 2653 checks; AVX-512 Editor rebuild; `Editor.exe --selftest-vst`; Rack-only gallery 208 PNGs at `artifacts\skin-gallery-rack-led-20260801-0023`; current-vs-current dynamic set was 8 PNGs; baseline comparison left only the same dynamic set plus low-amplitude `rack_dark_shelf_disabled.png`.
+- [x] Fine-combed live-preview/VST host paths: locked capture readiness checks, atomic VST2 sample-position frames, per-thread VST2 time-info returns.
+- [x] Fine-combed Studio inline theme material styles: remaining reusable black/white shadow/highlight styles now use material helpers or token colors.
+- [x] Validated beta pass: `git diff --check`; `Test-SourceSync.ps1`; forced `Common`, `HybridConvTests`, `EditorLogicTests`, `EngineOrchestrationTests` rebuilds; `HybridConvTests.exe` 1635 checks; `EditorLogicTests.exe` 2653 checks; `EngineOrchestrationTests.exe` 1160 checks; AVX-512 Editor rebuild; `Editor.exe --selftest-vst`; full skin gallery 492 PNGs at `artifacts\skin-gallery-theme-system-20260801-003249`.

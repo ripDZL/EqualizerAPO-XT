@@ -175,7 +175,7 @@ BadgeTreatment SkinManager::badgeTreatment(const CommandRowInfo& info, const QSt
 
 void SkinManager::prepareCommandRow(const CommandRowInfo& info, QWidget* card, QWidget* header, QWidget* body) const
 {
-	activeSkin->prepareCommandRow(info, card, header, body);
+	activeSkin->prepareCommandRow(info, card, header, body, currentTokens);
 }
 
 void SkinManager::paintCardChrome(QPainter& painter, const QRect& rect, const CommandRowInfo& info) const

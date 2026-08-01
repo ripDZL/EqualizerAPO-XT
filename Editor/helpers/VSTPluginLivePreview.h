@@ -10,10 +10,10 @@
 
 #pragma once
 
+#include <atomic>
 #include <memory>
+#include <thread>
 #include <vector>
-
-#include <QTimer>
 
 #include "Editor/helpers/VSTPreviewEndpoint.h"
 
@@ -34,18 +34,21 @@ private:
 	class WasapiCapture;
 
 	void start(VSTPluginInstance* effect, const VSTPreviewEndpoint& previewEndpoint);
-	void processBlock();
+	void processLoop();
+	void processOneBlock();
 	void allocateBuffers(int inputChannels, int outputChannels);
 
 	std::unique_ptr<WasapiCapture> selectedEndpointCapture;
 	std::unique_ptr<WasapiCapture> inputCapture;
 	std::unique_ptr<WasapiCapture> communicationsInputCapture;
 	std::unique_ptr<WasapiCapture> playbackCapture;
-	QTimer timer;
+	std::thread processingWorker;
+	std::atomic<bool> processingStopRequested{ false };
 	VSTPluginInstance* effect = nullptr;
 	VSTPreviewEndpoint activeEndpoint;
 	bool enabled = true;
 	bool active = false;
+	int previewSampleRate = 48000;
 	int inputChannelCount = 0;
 	int outputChannelCount = 0;
 	static constexpr int blockSize = 512;

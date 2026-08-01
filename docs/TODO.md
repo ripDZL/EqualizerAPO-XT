@@ -14,8 +14,22 @@
 - [ ] Decide whether `codex/upstream-main-review-fixes-20260726` should be merged into stable `main` now or kept beta-only.
 - [ ] Overlay `artifacts/github-run-30209856962/EqualizerAPO-x64-avx2` onto local install and test real VST3 GUI.
 - [x] Install a build containing the live analyzer preview feed.
-- [ ] Test ReaFIR and TDR Nova panel animation with the configured microphone.
+- [ ] Test ReaFIR, TDR Nova, and heavier analyzer plugin smoothness with the configured microphone.
 - [x] Extend live analyzer preview beyond default render loopback for mic/capture-device analyzers.
 - [x] Add selected-device-aware capture instead of relying only on default console/communications capture.
-- [ ] Build/push/download/install a selected-endpoint artifact for manual ReaFIR/TDR Nova testing.
+- [x] Build/push/download/install a selected-endpoint artifact for manual ReaFIR/TDR Nova testing.
+- [x] Add row-device-aware capture so VST rows under `Device:` use that config-scoped endpoint.
+- [x] Commit/push row-device fix after manual analyzer confirmation.
+- [x] Remove temporary `[DEBUG-VSTPREVIEW-0729]` instrumentation before declaring the VST live-preview change final.
+- [x] Extract shared scope-gutter coordinate helper for If/member/branch/tail rails.
+- [x] Reduce duplicated analysis-graph label/grid geometry across skins.
+- [x] Pass `SkinTokens` into `prepareCommandRow` to remove direct skin-manager lookups from the hook.
+- [x] Convert exact black/white QSS material-effect RGBA literals to `@SHADOW_Axx@` / `@HIGHLIGHT_Axx@`.
+- [x] Add shared C++ paint helpers for fixed black/white material effects.
+- [x] Decide contrast-tuned status/skin inks remain explicit per-skin overrides unless repeated cross-skin semantics emerge.
+- [x] Extract Rack-only shared paint primitives for repeated engraving/screw/boolean-LED recipes.
+- [x] Extract Rack brushing/grain helper while preserving each current alpha/ink law at the call site.
+- [x] Extend Rack LED primitive for glow/halo variants while preserving picker/reference-card state laws.
+- [x] Package the current theming cleanup into the beta update.
+- [x] Run `Editor --skin-gallery` after alpha-token QSS conversion.
 - [ ] Revoke temporary GitHub token when the user ends the session.

@@ -49,6 +49,17 @@ struct SkinEntry
 	SkinTokens (*tokens)(bool dark) = nullptr;
 };
 
+struct ResolvedStyleSheet
+{
+	QString resolvedId;
+	QString resourcePath;
+	QString qss;
+	QStringList unresolvedTokens;
+	bool dark = false;
+	bool loaded = false;
+	bool usedStudioFallback = false;
+};
+
 // Every built-in skin, in display order.
 const QVector<SkinEntry>& roster();
 // Just the ids, in the same order.
@@ -79,8 +90,18 @@ SkinTokens tokens(const QString& id, bool dark);
 // precision_* file names of the minimal skin.
 QString qssResource(const QString& id, bool dark);
 
-// Replaces the @TOKEN@ sentinels of a skin sheet with the token values.
+// Loads a complete app stylesheet for a skin: canonical id, resource lookup,
+// token substitution, Studio sheet fallback and common widget overrides. Tests
+// may pass the on-disk skins directory because they do not link the Qt .qrc.
+ResolvedStyleSheet styleSheet(const QString& id, bool dark,
+	const QString& sourceDirectory = QString());
+
+// Replaces the @TOKEN@ and @TOKEN_A30@ sentinels of a skin sheet with token
+// values. Alpha sentinels use an integer percent and expand to rgba().
 QString substituteTokens(QString qss, const SkinTokens& tokens);
+
+// Unique unresolved @TOKEN@ sentinels still present after substitution.
+QStringList unresolvedTokenPlaceholders(const QString& qss);
 
 // Token-derived QPalette for the widgets QSS does not cover (item views,
 // native popups). The same mapping SkinManager::applySkin applies in the

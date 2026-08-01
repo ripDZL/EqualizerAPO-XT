@@ -313,7 +313,7 @@ public:
 	// body stack; for body editors that consult the hook themselves (the
 	// Include/VST card editors and the legacy Include/VST rows) only body is
 	// set. Default: no-op.
-	virtual void prepareCommandRow(const CommandRowInfo& info, QWidget* card, QWidget* header, QWidget* body) const;
+	virtual void prepareCommandRow(const CommandRowInfo& info, QWidget* card, QWidget* header, QWidget* body, const SkinTokens& tokens) const;
 
 	// Painted decoration over the card frame's QSS background (rails, screws,
 	// per-type markers). Runs after the frame's stylesheet background and

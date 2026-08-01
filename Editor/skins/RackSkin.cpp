@@ -173,74 +173,9 @@ protected:
 };
 // ── SPECTRUM MONITOR: the analysis dock's response graph ───────────────────
 // The same oscilloscope law as the GraphicEQ scope (RackChrome), adapted to
-// a wide always-on monitoring unit. The engraving and lamp idioms below are
-// file-local reproductions of RackChrome's grammar, the way
-// RackReferenceCardView restates them, so RackChrome itself stays frame-only.
-
-// Engraved faceplate printing: a contrast pass offset one pixel down (the
-// recess edge catching the worklight), then the body ink on top.
-void monitorEngrave(QPainter& painter, const QRectF& rect, int flags, const QString& text, const QColor& body, bool dark)
-{
-	painter.setPen(dark ? QColor(0, 0, 0, 170) : QColor(255, 255, 255, 200));
-	painter.drawText(rect.translated(0, 1), flags, text);
-	painter.setPen(body);
-	painter.drawText(rect, flags, text);
-}
-
-// A panel LED in a bezel ring: lit = glowing dome with a specular dot,
-// unlit = the same dome gone dark.
-void monitorLamp(QPainter& painter, const QPointF& center, qreal radius, const QColor& litColor, bool lit, bool dark)
-{
-	painter.setPen(QPen(dark ? QColor(0, 0, 0, 190) : QColor(70, 62, 50, 190), 1));
-	painter.setBrush(Qt::NoBrush);
-	painter.drawEllipse(center, radius + 1.2, radius + 1.2);
-
-	if (lit)
-	{
-		QRadialGradient halo(center, radius * 3.2);
-		halo.setColorAt(0.0, withAlpha(litColor, 110));
-		halo.setColorAt(1.0, withAlpha(litColor, 0));
-		painter.setPen(Qt::NoPen);
-		painter.setBrush(halo);
-		painter.drawEllipse(center, radius * 3.2, radius * 3.2);
-	}
-
-	QRadialGradient dome(center - QPointF(radius * 0.3, radius * 0.3), radius * 1.6);
-	if (lit)
-	{
-		dome.setColorAt(0.0, litColor.lighter(150));
-		dome.setColorAt(1.0, litColor.darker(125));
-	}
-	else
-	{
-		const QColor off = litColor.darker(330);
-		dome.setColorAt(0.0, off.lighter(140));
-		dome.setColorAt(1.0, off);
-	}
-	painter.setPen(Qt::NoPen);
-	painter.setBrush(dome);
-	painter.drawEllipse(center, radius, radius);
-	painter.setBrush(QColor(255, 255, 255, lit ? 170 : (dark ? 28 : 60)));
-	painter.drawEllipse(center - QPointF(radius * 0.35, radius * 0.35), radius * 0.3, radius * 0.3);
-}
-
-// Horizontal brushing grain, restated from RackChrome's law - the same sheet
-// stock the faceplates, the master rail and the picker are cut from. The ink
-// varies deterministically per line, so metal reads as brushed rather than
-// evenly striped. Logical coordinates only; the painter's DPI transform
-// scales the grain.
-void monitorGrain(QPainter& painter, const QRectF& r, const QColor& ink, uint seed)
-{
-	QColor line = ink;
-	for (qreal y = r.top() + 2.0; y < r.bottom() - 1.0; y += 2.0)
-	{
-		const uint h = (seed ^ uint(qRound(y * 7.0))) * 2654435761u;
-		const bool polish = (h >> 8) % 11u == 0;
-		line.setAlpha(4 + int(h % 7u) + (polish ? 6 : 0));
-		painter.setPen(QPen(line, 1));
-		painter.drawLine(QPointF(r.left() + 2.0, y), QPointF(r.right() - 2.0, y));
-	}
-}
+// a wide always-on monitoring unit. Engraving and panel lamps use RackChrome's
+// shared hardware primitives so the monitor stays in the same grammar as the
+// cards, reference rows and toolbar.
 
 // ── The selector bank: this machine's answer to a segmented control ────────
 // A row of mutually exclusive choices is not a pill on a faceplate. It is the
@@ -275,7 +210,7 @@ void paintSelectorBank(QPainter& painter, const SegmentedControlState& state, co
 	// work light falling across metal. The dark side keeps the cream finish warm
 	// by mixing the plate's own ink toward black rather than laying a neutral
 	// grey over it - this skin's shadows are never cold.
-	const QColor shadowInk = dark ? QColor(0, 0, 0) : mixColor(bodyInk, QColor(0, 0, 0), 0.35);
+	const QColor shadowInk = dark ? skinMaterialShadow() : mixColor(bodyInk, skinMaterialShadow(), 0.35);
 	const QColor lightInk(255, 255, 255);
 	const QColor grainInk = dark ? lightInk : mixColor(bodyInk, panel, 0.30);
 
@@ -355,7 +290,7 @@ void paintSelectorBank(QPainter& painter, const SegmentedControlState& state, co
 		{
 			QPainterStateGuard capState(&painter);
 			painter.setClipPath(capPath);
-			monitorGrain(painter, cap, grainInk, seed);
+			RackChrome::paintBrushing(painter, cap, grainInk, 4, seed);
 		}
 
 		const QColor topEdge = raised ? withAlpha(lightInk, dark ? 46 : 155) : withAlpha(shadowInk, dark ? 175 : 125);
@@ -416,7 +351,7 @@ void paintSelectorBank(QPainter& painter, const SegmentedControlState& state, co
 		}
 
 		// The key's own lamp, in the bezel-ring grammar every lamp on this
-		// machine goes through (paintLed, restated here as monitorLamp) rather
+		// machine goes through (RackChrome::paintLed) rather
 		// than a bare glowing disc. Its PLACE on the cap is what makes this part
 		// a selector key and not one of the four Phase 2 switches: Device
 		// backlights the whole cap, Channel lights a window under it, Stage a
@@ -427,7 +362,7 @@ void paintSelectorBank(QPainter& painter, const SegmentedControlState& state, co
 		{
 			const qreal lampRadius = 2.4;
 			const QPointF lampCenter(cap.left() + 5.5 + lampRadius, cap.center().y());
-			monitorLamp(painter, lampCenter, lampRadius, amber, state.enabled && latched, dark);
+			RackChrome::paintLed(painter, lampCenter, lampRadius, amber, state.enabled && latched, dark);
 			if (warmed)
 			{
 				// The picker's law: an unlit lamp pre-heats under the hand
@@ -448,7 +383,7 @@ void paintSelectorBank(QPainter& painter, const SegmentedControlState& state, co
 		if (warmed)
 			ink = bodyInk;
 		const QRectF engravedAt = (latched || pressed) ? legendRect.translated(0.0, 1.0) : legendRect;
-		monitorEngrave(painter, engravedAt, Qt::AlignCenter,
+		RackChrome::engraveText(painter, engravedAt, Qt::AlignCenter,
 			legendMetrics.elidedText(state.labels.at(i), Qt::ElideRight, qMax(0.0, legendRect.width())),
 			ink, dark);
 	}
@@ -522,13 +457,15 @@ void paintSelectorBank(QPainter& painter, const SegmentedControlState& state, co
 void paintAnalysisMonitor(QPainter& painter, const AnalysisGraphState& state, const SkinTokens& tokens)
 {
 	const bool dark = skinIsDark(tokens);
-	const double hover = qBound(0.0, state.hover, 1.0);
 	// The unit reads one of three quantities. Magnitude is the function this
 	// monitor was built around, and every idiom below that assumes a gain - the
 	// OVER zone, the wash to the unity rail, the dB step ladder on the figures -
 	// is fenced behind this flag. Nothing outside those fences changes with the
 	// function, so the magnitude face is the one it always had.
 	const bool magnitude = state.metric == AnalysisMetric::MagnitudeDb;
+	const SkinAnalysisGraphLayout layout = skinAnalysisGraphLayout(
+		state.rect, state.plotRect, state.zeroY, state.hover);
+	const double hover = layout.hover;
 	QPainterStateGuard painterState(&painter);
 	painter.setRenderHint(QPainter::TextAntialiasing, true);
 
@@ -597,7 +534,7 @@ void paintAnalysisMonitor(QPainter& painter, const AnalysisGraphState& state, co
 		painter.setFont(plateFont);
 		const QRectF legendRect(plateText.left(), plateText.top(),
 			plateText.width() - reservedRight, plateText.height());
-		monitorEngrave(painter, legendRect, Qt::AlignRight | Qt::AlignVCenter, rightLegend,
+		RackChrome::engraveText(painter, legendRect, Qt::AlignRight | Qt::AlignVCenter, rightLegend,
 			state.clipping ? withAlpha(overInk, 245) : withAlpha(QColor(tokens.mutedText), dark ? 140 : 180), dark);
 		reservedRight += plateMetrics.horizontalAdvance(rightLegend) + 8.0;
 	}
@@ -615,7 +552,7 @@ void paintAnalysisMonitor(QPainter& painter, const AnalysisGraphState& state, co
 	if (plateText.width() >= designationWidth * 2.6)
 	{
 		painter.setFont(plateFont);
-		monitorEngrave(painter, plateText, Qt::AlignLeft | Qt::AlignVCenter, designation,
+		RackChrome::engraveText(painter, plateText, Qt::AlignLeft | Qt::AlignVCenter, designation,
 			withAlpha(QColor(tokens.mutedText), dark ? 150 : 190), dark);
 		reservedLeft = designationWidth + 14.0;
 	}
@@ -630,14 +567,14 @@ void paintAnalysisMonitor(QPainter& painter, const AnalysisGraphState& state, co
 		if (captionRect.width() >= 40.0)
 		{
 			painter.setFont(captionFont);
-			monitorEngrave(painter, captionRect, Qt::AlignCenter,
+			RackChrome::engraveText(painter, captionRect, Qt::AlignCenter,
 				captionMetrics.elidedText(state.channelText, Qt::ElideRight, captionRect.width()),
 				withAlpha(QColor(tokens.text), dark ? 175 : 205), dark);
 		}
 	}
 
 	painter.setRenderHint(QPainter::Antialiasing, true);
-	monitorLamp(painter, lampCenter, lampRadius, overInk, state.clipping, dark);
+	RackChrome::paintLed(painter, lampCenter, lampRadius, overInk, state.clipping, dark);
 
 	// ── The glass window ──
 	QPainterPath glassPath;
@@ -665,7 +602,7 @@ void paintAnalysisMonitor(QPainter& painter, const AnalysisGraphState& state, co
 	// vocabulary below hangs off this one flag; the magnitude test is redundant
 	// with state.clipping today and kept so the fence is visible here rather
 	// than assumed from a field set elsewhere.
-	const qreal zeroY = state.zeroY;
+	const qreal zeroY = layout.zeroY;
 	const bool overZone = magnitude && state.clipping && zeroY > state.plotRect.top() + 1.0;
 	if (overZone)
 	{
@@ -680,11 +617,11 @@ void paintAnalysisMonitor(QPainter& painter, const AnalysisGraphState& state, co
 	// scope law shared with the GEQ display). Inside the OVER zone the rules
 	// turn to the danger-red warning graticule.
 	painter.setRenderHint(QPainter::Antialiasing, false);
-	const int plotTop = int(state.plotRect.top());
-	const int plotBottom = int(state.plotRect.bottom());
-	const int plotLeft = int(state.plotRect.left());
-	const int plotRight = int(state.plotRect.right());
-	const int zeroRow = int(zeroY);
+	const int plotTop = layout.plotTop();
+	const int plotBottom = layout.plotBottom();
+	const int plotLeft = layout.plotLeft();
+	const int plotRight = layout.plotRight();
+	const int zeroRow = layout.zeroRow();
 	for (const AnalysisGraphState::GridLine& line : state.vertical)
 	{
 		const int x = int(line.pos);
@@ -738,9 +675,7 @@ void paintAnalysisMonitor(QPainter& painter, const AnalysisGraphState& state, co
 	axisFont.setPointSizeF(7.0);
 	axisFont.setBold(true);
 	painter.setFont(axisFont);
-	qreal figureGap = 1000.0;
-	for (int i = 1; i < state.horizontal.size(); i++)
-		figureGap = qMin(figureGap, qAbs(state.horizontal.at(i).pos - state.horizontal.at(i - 1).pos));
+	const qreal figureGap = skinMinimumAdjacentGridGap(state.horizontal, 1000.0);
 	const int labelStep = figureGap >= 13.0 ? 6 : (figureGap >= 6.5 ? 12 : 24);
 	// Thinning the column. Magnitude thins on the dB ladder, because 6/12/24 dB
 	// are the steps an engraved dB scale is allowed to keep. The other two
@@ -749,7 +684,7 @@ void paintAnalysisMonitor(QPainter& painter, const AnalysisGraphState& state, co
 	// and a millisecond figure is not a whole number at all, so it parses as
 	// zero and every figure survives however tight the rows get. They thin on
 	// the geometry instead, dropping rows only once they crowd.
-	const int rowStride = magnitude ? 1 : qMax(1, qCeil(14.0 / qMax(1.0, figureGap)));
+	const int rowStride = magnitude ? 1 : skinLabelStrideForGap(qMax(1.0, figureGap), 14.0);
 	int row = -1;
 	for (const AnalysisGraphState::GridLine& line : state.horizontal)
 	{
@@ -769,7 +704,7 @@ void paintAnalysisMonitor(QPainter& painter, const AnalysisGraphState& state, co
 		if (line.label.isEmpty())
 			continue;
 		painter.setPen(withAlpha(segmentDim, line.major ? 235 : 150));
-		painter.drawText(QRect(int(line.pos) - 24, plotBottom, 48, glassBottomRow - plotBottom),
+		painter.drawText(layout.truncatedXAxisLabelRect(line.pos, 0, 48, glassBottomRow - plotBottom),
 			Qt::AlignHCenter | Qt::AlignVCenter, line.label);
 	}
 
@@ -840,7 +775,7 @@ void paintAnalysisMonitor(QPainter& painter, const AnalysisGraphState& state, co
 			painter.drawPolyline(segment);
 			painter.setPen(QPen(overInk, 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
 			painter.drawPolyline(segment);
-			painter.setPen(QPen(withAlpha(mixColor(overInk, QColor(255, 255, 255), 0.55), 215), 0.9, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+			painter.setPen(QPen(withAlpha(mixColor(overInk, skinMaterialHighlight(), 0.55), 215), 0.9, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
 			painter.drawPolyline(segment);
 		}
 	}
@@ -903,8 +838,8 @@ void paintAnalysisMonitor(QPainter& painter, const AnalysisGraphState& state, co
 	// recessed grammar (shadowed top lip, lit lower lip below).
 	painter.setRenderHint(QPainter::Antialiasing, true);
 	QLinearGradient overhang(glassFrame.topLeft(), QPointF(glassFrame.left(), glassFrame.top() + 9.0));
-	overhang.setColorAt(0.0, QColor(0, 0, 0, dark ? 150 : 130));
-	overhang.setColorAt(1.0, QColor(0, 0, 0, 0));
+	overhang.setColorAt(0.0, skinMaterialShadow(dark ? 150 : 130));
+	overhang.setColorAt(1.0, skinMaterialShadow(0));
 	painter.fillRect(QRectF(glassFrame.left(), glassFrame.top(), glassFrame.width(), 9.0), overhang);
 
 	glassState.restore();
@@ -992,7 +927,7 @@ public:
 		return QStringLiteral("QWidget#FilterCardHeader { background: transparent; }");
 	}
 
-	void prepareCommandRow(const CommandRowInfo& info, QWidget* card, QWidget* header, QWidget* body) const override
+	void prepareCommandRow(const CommandRowInfo& info, QWidget* card, QWidget* header, QWidget* body, const SkinTokens& tokens) const override
 	{
 		// Reserve the rack-ear zones along the faceplate edges so the painted
 		// chrome (screws, LEDs, patchbay jacks, the VST nameplate) never
@@ -1021,8 +956,7 @@ public:
 		{
 			if (QLabel* raw = body->findChild<QLabel*>(QStringLiteral("FilterCardRawText")))
 			{
-				const SkinTokens tk = SkinManager::instance()->tokens();
-				const bool dark = skinIsDark(tk);
+				const bool dark = skinIsDark(tokens);
 				const QString glass = dark ? QStringLiteral("#0B0F0C") : QStringLiteral("#11150F");
 				const QString segments = !info.enabled
 					? (dark ? QStringLiteral("#3A6B51") : QStringLiteral("#2F6B4D"))
@@ -1033,7 +967,7 @@ public:
 					"QLabel#FilterCardRawText { background:%1; color:%2;"
 					" border:1px solid %3; border-bottom-color:%4; border-radius:2px;"
 					" padding:6px 10px; font-family:\"%5\"; font-weight:700; }")
-					.arg(glass, segments, bezel, lowerLip, tk.monoFontFamily));
+					.arg(glass, segments, bezel, lowerLip, tokens.monoFontFamily));
 			}
 		}
 	}

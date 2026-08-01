@@ -106,19 +106,18 @@ S4 가 없앤 것은 조용한 실패입니다. 스킨을 하나 추가하려면
 
 ## 남은 작업
 
-### S3. 스킨의 공용 좌표 어휘와 알파 토큰 (착수 전)
+### S3. 스킨의 공용 좌표 어휘와 알파 토큰 (부분 완료)
 
 스킨 층은 C++ 11,947줄에 QSS 12,177줄입니다. 차별화 자체는 스킨 헌법(`docs/skins/README.md`)이 지키는
 설계이고 유지해야 합니다. 문제는 **복제되는 것이 디자인이 아니라 산술**이라는 데 있습니다.
 
-- 스코프 레인 좌표를 4개 스킨이 글자 그대로 같은 식으로 다시 계산합니다. 원본은 `FilterCardRow` 가 이미 갖고 있습니다.
-- 그래프 눈금 라벨 사각형이 X축 9곳, Y축 7곳에 흩어져 있고 Y축 안쪽 여백이 스킨마다 4, 5, 6, 8 입니다. 아무도 정한 적 없는 차이입니다.
-- `prepareCommandRow` 만 21개 훅 중 유일하게 `SkinTokens&` 를 못 받아, 5개 스킨이 전부 `SkinManager::instance()` 를 직접 부릅니다.
-- `@TOKEN@` 치환에 알파 형태가 없어 `rgba(@ACCENT@, 0.30)` 을 쓸 수 없고, 팔레트 값을 손으로 펼쳐 적습니다. Studio 한 장에만 `rgba()` 리터럴이 285개입니다.
+- 스코프 레인 좌표를 4개 스킨이 글자 그대로 같은 식으로 다시 계산하던 부분은 `SkinScopeGutterLayout` 으로 모았습니다. Studio, Soft, Matrix, Rack 이 이 helper 를 쓰며, Minimal 은 다른 단순 레일 처리를 유지합니다.
+- 분석 그래프의 plot edge, zero/cursor clamp, label/footer rect, grid label thinning 산술은 `SkinAnalysisGraphLayout` 으로 모았습니다. 중립 기본값과 Studio, Soft, Matrix, Rack, Minimal 이 이 helper 를 쓰며, 스킨별 선/채움/재질은 유지합니다.
+- `prepareCommandRow` 도 다른 스킨 훅처럼 `SkinTokens&` 를 받도록 바꿨습니다. 다섯 스킨의 해당 훅 안에서 직접 `SkinManager::instance()->tokens()` 를 부르던 부분은 사라졌습니다.
+- `@TOKEN_A30@` 형태의 알파 치환은 추가됐고, QSS의 토큰 색상 `rgba()` 리터럴 621개가 기계적으로 치환됐습니다. 이어서 `@SHADOW_Axx@` / `@HIGHLIGHT_Axx@` 고정 효과 별칭을 추가했고 Studio/Soft QSS의 정확한 검정/흰색 `rgba()` 재질 리터럴 168개를 치환했습니다. C++ paint 쪽도 `skinMaterialShadow()` / `skinMaterialHighlight()` helper 로 130개 재질 call-site 를 정리했습니다. Rack 안에서 여러 translation unit 에 반복되던 각인/나사/boolean LED/brushing grain 물리 레시피는 `RackChrome` helper 로 모았습니다. 대비 보정용 상태/스킨 잉크와 상태 모델이 다른 Rack LED 변형은 스킨 문법이므로 토큰화/공유화하지 않고 명시적으로 둡니다.
 
 **방향.** `SkinPaint.h` 가 이미 '디자인 결정을 담지 않는 것'을 맡는 자리로 선언돼 있으니 거기에 좌표 어휘를 더합니다.
-행 위젯이 확정한 레인 좌표를 `CommandRowInfo` 에 실어 보내면 스킨은 '레인이 어떻게 생겼나'만 답하고
-'어디인가'는 묻지 않게 됩니다.
+스코프 거터와 분석 그래프 좌표, `prepareCommandRow` 토큰 전달, QSS/C++ 고정 그림자/하이라이트 효과 별칭, Rack 반복 hardware primitive/grain 은 처리했습니다. 다음은 다른 스킨에서 같은 수준으로 반복되는 paint/geometry recipe 가 있는지 선별하거나, 이 묶음을 패키징하는 것입니다.
 
 **검증 수단이 확실합니다.** 갤러리의 PNG SHA-256 비교로 그림이 안 바뀌었음을 증명할 수 있습니다.
 스킨 하나씩 나눠 진행하면 됩니다.
