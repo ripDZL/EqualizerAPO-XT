@@ -29,6 +29,7 @@
 #include <QMainWindow>
 #include <QMenu>
 #include <QMenuBar>
+#include <QMessageBox>
 #include <QPixmap>
 #include <QPointer>
 #include <QToolButton>
@@ -829,6 +830,19 @@ int renderStates(const QDir& outDir, const QString& skinId, const QString& mode,
 	return failures;
 }
 
+std::unique_ptr<QMessageBox> createHeritageMessageBoxProbe(QWidget* parent = nullptr)
+{
+	auto messageBox = std::make_unique<QMessageBox>(QMessageBox::Question,
+		QStringLiteral("Restart required"),
+		QStringLiteral("Configuration Editor will be restarted to apply the changed settings. Proceed?"),
+		QMessageBox::Yes | QMessageBox::No,
+		parent);
+	messageBox->setObjectName(QStringLiteral("HeritageGalleryMessageBox"));
+	messageBox->resize(qMax(520, messageBox->sizeHint().width()),
+		qMax(120, messageBox->sizeHint().height()));
+	return messageBox;
+}
+
 int renderSkin(const QDir& outDir, const QString& skinId, const QString& configPath, bool dark)
 {
 	SkinManager::instance()->applySkin(skinId, dark);
@@ -1388,6 +1402,20 @@ int renderHeritage(const QDir& outDir, const QString& configPath, const QStringL
 					failures++;
 				}
 			}
+
+			std::unique_ptr<QMessageBox> messageBox = createHeritageMessageBoxProbe();
+			messageBox->show();
+			QCoreApplication::processEvents();
+			const QString fileName = outDir.filePath(QStringLiteral("heritage_%1_%2_messagebox.png")
+					.arg(SkinManager::instance()->currentSkinId(),
+						dark ? QStringLiteral("dark") : QStringLiteral("light")));
+			const QPixmap dump = messageBox->grab();
+			if (dump.isNull() || !dump.save(fileName))
+			{
+				qWarning("SkinGallery: could not write %s", qPrintable(fileName));
+				failures++;
+			}
+			messageBox->hide();
 		}
 	}
 	return failures;
@@ -1617,7 +1645,8 @@ int runSwitchTest(const QStringList& arguments)
 		for (const QString& selector : { QStringLiteral("QMainWindow"),
 			QStringLiteral("QWidget#AppTitleBar"), QStringLiteral("QMenuBar"),
 			QStringLiteral("QToolBar"), QStringLiteral("QDockWidget"),
-			QStringLiteral("QGraphicsView") })
+			QStringLiteral("QGraphicsView"), QStringLiteral("QDialog"),
+			QStringLiteral("QMessageBox"), QStringLiteral("QDialogButtonBox") })
 		{
 			if (!heritageSheet.contains(selector))
 			{
@@ -1625,6 +1654,47 @@ int runSwitchTest(const QStringList& arguments)
 					qPrintable(selector));
 				failures++;
 			}
+		}
+		std::unique_ptr<QMessageBox> messageBox = createHeritageMessageBoxProbe();
+		messageBox->show();
+		QApplication::processEvents();
+		const QImage dialogImage = messageBox->grab().toImage().convertToFormat(QImage::Format_RGB32);
+		const auto colourDistance = [](const QColor& lhs, const QColor& rhs) {
+			return qAbs(lhs.red() - rhs.red())
+				+ qAbs(lhs.green() - rhs.green())
+				+ qAbs(lhs.blue() - rhs.blue());
+		};
+		const QVector<QColor> darkSurfaces = {
+			QColor(tokens.background),
+			QColor(tokens.surface),
+			QColor(tokens.card),
+			QColor(tokens.surfaceSunken)
+		};
+		constexpr int kSampleStridePx = 4;
+		constexpr int kSurfaceDistanceTolerance = 75;
+		constexpr int kMinimumDarkSurfacePercent = 25;
+		int darkLikePixels = 0;
+		int sampledPixels = 0;
+		for (int y = 0; y < dialogImage.height(); y += kSampleStridePx)
+			for (int x = 0; x < dialogImage.width(); x += kSampleStridePx)
+			{
+				const QColor pixel = dialogImage.pixelColor(x, y);
+				for (const QColor& surface : darkSurfaces)
+				{
+					if (surface.isValid() && colourDistance(pixel, surface) < kSurfaceDistanceTolerance)
+					{
+						darkLikePixels++;
+						break;
+					}
+				}
+				sampledPixels++;
+			}
+		messageBox->hide();
+		if (sampledPixels == 0 || darkLikePixels * 100 < sampledPixels * kMinimumDarkSurfacePercent)
+		{
+			qWarning("SkinSwitchTest: heritage QMessageBox body stayed native-light (%d/%d dark-like pixels)",
+				darkLikePixels, sampledPixels);
+			failures++;
 		}
 		failures += checkToolbar(QStringLiteral("heritage legacy-bronze/dark"));
 	}

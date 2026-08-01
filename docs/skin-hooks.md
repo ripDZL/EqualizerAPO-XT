@@ -383,8 +383,8 @@ striped precision layout.
 LegacyRows stays a compatibility mode: it keeps the original row widgets,
 filter factories, promoted controls, and plugin/graph behavior. The heritage
 path only dresses the shared Qt chrome and token-consuming painters so the
-window, menus, tabs, toolbar, scroll areas, row frames, and analysis dock do not
-fall back to a half-native light theme.
+window, menus, tabs, toolbar, scroll areas, row frames, message boxes, dialogs,
+and analysis dock do not fall back to a half-native light theme.
 
 `SkinManager::applyHeritage(id, dark)` resolves the selected built-in or custom
 theme, derives the same `SkinTokens` as the modern path, then applies a compact

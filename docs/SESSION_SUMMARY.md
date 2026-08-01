@@ -119,3 +119,6 @@
 - Fix: LegacyRows no longer clears the skin layer; `applyHeritage(id,dark)` resolves selected/custom tokens, applies a heritage palette/QSS layer, and uses the custom title strip unless the explicit native-titlebar setting is enabled.
 - Added five simple LegacyRows-safe themes: Legacy Slate, Legacy Blue, Legacy Forest, Legacy Bronze, Legacy Plum.
 - Validation: `git diff --check`; `Test-SourceSync.ps1`; `EditorLogicTests.exe` passed 3137 checks; AVX-512 Editor/DeviceSelector rebuilt; `Editor.exe --selftest-vst`; `Editor.exe --skin-switch-test`; focused LegacyRows gallery wrote 20 PNGs to `artifacts\skin-gallery-legacy-themes-20260801-112049`.
+- User reported unreadable LegacyRows message-box text: dark-theme label ink was painting over a native light dialog body.
+- Dialog contrast fix: heritage QSS now covers `QDialog`, `QMessageBox`, and `QDialogButtonBox`; `--skin-switch-test` renders a heritage message box and fails if the body stays native-light.
+- Validation: `git diff --check`; `Test-SourceSync.ps1`; `EditorLogicTests.exe` passed 3137 checks; AVX-512 Editor rebuilt; `Editor.exe --selftest-vst`; `Editor.exe --skin-switch-test`; focused gallery wrote 6 PNGs to `artifacts\skin-gallery-legacy-dialogs-20260801-121757`.
