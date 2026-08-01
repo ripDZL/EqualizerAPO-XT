@@ -122,3 +122,4 @@
 - User reported unreadable LegacyRows message-box text: dark-theme label ink was painting over a native light dialog body.
 - Dialog contrast fix: heritage QSS now covers `QDialog`, `QMessageBox`, and `QDialogButtonBox`; `--skin-switch-test` renders a heritage message box and fails if the body stays native-light.
 - Validation: `git diff --check`; `Test-SourceSync.ps1`; `EditorLogicTests.exe` passed 3137 checks; AVX-512 Editor rebuilt; `Editor.exe --selftest-vst`; `Editor.exe --skin-switch-test`; focused gallery wrote 6 PNGs to `artifacts\skin-gallery-legacy-dialogs-20260801-121757`.
+- Stable branch sync prep: user requested `master`; this fork only has stable `main`, so current `origin/main` was merged into `beta` and `version.h` stayed at `2.30.2` for the pending main fast-forward.

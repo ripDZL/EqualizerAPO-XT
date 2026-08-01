@@ -1,6 +1,6 @@
 # AI Context
 
-- Active task: sync `beta` with upstream `115dkk/EqualizerAPO-XT` `main`.
+- Active task: sync stable `main` from integration `beta`.
 - Current change: merge upstream `3d692be` into `beta`; preserve beta VST analyzer preview and theming cleanup while taking upstream engine/device folder split, Hilbert/dynamic velvet filters, editor atomic-save fixes, and skin `@TOKEN_RGB@` support.
 - Approach: prefer the selected EAPO endpoint for WASAPI preview capture, fall back to default console/communications mic endpoints plus default system playback, mix copied blocks into the visible editor-owned plugin instance, and discard output.
 - Scope note: this animates analyzer-style plugin GUIs while the panel is open; real APO audio processing remains in the service-owned instance.
@@ -59,6 +59,7 @@
 - 2026-08-01 LegacyRows theming pivot: `applyHeritage(id,dark)` now resolves built-in/custom tokens and applies a compact palette/QSS layer for full editor chrome while keeping the legacy row factories/widgets intact; custom titlebar is used unless `interface/nativeTitleBar` is explicitly enabled.
 - 2026-08-01 legacy-safe themes: added selectable `legacy-slate`, `legacy-blue`, `legacy-forest`, `legacy-bronze`, and `legacy-plum`; final validation passed `git diff --check`, `Test-SourceSync.ps1`, `EditorLogicTests.exe` 3137 checks, AVX-512 Editor/DeviceSelector rebuilds, `Editor.exe --selftest-vst`, `--skin-switch-test`, and a 20-PNG LegacyRows gallery at `artifacts/skin-gallery-legacy-themes-20260801-112049`.
 - 2026-08-01 LegacyRows dialog contrast follow-up: heritage QSS now covers `QDialog`, `QMessageBox`, and `QDialogButtonBox` so dark-theme labels do not land on native light dialog bodies; validation passed `git diff --check`, `Test-SourceSync.ps1`, `EditorLogicTests.exe` 3137 checks, AVX-512 Editor rebuild, `Editor.exe --selftest-vst`, `--skin-switch-test`, and message-box gallery `artifacts/skin-gallery-legacy-dialogs-20260801-121757`.
+- 2026-08-01 stable-branch sync prep: this fork has no `master`; stable is `main` (`origin/HEAD -> origin/main`). Merged current `origin/main` into `beta` and resolved the `version.h` bump conflict by keeping `2.30.2` before fast-forwarding stable `main` from `beta`.
 - 2026-07-29 alpha-token follow-up: `@TOKEN_A30@` QSS placeholders expand to token-derived `rgba(...)`; 621 hardcoded semantic token RGBA literals were converted across shipped skins without changing intended colors.
 - 2026-07-29 scope-gutter follow-up: `SkinScopeGutterLayout` centralizes If/member/branch/tail rail geometry in `SkinPaint.h`; Studio, Soft, Matrix, and Rack consume it while keeping skin-specific drawing logic.
 - 2026-07-29 scope-gutter validation: `EditorLogicTests.exe` passed 2623 checks; `git diff --check`; `Test-SourceSync.ps1`; forced AVX-512 Editor rebuild; `Editor.exe --selftest-vst`; full skin gallery 1040 PNGs at `artifacts/skin-gallery-scope-layout-20260729`; 20 logic/channelscope gallery PNG hashes matched the pre-refactor gallery exactly.
