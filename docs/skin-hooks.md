@@ -357,6 +357,25 @@ normalization, and token construction. The Editor and Device Selector both read
 that store, so a custom theme selected in the Editor also dresses Device Selector.
 New custom themes appear in the Interface menu after the next Editor startup.
 
+## Shipped token-variant themes
+
+Token variants are first-class roster entries in `SkinThemeData`, but they reuse
+an existing QSS and painter grammar instead of adding another skin class. That is
+intentional: a palette can get the texture of Studio glass, Soft velvet, Rack
+brushed metal, Matrix rails, or Minimal precision without duplicating the widget
+grammar.
+
+- `midnight` / `obsidian` use Studio glass.
+- `arctic` / `aurora` use Soft Lab shadows.
+- `ember` / `forge` use Hardware Rack brushing and LEDs.
+- `violet` / `nebula` use Signal Matrix rails and grid language.
+- `solar` / `noir` use Precision Minimal chrome.
+
+The second-wave dark variants also adjust material tokens, not just colour:
+Obsidian rounds Studio glass chrome, Aurora deepens the Soft radius/spacing,
+Forge tightens Rack metal, Nebula thickens Matrix rails, and Noir keeps a compact
+striped precision layout.
+
 ## Adding a skin
 
 Six files, and the first one is the only list of which skins exist.

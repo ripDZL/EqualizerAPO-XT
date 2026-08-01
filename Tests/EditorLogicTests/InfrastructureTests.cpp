@@ -82,7 +82,7 @@ void testUpdateElevationPolicyUsesOnePromptForEditorUpdates()
 void testTheSkinRosterIsTheOneList()
 {
 	const QVector<SkinThemeData::SkinEntry>& roster = SkinThemeData::roster();
-	requireTrue(roster.size() >= 10, "the roster carries the built-in skins and token variants");
+	requireTrue(roster.size() >= 15, "the roster carries the built-in skins and token variants");
 	expectTrue(roster.first().id == QStringLiteral("studio"),
 		"studio is first, which is what an unknown id falls back to and what the default is");
 
@@ -107,7 +107,9 @@ void testTheSkinRosterIsTheOneList()
 	for (int index = 0; index < ids.size(); index++)
 		expectTrue(ids[index] == roster[index].id, "ids() preserves the roster order, which is the display order");
 	for (const QString& variant : { QStringLiteral("midnight"), QStringLiteral("arctic"),
-		QStringLiteral("ember"), QStringLiteral("violet"), QStringLiteral("solar") })
+		QStringLiteral("ember"), QStringLiteral("violet"), QStringLiteral("solar"),
+		QStringLiteral("obsidian"), QStringLiteral("aurora"), QStringLiteral("forge"),
+		QStringLiteral("nebula"), QStringLiteral("noir") })
 	{
 		expectTrue(ids.contains(variant),
 			QStringLiteral("%1 is a selectable token-variant theme").arg(variant));
@@ -132,6 +134,37 @@ void testTheSkinRosterIsTheOneList()
 		"Solar Paper rides the Minimal QSS grammar");
 	expectTrue(SkinThemeData::entry(QStringLiteral("solar")).paintBaseId == QStringLiteral("minimal"),
 		"Solar Paper rides the Minimal paint grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("obsidian")).qssBaseName == QStringLiteral("studio"),
+		"Obsidian Glass rides the Studio QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("obsidian")).paintBaseId == QStringLiteral("studio"),
+		"Obsidian Glass rides the Studio paint grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("aurora")).qssBaseName == QStringLiteral("soft"),
+		"Aurora Veil rides the Soft QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("aurora")).paintBaseId == QStringLiteral("soft"),
+		"Aurora Veil rides the Soft paint grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("forge")).qssBaseName == QStringLiteral("rack"),
+		"Copper Forge rides the Rack QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("forge")).paintBaseId == QStringLiteral("rack"),
+		"Copper Forge rides the Rack paint grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("nebula")).qssBaseName == QStringLiteral("matrix"),
+		"Neon Nebula rides the Matrix QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("nebula")).paintBaseId == QStringLiteral("matrix"),
+		"Neon Nebula rides the Matrix paint grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("noir")).qssBaseName == QStringLiteral("precision"),
+		"Noir Chrome rides the Minimal QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("noir")).paintBaseId == QStringLiteral("minimal"),
+		"Noir Chrome rides the Minimal paint grammar");
+
+	expectTrue(SkinThemeData::tokens(QStringLiteral("obsidian"), true).graphRadius == 12,
+		"Obsidian Glass adds rounder glass graph chrome");
+	expectTrue(SkinThemeData::tokens(QStringLiteral("aurora"), true).borderRadius == 18,
+		"Aurora Veil uses a softer dark-mode radius");
+	expectTrue(SkinThemeData::tokens(QStringLiteral("forge"), true).graphRadius == 6,
+		"Copper Forge adds small-radius metal graph chrome");
+	expectTrue(SkinThemeData::tokens(QStringLiteral("nebula"), true).cardRailWidth == 5,
+		"Neon Nebula thickens Matrix rails");
+	expectTrue(SkinThemeData::tokens(QStringLiteral("noir"), true).zebraStripe,
+		"Noir Chrome keeps precision zebra striping");
 
 	// The two stored aliases from earlier releases, which are the only ids that
 	// cannot be derived from the roster.
