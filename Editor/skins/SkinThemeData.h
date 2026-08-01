@@ -96,8 +96,9 @@ QString qssResource(const QString& id, bool dark);
 ResolvedStyleSheet styleSheet(const QString& id, bool dark,
 	const QString& sourceDirectory = QString());
 
-// Replaces the @TOKEN@ and @TOKEN_A30@ sentinels of a skin sheet with token
-// values. Alpha sentinels use an integer percent and expand to rgba().
+// Replaces the @TOKEN@, @TOKEN_RGB@ and @TOKEN_A30@ sentinels of a skin sheet
+// with token values. RGB sentinels expand to colour channels; alpha sentinels
+// use an integer percent and expand to rgba().
 QString substituteTokens(QString qss, const SkinTokens& tokens);
 
 // Unique unresolved @TOKEN@ sentinels still present after substitution.

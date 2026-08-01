@@ -695,7 +695,7 @@ void paintAnalysisMonitor(QPainter& painter, const AnalysisGraphState& state, co
 			continue;
 		const bool overFigure = overZone && line.pos < zeroY - 1.0;
 		painter.setPen(withAlpha(overFigure ? overInk : segmentDim, line.major ? 235 : 150));
-		painter.drawText(QRect(plotLeft + 4, int(line.pos) - 8, 34, 16),
+		painter.drawText(skinYTickLabelRect(int(line.pos), plotLeft + 4, 34.0, 16.0).toRect(),
 			Qt::AlignLeft | Qt::AlignVCenter, line.label);
 	}
 	const int glassBottomRow = int(glassFrame.bottom());

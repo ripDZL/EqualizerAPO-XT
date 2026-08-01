@@ -8,11 +8,54 @@ fork started on 2026-05-22.
 
 Versions are bumped automatically by CI from Conventional Commits message
 types, so some version numbers were skipped (1.7, 1.9, 1.12.1, 1.14, 1.16,
-1.23, and 1.25 were never released). Tags up to v1.10.1 carried a `-main.<run>` suffix; from v1.11.0 on,
+1.23, 1.25, and 2.30.1 were never released). Tags up to v1.10.1 carried a `-main.<run>` suffix; from v1.11.0 on,
 tags are clean `vX.Y.Z` names. Installers for every version are on the
 [Releases page](https://github.com/115dkk/EqualizerAPO-XT/releases).
 
 ## Unreleased
+
+## v2.30.2 — 2026-07-30
+
+- **Saving a configuration no longer intermittently fails with "Access is
+  denied" while the audio engine reloads it.** The Editor writes through a
+  temporary file and atomically replaces the old configuration. Creating that
+  temporary file wakes the engine's directory watcher, which could open the old
+  file without allowing its directory entry to be replaced; if the Editor
+  committed during that short read, Windows rejected the replacement. The
+  Editor now retries only that atomic commit for a bounded period, while config
+  readers keep rejecting in-place writes and retain a stable view of the bytes
+  they opened. A failed save also records its path, error and exact
+  open/write/commit stage in
+  `%LOCALAPPDATA%\EqualizerAPO\logs\Editor.log`.
+
+## v2.30.0 — 2026-07-27
+
+- **Hilbert phase shifting is now a built-in filter with a complete Editor.**
+  `Hilbert: Shift=SL,SR Align=L,R Direction=-90` runs a normalized 1025-tap
+  linear-phase FIR on the explicitly shifted channels and applies its
+  512-sample latency, without the phase transform, to explicitly aligned
+  channels. Its independent card edits both channel roles and ±90° direction,
+  reports the fixed FIR/latency contract, and can switch the analysis graph
+  directly to phase or group delay.
+- **Dynamic velvet-noise decorrelation is now a built-in filter with a complete
+  Editor.** Every channel receives an independently seeded, sparse unit-energy
+  FIR. Dynamic mode renews preallocated kernel banks at the Evolution interval
+  and crosses between them with equal-power weights; Static mode keeps one
+  deterministic bank. The independent card exposes amount, time spread and
+  evolution up front, a deterministic impulse preview and correlation readout,
+  and density, transition, decay and variation in a real expanding Advanced
+  section. Frequency-response analysis freezes a Dynamic filter to one
+  deterministic bank and labels the graph as a frozen Velvet snapshot.
+- Both commands have strict round-tripping grammars, allocation-free real-time
+  processing after initialization, independent picker entries, five-skin
+  gallery coverage including invalid, expanded and 520 px states, and
+  unit/integration/audio-reference tests. A separately distributable
+  MIT-licensed VST3 uses the same independently implemented portable Velvet DSP.
+- **A failed install's report no longer claims it created a registry key it did
+  not.** Device Selector's log lists what an install wrote, and it counted a key as
+  created whenever the install touched one - including keys that were already
+  there. Nothing behaved differently; the line was simply wrong in the one place
+  someone reads to work out what happened ([#243](https://github.com/115dkk/EqualizerAPO-XT/pull/243)).
 
 ## v2.29.0 — 2026-07-26
 

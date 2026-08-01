@@ -77,6 +77,18 @@ QString colorWithAlpha(const QString& value, int alphaPercent)
 		.arg(QString::number(alphaPercent / 100.0, 'f', 2));
 }
 
+QString colorChannels(const QString& value)
+{
+	const QColor color(value);
+	if (!color.isValid())
+		return QString();
+
+	return QStringLiteral("%1, %2, %3")
+		.arg(color.red())
+		.arg(color.green())
+		.arg(color.blue());
+}
+
 QString alphaTokenValue(const QVector<TokenSubstitution>& table, const QString& name, int alphaPercent)
 {
 	for (const TokenSubstitution& token : table)
@@ -109,6 +121,18 @@ QString substituteAlphaTokens(QString qss, const QVector<TokenSubstitution>& tab
 
 		qss.replace(match.capturedStart(0), match.capturedLength(0), replacement);
 		offset = match.capturedStart(0) + replacement.size();
+	}
+	return qss;
+}
+
+QString substituteRgbTokens(QString qss, const QVector<TokenSubstitution>& table)
+{
+	for (const TokenSubstitution& token : table)
+	{
+		const QString replacement = colorChannels(token.value);
+		if (replacement.isEmpty())
+			continue;
+		qss.replace(QStringLiteral("@%1_RGB@").arg(QLatin1String(token.name)), replacement);
 	}
 	return qss;
 }
@@ -537,6 +561,7 @@ QString substituteTokens(QString qss, const SkinTokens& tokens)
 	// sentinel is unique.
 	const QVector<TokenSubstitution> table = tokenSubstitutions(tokens);
 	qss = substituteAlphaTokens(qss, table);
+	qss = substituteRgbTokens(qss, table);
 	for (const TokenSubstitution& token : table)
 		qss.replace(QStringLiteral("@%1@").arg(QLatin1String(token.name)), token.value);
 	return qss;

@@ -4,7 +4,7 @@
 
 #include "VSTPreviewEndpoint.h"
 
-#include "AbstractAPOInfo.h"
+#include "devices/AbstractAPOInfo.h"
 #include "filters/DeviceCommand.h"
 #include "helpers/StringHelper.h"
 

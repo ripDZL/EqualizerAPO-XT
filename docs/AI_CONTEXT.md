@@ -1,7 +1,7 @@
 # AI Context
 
-- Active task: EqualizerAPO-XT theming-system cleanup on `beta`.
-- Current change: theming-system cleanup; `SkinThemeData::styleSheet` owns QSS resolution/token substitution, QSS supports `@TOKEN_Axx@` alpha sentinels plus fixed `@SHADOW_Axx@` / `@HIGHLIGHT_Axx@` material-effect aliases, `SkinPaint.h` owns shared scope-gutter plus analysis-graph layout geometry and C++ material-effect helpers, `RackChrome` owns repeated Rack hardware paint primitives/grain/LED dome variants, and `prepareCommandRow` receives `SkinTokens` like the other skin hooks.
+- Active task: sync `beta` with upstream `115dkk/EqualizerAPO-XT` `main`.
+- Current change: merge upstream `3d692be` into `beta`; preserve beta VST analyzer preview and theming cleanup while taking upstream engine/device folder split, Hilbert/dynamic velvet filters, editor atomic-save fixes, and skin `@TOKEN_RGB@` support.
 - Approach: prefer the selected EAPO endpoint for WASAPI preview capture, fall back to default console/communications mic endpoints plus default system playback, mix copied blocks into the visible editor-owned plugin instance, and discard output.
 - Scope note: this animates analyzer-style plugin GUIs while the panel is open; real APO audio processing remains in the service-owned instance.
 
@@ -71,3 +71,5 @@
 - 2026-08-01 fine-comb beta pass: `WasapiCapture::start()` now reads readiness through its mutex; VST2 host time uses an atomic sample-position frame counter and per-thread returned `vst_time_info`; Studio inline QSS material highlights/shadows use shared material helpers/token colors.
 - 2026-08-01 beta validation: `git diff --check`; `Test-SourceSync.ps1`; forced `Common.vcxproj`, `HybridConvTests.vcxproj`, `EditorLogicTests.vcxproj`, and `EngineOrchestrationTests.vcxproj` rebuilds; `HybridConvTests.exe` 1635 checks; `EditorLogicTests.exe` 2653 checks; `EngineOrchestrationTests.exe` 1160 checks; AVX-512 Editor rebuild; `Editor.exe --selftest-vst`; full skin gallery 492 PNGs at `artifacts/skin-gallery-theme-system-20260801-003249`.
 - 2026-08-01 beta CI follow-up: run `30684648642` failed only `cppcheck`; local follow-up fix makes `SkinAnalysisGraphLayout::centeredRectClampedToX` static, initializes VST2 test plugin state, and treats returned VST2 time info as const.
+- 2026-08-01 upstream sync: merged upstream commits `e004ed7..3d692be` into `beta`; integration fixes update moved `AbstractAPOInfo` includes and combine beta `@TOKEN_Axx@` alpha substitution with upstream `@TOKEN_RGB@`.
+- 2026-08-01 upstream-sync validation: `git diff --check`; `Test-SourceSync.ps1`; `HybridConvTests.exe` 1635 checks; `EditorLogicTests.exe` 2678 checks; `EngineOrchestrationTests.exe` 1167 checks; `AudioRegressionTests.exe --config-dir Tests/AudioRegressionTests/configs --ref-dir Tests/AudioRegressionTests/references` 30/30; rebuilt AVX-512 Editor; `Editor.exe --selftest-vst`; skin gallery 1180 PNGs at `artifacts/skin-gallery-upstream-merge-final-20260801-062442`.

@@ -52,7 +52,7 @@
 #include "Editor/widgets/routing/StudioRoutingModel.h"
 #include "helpers/MemoryHelper.h"
 #include "helpers/OwnedBackgroundTask.h"
-#include "AbstractAPOInfo.h"
+#include "devices/AbstractAPOInfo.h"
 #include "filters/FilterFactoryRegistry.h"
 #include "helpers/StringHelper.h"
 #include "helpers/Win32Resource.h"
@@ -630,6 +630,36 @@ void testFilterCardDescriptors()
 	FilterCardDescriptor graphicEq = FilterCardModel::describeLine("GraphicEQ: 20 -1; 100 0; 1000 2");
 	expectEqual(graphicEq.badge, "GEQ", "graphic eq badge");
 	expectEqual(graphicEq.summary, "3 bands", "graphic eq band count");
+
+	FilterCardDescriptor hilbert = FilterCardModel::describeLine(
+		"Hilbert: Shift=SL,SR Align=L,R Direction=-90");
+	expectEqual(hilbert.type, "hilbert", "Hilbert gets its own card type");
+	expectEqual(hilbert.badge, "H90", "Hilbert card badge");
+	expectEqual(hilbert.title, "Hilbert transform", "Hilbert card title");
+	expectTrue(hilbert.summary.contains(QString::fromUtf8("−90°"))
+		&& hilbert.summary.contains("2 shifted")
+		&& hilbert.summary.contains("2 aligned"),
+		QStringLiteral("Hilbert summary exposes phase and both explicit roles: ")
+			+ hilbert.summary);
+	expectTrue(hilbert.channelBadges == QStringList({"SL", "SR"}),
+		"Hilbert header badges identify only phase-shifted channels");
+	expectEqual(FilterCardModel::badgeIconResource("hilbert", "H90"),
+		":/icons/modern/eq-allpass.svg", "Hilbert uses the phase-family pictogram");
+
+	FilterCardDescriptor velvet = FilterCardModel::describeLine(
+		"Velvet: Mode=Dynamic Amount=85% Length=27.5625ms "
+		"Density=1088.435/s Evolution=5s Transition=250ms "
+		"Decay=-60dB Variation=2050083136");
+	expectEqual(velvet.type, "velvet", "Velvet gets its own card type");
+	expectEqual(velvet.badge, "VEL", "Velvet card badge");
+	expectEqual(velvet.title, "Velvet decorrelator", "Velvet card title");
+	expectTrue(velvet.summary.contains("Dynamic")
+		&& velvet.summary.contains("85%")
+		&& velvet.summary.contains("30 taps/ch"),
+		QStringLiteral("Velvet summary exposes mode, mix and sparse size: ")
+			+ velvet.summary);
+	expectEqual(FilterCardModel::badgeIconResource("velvet", "VEL"),
+		":/icons/modern/waveform.svg", "Velvet uses the sparse-waveform pictogram");
 
 	FilterCardDescriptor copy = FilterCardModel::describeLine("Copy: VL=L VR=R L=VL R=VR");
 	expectEqual(copy.badge, "CPY", "copy card badge");
@@ -1843,6 +1873,7 @@ int main(int argc, char** argv)
 		testBiQuadWidthRoundTripsExactly();
 		testBiQuadWidthModesAndDefaults();
 		testConfigFileCodec();
+		testConfigFileCodecRetriesAtomicReplaceAfterReaderCloses();
 		testConfigFileCodecPreservesExistingFileWhenAtomicReplaceFails();
 		testConfigFileCodecRejectsPartialRead();
 		testMemoryHelperConstructReleasesStorageWhenConstructorThrows();
@@ -1850,6 +1881,7 @@ int main(int argc, char** argv)
 		testUpdateElevationPolicyUsesOnePromptForEditorUpdates();
 		testTheSkinRosterIsTheOneList();
 		testSkinTokensCarryExplicitMode();
+		testTokenSubstitutionOffersAnAlphaForm();
 		testEverySkinSheetResolvesAllThemeTokens();
 		testSkinMaterialEffectHelpersStayFixedBlackAndWhite();
 		testSkinScopeGutterLayoutKeepsIfBranchesOnMemberRails();

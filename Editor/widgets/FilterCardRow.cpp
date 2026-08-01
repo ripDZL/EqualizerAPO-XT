@@ -17,6 +17,7 @@
 
 #include "Editor/SkinManager.h"
 #include "Editor/widgets/ChBadge.h"
+#include "Editor/widgets/ElidedLabel.h"
 #include "Editor/widgets/routing/IRoutingRenderer.h"
 #include "Editor/widgets/routing/CopyRoutingAdapter.h"
 
@@ -34,6 +35,7 @@ bool channelSelectionGatesType(const QString& type)
 		|| type == QStringLiteral("delay")
 		|| type == QStringLiteral("graphiceq")
 		|| type == QStringLiteral("convolution")
+		|| type == QStringLiteral("velvet")
 		|| type == QStringLiteral("vst")
 		|| type == QStringLiteral("loudness")
 		|| type == QStringLiteral("include");
@@ -107,13 +109,16 @@ FilterCardRow::FilterCardRow(FilterTable* table, int number, FilterTable::Item* 
 	typeBadge->setMinimumWidth(46);
 	headerLayout->addWidget(typeBadge);
 
-	titleLabel = new QLabel(headerWidget);
+	titleLabel = new ElidedLabel(headerWidget);
 	titleLabel->setObjectName(QStringLiteral("FilterCardTitle"));
+	titleLabel->setElideMode(Qt::ElideRight);
 	titleLabel->setMinimumWidth(92);
+	titleLabel->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
 	headerLayout->addWidget(titleLabel);
 
-	summaryLabel = new QLabel(headerWidget);
+	summaryLabel = new ElidedLabel(headerWidget);
 	summaryLabel->setObjectName(QStringLiteral("FilterCardSummary"));
+	summaryLabel->setElideMode(Qt::ElideRight);
 	summaryLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
 	summaryLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 	headerLayout->addWidget(summaryLabel, 1);
@@ -355,6 +360,13 @@ CommandRowInfo FilterCardRow::currentRowInfo() const
 	info.depth = descriptor.depth;
 	info.logicDepth = descriptor.logicDepth;
 	info.dynamicLine = descriptor.dynamicLine;
+
+	// The lane geometry, resolved here because this widget is what decides it:
+	// rowIndentUnits() is the same call its own layout margin uses, so a skin's
+	// gutter can no longer disagree with the card face it sits beside.
+	info.laneUnit = SkinManager::instance()->tokens().channelGroupIndent;
+	info.laneCount = rowIndentUnits();
+	info.cardLeft = 8 + info.laneCount * info.laneUnit;
 
 	// Fold in the analysis engine's load facts for this line (dynamic
 	// commands): branch truth for the If family, computed values for
@@ -722,13 +734,13 @@ void FilterCardRow::applyDescriptor()
 		typeBadge->setText(QString());
 		typeBadge->setPixmap(badgePictogram(badgeIcon, badgeTreatment.ink, 16, devicePixelRatioF()));
 	}
-	titleLabel->setText(descriptor.title);
-	summaryLabel->setText(descriptor.summary);
+	titleLabel->setFullText(descriptor.title);
+	summaryLabel->setFullText(descriptor.summary);
 	// A line the engine could not use says why on hover. The analysis run is what
 	// produces the reason, so this is empty until one has happened and goes stale
 	// on edit, like every other load fact.
 	const QString parseError = currentRowInfo().parseError;
-	summaryLabel->setToolTip(parseError.isEmpty() ? QString()
+	summaryLabel->setToolTip(parseError.isEmpty() ? descriptor.summary
 		: tr("This line was not applied: %1").arg(parseError));
 	// The text stays current even while the label is hidden: skins may read
 	// it as the live raw-spec source instead of showing the label itself

@@ -267,7 +267,7 @@ $env:QT_QPA_PLATFORM = "offscreen"
 .\build-Editor-x64\release\Editor.exe --skin-gallery <outDir> [--skin-gallery-skins studio,rack]
 ```
 
-For every skin × {dark, light} it renders 26 representative rows — a
+For every skin × {dark, light} it renders 29 representative rows — a
 parametric filter (`Filter 1: ON PK ...`), a high-shelf with its three knobs,
 a peaking filter at 0 dB (bipolar gain at its neutral detent), a `Preamp:`
 row (the bare knob + value scrub pair — the row that shows whether a skin
@@ -285,8 +285,10 @@ empty `Copy:` row, a
 populated `Copy:` row (mixed factors and a virtual target — the routing
 views' judged scene), a `Convolution:` row, two `MultiConvolution:` rows
 (populated and freshly inserted empty), a `GraphicEQ:` row (the modern
-GraphicEQ card — the clean-install first impression) and two raw-text rows
-(a bare note line and an `If:` command, the TXT presentation) — in three
+GraphicEQ card — the clean-install first impression), `Filter:` rows for
+dynamic preamp, all-pass, notch, IIR, and Hilbert, three `Velvet:` rows
+(static, dynamic, and invalid), and two raw-text rows (a bare note line and
+an `If:` command, the TXT presentation) — in three
 states: `normal`, `hover` (hover-equivalent via `Qt::WA_UnderMouse`), and
 `disabled` (the line commented out, which is the product's real disabled
 state). The reference rows resolve against synthetic target files the gallery
@@ -301,7 +303,7 @@ each for the toolbar, title bar, menu bar and an open menu, two for the
 add-card row (`addrow` normal/hover), one for the insertion seam's hover
 reveal (`seam`) and one for the update toast (`toast`). Output names are
 stable: `<skin>_<dark|light>_<row>_<state>.png`,
-5 × 2 × (26 × 3 + 26) = 1040 PNGs
+5 × 2 × 118 = 1180 PNGs
 for a full run; the run self-checks the count, so adding a gallery row needs
 no external count update. A row shot fails the render (non-zero exit) if a
 visible horizontal scrollbar is found inside the row — rows must fit the
@@ -318,6 +320,31 @@ derives the palette), and renders at device pixel ratio 1 on the
 offscreen platform. PNGs from the same machine and build are byte-stable, so
 `Get-FileHash` comparisons prove pixel identity; PNGs from different machines
 may differ slightly in font rasterization.
+
+## Lane geometry and tick label boxes
+
+`CommandRowInfo` carries the row's lane geometry: `laneUnit` (one indent band),
+`laneCount` (how many bands are drawn left of the card face), `cardLeft`, and
+`laneCenter(level)`. `paintScopeGutter` paints in that space, so a skin answers
+what a lane looks like and never recomputes where it is. The rule that a branch or
+tail row mounts one unit deeper than its head is already folded into `laneCount`,
+because the same call sets the row widget's own left margin - a gutter can no
+longer disagree with the card face beside it.
+
+`skinXTickLabelRect` / `skinYTickLabelRect` in `SkinPaint.h` build a tick label
+box centred on a grid line. The y variant keeps its inset and width as arguments:
+the skins use 4, 5, 6 and 8 px and nobody decided they should differ, but nobody
+decided they should agree either, so settling it is a skin round's call rather
+than a refactor's.
+
+Colour tokens answer to an `@TOKEN_RGB@` form as well as `@TOKEN@`, expanding to
+the three channels so a sheet can write `rgba(@ACCENT_RGB@, 0.30)`. QSS has no
+variables and its `rgba()` wants numbers, so this is the only way a sheet holds a
+token at partial alpha instead of writing the palette value out by hand.
+
+`prepareCommandRow` receives `SkinTokens` like every other hook. It was the one
+that did not, and all five skins reached for `SkinManager::instance()->tokens()`
+inside it instead.
 
 ## Adding a skin
 

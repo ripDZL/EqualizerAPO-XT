@@ -56,7 +56,7 @@ SOURCES += main.cpp\
 	FilterTemplate.cpp \
 	guis/DeviceFilterGUI.cpp \
 	guis/DeviceFilterGUIFactory.cpp \
-	../DeviceAPOInfo.cpp \
+	../devices/DeviceAPOInfo.cpp \
 	../devices/DeviceAPOInfo.Install.cpp \
 	../devices/DeviceAPOInfo.Load.cpp \
 	../devices/DeviceAPOInfo.State.cpp \
@@ -81,7 +81,7 @@ SOURCES += main.cpp\
 	guis/CopyFilterGUIChannelItem.cpp \
 	../filters/CopyFilter.cpp \
 	../filters/CopyFilterFactory.cpp \
-	../IFilter.cpp \
+	../engine/IFilter.cpp \
 	guis/CopyFilterGUIScene.cpp \
 	guis/CopyFilterGUIForm.cpp \
 	guis/CopyFilterGUIRow.cpp \
@@ -122,6 +122,7 @@ SOURCES += main.cpp\
 	guis/ConvolutionFilterGUI.cpp \
 	guis/MultiConvolutionFilterGUIFactory.cpp \
 	guis/MultiConvolutionFilterGUI.cpp \
+	guis/SpatialFilterGUIFactory.cpp \
 	helpers/ConvolutionPathHelper.cpp \
 	helpers/DisableWheelFilter.cpp \
 	widgets/EscapableLineEdit.cpp \
@@ -142,13 +143,13 @@ SOURCES += main.cpp\
 	widgets/ResizeCorner.cpp \
 	analysis/AnalysisResponse.cpp \
 	analysis/ResponseCurveBuilder.cpp \
-	../FilterEngine.cpp \
+	../engine/FilterEngine.cpp \
 	../engine/FilterEngine.Configuration.cpp \
 	../engine/FilterEngine.Process.cpp \
 	../engine/FilterEngine.Runtime.cpp \
 	../engine/ConfigWatcher.cpp \
 	../filters/FilterFactoryRegistry.cpp \
-	../FilterConfiguration.cpp \
+	../engine/FilterConfiguration.cpp \
 	../filters/ChannelCommand.cpp \
 	../filters/ChannelFilterFactory.cpp \
 	../filters/ExpressionCommand.cpp \
@@ -170,7 +171,14 @@ SOURCES += main.cpp\
 	../filters/MultiConvolutionCommand.cpp \
 	../filters/MultiConvolutionFilter.cpp \
 	../filters/MultiConvolutionFilterFactory.cpp \
-	../ConfigurationFileReader.cpp \
+	../filters/HilbertCommand.cpp \
+	../filters/HilbertFilter.cpp \
+	../filters/HilbertFilterFactory.cpp \
+	../filters/VelvetCommand.cpp \
+	../filters/VelvetFilter.cpp \
+	../filters/VelvetFilterFactory.cpp \
+	../filters/velvet/Processor.cpp \
+	../engine/ConfigurationFileReader.cpp \
 	../filters/IrCache.cpp \
 	../parser/ParserExtensions.cpp \
 	../parser/EngineParser.cpp \
@@ -181,8 +189,8 @@ SOURCES += main.cpp\
 	widgets/ExponentialSpinBox.cpp \
 	FilterTableMimeData.cpp \
 	CustomStyle.cpp \
-	../AbstractAPOInfo.cpp \
-	../VoicemeeterAPOInfo.cpp \
+	../devices/AbstractAPOInfo.cpp \
+	../devices/VoicemeeterAPOInfo.cpp \
 	../helpers/AbstractLibrary.cpp \
 	../helpers/VST3PluginIIDs.cpp \
 	../helpers/VSTPluginLibrary.cpp \
@@ -251,6 +259,9 @@ SOURCES += main.cpp\
 	widgets/cards/GraphicEQCardEditor.cpp \
 	widgets/cards/IIRCardEditor.cpp \
 	widgets/cards/AllPassCardEditor.cpp \
+	widgets/cards/HilbertCardEditor.cpp \
+	widgets/cards/VelvetCardEditor.cpp \
+	widgets/cards/VelvetImpulsePreview.cpp \
 	widgets/cards/FilterCardEditorRouter.cpp \
 	analysis/AnalysisViewController.cpp \
 	widgets/cards/IncludeCardEditor.cpp \
@@ -332,7 +343,7 @@ HEADERS  += \
 	FilterTemplate.h \
 	guis/DeviceFilterGUI.h \
 	guis/DeviceFilterGUIFactory.h \
-	../DeviceAPOInfo.h \
+	../devices/DeviceAPOInfo.h \
 	guis/DeviceFilterGUIDialog.h \
 	../filters/DeviceCommand.h \
 	../filters/DeviceFilterFactory.h \
@@ -352,8 +363,8 @@ HEADERS  += \
 	guis/CopyFilterGUIChannelItem.h \
 	../filters/CopyFilter.h \
 	../filters/CopyFilterFactory.h \
-	../IFilter.h \
-	../IFilterFactory.h \
+	../engine/IFilter.h \
+	../engine/IFilterFactory.h \
 	guis/CopyFilterGUIScene.h \
 	guis/CopyFilterGUIForm.h \
 	guis/CopyFilterGUIRow.h \
@@ -392,6 +403,7 @@ HEADERS  += \
 	guis/ConvolutionFilterGUI.h \
 	guis/MultiConvolutionFilterGUIFactory.h \
 	guis/MultiConvolutionFilterGUI.h \
+	guis/SpatialFilterGUIFactory.h \
 	helpers/AnalysisWorkerRecovery.h \
 	helpers/ConvolutionPathHelper.h \
 	helpers/DisableWheelFilter.h \
@@ -407,9 +419,9 @@ HEADERS  += \
 	analysis/AnalysisMetric.h \
 	analysis/AnalysisResponse.h \
 	analysis/ResponseCurveBuilder.h \
-	../FilterEngine.h \
+	../engine/FilterEngine.h \
 	../engine/ConfigWatcher.h \
-	../FilterConfiguration.h \
+	../engine/FilterConfiguration.h \
 	../filters/ChannelFilterFactory.h \
 	../filters/ExpressionCommand.h \
 	../filters/ExpressionFilterFactory.h \
@@ -428,6 +440,13 @@ HEADERS  += \
 	../filters/ConvolutionCommand.h \
 	../filters/ConvolutionFilter.h \
 	../filters/IrCache.h \
+	../filters/HilbertCommand.h \
+	../filters/HilbertFilter.h \
+	../filters/HilbertFilterFactory.h \
+	../filters/VelvetCommand.h \
+	../filters/VelvetFilter.h \
+	../filters/VelvetFilterFactory.h \
+	../filters/velvet/Processor.h \
 	../parser/RegexFunctions.h \
 	../parser/RegistryFunctions.h \
 	../parser/ParserExtensions.h \
@@ -437,8 +456,8 @@ HEADERS  += \
 	widgets/ExponentialSpinBox.h \
 	FilterTableMimeData.h \
 	CustomStyle.h \
-	../AbstractAPOInfo.h \
-	../VoicemeeterAPOInfo.h \
+	../devices/AbstractAPOInfo.h \
+	../devices/VoicemeeterAPOInfo.h \
 	../helpers/AbstractLibrary.h \
 	../helpers/VSTPluginLibrary.h \
 	guis/VSTPluginFilterGUI.h \
@@ -501,6 +520,9 @@ HEADERS  += \
 	widgets/cards/GraphicEQCardEditor.h \
 	widgets/cards/IIRCardEditor.h \
 	widgets/cards/AllPassCardEditor.h \
+	widgets/cards/HilbertCardEditor.h \
+	widgets/cards/VelvetCardEditor.h \
+	widgets/cards/VelvetImpulsePreview.h \
 	analysis/AnalysisViewController.h \
 	widgets/cards/IncludeCardEditor.h \
 	widgets/cards/PreampCardEditor.h \

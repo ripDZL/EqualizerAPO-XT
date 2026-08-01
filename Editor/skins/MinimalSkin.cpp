@@ -426,7 +426,7 @@ void paintMinimalAnalysisGraph(QPainter& painter, const AnalysisGraphState& stat
 		if (!line.major && x - halfWidth < lastFigureRight + 4.0)
 			continue;
 		painter.setPen(secondary);
-		painter.drawText(QRectF(x - 24.0, plotBottom + 3.0, 48.0, 11.0),
+		painter.drawText(skinXTickLabelRect(x, plotBottom + 3.0, 11.0),
 			Qt::AlignHCenter | Qt::AlignTop, line.label);
 		lastFigureRight = x + halfWidth;
 	}
@@ -466,9 +466,9 @@ void paintMinimalAnalysisGraph(QPainter& painter, const AnalysisGraphState& stat
 		painter.setPen(line.major ? bodyInk : secondary);
 		if (magnitudeSheet)
 		{
-			painter.drawText(QRectF(state.rect.left(), y - 6.0, plotLeft - state.rect.left() - 2.0, 12.0),
+			painter.drawText(skinYTickLabelRect(y, state.rect.left(), plotLeft - state.rect.left() - 2.0),
 				Qt::AlignRight | Qt::AlignVCenter, line.label);
-			painter.drawText(QRectF(plotRight + 2.0, y - 6.0, state.rect.right() - plotRight - 2.0, 12.0),
+			painter.drawText(skinYTickLabelRect(y, plotRight + 2.0, state.rect.right() - plotRight - 2.0),
 				Qt::AlignLeft | Qt::AlignVCenter, line.label);
 		}
 		else
@@ -1056,12 +1056,11 @@ public:
 		// is not running (paired with the frame's background step in
 		// cardFrameStyle).
 		painter.setPen(QPen(QColor(tokens.border), 1, info.lineSkipped ? Qt::DotLine : Qt::SolidLine));
-		const int unit = tokens.channelGroupIndent;
 		for (int level = 0; level < info.depth; level++)
 		{
-			// Centred in its indent band, like RackChrome's level math; the
-			// card face starts at x = 8 + depth * unit.
-			const int x = 8 + level * unit + unit / 2;
+			// Centred in its indent band. The centre comes from the row widget
+			// now, which is also what sets the card face's own left margin.
+			const int x = info.laneCenter(level);
 			painter.drawLine(x, 0, x, size.height());
 		}
 		return true;

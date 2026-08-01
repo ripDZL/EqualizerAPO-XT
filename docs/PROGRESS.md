@@ -39,7 +39,7 @@
 - [x] `HybridConvTests.exe` passed: 1623 checks, including VST2/VST3 host tests.
 - [x] `EditorLogicTests.exe` passed: 2520 checks.
 - [x] `EngineOrchestrationTests.exe` passed: 617 checks.
-- [ ] `AudioRegressionTests.exe` local run blocked by missing `x64/Release/references/*.raw` fixtures.
+- [x] `AudioRegressionTests.exe` local verification passes when run against source-tree references; default output-dir reference copy remains an upstream project-layout gap.
 - [x] Extended VST live analyzer preview to include default mic/capture endpoints after ReaFIR/TDR Nova stayed static on a mic chain.
 - [x] Rebuilt Qt Editor x64 AVX2 after mic-feed change.
 - [x] Re-ran `Editor.exe --selftest-vst`, `HybridConvTests.exe`, `EditorLogicTests.exe`, and `EngineOrchestrationTests.exe`.
@@ -55,7 +55,7 @@
 - [x] Triggered GitHub Actions run `30472634359`; downloaded AVX-512 artifact to `artifacts/github-run-30472634359-avx512`.
 - [x] Backed up installed AVX-512 `current` to `artifacts/install-backups/EqualizerAPO-XT-x64-avx512-pre-6ae8abf-20260729`.
 - [x] Overlaid and hash-verified the selected-endpoint AVX-512 artifact, restarted Windows Audio, passed installed Editor `--selftest-vst`, and opened Editor.
-- [ ] `AudioRegressionTests.exe` still blocked by missing `x64/Release/references/*.raw` fixtures; equivalence checks passed before fixture failures.
+- [x] `AudioRegressionTests.exe` passes with source `--ref-dir`; default `x64/Release/references` is still not populated by the upstream post-build step.
 - [x] Reproduced live input at WASAPI level: BEHRINGER `IN 1` had non-zero peak/RMS while default console/communications capture were silent.
 - [x] Added row-scoped VST preview endpoint resolution from preceding `Device:` config rows.
 - [x] Added `EditorLogicTests.exe` coverage for VST rows inheriting `Device: IN 1 BEHRINGER ... {cf6bfa75-...}` as a capture endpoint.
@@ -96,3 +96,7 @@
 - [x] Fine-combed Studio inline theme material styles: remaining reusable black/white shadow/highlight styles now use material helpers or token colors.
 - [x] Validated beta pass: `git diff --check`; `Test-SourceSync.ps1`; forced `Common`, `HybridConvTests`, `EditorLogicTests`, `EngineOrchestrationTests` rebuilds; `HybridConvTests.exe` 1635 checks; `EditorLogicTests.exe` 2653 checks; `EngineOrchestrationTests.exe` 1160 checks; AVX-512 Editor rebuild; `Editor.exe --selftest-vst`; full skin gallery 492 PNGs at `artifacts\skin-gallery-theme-system-20260801-003249`.
 - [x] Fixed fresh beta CI `cppcheck` findings: static analysis-graph helper, explicit VST2 test plugin state initialization, const host time pointer; local `EditorLogicTests.exe` 2653 checks and `HybridConvTests.exe` 1635 checks passed.
+- [x] Checked upstream `115dkk/main`; `beta` was behind by nine commits through `3d692be`.
+- [x] Merged upstream into `beta` while preserving beta VST analyzer-preview and theming changes.
+- [x] Fixed upstream-merge integration seams: moved `devices/AbstractAPOInfo.h` includes and combined upstream `@TOKEN_RGB@` substitution with beta `@TOKEN_Axx@`.
+- [x] Validated upstream sync: `git diff --check`; `Test-SourceSync.ps1`; `HybridConvTests.exe` 1635 checks; `EditorLogicTests.exe` 2678 checks; `EngineOrchestrationTests.exe` 1167 checks; `AudioRegressionTests.exe` 30/30 with source refs; rebuilt AVX-512 Editor; `Editor.exe --selftest-vst`; skin gallery 1180 PNGs.

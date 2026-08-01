@@ -21,8 +21,9 @@
 
 #include <vector>
 
-#include "IFilter.h"
+#include "engine/IFilter.h"
 #include "helpers/MemoryHelper.h"
+#include "helpers/VSTPluginInstance.h"
 #include "helpers/VSTPluginLibrary.h"
 
 #pragma AVRT_VTABLES_BEGIN
