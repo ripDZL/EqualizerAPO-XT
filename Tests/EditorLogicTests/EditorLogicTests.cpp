@@ -1883,6 +1883,7 @@ int main(int argc, char** argv)
 		testSkinTokensCarryExplicitMode();
 		testTokenSubstitutionOffersAnAlphaForm();
 		testEverySkinSheetResolvesAllThemeTokens();
+		testThemePreviewStyleSheetUsesCustomTokens();
 		testSkinMaterialEffectHelpersStayFixedBlackAndWhite();
 		testSkinScopeGutterLayoutKeepsIfBranchesOnMemberRails();
 		testSkinAnalysisGraphLayoutKeepsAxisMathShared();

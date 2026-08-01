@@ -66,6 +66,8 @@
 - [x] Installed the background-preview Editor to `C:\Program Files\EqualizerAPO\Editor.exe`; hash matched the local AVX-512 build; installed self-test passed; Editor reopened.
 - [ ] Verify ReaFIR, TDR Nova, and heavier analyzer plugins for smooth graph movement while speaking into the configured microphone.
 - [x] Centralized skin QSS loading, Studio fallback, token substitution, shared overrides, unresolved-token reporting, and runtime warnings in `SkinThemeData::styleSheet`.
+- [x] Added five token-variant themes and a Theme Lab v1 for live palette preview plus JSON copy/export.
+- [x] Validated theme variants/editor: `git diff --check`; `Test-SourceSync.ps1`; `EditorLogicTests.exe` 2825 checks; AVX-512 Editor and DeviceSelector rebuilds; `Editor.exe --selftest-vst`; new-theme gallery 1180 PNGs.
 - [x] Rebuilt and ran `EditorLogicTests.exe`: 2594 checks.
 - [x] Added `@TOKEN_Axx@` alpha placeholders and converted 621 semantic token RGBA literals across shipped skins.
 - [x] Forced AVX-512 Editor rebuild, ran waited `Editor.exe --selftest-vst`, and generated full skin gallery: 1040 PNGs.

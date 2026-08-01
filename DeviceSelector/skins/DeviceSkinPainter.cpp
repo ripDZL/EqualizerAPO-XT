@@ -27,7 +27,7 @@ const DeviceSkinPainter* DeviceSkinPainter::forSkin(const QString& skinId)
 	// only has to answer which painter implements it. A roster id with no painter
 	// here falls back to Studio, which is the same shape as the Editor's ISkin
 	// lookup and the one place this executable can be behind the roster.
-	const QString id = SkinThemeData::resolveId(skinId);
+	const QString id = SkinThemeData::entry(skinId).paintBaseId;
 	if (id == QStringLiteral("minimal"))
 		return minimalDeviceSkinPainter();
 	if (id == QStringLiteral("soft"))

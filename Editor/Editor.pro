@@ -222,6 +222,7 @@ SOURCES += main.cpp\
 	skins/ISkin.cpp \
 	skins/pickers/MatrixFilterPicker.cpp \
 	skins/RackChrome.cpp \
+	skins/SkinDisplayNames.cpp \
 	skins/Skins.cpp \
 	skins/SkinFileIcons.cpp \
 	skins/SkinThemeData.cpp \
@@ -290,6 +291,7 @@ SOURCES += main.cpp\
 	widgets/MainToolbarKit.cpp \
 	widgets/ValueScrubBox.cpp \
 	widgets/DialogChrome.cpp \
+	widgets/ThemeEditorDialog.cpp \
 	widgets/TitleBar.cpp \
 	widgets/routing/CopyRoutingAdapter.cpp \
 	widgets/routing/RoutingFold.cpp \
@@ -486,6 +488,7 @@ HEADERS  += \
 	skins/ISkin.h \
 	skins/pickers/MatrixFilterPicker.h \
 	skins/RackChrome.h \
+	skins/SkinDisplayNames.h \
 	skins/Skins.h \
 	skins/SkinFileIcons.h \
 	skins/SkinChromeOverlay.h \
@@ -550,6 +553,7 @@ HEADERS  += \
 	widgets/MainToolbarKit.h \
 	widgets/ValueScrubBox.h \
 	widgets/DialogChrome.h \
+	widgets/ThemeEditorDialog.h \
 	widgets/TitleBar.h \
 	widgets/routing/CopyRoutingAdapter.h \
 	widgets/routing/RoutingFold.h \

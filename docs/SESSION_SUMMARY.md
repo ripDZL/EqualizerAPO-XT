@@ -106,6 +106,8 @@
 - Merged upstream `e004ed7..3d692be` into `beta`.
 - Upstream additions included engine/device folder split, Hilbert and dynamic velvet filters, editor atomic config replacement/save retry fixes, and skin `@TOKEN_RGB@`.
 - Integration fixes: beta VST analyzer preview includes now use `devices/AbstractAPOInfo.h`; `SkinThemeData::substituteTokens` now runs beta `@TOKEN_Axx@`, upstream `@TOKEN_RGB@`, then normal `@TOKEN@` replacement.
+- Theme Lab pass: added `midnight`, `arctic`, `ember`, `violet`, and `solar` as selectable token variants; added a transient Theme Lab dialog for editing palette tokens, previewing live, resetting to a built-in theme, and copying/exporting JSON.
+- Theme Lab validation: `git diff --check`; `Test-SourceSync.ps1`; rebuilt `EditorLogicTests.exe` with 2825 checks; regenerated/rebuilt AVX-512 Editor and DeviceSelector; `Editor.exe --selftest-vst` passed; `Editor --skin-gallery --skin-gallery-skins midnight,arctic,ember,violet,solar` wrote 1180 PNGs at `artifacts\skin-gallery-theme-variants-20260801-074412`.
 - Upstream-sync validation: `git diff --check`; `Test-SourceSync.ps1`; `HybridConvTests.exe` passed 1635 checks; `EditorLogicTests.exe` passed 2678 checks; `EngineOrchestrationTests.exe` passed 1167 checks; `AudioRegressionTests.exe --config-dir Tests/AudioRegressionTests/configs --ref-dir Tests/AudioRegressionTests/references` passed 30/30; AVX-512 `Editor.exe --selftest-vst` passed.
 - Skin gallery after merge: 1180 PNGs under `artifacts\skin-gallery-upstream-merge-final-20260801-062442`.
 - Note: the upstream AudioRegression project still does not copy `references` into `x64\Release`; use source `--ref-dir` locally unless that project file is fixed.

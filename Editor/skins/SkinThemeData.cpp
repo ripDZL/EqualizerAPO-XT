@@ -397,6 +397,221 @@ SkinTokens matrixTokens(bool dark)
 	finishTokens(t);
 	return t;
 }
+
+SkinTokens midnightTokens(bool dark)
+{
+	SkinTokens t = studioTokens(dark);
+	if (dark)
+	{
+		t.background = QStringLiteral("#040817");
+		t.surface = QStringLiteral("#0A1021");
+		t.card = QStringLiteral("#10182E");
+		t.cardHover = QStringLiteral("#172342");
+		t.cardSelected = QStringLiteral("#123B66");
+		t.text = QStringLiteral("#EEF5FF");
+		t.mutedText = QStringLiteral("#91A6C8");
+		t.border = QStringLiteral("#1F3355");
+		t.graph = QStringLiteral("#020611");
+		t.graphGridMinor = QStringLiteral("#18304E");
+		t.accent = QStringLiteral("#3DDCFF");
+		t.accent2 = QStringLiteral("#7C6CFF");
+		t.success = QStringLiteral("#2BEFA3");
+		t.warning = QStringLiteral("#F8C45D");
+		t.danger = QStringLiteral("#FF5D73");
+	}
+	else
+	{
+		t.background = QStringLiteral("#EAF4FF");
+		t.surface = QStringLiteral("#F8FCFF");
+		t.card = QStringLiteral("#FFFFFF");
+		t.cardHover = QStringLiteral("#EEF7FF");
+		t.cardSelected = QStringLiteral("#CFE9FF");
+		t.text = QStringLiteral("#10233A");
+		t.mutedText = QStringLiteral("#5F748D");
+		t.border = QStringLiteral("#BAD5EF");
+		t.graph = QStringLiteral("#F6FBFF");
+		t.graphGridMinor = QStringLiteral("#D8E9FA");
+		t.accent = QStringLiteral("#0978D8");
+		t.accent2 = QStringLiteral("#6159E8");
+		t.success = QStringLiteral("#0F9F75");
+		t.warning = QStringLiteral("#B7791F");
+		t.danger = QStringLiteral("#D93654");
+	}
+	finishTokens(t);
+	return t;
+}
+
+SkinTokens arcticTokens(bool dark)
+{
+	SkinTokens t = softTokens(dark);
+	if (dark)
+	{
+		t.background = QStringLiteral("#071013");
+		t.surface = QStringLiteral("#0D1A1F");
+		t.card = QStringLiteral("#14272E");
+		t.cardHover = QStringLiteral("#1B343D");
+		t.cardSelected = QStringLiteral("#164C55");
+		t.text = QStringLiteral("#E9FCFF");
+		t.mutedText = QStringLiteral("#95B8C2");
+		t.border = QStringLiteral("#27444C");
+		t.graph = QStringLiteral("#041014");
+		t.graphGridMinor = QStringLiteral("#17343C");
+		t.accent = QStringLiteral("#62E6F2");
+		t.accent2 = QStringLiteral("#8EF7C9");
+		t.success = QStringLiteral("#7FF0B8");
+		t.warning = QStringLiteral("#FFE08A");
+		t.danger = QStringLiteral("#FF8FA3");
+	}
+	else
+	{
+		t.background = QStringLiteral("#F0FBFC");
+		t.surface = QStringLiteral("#FBFEFF");
+		t.card = QStringLiteral("#FFFFFF");
+		t.cardHover = QStringLiteral("#EAF8FA");
+		t.cardSelected = QStringLiteral("#D7F4F8");
+		t.text = QStringLiteral("#173238");
+		t.mutedText = QStringLiteral("#66838B");
+		t.border = QStringLiteral("#C8E4EA");
+		t.graph = QStringLiteral("#F8FEFF");
+		t.graphGridMinor = QStringLiteral("#D7EDF1");
+		t.accent = QStringLiteral("#1597A6");
+		t.accent2 = QStringLiteral("#30B37D");
+		t.success = QStringLiteral("#15985F");
+		t.warning = QStringLiteral("#B38A16");
+		t.danger = QStringLiteral("#CB4B63");
+	}
+	finishTokens(t);
+	return t;
+}
+
+SkinTokens emberTokens(bool dark)
+{
+	SkinTokens t = rackTokens(dark);
+	if (dark)
+	{
+		t.background = QStringLiteral("#100806");
+		t.surface = QStringLiteral("#1A100C");
+		t.card = QStringLiteral("#27160F");
+		t.cardHover = QStringLiteral("#332016");
+		t.cardSelected = QStringLiteral("#4A2812");
+		t.text = QStringLiteral("#FFEFE1");
+		t.mutedText = QStringLiteral("#B99B84");
+		t.border = QStringLiteral("#563121");
+		t.graph = QStringLiteral("#0A0503");
+		t.graphGridMinor = QStringLiteral("#3A2318");
+		t.accent = QStringLiteral("#FF9A3D");
+		t.accent2 = QStringLiteral("#FFD166");
+		t.success = QStringLiteral("#88D97A");
+		t.warning = QStringLiteral("#FFC44D");
+		t.danger = QStringLiteral("#FF5A3D");
+	}
+	else
+	{
+		t.background = QStringLiteral("#FFF0E4");
+		t.surface = QStringLiteral("#FFF9F2");
+		t.card = QStringLiteral("#FFFFFF");
+		t.cardHover = QStringLiteral("#FFEBD8");
+		t.cardSelected = QStringLiteral("#FFD6A8");
+		t.text = QStringLiteral("#372014");
+		t.mutedText = QStringLiteral("#866651");
+		t.border = QStringLiteral("#E2B98F");
+		t.graph = QStringLiteral("#FFF8EE");
+		t.graphGridMinor = QStringLiteral("#F0D2B2");
+		t.accent = QStringLiteral("#C85A13");
+		t.accent2 = QStringLiteral("#9B6A00");
+		t.success = QStringLiteral("#2F8A4A");
+		t.warning = QStringLiteral("#A86E00");
+		t.danger = QStringLiteral("#C93626");
+	}
+	finishTokens(t);
+	return t;
+}
+
+SkinTokens violetTokens(bool dark)
+{
+	SkinTokens t = matrixTokens(dark);
+	if (dark)
+	{
+		t.background = QStringLiteral("#090616");
+		t.surface = QStringLiteral("#120D22");
+		t.card = QStringLiteral("#1B1431");
+		t.cardHover = QStringLiteral("#251C43");
+		t.cardSelected = QStringLiteral("#2B1C5A");
+		t.text = QStringLiteral("#F4ECFF");
+		t.mutedText = QStringLiteral("#AA98C9");
+		t.border = QStringLiteral("#3B2B62");
+		t.graph = QStringLiteral("#070410");
+		t.graphGridMinor = QStringLiteral("#2D2450");
+		t.accent = QStringLiteral("#B56CFF");
+		t.accent2 = QStringLiteral("#42E8FF");
+		t.success = QStringLiteral("#65F0B4");
+		t.warning = QStringLiteral("#FFD36A");
+		t.danger = QStringLiteral("#FF64A6");
+	}
+	else
+	{
+		t.background = QStringLiteral("#F8F1FF");
+		t.surface = QStringLiteral("#FFFFFF");
+		t.card = QStringLiteral("#FEFBFF");
+		t.cardHover = QStringLiteral("#F2E7FF");
+		t.cardSelected = QStringLiteral("#E5D5FF");
+		t.text = QStringLiteral("#27183D");
+		t.mutedText = QStringLiteral("#75648E");
+		t.border = QStringLiteral("#D8C7EE");
+		t.graph = QStringLiteral("#FFFBFF");
+		t.graphGridMinor = QStringLiteral("#E6D8F6");
+		t.accent = QStringLiteral("#7B2FD3");
+		t.accent2 = QStringLiteral("#008FAB");
+		t.success = QStringLiteral("#198754");
+		t.warning = QStringLiteral("#A26A00");
+		t.danger = QStringLiteral("#C93476");
+	}
+	finishTokens(t);
+	return t;
+}
+
+SkinTokens solarTokens(bool dark)
+{
+	SkinTokens t = minimalTokens(dark);
+	if (dark)
+	{
+		t.background = QStringLiteral("#002B36");
+		t.surface = QStringLiteral("#073642");
+		t.card = QStringLiteral("#0A3A46");
+		t.cardHover = QStringLiteral("#104653");
+		t.cardSelected = QStringLiteral("#123F55");
+		t.text = QStringLiteral("#EEE8D5");
+		t.mutedText = QStringLiteral("#93A1A1");
+		t.border = QStringLiteral("#315862");
+		t.graph = QStringLiteral("#001F27");
+		t.graphGridMinor = QStringLiteral("#16424D");
+		t.accent = QStringLiteral("#268BD2");
+		t.accent2 = QStringLiteral("#D33682");
+		t.success = QStringLiteral("#859900");
+		t.warning = QStringLiteral("#B58900");
+		t.danger = QStringLiteral("#DC322F");
+	}
+	else
+	{
+		t.background = QStringLiteral("#FDF6E3");
+		t.surface = QStringLiteral("#FFFBEF");
+		t.card = QStringLiteral("#FFFFFF");
+		t.cardHover = QStringLiteral("#F7EFD8");
+		t.cardSelected = QStringLiteral("#E9F1D2");
+		t.text = QStringLiteral("#073642");
+		t.mutedText = QStringLiteral("#657B83");
+		t.border = QStringLiteral("#D8CBA6");
+		t.graph = QStringLiteral("#FFF8E6");
+		t.graphGridMinor = QStringLiteral("#EDE0BD");
+		t.accent = QStringLiteral("#268BD2");
+		t.accent2 = QStringLiteral("#D33682");
+		t.success = QStringLiteral("#6C8500");
+		t.warning = QStringLiteral("#A66F00");
+		t.danger = QStringLiteral("#CB2D2A");
+	}
+	finishTokens(t);
+	return t;
+}
 }
 
 namespace SkinThemeData
@@ -447,13 +662,18 @@ const QVector<SkinEntry>& roster()
 	// Display order. Studio is first, and that is load-bearing twice over: it is
 	// the default skin and it is what an unknown id falls back to.
 	static const QVector<SkinEntry> entries = {
-		{ QStringLiteral("studio"), QStringLiteral("studio"), &studioTokens },
+		{ QStringLiteral("studio"), QStringLiteral("studio"), QStringLiteral("studio"), &studioTokens },
 		// The minimal skin's sheets are precision_light.qss / precision_dark.qss;
 		// the name predates the skin's rename and the files were left alone.
-		{ QStringLiteral("minimal"), QStringLiteral("precision"), &minimalTokens },
-		{ QStringLiteral("soft"), QStringLiteral("soft"), &softTokens },
-		{ QStringLiteral("rack"), QStringLiteral("rack"), &rackTokens },
-		{ QStringLiteral("matrix"), QStringLiteral("matrix"), &matrixTokens },
+		{ QStringLiteral("minimal"), QStringLiteral("precision"), QStringLiteral("minimal"), &minimalTokens },
+		{ QStringLiteral("soft"), QStringLiteral("soft"), QStringLiteral("soft"), &softTokens },
+		{ QStringLiteral("rack"), QStringLiteral("rack"), QStringLiteral("rack"), &rackTokens },
+		{ QStringLiteral("matrix"), QStringLiteral("matrix"), QStringLiteral("matrix"), &matrixTokens },
+		{ QStringLiteral("midnight"), QStringLiteral("studio"), QStringLiteral("studio"), &midnightTokens },
+		{ QStringLiteral("arctic"), QStringLiteral("soft"), QStringLiteral("soft"), &arcticTokens },
+		{ QStringLiteral("ember"), QStringLiteral("rack"), QStringLiteral("rack"), &emberTokens },
+		{ QStringLiteral("violet"), QStringLiteral("matrix"), QStringLiteral("matrix"), &violetTokens },
+		{ QStringLiteral("solar"), QStringLiteral("precision"), QStringLiteral("minimal"), &solarTokens },
 	};
 	return entries;
 }
@@ -531,6 +751,12 @@ QString qssResource(const QString& id, bool dark)
 
 ResolvedStyleSheet styleSheet(const QString& id, bool dark, const QString& sourceDirectory)
 {
+	return styleSheetForTokens(id, dark, tokens(resolveId(id), dark), sourceDirectory);
+}
+
+ResolvedStyleSheet styleSheetForTokens(const QString& id, bool dark, const SkinTokens& themeTokens,
+	const QString& sourceDirectory)
+{
 	ResolvedStyleSheet result;
 	result.resolvedId = resolveId(id);
 	result.resourcePath = qssResource(result.resolvedId, dark);
@@ -545,7 +771,6 @@ ResolvedStyleSheet styleSheet(const QString& id, bool dark, const QString& sourc
 		qss = readQss(result.resourcePath, sourceDirectory, loaded);
 	}
 
-	const SkinTokens themeTokens = tokens(result.resolvedId, dark);
 	result.loaded = loaded;
 	result.qss = substituteTokens(qss, themeTokens)
 		+ comboArrowOverride() + fileDialogOverride();

@@ -171,7 +171,7 @@ helpers for geometry instead of recalculating label placement per skin.
 ## Skin theme data for satellite executables
 
 `Editor/skins/SkinThemeData.{h,cpp}` holds the behaviour-free half of the
-skin system: id aliases (`resolveId`), the five token tables, QSS resource
+skin system: id aliases (`resolveId`), the built-in token tables, QSS resource
 paths, complete style-sheet loading (`styleSheet`), the `@TOKEN@` /
 `@TOKEN_A30@` substitution, unresolved-token reporting, the token → `QPalette`
 mapping and the Qt 6.10 combo-arrow override. Alpha sentinels use integer
@@ -216,7 +216,7 @@ panel). Hosts hand action buttons over with semantic roles
 (`addActionButton`) and never lose control of their behavior or visibility;
 the Browse button doubles as the "Locate..." recovery entry while the
 reference is missing. The default is the neutral
-`DefaultReferenceCardView`; the five shipped skins override it in
+`DefaultReferenceCardView`; the shipped skins override it in
 `Editor/skins/cards/<Skin>ReferenceCardView.{h,cpp}`. Paths elide at paint
 time (`Editor/widgets/ElidedLabel.h`), never at set time.
 
@@ -260,10 +260,9 @@ $env:QT_QPA_PLATFORM = "offscreen"
 # Qt bin + fftw/libsndfile DLL directories must be on PATH; velopack_libc.dll
 # must sit next to Editor.exe (copy deps\velopack_libc\lib\velopack_libc_win_x64_msvc.dll).
 # If windeployqt has run on the build dir, the deployed app dir only carries
-# the qwindows platform plugin and the offscreen platform fails to load (the
-# Editor then hangs on a fatal-error dialog). Point the plugin search at the
-# full Qt install in that case:
-#   $env:QT_QPA_PLATFORM_PLUGIN_PATH = "<QT_ROOT>\plugins\platforms"
+# the qwindows platform plugin and the offscreen platform fails to load. Point
+# Qt at the full plugin tree in that case:
+#   $env:QT_PLUGIN_PATH = "<QT_ROOT>\plugins"
 .\build-Editor-x64\release\Editor.exe --skin-gallery <outDir> [--skin-gallery-skins studio,rack]
 ```
 
@@ -303,7 +302,7 @@ each for the toolbar, title bar, menu bar and an open menu, two for the
 add-card row (`addrow` normal/hover), one for the insertion seam's hover
 reveal (`seam`) and one for the update toast (`toast`). Output names are
 stable: `<skin>_<dark|light>_<row>_<state>.png`,
-5 × 2 × 118 = 1180 PNGs
+10 × 2 × 118 = 2360 PNGs
 for a full run; the run self-checks the count, so adding a gallery row needs
 no external count update. A row shot fails the render (non-zero exit) if a
 visible horizontal scrollbar is found inside the row — rows must fit the
@@ -343,7 +342,7 @@ variables and its `rgba()` wants numbers, so this is the only way a sheet holds 
 token at partial alpha instead of writing the palette value out by hand.
 
 `prepareCommandRow` receives `SkinTokens` like every other hook. It was the one
-that did not, and all five skins reached for `SkinManager::instance()->tokens()`
+that did not, and all shipped skins reached for `SkinManager::instance()->tokens()`
 inside it instead.
 
 ## Adding a skin

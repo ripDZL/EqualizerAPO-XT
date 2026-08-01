@@ -6,7 +6,7 @@
 	the reference-card information hierarchy plainly - icon, name-first label with format /
 	ABS / MISSING badges, middle-elided location line, readout line, status
 	line - styled from SkinTokens only, so it stays legible under any palette.
-	The five shipped skins override it; keep this class free of any one skin's
+	The shipped skins override it; keep this class free of any one skin's
 	vocabulary.
 */
 

@@ -44,6 +44,10 @@ struct SkinEntry
 	// Base name of the .qss pair, which is not always the id: the minimal skin's
 	// sheets keep their original precision_* names (docs/skins/minimal.md).
 	QString qssBaseName;
+	// Skin id whose custom painters implement this theme's form language. Token
+	// variants keep their own id and colours while reusing a shipped skin's
+	// widget grammar.
+	QString paintBaseId;
 	// The skin's token table. Every skin builds both modes from one function,
 	// so the roster carries one pointer rather than a light/dark pair.
 	SkinTokens (*tokens)(bool dark) = nullptr;
@@ -95,6 +99,13 @@ QString qssResource(const QString& id, bool dark);
 // may pass the on-disk skins directory because they do not link the Qt .qrc.
 ResolvedStyleSheet styleSheet(const QString& id, bool dark,
 	const QString& sourceDirectory = QString());
+
+// Same loader as styleSheet(), but substitutes a caller-supplied token table.
+// Used by the Theme Lab's transient live preview: it keeps the chosen skin's
+// QSS grammar while testing edited colours that are not part of the built-in
+// roster.
+ResolvedStyleSheet styleSheetForTokens(const QString& id, bool dark,
+	const SkinTokens& tokens, const QString& sourceDirectory = QString());
 
 // Replaces the @TOKEN@, @TOKEN_RGB@ and @TOKEN_A30@ sentinels of a skin sheet
 // with token values. RGB sentinels expand to colour channels; alpha sentinels

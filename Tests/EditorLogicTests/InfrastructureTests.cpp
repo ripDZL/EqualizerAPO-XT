@@ -14,6 +14,7 @@
 
 #include "Benchmark/BatchPlan.h"
 #include "Editor/skins/SkinPaint.h"
+#include "Editor/skins/SkinSupport.h"
 #include "Editor/skins/SkinThemeData.h"
 #include "Editor/widgets/EditableValueText.h"
 #include "Editor/widgets/cards/FileReferenceController.h"
@@ -78,7 +79,7 @@ void testUpdateElevationPolicyUsesOnePromptForEditorUpdates()
 void testTheSkinRosterIsTheOneList()
 {
 	const QVector<SkinThemeData::SkinEntry>& roster = SkinThemeData::roster();
-	requireTrue(roster.size() >= 5, "the roster carries the five built-in skins");
+	requireTrue(roster.size() >= 10, "the roster carries the built-in skins and token variants");
 	expectTrue(roster.first().id == QStringLiteral("studio"),
 		"studio is first, which is what an unknown id falls back to and what the default is");
 
@@ -102,6 +103,32 @@ void testTheSkinRosterIsTheOneList()
 	requireTrue(ids.size() == roster.size(), "ids() has one entry per roster skin, in the same order");
 	for (int index = 0; index < ids.size(); index++)
 		expectTrue(ids[index] == roster[index].id, "ids() preserves the roster order, which is the display order");
+	for (const QString& variant : { QStringLiteral("midnight"), QStringLiteral("arctic"),
+		QStringLiteral("ember"), QStringLiteral("violet"), QStringLiteral("solar") })
+	{
+		expectTrue(ids.contains(variant),
+			QStringLiteral("%1 is a selectable token-variant theme").arg(variant));
+	}
+	expectTrue(SkinThemeData::entry(QStringLiteral("midnight")).qssBaseName == QStringLiteral("studio"),
+		"Midnight Console rides the Studio QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("midnight")).paintBaseId == QStringLiteral("studio"),
+		"Midnight Console rides the Studio paint grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("arctic")).qssBaseName == QStringLiteral("soft"),
+		"Arctic Bloom rides the Soft QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("arctic")).paintBaseId == QStringLiteral("soft"),
+		"Arctic Bloom rides the Soft paint grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("ember")).qssBaseName == QStringLiteral("rack"),
+		"Ember Rack rides the Rack QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("ember")).paintBaseId == QStringLiteral("rack"),
+		"Ember Rack rides the Rack paint grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("violet")).qssBaseName == QStringLiteral("matrix"),
+		"Violet Pulse rides the Matrix QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("violet")).paintBaseId == QStringLiteral("matrix"),
+		"Violet Pulse rides the Matrix paint grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("solar")).qssBaseName == QStringLiteral("precision"),
+		"Solar Paper rides the Minimal QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("solar")).paintBaseId == QStringLiteral("minimal"),
+		"Solar Paper rides the Minimal paint grammar");
 
 	// The two stored aliases from earlier releases, which are the only ids that
 	// cannot be derived from the roster.
@@ -203,6 +230,30 @@ void testEverySkinSheetResolvesAllThemeTokens()
 		"alpha token handles fixed shadow/highlight material effects");
 	expectTrue(SkinThemeData::unresolvedTokenPlaceholders(alphaResolved).contains(QStringLiteral("@ACCENT_A101@")),
 		"invalid alpha tokens stay visible to unresolved-token reporting");
+}
+
+void testThemePreviewStyleSheetUsesCustomTokens()
+{
+	QDir repoRoot(QFileInfo(QString::fromUtf8(__FILE__)).absolutePath());
+	requireTrue(repoRoot.cdUp(), "theme-preview test reaches the tests directory");
+	requireTrue(repoRoot.cdUp(), "theme-preview test reaches the repository root");
+	const QString sourceDirectory = repoRoot.filePath(QStringLiteral("Editor/skins"));
+
+	SkinTokens tokens = SkinThemeData::tokens(QStringLiteral("midnight"), true);
+	tokens.accent = QStringLiteral("#123456");
+	finishTokens(tokens);
+
+	const SkinThemeData::ResolvedStyleSheet sheet =
+		SkinThemeData::styleSheetForTokens(QStringLiteral("midnight"), true, tokens, sourceDirectory);
+	expectTrue(sheet.loaded, "theme preview loads the base skin source sheet");
+	expectTrue(sheet.resolvedId == QStringLiteral("midnight"),
+		"theme preview keeps the selected variant id");
+	expectTrue(sheet.resourcePath == SkinThemeData::qssResource(QStringLiteral("midnight"), true),
+		"theme preview uses the variant's QSS grammar");
+	expectTrue(sheet.qss.contains(QStringLiteral("#123456")),
+		"theme preview substitutes edited token values");
+	expectTrue(sheet.unresolvedTokens.isEmpty(),
+		"theme preview leaves no unresolved @TOKEN@ sentinels");
 }
 
 void testSkinMaterialEffectHelpersStayFixedBlackAndWhite()

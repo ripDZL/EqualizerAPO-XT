@@ -289,8 +289,8 @@ public:
 	virtual QString id() const = 0;
 
 	// Colour + metric tokens for the requested mode. The default resolves the
-	// table SkinThemeData keeps for id(); the five shipped skins live there,
-	// so they do not override this.
+	// table SkinThemeData keeps for id(); shipped skins and token variants live
+	// there, so they do not override this.
 	virtual SkinTokens tokens(bool dark) const;
 
 	// Resource path of the QSS sheet for the requested mode. Default:

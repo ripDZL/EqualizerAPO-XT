@@ -1,6 +1,7 @@
 #include "SkinManager.h"
 
 #include <QApplication>
+#include <QDebug>
 #include <QFile>
 #include <QWidget>
 
@@ -52,6 +53,7 @@ void SkinManager::applyHeritage()
 	LogFStatic(L"Applying heritage presentation (legacy rows)");
 
 	heritageMode = true;
+	previewMode = false;
 	// Token donor and the base-class knob painter; nothing of the skin's own
 	// look survives below.
 	activeSkin = Skins::byId(QStringLiteral("studio"));
@@ -101,7 +103,7 @@ void SkinManager::applySkin(const QString& newSkinId, bool dark)
 	// three times (main(), loadPreferences() before and after the open-files
 	// restore); the post-restore pass alone re-polished every filter card and
 	// took seconds on a large config.
-	if (sheetApplied && !heritageMode && darkMode == dark
+	if (sheetApplied && !previewMode && !heritageMode && darkMode == dark
 		&& Skins::byId(newSkinId)->id() == skinId)
 	{
 		LogFStatic(L"Skin %s (dark=%d) already active, skipping re-apply",
@@ -110,6 +112,7 @@ void SkinManager::applySkin(const QString& newSkinId, bool dark)
 	}
 
 	heritageMode = false;
+	previewMode = false;
 	// Breadcrumb + unconditional log line: a skin-switch crash reported from
 	// the field must identify the dying skin in the crash report and in
 	// %TEMP%\EqualizerAPO.log.
@@ -133,6 +136,32 @@ void SkinManager::applySkin(const QString& newSkinId, bool dark)
 		widget->update();
 
 	LogFStatic(L"Skin %s applied", reinterpret_cast<const wchar_t*>(skinId.utf16()));
+}
+
+void SkinManager::applyTokenPreview(const QString& newSkinId, bool dark, const SkinTokens& tokens)
+{
+	heritageMode = false;
+	previewMode = true;
+	activeSkin = Skins::byId(newSkinId);
+	skinId = activeSkin->id();
+	darkMode = dark;
+	currentTokens = tokens;
+
+	SkinThemeData::registerBundledFonts(true);
+	const SkinThemeData::ResolvedStyleSheet sheet =
+		SkinThemeData::styleSheetForTokens(skinId, darkMode, currentTokens);
+	if (!sheet.loaded)
+		qWarning("Theme preview stylesheet %s could not be loaded", qPrintable(sheet.resourcePath));
+	if (!sheet.unresolvedTokens.isEmpty())
+		qWarning("Theme preview stylesheet %s has unresolved tokens: %s",
+			qPrintable(sheet.resourcePath), qPrintable(sheet.unresolvedTokens.join(QStringLiteral(", "))));
+	qApp->setPalette(SkinThemeData::palette(currentTokens, darkMode));
+	qApp->setStyleSheet(sheet.qss);
+	sheetApplied = true;
+
+	emit skinChanged(currentTokens);
+	for (QWidget* widget : qApp->allWidgets())
+		widget->update();
 }
 
 // The forwarders below delegate without a null check on purpose: activeSkin

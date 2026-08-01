@@ -28,9 +28,11 @@
 #include "version.h"
 #include "Editor/import/LegacyMigration.h"
 #include "Editor/widgets/TitleBar.h"
+#include "Editor/widgets/ThemeEditorDialog.h"
 #include "FilterTable.h"
 #include "MainWindow.h"
 #include "SkinManager.h"
+#include "skins/SkinDisplayNames.h"
 #include "skins/SkinThemeData.h"
 #include "ui_MainWindow.h"
 
@@ -241,23 +243,14 @@ void MainWindow::setupRedesignActions()
 
 	skinActionGroup = new QActionGroup(this);
 	skinActionGroup->setExclusive(true);
-	// Which skins exist and in what order comes from SkinThemeData::roster(); this
-	// only supplies the translated names. A roster id with no name here shows as
-	// its raw id - visible and reportable, unlike the old hand-written list, where
-	// a forgotten skin was simply absent from the menu.
-	const QHash<QString, QString> skinNames = {
-		{ QStringLiteral("studio"), tr("Studio Glass") },
-		{ QStringLiteral("minimal"), tr("Precision Minimal") },
-		{ QStringLiteral("soft"), tr("Soft Lab") },
-		{ QStringLiteral("rack"), tr("Hardware Rack") },
-		{ QStringLiteral("matrix"), tr("Signal Matrix") }
-	};
 	for (const QString& skinId : SkinThemeData::ids())
 	{
-		QAction* action = interfaceMenu->addAction(skinNames.value(skinId, skinId));
+		QAction* action = interfaceMenu->addAction(SkinDisplayNames::displayName(skinId));
 		action->setCheckable(true);
 		action->setData(skinId);
-		action->setShortcut(QKeySequence(QStringLiteral("Ctrl+Alt+%1").arg(skinActionGroup->actions().size() + 1)));
+		const int shortcutNumber = skinActionGroup->actions().size() + 1;
+		if (shortcutNumber <= 9)
+			action->setShortcut(QKeySequence(QStringLiteral("Ctrl+Alt+%1").arg(shortcutNumber)));
 		skinActionGroup->addAction(action);
 	}
 	connect(skinActionGroup, SIGNAL(triggered(QAction*)), this, SLOT(skinSelected(QAction*)));
@@ -267,12 +260,43 @@ void MainWindow::setupRedesignActions()
 	darkThemeAction->setShortcut(QKeySequence(QStringLiteral("Ctrl+Alt+D")));
 	connect(darkThemeAction, SIGNAL(toggled(bool)), this, SLOT(darkThemeToggled(bool)));
 
+	QAction* themeEditorAction = interfaceMenu->addAction(tr("Theme editor..."));
+	connect(themeEditorAction, &QAction::triggered, this, [this]() {
+		ThemeEditorDialog dialog(skinId, skinDark, this);
+		connect(&dialog, &ThemeEditorDialog::builtInThemeRequested, this,
+			[this](const QString& id, bool dark) {
+				skinId = id;
+				skinDark = dark;
+				applySkinAndRebuild();
+				applyRedesignPreferences();
+			});
+		connect(&dialog, &ThemeEditorDialog::themePreviewRequested, this,
+			[this](const QString& id, bool dark, const SkinTokens& tokens) {
+				const QString resolvedId = SkinThemeData::resolveId(id);
+				const bool needsRebuild = skinId != resolvedId
+					|| skinDark != dark
+					|| SkinManager::instance()->currentSkinId() != resolvedId;
+				if (needsRebuild)
+				{
+					const bool wasSuppressed = skinPersistenceSuppressed;
+					skinPersistenceSuppressed = true;
+					skinId = resolvedId;
+					skinDark = dark;
+					applySkinAndRebuild();
+					skinPersistenceSuppressed = wasSuppressed;
+				}
+				SkinManager::instance()->applyTokenPreview(resolvedId, dark, tokens);
+			});
+		dialog.exec();
+	});
+
 	if (SkinManager::instance()->isHeritage())
 	{
 		// Heritage is unskinned by definition; the choices come back with the
 		// modern presentation.
 		skinActionGroup->setEnabled(false);
 		darkThemeAction->setEnabled(false);
+		themeEditorAction->setEnabled(false);
 	}
 
 	interfaceMenu->addSeparator();

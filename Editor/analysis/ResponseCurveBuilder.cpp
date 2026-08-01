@@ -444,7 +444,7 @@ AnalysisCurve buildAnalysisCurve(const AnalysisResponse& response, const Analysi
 		// grid, ticks and captions the graph has always shown before its first
 		// analysis lands. Returning a bare range instead would empty the
 		// horizontal grid and every value figure out of the resting graph in
-		// all five skins.
+		// every shipped skin.
 		applyFit(curve);
 		return curve;
 	}
