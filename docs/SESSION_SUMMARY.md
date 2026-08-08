@@ -134,4 +134,5 @@
 - 2026-08-08 beta CI run `31277330076` passed Pester 5, cppcheck, x64 SSE2/AVX/AVX2/AVX-512/AVX10.1, ARM64, cross-variant comparison, packaging, and offscreen UI checks.
 - 2026-08-08 stable promotion/release: pushed `0d26e5b` to `main`; run `31278644890` bumped `a4a3c78` to `2.35.0`, passed all six build variants plus Pester/cppcheck/cross-variant checks, and published `v2.35.0` installers, source archive, and checksums.
 - Corrected `v2.35.0` tag and release target to `a4a3c78`; fixed `build.yml` to supply `needs.version-bump.outputs.bumped_sha || github.sha` to Velopack and added a Pester assertion.
-- Current upstream `ddf4e50` is intentionally not in this release: it is a broad refactor that removes/reworks fork live-preview and theme files; review it as a separate beta task.
+- Current upstream `ddf4e50` is intentionally not in this release pending a separate beta review.
+- 2026-08-08 review correction: `git diff beta...upstream/main` is a 28-file registry/UAC change, not a preview/theme removal. PR #257 is not merge-ready: `DllRegisterServer` rolls back APOs after a CLSID write failure but leaves completed/partial CLSID trees; add partial-write cleanup plus fake-registry residue tests. Merge simulation conflicts only in `version.h`.

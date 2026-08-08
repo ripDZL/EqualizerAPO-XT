@@ -123,4 +123,4 @@
 - [x] Promoted verified `beta` `0d26e5b` to stable `main`; GitHub Actions run `31278644890` passed Pester 5, cppcheck, all x64/ARM64 builds, cross-variant comparison, packaging, and offscreen UI checks.
 - [x] Published stable `v2.35.0` from `a4a3c78`, including the auto-detect installer, six channel installers, source archive, and `SHA256SUMS.txt`; release tag and target both resolve to `a4a3c78`.
 - [x] Fixed release targeting: Velopack now receives the version-bump SHA, with a Pester assertion preventing a return to the pre-bump trigger SHA.
-- [ ] Review current upstream `ddf4e50` separately before another beta merge; it broadly reworks/removes fork live-preview and theme code.
+- [ ] Address upstream PR #257 CLSID rollback residue before another beta merge; its 28-file three-dot diff has no preview/theme overlap, and only `version.h` conflicts with `beta`.
