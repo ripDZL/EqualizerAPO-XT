@@ -123,3 +123,5 @@
 - Dialog contrast fix: heritage QSS now covers `QDialog`, `QMessageBox`, and `QDialogButtonBox`; `--skin-switch-test` renders a heritage message box and fails if the body stays native-light.
 - Validation: `git diff --check`; `Test-SourceSync.ps1`; `EditorLogicTests.exe` passed 3137 checks; AVX-512 Editor rebuilt; `Editor.exe --selftest-vst`; `Editor.exe --skin-switch-test`; focused gallery wrote 6 PNGs to `artifacts\skin-gallery-legacy-dialogs-20260801-121757`.
 - Stable branch sync prep: user requested `master`; this fork only has stable `main`, so current `origin/main` was merged into `beta` and `version.h` stayed at `2.30.2` for the pending main fast-forward.
+- 2026-08-08 upstream beta integration: merged `upstream/main` `3d692be..3412d72` without conflicts. Included VST3 panel stabilization/close controls, incremental card moves, path-entry file dialogs, skin checkbox glyphs, and pinned-vcpkg CI bootstrap.
+- Validation: `git diff --check`; `Test-SourceSync.ps1`; `EditorLogicTests.exe` 3161 checks; `HybridConvTests.exe` 1635 checks; rebuilt AVX-512 Editor; `--selftest-vst`; card move worst 59 ms/1000 ms limit; `--skin-switch-test` passed.

@@ -111,3 +111,5 @@
 - [x] Validated LegacyRows pivot: `git diff --check`; `Test-SourceSync.ps1`; `EditorLogicTests.exe` 3137 checks; AVX-512 Editor/DeviceSelector rebuilds; `Editor.exe --selftest-vst`; `Editor.exe --skin-switch-test`; focused LegacyRows gallery 20 PNGs at `artifacts\skin-gallery-legacy-themes-20260801-112049`.
 - [x] Fixed LegacyRows dark-dialog contrast: `QDialog`, `QMessageBox`, and `QDialogButtonBox` now receive the heritage palette/QSS; validation passed `git diff --check`, `Test-SourceSync.ps1`, `EditorLogicTests.exe` 3137 checks, AVX-512 Editor rebuild, `Editor.exe --selftest-vst`, `Editor.exe --skin-switch-test`, and message-box gallery 6 PNGs at `artifacts\skin-gallery-legacy-dialogs-20260801-121757`.
 - [x] Prepared stable `main` update from `beta`; no `master` branch exists, and `version.h` stayed at `2.30.2` after merging current `origin/main` into `beta`.
+- [x] Merged current upstream `main` (`3d692be..3412d72`) into `beta` with no conflicts.
+- [x] Validated the upstream integration: `Test-SourceSync.ps1`; `EditorLogicTests.exe` 3161 checks; `HybridConvTests.exe` 1635 checks; AVX-512 Editor rebuild; VST self-test; card-move test; skin-switch test.

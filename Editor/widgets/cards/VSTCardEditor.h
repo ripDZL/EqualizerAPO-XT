@@ -51,6 +51,7 @@ public:
 
 private slots:
 	void openPanel();
+	void panelButtonClicked();
 	void applyDialog();
 	void autoApplyToggled(bool checked);
 	void pathCommitted(const QString& text);
