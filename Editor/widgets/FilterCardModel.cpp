@@ -4,18 +4,34 @@
 #include <QRegularExpression>
 
 #include <utility>
+#include <variant>
 
 #include "filters/ExpressionCommand.h"
 #include "filters/FilterFactoryRegistry.h"
+#include "SubwooferRouting/StateCodec.h"
+#include "filters/subwooferRouting/SubwooferRoutingCommand.h"
 #include "filters/BiQuadCommand.h"
 #include "filters/HilbertCommand.h"
 #include "filters/VelvetCommand.h"
+#include "FilterCommandCatalog.h"
 
 namespace
 {
 QString middleDotSeparator()
 {
 	return QStringLiteral(" %1 ").arg(QChar(0x00B7));
+}
+
+// The catalog states each command's card identity once; describeLine keeps
+// only the per-line summary work below.
+void applyCommandIdentity(FilterCardDescriptor& descriptor,
+	const FilterCommandCatalog::CommandEntry& entry)
+{
+	descriptor.type = QLatin1String(entry.type);
+	descriptor.badge = QLatin1String(entry.badge);
+	descriptor.title = FilterCommandCatalog::title(entry);
+	descriptor.color = QLatin1String(entry.color);
+	descriptor.routeType = entry.routeType;
 }
 
 QString biquadTypeTitle(const QString& code)
@@ -209,6 +225,17 @@ bool FilterCardModel::hasInlineExpressions(const QString& parameters)
 	return false;
 }
 
+bool FilterCardModel::hostsSharedRawBody(const QString& type, bool dynamicLine)
+{
+	return type == QStringLiteral("text") || type == QStringLiteral("if")
+		|| type == QStringLiteral("eval") || dynamicLine;
+}
+
+bool FilterCardModel::opensRoutingView(const FilterCardDescriptor& descriptor)
+{
+	return descriptor.type == QStringLiteral("copy") && !descriptor.dynamicLine;
+}
+
 QString FilterCardModel::commandForLine(const QString& line, QString* parameters)
 {
 	QString trimmed = line.trimmed();
@@ -267,11 +294,10 @@ FilterCardDescriptor FilterCardModel::describeLine(const QString& line, int dept
 	{
 		QString trimmed = line.trimmed();
 		descriptor.command = QStringLiteral("#");
-		descriptor.title = tr("Comment");
+		if (const FilterCommandCatalog::CommandEntry* entry
+			= FilterCommandCatalog::entryForKeyword(QStringLiteral("#")))
+			applyCommandIdentity(descriptor, *entry);
 		descriptor.summary = compactWhitespace(trimmed.mid(1));
-		descriptor.type = QStringLiteral("comment");
-		descriptor.badge = QStringLiteral("#");
-		descriptor.color = QStringLiteral("#94a3b8");
 		descriptor.canToggleEnabled = false;
 		return descriptor;
 	}
@@ -294,26 +320,16 @@ FilterCardDescriptor FilterCardModel::describeLine(const QString& line, int dept
 	if (!descriptor.enabled && command != QStringLiteral("#"))
 		descriptor.summary = compactWhitespace(parameters);
 
-	if (keyword == QStringLiteral("Preamp"))
+	// One identity application for every recognized command; the ladder below
+	// keeps only the branches that compute a summary from the parameters.
+	// Commands whose card is fully described by their catalog row (Preamp,
+	// Delay, Device, Stage, Loudness, Eval, the If family) need no branch.
+	if (const FilterCommandCatalog::CommandEntry* entry
+		= FilterCommandCatalog::entryForKeyword(keyword))
+		applyCommandIdentity(descriptor, *entry);
+
+	if (keyword == QStringLiteral("Hilbert"))
 	{
-		descriptor.type = QStringLiteral("preamp");
-		descriptor.badge = QStringLiteral("PRE");
-		descriptor.title = tr("Preamp");
-		descriptor.color = QStringLiteral("#f59e0b");
-	}
-	else if (keyword == QStringLiteral("Delay"))
-	{
-		descriptor.type = QStringLiteral("delay");
-		descriptor.badge = QStringLiteral("DLY");
-		descriptor.title = tr("Delay");
-		descriptor.color = QStringLiteral("#14b8a6");
-	}
-	else if (keyword == QStringLiteral("Hilbert"))
-	{
-		descriptor.type = QStringLiteral("hilbert");
-		descriptor.badge = QStringLiteral("H90");
-		descriptor.title = tr("Hilbert transform");
-		descriptor.color = QStringLiteral("#6366f1");
 		HilbertCommand parsed;
 		if (HilbertCommand::parse(command.toStdWString(),
 			parameters.toStdWString(), parsed))
@@ -334,10 +350,6 @@ FilterCardDescriptor FilterCardModel::describeLine(const QString& line, int dept
 	}
 	else if (keyword == QStringLiteral("Velvet"))
 	{
-		descriptor.type = QStringLiteral("velvet");
-		descriptor.badge = QStringLiteral("VEL");
-		descriptor.title = tr("Velvet decorrelator");
-		descriptor.color = QStringLiteral("#d946ef");
 		VelvetCommand parsed;
 		if (VelvetCommand::parse(command.toStdWString(),
 			parameters.toStdWString(), parsed))
@@ -359,10 +371,6 @@ FilterCardDescriptor FilterCardModel::describeLine(const QString& line, int dept
 		// (commonly emitted by REW, Room EQ Wizard, Dirac, and other tools).
 		// canonicalCommand already folds the trailing token away, so both spellings
 		// land here and keep the type-specific badge/title/summary.
-		descriptor.type = QStringLiteral("biquad");
-		descriptor.badge = QStringLiteral("BQUAD");
-		descriptor.title = tr("Biquad");
-		descriptor.color = QStringLiteral("#22c55e");
 
 		// The custom-coefficient IIR grammar ("ON IIR Order N Coefficients ...")
 		// keeps the biquad card type so every skin's biquad styling applies;
@@ -416,23 +424,12 @@ FilterCardDescriptor FilterCardModel::describeLine(const QString& line, int dept
 	}
 	else if (keyword == QStringLiteral("GraphicEQ"))
 	{
-		descriptor.type = QStringLiteral("graphiceq");
-		descriptor.badge = QStringLiteral("GEQ");
-		descriptor.title = tr("Graphic EQ");
-		descriptor.color = QStringLiteral("#8b5cf6");
-
 		int bandCount = parameters.count(';') + 1;
 		if (!parameters.trimmed().isEmpty())
 			descriptor.summary = tr("%1 bands").arg(bandCount);
 	}
 	else if (keyword == QStringLiteral("Copy"))
 	{
-		descriptor.type = QStringLiteral("copy");
-		descriptor.badge = QStringLiteral("CPY");
-		descriptor.title = tr("Copy");
-		descriptor.color = QStringLiteral("#06b6d4");
-		descriptor.routeType = true;
-
 		static const QRegularExpression stepExpression(QStringLiteral("([A-Za-z0-9]+)\\s*="));
 		QRegularExpressionMatchIterator matches = stepExpression.globalMatch(parameters);
 		QStringList destinations;
@@ -458,45 +455,26 @@ FilterCardDescriptor FilterCardModel::describeLine(const QString& line, int dept
 	}
 	else if (keyword == QStringLiteral("Channel"))
 	{
-		descriptor.type = QStringLiteral("channel");
-		descriptor.badge = QStringLiteral("CH");
-		descriptor.title = tr("Channel");
-		descriptor.color = QStringLiteral("#3b82f6");
-		descriptor.routeType = true;
 		descriptor.channelBadges = parseChannelList(parameters);
 		descriptor.summary = descriptor.channelBadges.join(' ');
 	}
 	else if (keyword == QStringLiteral("Include"))
 	{
-		descriptor.type = QStringLiteral("include");
-		descriptor.badge = QStringLiteral("INC");
-		descriptor.title = tr("Include");
-		descriptor.color = QStringLiteral("#64748b");
-		descriptor.routeType = true;
 		descriptor.summary = QFileInfo(parameters).fileName();
 		if (descriptor.summary.isEmpty())
 			descriptor.summary = parameters;
 	}
 	else if (keyword == QStringLiteral("Convolution"))
 	{
-		descriptor.type = QStringLiteral("convolution");
-		descriptor.badge = QStringLiteral("CONV");
-		descriptor.title = tr("Convolution");
-		descriptor.color = QStringLiteral("#ec4899");
 		QString fileName = QFileInfo(parameters.section(' ', 0, 0)).fileName();
 		if (!fileName.isEmpty())
 			descriptor.summary = fileName;
 	}
 	else if (keyword == QStringLiteral("MultiConvolution"))
 	{
-		// Shares the convolution row type so skins style it like the single-input
-		// convolution card. The grammar differs: the first token is the output
+		// The grammar differs from Convolution: the first token is the output
 		// channel and the remainder is the impulse-response path, so the header
 		// reads "<channel> · <file>" (e.g. "L · brir.wav").
-		descriptor.type = QStringLiteral("convolution");
-		descriptor.badge = QStringLiteral("MCONV");
-		descriptor.title = tr("MultiConvolution");
-		descriptor.color = QStringLiteral("#ec4899");
 		const QString trimmedParams = parameters.trimmed();
 		static const QRegularExpression whitespaceExpression(QStringLiteral("\\s"));
 		const int split = trimmedParams.indexOf(whitespaceExpression);
@@ -509,72 +487,111 @@ FilterCardDescriptor FilterCardModel::describeLine(const QString& line, int dept
 	}
 	else if (keyword == QStringLiteral("VSTPlugin"))
 	{
-		descriptor.type = QStringLiteral("vst");
-		descriptor.badge = QStringLiteral("VST");
-		descriptor.title = tr("VST Plugin");
-		descriptor.color = QStringLiteral("#a855f7");
 		descriptor.summary = QFileInfo(parameters).fileName();
 		if (descriptor.summary.isEmpty())
 			descriptor.summary = parameters;
 	}
-	else if (keyword == QStringLiteral("Device"))
+	else if (keyword == QStringLiteral("SubwooferRouting"))
 	{
-		descriptor.type = QStringLiteral("device");
-		descriptor.badge = QStringLiteral("DEV");
-		descriptor.title = tr("Device");
-		descriptor.color = QStringLiteral("#64748b");
-	}
-	else if (keyword == QStringLiteral("Stage"))
-	{
-		descriptor.type = QStringLiteral("stage");
-		descriptor.badge = QStringLiteral("STG");
-		descriptor.title = tr("Stage");
-		descriptor.color = QStringLiteral("#f97316");
-	}
-	else if (keyword == QStringLiteral("LoudnessCorrection"))
-	{
-		descriptor.type = QStringLiteral("loudness");
-		descriptor.badge = QStringLiteral("LOUD");
-		descriptor.title = tr("Loudness");
-		descriptor.color = QStringLiteral("#eab308");
-	}
-	else if (keyword == QStringLiteral("If") || keyword == QStringLiteral("ElseIf")
-		|| keyword == QStringLiteral("Else") || keyword == QStringLiteral("EndIf"))
-	{
-		// The whole If family shares one card type; the badge tells the branch
-		// kind apart. The summary is the condition expression as written - for
-		// Else/EndIf the engine ignores any text after the colon, and an empty
-		// summary is the honest reading (the title already says everything).
-		descriptor.type = QStringLiteral("if");
-		descriptor.color = QStringLiteral("#f43f5e");
-		if (keyword == QStringLiteral("If"))
+		// Keep card-list work bounded. The full editor owns profile I/O and
+		// detailed validation; the descriptor only summarizes an in-memory
+		// State payload or names a linked profile.
+		constexpr qsizetype maximumSummaryPayload = 1024 * 1024;
+		if (parameters.size() > maximumSummaryPayload)
 		{
-			descriptor.badge = QStringLiteral("IF");
-			descriptor.title = tr("If");
-		}
-		else if (keyword == QStringLiteral("ElseIf"))
-		{
-			descriptor.badge = QStringLiteral("ELIF");
-			descriptor.title = tr("Else if");
-		}
-		else if (keyword == QStringLiteral("Else"))
-		{
-			descriptor.badge = QStringLiteral("ELSE");
-			descriptor.title = tr("Else");
+			descriptor.summary = tr("invalid state");
 		}
 		else
 		{
-			descriptor.badge = QStringLiteral("ENDIF");
-			descriptor.title = tr("End if");
+			SubwooferRoutingCommand parsed;
+			if (!SubwooferRoutingCommand::parse(command.toStdWString(),
+				parameters.toStdWString(), parsed))
+			{
+				descriptor.summary = tr("invalid state");
+			}
+			else if (parsed.form == SubwooferRoutingCommand::Form::Profile)
+			{
+				QString path = QString::fromStdWString(parsed.payload);
+				if (path.size() >= 2 && path.front() == QLatin1Char('"')
+					&& path.back() == QLatin1Char('"'))
+				{
+					path = path.mid(1, path.size() - 2);
+				}
+				descriptor.summary = QFileInfo(path).fileName();
+				if (descriptor.summary.isEmpty())
+					descriptor.summary = path;
+			}
+			else
+			{
+				const std::string payload =
+					subwooferRoutingToUtf8(parsed.payload);
+				const subroute::StateDecodeResult decoded =
+					subroute::decodeState(payload);
+				if (!decoded.succeeded())
+				{
+					descriptor.summary = tr("invalid state");
+				}
+				else
+				{
+					int lfeChannels = 0;
+					for (const subroute::PhysicalChannel& channel
+						: decoded.state->layout.channels)
+					{
+						if (QString::fromUtf8(channel.id.data(),
+							static_cast<int>(channel.id.size()))
+							.compare(QStringLiteral("LFE"),
+								Qt::CaseInsensitive) == 0)
+						{
+							lfeChannels++;
+						}
+					}
+
+					// The header speaks the user's language: the layout and
+					// the crossover corner. Internal graph statistics (group
+					// and path counts) belong to the full editor.
+					double crossoverHz = 0.0;
+					for (const subroute::Path& path
+						: decoded.state->paths)
+					{
+						for (const subroute::PathStage& stage : path.chain)
+						{
+							const subroute::BiquadStage* biquad =
+								std::get_if<subroute::BiquadStage>(&stage);
+							if (biquad == nullptr)
+								continue;
+							if (biquad->filter.type
+								== subroute::BiquadType::HighPass
+								|| biquad->filter.type
+								== subroute::BiquadType::LowPass)
+							{
+								crossoverHz = biquad->filter.frequencyHz;
+								break;
+							}
+						}
+						if (crossoverHz > 0.0)
+							break;
+					}
+
+					const int mainChannels =
+						static_cast<int>(
+							decoded.state->layout.channels.size())
+						- lfeChannels;
+					const QString layout =
+						QStringLiteral("%1.%2")
+							.arg(mainChannels)
+							.arg(lfeChannels);
+					descriptor.summary = crossoverHz > 0.0
+						? tr("%1 - crossover %2 Hz")
+							.arg(layout)
+							.arg(QString::number(crossoverHz, 'g', 5))
+						: tr("%1 - full range").arg(layout);
+				}
+			}
 		}
 	}
-	else if (keyword == QStringLiteral("Eval"))
-	{
-		descriptor.type = QStringLiteral("eval");
-		descriptor.badge = QStringLiteral("EVAL");
-		descriptor.title = tr("Eval");
-		descriptor.color = QStringLiteral("#0ea5e9");
-	}
+	// The If family and Eval keep their as-written condition text as the
+	// summary; each branch keyword is its own catalog row (shared "if" card
+	// type, distinct badge), so no branch code is needed here.
 
 	// Rows whose summary is the parameter text as written (raw text lines and
 	// the programmatic If/Eval vocabulary) would otherwise fall through to the
@@ -599,26 +616,17 @@ QString FilterCardModel::badgeIconResource(const QString& type, const QString& b
 		// response-curve glyphs (LPQ rides with LP, LSC with LS, PEQ/MODAL
 		// with PK); an unparsed biquad ("BQUAD") shows the generic peaking
 		// curve rather than a letter chunk, mirroring the picker's fallback.
-		static const struct { const char* prefix; const char* icon; } curves[] = {
-			{ "LP", "eq-lowpass" },
-			{ "HP", "eq-highpass" },
-			{ "BP", "eq-bandpass" },
-			{ "LS", "eq-lowshelf" },
-			{ "HS", "eq-highshelf" },
-			{ "NO", "eq-notch" },
-			{ "AP", "eq-allpass" }
-		};
-		for (const auto& curve : curves)
-			if (badge.startsWith(QLatin1String(curve.prefix)))
-				return QStringLiteral(":/icons/modern/%1.svg").arg(QLatin1String(curve.icon));
-		return QStringLiteral(":/icons/modern/eq-peaking.svg");
+		for (const FilterCommandCatalog::BiquadCurveEntry& curve
+			: FilterCommandCatalog::biquadCurves())
+			if (badge.startsWith(QLatin1String(curve.code)))
+				return FilterCommandCatalog::iconResource(curve.icon);
+		return FilterCommandCatalog::iconResource("eq-peaking");
 	}
 	if (type == QStringLiteral("convolution"))
 	{
 		// The badge splits the siblings: one shared type, two pictograms.
-		return badge == QStringLiteral("MCONV")
-			? QStringLiteral(":/icons/modern/multi-convolution.svg")
-			: QStringLiteral(":/icons/modern/waveform.svg");
+		return commandIconResource(badge == QStringLiteral("MCONV")
+			? QStringLiteral("multiconvolution") : QStringLiteral("convolution"));
 	}
 	if (type == QStringLiteral("hilbert"))
 		return commandIconResource(QStringLiteral("hilbert"));
@@ -636,53 +644,23 @@ QString FilterCardModel::badgeIconResource(const QString& type, const QString& b
 
 QString FilterCardModel::commandIconResource(const QString& command, const QString& parameters)
 {
-	const QString normalized = command.trimmed().toLower();
-	if (normalized == QStringLiteral("#") || normalized == QStringLiteral("comment"))
-		return QStringLiteral(":/icons/modern/comment-bubble.svg");
-	if (normalized == QStringLiteral("filter"))
+	const QString normalized = command.trimmed();
+	if (normalized.compare(QStringLiteral("filter"), Qt::CaseInsensitive) == 0)
 	{
+		// The Filter command splits by its response-type token; an unmatched
+		// line keeps the generic peaking curve.
 		const QString upper = QStringLiteral(" ") + parameters.toUpper() + QStringLiteral(" ");
-		static const struct { const char* token; const char* icon; } curves[] = {
-			{ " PK ", "eq-peaking" },
-			{ " LP ", "eq-lowpass" },
-			{ " HP ", "eq-highpass" },
-			{ " BP ", "eq-bandpass" },
-			{ " LS ", "eq-lowshelf" },
-			{ " HS ", "eq-highshelf" },
-			{ " NO ", "eq-notch" },
-			{ " AP ", "eq-allpass" }
-		};
-		for (const auto& curve : curves)
-			if (upper.contains(QLatin1String(curve.token)))
-				return QStringLiteral(":/icons/modern/%1.svg").arg(QLatin1String(curve.icon));
-		return QStringLiteral(":/icons/modern/eq-peaking.svg");
+		for (const FilterCommandCatalog::BiquadCurveEntry& curve
+			: FilterCommandCatalog::biquadCurves())
+			if (upper.contains(QStringLiteral(" %1 ").arg(QLatin1String(curve.code))))
+				return FilterCommandCatalog::iconResource(curve.icon);
+		return FilterCommandCatalog::iconResource("eq-peaking");
 	}
 
-	static const struct { const char* command; const char* icon; } commands[] = {
-		{ "include", "file-include" },
-		{ "convolution", "waveform" },
-		{ "multiconvolution", "multi-convolution" },
-		{ "vstplugin", "plugin" },
-		{ "graphiceq", "graphic-eq" },
-		{ "preamp", "preamp-gain" },
-		{ "delay", "delay-clock" },
-		{ "hilbert", "eq-allpass" },
-		{ "velvet", "waveform" },
-		{ "device", "device-speaker" },
-		{ "channel", "channel-select" },
-		{ "stage", "stage-chain" },
-		{ "copy", "route-channels" },
-		{ "loudnesscorrection", "loudness" },
-		{ "if", "logic-if" },
-		{ "elseif", "logic-if" },
-		{ "else", "logic-if" },
-		{ "endif", "logic-if" },
-		{ "eval", "logic-eval" }
-	};
-	for (const auto& mapping : commands)
-		if (normalized == QLatin1String(mapping.command))
-			return QStringLiteral(":/icons/modern/%1.svg").arg(QLatin1String(mapping.icon));
-	return QString();
+	const FilterCommandCatalog::CommandEntry* entry
+		= FilterCommandCatalog::entryForCommandWord(normalized);
+	// An unmapped word returns empty so raw text falls back to its monogram.
+	return entry == nullptr ? QString() : FilterCommandCatalog::iconResource(entry->icon);
 }
 
 QVector<FilterCardRowScope> FilterCardModel::calculateScopes(const QList<QString>& lines)

@@ -12,6 +12,17 @@ Describe "extracted build script decisions" {
         # links Common.lib whole-archive and so now carries the variant's /arch
         # into a static initializer.
         $plan.RuntimeTests | Should -BeNullOrEmpty
+        # No x86 cross-build on the ARM64 leg; the avx2 leg owns the installer.
+        $plan.InstallerProject | Should -BeNullOrEmpty
+    }
+
+    It "builds the auto-detect installer on the avx2 leg only" {
+        $avx2 = & (Join-Path $PSScriptRoot "..\Build-Solution.ps1") `
+            -WorkspaceRoot $root -Platform x64 -SimdVariant avx2 -ArchFlag AdvancedVectorExtensions2 -PlanOnly
+        $avx2.InstallerProject | Should -Be "Installer\Installer.vcxproj"
+        $sse2 = & (Join-Path $PSScriptRoot "..\Build-Solution.ps1") `
+            -WorkspaceRoot $root -Platform x64 -SimdVariant sse2 -ArchFlag NotSet -PlanOnly
+        $sse2.InstallerProject | Should -BeNullOrEmpty
     }
 
     It "derives the AVX10 and ARM64 update channels" {
@@ -64,7 +75,9 @@ Describe "extracted build script decisions" {
             "VoicemeeterClient\x64\Release\VoicemeeterClient.exe",
             "deps\fftw\Release\libfftw3.dll",
             "deps\libsndfile\build\Release\sndfile.dll",
-            "deps\velopack_libc\lib\velopack_libc_win_x64_msvc.dll"
+            "deps\velopack_libc\lib\velopack_libc_win_x64_msvc.dll",
+            "VST3\SubwooferRouting\x64\Release\EapoXtSubwooferRouting.vst3",
+            "VST3\SubwooferRouting\LICENSE"
         )
         foreach ($relative in $required) {
             $target = Join-Path $repo $relative
@@ -92,6 +105,10 @@ Describe "extracted build script decisions" {
             Should -BeFalse -Because "reruns must not keep deleted files"
         Test-Path -LiteralPath (Join-Path $artifact "Editor.exe") | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $artifact "platforms\qwindows.dll") | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $artifact "VST3\EapoXtSubwooferRouting.vst3\Contents\x86_64-win\EapoXtSubwooferRouting.vst3") |
+            Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $artifact "VST3\EapoXtSubwooferRouting.vst3\LICENSE") |
+            Should -BeTrue
         Test-Path -LiteralPath (Join-Path $artifact "moc_Editor.cpp") |
             Should -BeFalse -Because "generated source files are not install artifacts"
         Test-Path -LiteralPath (Join-Path $artifact "ui_Editor.h") |

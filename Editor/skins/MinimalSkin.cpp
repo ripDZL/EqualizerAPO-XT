@@ -22,8 +22,10 @@
 #include <QtMath>
 
 #include "Editor/SkinManager.h"
+#include "Editor/widgets/FilterCardModel.h"
 #include "Editor/skins/pickers/MinimalFilterPicker.h"
 #include "Editor/skins/cards/MinimalReferenceCardView.h"
+#include "Editor/skins/cards/MinimalSubwooferRoutingCardView.h"
 #include "Editor/widgets/routing/StepListRoutingRenderer.h"
 #include "SkinFileIcons.h"
 #include "SkinPaint.h"
@@ -855,6 +857,11 @@ public:
 	{
 		return new MinimalReferenceCardView(kind, parent);
 	}
+
+	SubwooferRoutingCardView* createSubwooferRoutingCardView(QWidget* parent) const override
+	{
+		return new MinimalSubwooferRoutingCardView(parent);
+	}
 	// The neutral default keeps the shared stroke icons on the actions so the
 	// File menu (which shares the QActions) stays modern; the toolbar buttons
 	// themselves drop the pictures and show the command words instead
@@ -933,8 +940,7 @@ public:
 		// so QSS cannot reach it and the override happens here. Rows are
 		// rebuilt on skin/theme switches, so construction-time token values
 		// stay current.
-		if ((info.type == QStringLiteral("text") || info.type == QStringLiteral("if")
-			|| info.type == QStringLiteral("eval") || info.dynamicLine) && body != nullptr)
+		if (FilterCardModel::hostsSharedRawBody(info.type, info.dynamicLine) && body != nullptr)
 		{
 			if (QLabel* rawText = body->findChild<QLabel*>(QStringLiteral("FilterCardRawText")))
 			{

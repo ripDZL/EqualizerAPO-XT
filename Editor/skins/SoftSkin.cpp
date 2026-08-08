@@ -28,8 +28,10 @@
 
 #include "Editor/SkinManager.h"
 #include "Editor/helpers/GUIHelper.h"
+#include "Editor/widgets/FilterCardModel.h"
 #include "Editor/skins/pickers/SoftFilterPicker.h"
 #include "Editor/skins/cards/SoftReferenceCardView.h"
+#include "Editor/skins/cards/SoftSubwooferRoutingCardView.h"
 #include "Editor/widgets/routing/BlockChipRoutingRenderer.h"
 #include "SkinPaint.h"
 #include "SkinSupport.h"
@@ -160,6 +162,11 @@ public:
 	ReferenceCardView* createReferenceCardView(const QString& kind, QWidget* parent) const override
 	{
 		return new SoftReferenceCardView(kind, parent);
+	}
+
+	SubwooferRoutingCardView* createSubwooferRoutingCardView(QWidget* parent) const override
+	{
+		return new SoftSubwooferRoutingCardView(parent);
 	}
 
 	// Window chrome: deliberately NO paintTitleBarChrome override. The
@@ -1058,10 +1065,8 @@ public:
 	void prepareCommandRow(const CommandRowInfo& info, QWidget* card, QWidget* header, QWidget* body, const SkinTokens& tokens) const override
 	{
 		Q_UNUSED(card);
-		const bool rawBodyRow = info.type == QStringLiteral("text")
-			|| info.type == QStringLiteral("if") || info.type == QStringLiteral("eval")
-			|| info.dynamicLine;
-		if (info.legacyRow || !rawBodyRow)
+		if (info.legacyRow
+			|| !FilterCardModel::hostsSharedRawBody(info.type, info.dynamicLine))
 			return;
 
 		// Sentence conditions: a simple If/Eval line is retold in the header

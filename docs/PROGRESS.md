@@ -115,3 +115,7 @@
 - [x] Validated the upstream integration: `Test-SourceSync.ps1`; `EditorLogicTests.exe` 3161 checks; `HybridConvTests.exe` 1635 checks; AVX-512 Editor rebuild; VST self-test; card-move test; skin-switch test.
 - [x] Merged stable-only `0ccd698` into `beta`, retaining `version.h` `2.33.1`; promoted the combined history to `main` at `03c8d07`.
 - [x] Added main-only dispatch release support (`2564f99`) and published stable `v2.33.1` from GitHub Actions run `31261255797`; release includes the auto-detect installer, every SIMD channel installer, source archive, and SHA-256 checksums.
+- [x] Merged upstream `b3b8544` (`v2.34.1`) into `beta`; preserved beta live-preview include, artifact exclusions, and six-config HybridConv whole-archive linking.
+- [x] Added the missing Subwoofer Routing VST3 fixture/assertions to the package-script test.
+- [x] Local validation: source/variant sync; core, APO, VST3, installer, and Qt rebuilds; EditorLogic 3509 checks; HybridConv 1635 checks; EngineOrchestration 1167 checks; AudioRegression 30/30; VST, skin-switch, and card-move gates; 5080-image skin gallery; real package has 69 files including the VST3 bundle.
+- [ ] Push only `beta` and await the Pester 5/full GitHub Actions matrix; local Pester 3.4 cannot execute the repository's Pester 5 tests.

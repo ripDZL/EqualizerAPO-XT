@@ -1,8 +1,9 @@
 # AI Context
 
-- Active task: stable `main` release published; await the user's installer test from `v2.33.1`.
-- Current change: merge upstream `3d692be` into `beta`; preserve beta VST analyzer preview and theming cleanup while taking upstream engine/device folder split, Hilbert/dynamic velvet filters, editor atomic-save fixes, and skin `@TOKEN_RGB@` support.
+- Active task: merge current upstream `b3b8544` into integration `beta`; leave stable `main` and published `v2.33.1` unchanged.
+- Current change: preserve beta VST analyzer preview, LegacyRows/theme work, artifact hygiene, and whole-archive test linking while taking upstream `v2.34.1` Subwoofer Routing, VST3, installer, and CI work.
 - 2026-08-08 release path: merge stable-only `0ccd698` into `beta` while retaining `2.33.1`; `2564f99` permits an explicit `workflow_dispatch` release on `main` when a prerelease is promoted without another SemVer bump. Stable `v2.33.1` targets `2564f99` and includes the auto-detect installer plus all channel installers.
+- 2026-08-08 current upstream integration: merge `b3b8544` into `beta`; validate locally, push only `beta`, then use the pinned Pester 5 CI matrix. Do not promote `main` or create a release in this task.
 - Approach: prefer the selected EAPO endpoint for WASAPI preview capture, fall back to default console/communications mic endpoints plus default system playback, mix copied blocks into the visible editor-owned plugin instance, and discard output.
 - Scope note: this animates analyzer-style plugin GUIs while the panel is open; real APO audio processing remains in the service-owned instance.
 

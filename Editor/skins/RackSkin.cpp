@@ -21,8 +21,10 @@
 #include <QWidget>
 
 #include "Editor/SkinManager.h"
+#include "Editor/widgets/FilterCardModel.h"
 #include "Editor/skins/RackChrome.h"
 #include "Editor/skins/cards/RackReferenceCardView.h"
+#include "Editor/skins/cards/RackSubwooferRoutingCardView.h"
 #include "Editor/skins/pickers/RackFilterPicker.h"
 #include "Editor/widgets/routing/HardwarePatchbayRoutingRenderer.h"
 #include "SkinPaint.h"
@@ -951,8 +953,7 @@ public:
 		// inline token style QSS cannot beat, so the display law is applied
 		// here, and a powered-down unit dims its segments at the same time
 		// (rows are rebuilt whenever the line's state changes).
-		if ((info.type == QStringLiteral("text") || info.type == QStringLiteral("if")
-			|| info.type == QStringLiteral("eval") || info.dynamicLine) && body != nullptr)
+		if (FilterCardModel::hostsSharedRawBody(info.type, info.dynamicLine) && body != nullptr)
 		{
 			if (QLabel* raw = body->findChild<QLabel*>(QStringLiteral("FilterCardRawText")))
 			{
@@ -1005,6 +1006,11 @@ public:
 	ReferenceCardView* createReferenceCardView(const QString& kind, QWidget* parent) const override
 	{
 		return new RackReferenceCardView(kind, parent);
+	}
+
+	SubwooferRoutingCardView* createSubwooferRoutingCardView(QWidget* parent) const override
+	{
+		return new RackSubwooferRoutingCardView(parent);
 	}
 
 	void styleMainToolbar(QToolBar* toolBar, const SkinTokens& tokens) const override

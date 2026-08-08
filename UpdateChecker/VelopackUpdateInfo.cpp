@@ -8,6 +8,9 @@
 #include <QVector>
 
 #include <algorithm>
+#include <limits>
+
+#include "helpers/ReleaseAssetNames.h"
 
 namespace
 {
@@ -25,7 +28,17 @@ QVector<int> numericVersionParts(const QString& version)
 	QRegularExpression numberExpression("(\\d+)");
 	QRegularExpressionMatchIterator it = numberExpression.globalMatch(version);
 	while (it.hasNext())
-		parts.append(it.next().captured(1).toInt());
+	{
+		// Audit #250 F044: toInt() returns 0 on overflow, which would make
+		// an absurd component compare as the smallest instead of the
+		// largest. Saturate explicitly.
+		bool ok = false;
+		const qlonglong value = it.next().captured(1).toLongLong(&ok);
+		if (!ok || value > std::numeric_limits<int>::max())
+			parts.append(std::numeric_limits<int>::max());
+		else
+			parts.append(static_cast<int>(value));
+	}
 	return parts;
 }
 
@@ -137,7 +150,8 @@ QString releasePageUrl(const QJsonDocument& githubReleaseDoc)
 
 QJsonObject newestFeedAsset(const QJsonDocument& feedDoc, const QString& channel, const QString& installedVersion)
 {
-	const QString packageId = QString("EqualizerAPO-XT-%0").arg(channel).toLower();
+	const QString packageId = QString::fromStdWString(
+		ReleaseAssetNames::velopackPackId(channel.toStdWString())).toLower();
 	QJsonObject bestAsset;
 	QString bestVersion;
 
@@ -242,7 +256,11 @@ bool VelopackUpdateInfo::isNewerVersion(const QString& candidateVersion, const Q
 			return false;
 	}
 
-	return candidate != installed && candidate.startsWith(installed);
+	// Audit #250 F044: the zero-padded comparison above already judged the
+	// versions equal; the old startsWith tie-breaker declared "v1.2.3.0"
+	// forever newer than an installed "1.2.3" and offered the update on
+	// every check.
+	return false;
 }
 
 QJsonDocument VelopackUpdateInfo::fromVelopackFeed(

@@ -22,7 +22,9 @@
 #include <QtMath>
 
 #include "Editor/SkinManager.h"
+#include "Editor/widgets/FilterCardModel.h"
 #include "Editor/skins/cards/MatrixReferenceCardView.h"
+#include "Editor/skins/cards/MatrixSubwooferRoutingCardView.h"
 #include "Editor/skins/pickers/MatrixFilterPicker.h"
 #include "Editor/widgets/routing/CrosspointMatrixRoutingRenderer.h"
 #include "SkinFileIcons.h"
@@ -396,6 +398,11 @@ public:
 	{
 		return new MatrixReferenceCardView(kind, parent);
 	}
+
+	SubwooferRoutingCardView* createSubwooferRoutingCardView(QWidget* parent) const override
+	{
+		return new MatrixSubwooferRoutingCardView(parent);
+	}
 	// tokens()/qssResource() ride the ISkin defaults (SkinThemeData tables).
 
 	// Rotary encoder with an LED ring: the value reads as discrete lit
@@ -617,8 +624,7 @@ public:
 		// so the board answer must be inline too: the ">_" scan glyph
 		// becomes a sunken mono designation cell and the raw line a sunken
 		// mono line cell.
-		if ((info.type == QStringLiteral("text") || info.type == QStringLiteral("if")
-			|| info.type == QStringLiteral("eval") || info.dynamicLine) && body != nullptr)
+		if (FilterCardModel::hostsSharedRawBody(info.type, info.dynamicLine) && body != nullptr)
 		{
 			if (QLabel* glyph = body->findChild<QLabel*>(QStringLiteral("FilterCardRawGlyph")))
 			{
