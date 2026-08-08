@@ -3,6 +3,14 @@ Describe "extracted build script decisions" {
         $root = Join-Path $TestDrive "repo"
     }
 
+    It "targets the version-bump commit when publishing a release" {
+        $workflowPath = Join-Path $PSScriptRoot "..\..\workflows\build.yml"
+        $workflow = Get-Content -Path $workflowPath -Raw
+
+        $workflow | Should -Match ([regex]::Escape(
+            '-TargetCommit "${{ needs.version-bump.outputs.bumped_sha || github.sha }}"'))
+    }
+
     It "selects native ARM64 toolchain and suppresses unsupported runtime tests" {
         $plan = & (Join-Path $PSScriptRoot "..\Build-Solution.ps1") `
             -WorkspaceRoot $root -Platform ARM64 -SimdVariant neon -CanExecute:$false -PlanOnly

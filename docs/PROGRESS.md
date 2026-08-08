@@ -120,3 +120,7 @@
 - [x] Local validation: source/variant sync; core, APO, VST3, installer, and Qt rebuilds; EditorLogic 3509 checks; HybridConv 1635 checks; EngineOrchestration 1167 checks; AudioRegression 30/30; VST, skin-switch, and card-move gates; 5080-image skin gallery; real package has 69 files including the VST3 bundle.
 - [x] Pushed upstream integration commit `47608d6` to `beta`; local Pester 3.4 cannot execute the repository's Pester 5 tests.
 - [x] GitHub Actions run `31277330076` passed Pester 5, cppcheck, all x64/ARM64 builds, cross-variant comparison, packaging, and offscreen UI checks.
+- [x] Promoted verified `beta` `0d26e5b` to stable `main`; GitHub Actions run `31278644890` passed Pester 5, cppcheck, all x64/ARM64 builds, cross-variant comparison, packaging, and offscreen UI checks.
+- [x] Published stable `v2.35.0` from `a4a3c78`, including the auto-detect installer, six channel installers, source archive, and `SHA256SUMS.txt`; release tag and target both resolve to `a4a3c78`.
+- [x] Fixed release targeting: Velopack now receives the version-bump SHA, with a Pester assertion preventing a return to the pre-bump trigger SHA.
+- [ ] Review current upstream `ddf4e50` separately before another beta merge; it broadly reworks/removes fork live-preview and theme code.

@@ -132,3 +132,6 @@
 - Validation: source/variant sync; native + Qt rebuilds; EditorLogic 3509, HybridConv 1635, EngineOrchestration 1167, AudioRegression 30/30; Editor VST/skin/card gates; 5080 PNG gallery; real 69-file package contains VST3.
 - Local Pester is 3.4 only; repository tests require Pester 5.6.1 and must be confirmed by the beta CI matrix.
 - 2026-08-08 beta CI run `31277330076` passed Pester 5, cppcheck, x64 SSE2/AVX/AVX2/AVX-512/AVX10.1, ARM64, cross-variant comparison, packaging, and offscreen UI checks.
+- 2026-08-08 stable promotion/release: pushed `0d26e5b` to `main`; run `31278644890` bumped `a4a3c78` to `2.35.0`, passed all six build variants plus Pester/cppcheck/cross-variant checks, and published `v2.35.0` installers, source archive, and checksums.
+- Corrected `v2.35.0` tag and release target to `a4a3c78`; fixed `build.yml` to supply `needs.version-bump.outputs.bumped_sha || github.sha` to Velopack and added a Pester assertion.
+- Current upstream `ddf4e50` is intentionally not in this release: it is a broad refactor that removes/reworks fork live-preview and theme files; review it as a separate beta task.

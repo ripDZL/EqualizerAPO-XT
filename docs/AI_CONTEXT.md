@@ -1,9 +1,9 @@
 # AI Context
 
-- Active task: completed upstream `b3b8544` integration on `beta`; stable `main` and published `v2.33.1` remain unchanged.
+- Active task: completed upstream `b3b8544` integration, stable promotion, and `v2.35.0` release; `main`/`beta` are synchronized through the version bump.
 - Current change: preserve beta VST analyzer preview, LegacyRows/theme work, artifact hygiene, and whole-archive test linking while taking upstream `v2.34.1` Subwoofer Routing, VST3, installer, and CI work.
-- 2026-08-08 release path: merge stable-only `0ccd698` into `beta` while retaining `2.33.1`; `2564f99` permits an explicit `workflow_dispatch` release on `main` when a prerelease is promoted without another SemVer bump. Stable `v2.33.1` targets `2564f99` and includes the auto-detect installer plus all channel installers.
-- 2026-08-08 current upstream integration: merged `b3b8544` into `beta` as `47608d6`; local validation and pinned Pester 5 CI run `31277330076` passed. Do not promote `main` or create a release in this task.
+- 2026-08-08 release: promoted `beta` `0d26e5b` to `main`; GitHub Actions run `31278644890` bumped `a4a3c78` to `2.35.0`, passed all gates, and published the auto-detect installer, all SIMD installers, source archive, and checksums.
+- 2026-08-08 release safeguard: corrected `v2.35.0` to target `a4a3c78`; release workflow now passes `needs.version-bump.outputs.bumped_sha || github.sha` to Velopack. Current upstream `ddf4e50` is held for separate beta review because it broadly reworks/removes fork preview/theme code.
 - Approach: prefer the selected EAPO endpoint for WASAPI preview capture, fall back to default console/communications mic endpoints plus default system playback, mix copied blocks into the visible editor-owned plugin instance, and discard output.
 - Scope note: this animates analyzer-style plugin GUIs while the panel is open; real APO audio processing remains in the service-owned instance.
 
