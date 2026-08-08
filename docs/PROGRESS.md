@@ -113,3 +113,5 @@
 - [x] Prepared stable `main` update from `beta`; no `master` branch exists, and `version.h` stayed at `2.30.2` after merging current `origin/main` into `beta`.
 - [x] Merged current upstream `main` (`3d692be..3412d72`) into `beta` with no conflicts.
 - [x] Validated the upstream integration: `Test-SourceSync.ps1`; `EditorLogicTests.exe` 3161 checks; `HybridConvTests.exe` 1635 checks; AVX-512 Editor rebuild; VST self-test; card-move test; skin-switch test.
+- [x] Merged stable-only `0ccd698` into `beta`, retaining `version.h` `2.33.1`; promoted the combined history to `main` at `03c8d07`.
+- [x] Added main-only dispatch release support (`2564f99`) and published stable `v2.33.1` from GitHub Actions run `31261255797`; release includes the auto-detect installer, every SIMD channel installer, source archive, and SHA-256 checksums.

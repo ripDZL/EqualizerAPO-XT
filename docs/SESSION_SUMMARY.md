@@ -125,3 +125,5 @@
 - Stable branch sync prep: user requested `master`; this fork only has stable `main`, so current `origin/main` was merged into `beta` and `version.h` stayed at `2.30.2` for the pending main fast-forward.
 - 2026-08-08 upstream beta integration: merged `upstream/main` `3d692be..3412d72` without conflicts. Included VST3 panel stabilization/close controls, incremental card moves, path-entry file dialogs, skin checkbox glyphs, and pinned-vcpkg CI bootstrap.
 - Validation: `git diff --check`; `Test-SourceSync.ps1`; `EditorLogicTests.exe` 3161 checks; `HybridConvTests.exe` 1635 checks; rebuilt AVX-512 Editor; `--selftest-vst`; card move worst 59 ms/1000 ms limit; `--skin-switch-test` passed.
+- 2026-08-08 stable promotion: merged main-only version history into beta as `03c8d07`, retaining `2.33.1`, then promoted beta/main together.
+- Release workflow follow-up: `2564f99` allows an explicit main `workflow_dispatch` release when a prerelease promotion does not need a new SemVer bump. GitHub Actions run `31261255797` passed and published stable `v2.33.1` at `2564f99`, including `EqualizerAPO-XT-Setup.exe`, per-channel installers, source archive, and `SHA256SUMS.txt`.
