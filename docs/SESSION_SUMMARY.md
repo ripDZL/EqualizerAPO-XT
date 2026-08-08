@@ -131,3 +131,4 @@
 - Added missing fake VST3 input and bundle assertions to `.github/scripts/Tests/BuildScripts.Tests.ps1`.
 - Validation: source/variant sync; native + Qt rebuilds; EditorLogic 3509, HybridConv 1635, EngineOrchestration 1167, AudioRegression 30/30; Editor VST/skin/card gates; 5080 PNG gallery; real 69-file package contains VST3.
 - Local Pester is 3.4 only; repository tests require Pester 5.6.1 and must be confirmed by the beta CI matrix.
+- 2026-08-08 beta CI run `31277330076` passed Pester 5, cppcheck, x64 SSE2/AVX/AVX2/AVX-512/AVX10.1, ARM64, cross-variant comparison, packaging, and offscreen UI checks.

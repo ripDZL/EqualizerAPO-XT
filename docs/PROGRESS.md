@@ -118,4 +118,5 @@
 - [x] Merged upstream `b3b8544` (`v2.34.1`) into `beta`; preserved beta live-preview include, artifact exclusions, and six-config HybridConv whole-archive linking.
 - [x] Added the missing Subwoofer Routing VST3 fixture/assertions to the package-script test.
 - [x] Local validation: source/variant sync; core, APO, VST3, installer, and Qt rebuilds; EditorLogic 3509 checks; HybridConv 1635 checks; EngineOrchestration 1167 checks; AudioRegression 30/30; VST, skin-switch, and card-move gates; 5080-image skin gallery; real package has 69 files including the VST3 bundle.
-- [ ] Push only `beta` and await the Pester 5/full GitHub Actions matrix; local Pester 3.4 cannot execute the repository's Pester 5 tests.
+- [x] Pushed upstream integration commit `47608d6` to `beta`; local Pester 3.4 cannot execute the repository's Pester 5 tests.
+- [x] GitHub Actions run `31277330076` passed Pester 5, cppcheck, all x64/ARM64 builds, cross-variant comparison, packaging, and offscreen UI checks.
