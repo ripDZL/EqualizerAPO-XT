@@ -56,6 +56,7 @@ Current work areas:
 - Modernized Qt Editor: card-based filter UI and five fully differentiated visual skins — each with its own row chrome, knob rendering, and Copy routing renderer ([docs/skin-integration-report.md](docs/skin-integration-report.md)) — plus embedded fonts and high-DPI scaling.
 - Automatic updates: the Editor downloads new releases in the background and applies them on exit. A standalone UpdateChecker tool provides notify-only checks.
 - Auto-detect installer that picks the matching SIMD build for the local CPU and verifies the download against the release checksums before running it.
+- Device Selector asks for elevation once per launch attempt; if it is declined or fails, the Editor shows how to retry instead of immediately reopening the UAC prompt.
 - AOCL-FFTW, libsndfile, muparserx, TCLAP, and Qt-based GUI tools.
 - Shared VC++ runtime DLLs for better Windows compatibility.
 - GitHub Actions pipeline for builds, tests, installers, and releases, plus a biweekly automated code audit that builds the tree and runs the test suites.

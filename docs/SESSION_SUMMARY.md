@@ -136,3 +136,6 @@
 - Corrected `v2.35.0` tag and release target to `a4a3c78`; fixed `build.yml` to supply `needs.version-bump.outputs.bumped_sha || github.sha` to Velopack and added a Pester assertion.
 - Current upstream `ddf4e50` is intentionally not in this release pending a separate beta review.
 - 2026-08-08 review correction: `git diff beta...upstream/main` is a 28-file registry/UAC change, not a preview/theme removal. PR #257 is not merge-ready: `DllRegisterServer` rolls back APOs after a CLSID write failure but leaves completed/partial CLSID trees; add partial-write cleanup plus fake-registry residue tests. Merge simulation conflicts only in `version.h`.
+- 2026-08-08 beta registry follow-up: merged reviewed upstream PR #257 (`61f7238`) and changed CLSID registration into a tree/batch transaction. A fake late `ThreadingModel` write failure now removes new partial/companion trees and restores pre-existing trees; `EngineOrchestrationTests` passed 1198 checks.
+- Validation: rebuilt `Common`, `EqualizerAPO`, AVX-512 Editor, and DeviceSelector; `Test-SourceSync.ps1`, `Test-VariantSync.ps1`, VST self-test, and CI-equivalent offscreen `--skin-switch-test` passed (120 switches, worst 828 ms, zero failures).
+- Upstream PR #258 was intentionally left out pending a separate DSP review.

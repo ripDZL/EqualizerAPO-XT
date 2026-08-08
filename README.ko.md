@@ -44,6 +44,7 @@ EqualizerAPO-XT는 Windows용 시스템 전체 이퀄라이저인 [Equalizer APO
 - Qt Editor를 현대화했습니다. 카드 기반 필터 UI와 행 chrome·노브 렌더링·Copy 라우팅 렌더러까지 서로 다른 5종 스킨([docs/skin-integration-report.md](docs/skin-integration-report.md)), 내장 폰트, 고해상도(High-DPI) 대응이 들어 있습니다.
 - Editor가 새 릴리스를 백그라운드에서 내려받아 종료할 때 적용하는 자동 업데이트가 들어 있습니다. 알림만 하는 UpdateChecker 도구도 따로 있습니다.
 - 자동 감지 설치기가 로컬 CPU에 맞는 SIMD 빌드를 골라 내려받고, 실행 전에 릴리스 체크섬으로 검증합니다.
+- Device Selector를 열 때 권한 요청은 한 번만 합니다. 거절하거나 실행에 실패하면 바로 다시 묻지 않고, Editor가 다시 여는 방법을 알려줍니다.
 - 오디오 처리는 AOCL-FFTW, libsndfile, muparserx, TCLAP을 쓰고, GUI 도구는 Qt로 만들었습니다.
 - Windows 호환성을 위해 공유 VC++ 런타임 DLL을 함께 배포합니다.
 - GitHub Actions 파이프라인이 빌드, 테스트, 설치 파일, 릴리스를 만들고, 격주 자동 코드 감사가 트리를 직접 빌드해 테스트까지 돌립니다.
