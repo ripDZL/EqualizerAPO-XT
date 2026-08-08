@@ -14,6 +14,8 @@ tags are clean `vX.Y.Z` names. Installers for every version are on the
 
 ## Unreleased
 
+## v2.35.1 — 2026-08-08
+
 - **Declining the Device Selector's UAC prompt no longer pops a second
   one.** Opening the Device Selector from the menu or a problem-fix
   prompt used to re-ask for elevation immediately after you said no, and
