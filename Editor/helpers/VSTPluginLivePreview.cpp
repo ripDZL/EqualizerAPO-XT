@@ -22,7 +22,7 @@
 #include <mmdeviceapi.h>
 #include <mmreg.h>
 
-#include "helpers/ComPtr.h"
+#include "platform/windows/ComPtr.h"
 #include "vst/VSTPluginInstance.h"
 
 namespace

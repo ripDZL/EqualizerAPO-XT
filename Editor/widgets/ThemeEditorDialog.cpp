@@ -31,7 +31,7 @@
 #include <QTableWidgetItem>
 #include <QVBoxLayout>
 
-#include "helpers/RegistryHelper.h"
+#include "services/registry/RegistryHelper.h"
 #include "Editor/skins/SkinDisplayNames.h"
 #include "Editor/skins/shared/SkinSupport.h"
 #include "Editor/skins/SkinThemeData.h"

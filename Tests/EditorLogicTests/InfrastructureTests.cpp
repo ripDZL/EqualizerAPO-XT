@@ -12,7 +12,7 @@
 #include "Editor/helpers/AnalysisWorkerRecovery.h"
 #include "Editor/widgets/EditableValueText.h"
 #include "Editor/widgets/cards/FileReferenceController.h"
-#include "helpers/MemoryHelper.h"
+#include "runtime/memory/MemoryHelper.h"
 
 void testEditableValueTextUsesDisplayedDecimalFormatFirst()
 {

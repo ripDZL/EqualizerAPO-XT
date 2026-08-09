@@ -23,7 +23,7 @@
 #include <cstdio>
 #include <cstdlib>
 
-#include "helpers/StringHelper.h"
+#include "text/StringHelper.h"
 #include "vst/VSTPluginInstance.h"
 #include "vst/VSTPluginLibrary.h"
 #include "VSTPluginCommand.h"

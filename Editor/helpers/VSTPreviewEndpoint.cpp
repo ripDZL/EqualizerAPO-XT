@@ -6,7 +6,7 @@
 
 #include "devices/AbstractAPOInfo.h"
 #include "filters/DeviceCommand.h"
-#include "helpers/StringHelper.h"
+#include "text/StringHelper.h"
 
 namespace
 {

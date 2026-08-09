@@ -19,7 +19,7 @@
 
 #include "stdafx.h"
 #include <devices/DeviceAPOInfo.h>
-#include <helpers/RegistryHelper.h>
+#include <services/registry/RegistryHelper.h>
 #include <ObjBase.h>
 #include <QDir>
 #include <QFile>
@@ -38,9 +38,9 @@
 #include "Editor/helpers/EditorSettings.h"
 #include "Editor/skins/CustomThemeStore.h"
 #include "Editor/skins/SkinThemeData.h"
-#include "helpers/ApoRegistration.h"
-#include "helpers/InstallDiagnostics.h"
-#include "helpers/LogHelper.h"
+#include "services/install/ApoRegistration.h"
+#include "services/diagnostics/InstallDiagnostics.h"
+#include "services/logging/LogHelper.h"
 
 namespace
 {

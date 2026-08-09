@@ -7,8 +7,8 @@
 #include <QSettings>
 #include <QWidget>
 
-#include "helpers/LogHelper.h"
-#include "helpers/RegistryHelper.h"
+#include "services/logging/LogHelper.h"
+#include "services/registry/RegistryHelper.h"
 #include "Editor/helpers/CrashHandler.h"
 #include "skins/CustomThemeStore.h"
 #include "skins/ISkin.h"
