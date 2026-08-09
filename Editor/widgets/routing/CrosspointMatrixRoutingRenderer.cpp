@@ -3,6 +3,7 @@
 */
 
 #include "CrosspointMatrixRoutingRenderer.h"
+#include "RoutingAddChannelEditor.h"
 
 #include <QPainter>
 #include <QMouseEvent>
@@ -511,7 +512,7 @@ void CrosspointMatrixView::openChannelEditor()
 {
 	if (channelEditor == nullptr)
 	{
-		channelEditor = new QLineEdit(this);
+		channelEditor = new RoutingAddChannelEditor(this);
 		channelEditor->setObjectName(QStringLiteral("CrosspointChannelEditor"));
 		channelEditor->setAlignment(Qt::AlignCenter);
 		connect(channelEditor, &QLineEdit::editingFinished, this, &CrosspointMatrixView::commitChannelEditor);

@@ -3,6 +3,7 @@
 */
 
 #include "StepListRoutingRenderer.h"
+#include "RoutingAddChannelEditor.h"
 #include "Editor/skins/SkinPaint.h"
 
 #include <cmath>
@@ -527,7 +528,7 @@ void StepListView::openChannelEditor()
 {
 	if (channelEditor == nullptr)
 	{
-		channelEditor = new QLineEdit(this);
+		channelEditor = new RoutingAddChannelEditor(this);
 		channelEditor->setObjectName(QStringLiteral("StepChannelEditor"));
 		connect(channelEditor, &QLineEdit::editingFinished, this, &StepListView::commitChannelEditor);
 	}

@@ -3,6 +3,7 @@
 */
 
 #include "BlockChipRoutingRenderer.h"
+#include "RoutingAddChannelEditor.h"
 
 #include <QMenu>
 #include <QPainter>
@@ -490,7 +491,7 @@ void BlockChipView::openChannelEditor()
 {
 	if (channelEditor == nullptr)
 	{
-		channelEditor = new QLineEdit(this);
+		channelEditor = new RoutingAddChannelEditor(this);
 		channelEditor->setObjectName(QStringLiteral("BlockChannelEditor"));
 		connect(channelEditor, &QLineEdit::editingFinished, this, &BlockChipView::commitChannelEditor);
 	}

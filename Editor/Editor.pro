@@ -610,6 +610,7 @@ HEADERS  += \
 	widgets/TitleBar.h \
 	widgets/routing/CopyRoutingAdapter.h \
 	widgets/routing/RoutingFold.h \
+	widgets/routing/RoutingAddChannelEditor.h \
 	widgets/routing/MultiConvolutionRoutingAdapter.h \
 	widgets/routing/IRoutingRenderer.h \
 	widgets/routing/CrosspointMatrixRoutingRenderer.h \

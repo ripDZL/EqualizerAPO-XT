@@ -3,6 +3,7 @@
 */
 
 #include "HardwarePatchbayRoutingRenderer.h"
+#include "RoutingAddChannelEditor.h"
 
 #include <QPainter>
 #include <QMouseEvent>
@@ -563,7 +564,7 @@ void HardwarePatchbayView::openChannelEditor()
 {
 	if (channelEditor == nullptr)
 	{
-		channelEditor = new QLineEdit(this);
+		channelEditor = new RoutingAddChannelEditor(this);
 		channelEditor->setObjectName(QStringLiteral("PatchbayChannelEditor"));
 		channelEditor->setAlignment(Qt::AlignCenter);
 		connect(channelEditor, &QLineEdit::editingFinished, this, &HardwarePatchbayView::commitChannelEditor);

@@ -3,6 +3,7 @@
 */
 
 #include "LightTraceRoutingRenderer.h"
+#include "RoutingAddChannelEditor.h"
 #include "Editor/skins/SkinPaint.h"
 
 #include <algorithm>
@@ -876,7 +877,7 @@ void StudioRoutingView::openChannelEditor()
 {
 	if (channelEditor == nullptr)
 	{
-		channelEditor = new QLineEdit(this);
+		channelEditor = new RoutingAddChannelEditor(this);
 		channelEditor->setObjectName(QStringLiteral("StudioRoutingChannelEditor"));
 		channelEditor->setAlignment(Qt::AlignCenter);
 		connect(channelEditor, &QLineEdit::editingFinished, this, &StudioRoutingView::commitChannelEditor);

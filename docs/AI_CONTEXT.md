@@ -1,6 +1,6 @@
 # AI Context
 
-- Active task: `v2.35.1` is published; `beta` now carries the reviewed upstream engine/DSP batch (#258/#259/#260), with regression fixes and local validation complete; hosted CI and real-audio acceptance remain before stable promotion.
+- Active task: `v2.35.1` is published; `beta` carries the reviewed upstream engine/DSP batch (#258/#259/#260) plus upstream #263 Subwoofer Routing usability, with local validation complete; hosted CI and real-audio acceptance remain before stable promotion.
 - Current change: preserve beta VST analyzer preview, LegacyRows/theme work, artifact hygiene, and whole-archive test linking while taking upstream `v2.34.1` Subwoofer Routing, VST3, installer, and CI work.
 - 2026-08-08 release: promoted `beta` `0d26e5b` to `main`; GitHub Actions run `31278644890` bumped `a4a3c78` to `2.35.0`, passed all gates, and published the auto-detect installer, all SIMD installers, source archive, and checksums.
 - 2026-08-08 release safeguard: corrected `v2.35.0` to target `a4a3c78`; release workflow now passes `needs.version-bump.outputs.bumped_sha || github.sha` to Velopack. Reviewed upstream PR #257 (`61f7238`) is integrated into beta with transactional CLSID rollback: a late write removes new partial/companion trees or restores existing ones; fake-registry coverage proves both paths. Upstream PR #258 remains unreviewed.
@@ -9,7 +9,8 @@
 - Stage-1 validation: `git diff --check`; source/variant sync; EditorLogic 3509; AudioRegression 31/31; HybridConv 1635; EngineOrchestration 1198; rebuilt AVX-512 Editor; normal `--selftest-vst` passed. Hosted beta run `31288693820` passed Pester, cppcheck, all six native variants, offscreen UI gates, and cross-variant comparison. Forced-offscreen Qt self-tests hang for both pre-stage and rebuilt binaries locally, so the hosted beta UI matrix remains the offscreen acceptance gate.
 - 2026-08-08 upstream stage 2: cherry-picked #258/#259/#260 as `6dfefa7`, `b8eda48`, and `ff99381`. Review fixes preserve capture channel-mask selection before engine initialization, report/reset Hilbert mismatch diagnostics across reinitialization, and cover EngineSetup device/stage routing.
 - Stage-2 local validation: `git diff --check`; source/variant sync; HybridConv 1635; EngineOrchestration 1221; AudioRegression 31/31; EditorLogic 3509; Common/APO/Benchmark/Voicemeeter and Editor rebuilt; normal `--selftest-vst` passed.
-- Next: hosted beta matrix, then real microphone/capture and playback acceptance before any stable promotion.
+- 2026-08-09 upstream #263: routing views now scroll inside the Subwoofer Routing right pane while actions stay visible; Copy add-channel Return is handled only by its inline field, preserving normal dialog keyboard behavior. Local AVX2 Editor rebuild, VST self-test, source/variant sync, and five-skin offscreen gallery (1280 PNGs) passed; review found no remaining blocker.
+- Next: push and run the hosted beta matrix, then real microphone/capture and playback acceptance before any stable promotion.
 - Approach: prefer the selected EAPO endpoint for WASAPI preview capture, fall back to default console/communications mic endpoints plus default system playback, mix copied blocks into the visible editor-owned plugin instance, and discard output.
 - Scope note: this animates analyzer-style plugin GUIs while the panel is open; real APO audio processing remains in the service-owned instance.
 

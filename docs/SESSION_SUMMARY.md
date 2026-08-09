@@ -146,3 +146,6 @@
 - 2026-08-08 upstream staged integration, phase 2: cherry-picked #258/#259/#260 as `6dfefa7`, `b8eda48`, and `ff99381`. Review fixes keep first capture locks on the input channel mask, flush/reset Hilbert mismatch state across reinitialize, and exercise EngineSetup identity/stage routing.
 - Stage-2 local proof: source/variant sync; HybridConv 1635; EngineOrchestration 1221; AudioRegression 31/31; EditorLogic 3509; rebuilt Common/APO/Benchmark/Voicemeeter/Editor; normal `--selftest-vst` passed.
 - Next: hosted beta matrix, then real microphone/capture and playback acceptance. Do not promote engine/DSP work to `main` first.
+- 2026-08-09 upstream #263: added scroll containment for expanded Subwoofer Routing views, fixed dark wrapper remnants around routing controls, and kept dialog actions outside the scroll pane.
+- Review follow-up: Return is consumed only by the five inline add-channel fields; normal dialog actions retain their default keyboard behavior. Gallery asserts the commit (and assignment where serialized) without accepting the dialog.
+- Validation: source/variant sync; rebuilt x64 AVX2 Editor; VST self-test; focused five-skin offscreen gallery wrote 1280 PNGs at `artifacts\skin-gallery-routing-pr263-final-20260809`; visual inspection confirmed visible action buttons and right-pane scrolling.
