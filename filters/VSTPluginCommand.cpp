@@ -24,8 +24,8 @@
 #include <cstdlib>
 
 #include "helpers/StringHelper.h"
-#include "helpers/VSTPluginInstance.h"
-#include "helpers/VSTPluginLibrary.h"
+#include "vst/VSTPluginInstance.h"
+#include "vst/VSTPluginLibrary.h"
 #include "VSTPluginCommand.h"
 
 using std::vector;

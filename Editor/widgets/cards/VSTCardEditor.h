@@ -25,7 +25,8 @@
 
 #include "Editor/IFilterGUI.h"
 #include "Editor/helpers/VSTPluginLivePreview.h"
-#include "helpers/VSTPluginLibrary.h"
+#include "vst/VSTPluginInstance.h"
+#include "vst/VSTPluginLibrary.h"
 
 class QToolButton;
 class QPushButton;

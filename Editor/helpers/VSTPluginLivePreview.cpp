@@ -23,7 +23,7 @@
 #include <mmreg.h>
 
 #include "helpers/ComPtr.h"
-#include "helpers/VSTPluginInstance.h"
+#include "vst/VSTPluginInstance.h"
 
 namespace
 {
