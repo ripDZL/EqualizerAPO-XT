@@ -11,7 +11,8 @@
 - Stage-2 local validation: `git diff --check`; source/variant sync; HybridConv 1635; EngineOrchestration 1221; AudioRegression 31/31; EditorLogic 3509; Common/APO/Benchmark/Voicemeeter and Editor rebuilt; normal `--selftest-vst` passed.
 - 2026-08-09 upstream #263: routing views now scroll inside the Subwoofer Routing right pane while actions stay visible; Copy add-channel Return is handled only by its inline field, preserving normal dialog keyboard behavior. Local AVX2 Editor rebuild, VST self-test, source/variant sync, and five-skin offscreen gallery (1280 PNGs) passed; review found no remaining blocker.
 - 2026-08-09 CI correction: beta run `31320398601` exposed a gallery false negative for compact Studio-derived `midnight`/`obsidian` skins; the gallery now tests actual content overflow rather than skin identity. AVX2 Editor rebuild, VST self-test, source/variant sync, and the full 20-skin gallery (5120 PNGs, zero warnings) passed locally. Hosted beta run `31322362583` then passed Pester, cppcheck, all six native variants, offscreen UI gates, packaging, and cross-variant comparison.
-- Next: real microphone/capture and playback acceptance before any stable promotion.
+- 2026-08-09 beta handoff: published prerelease `v2.36.0-beta.1` from tested commit `c0c858d`, with portable AVX-512/AVX2 archives and `SHA256SUMS.txt`; it intentionally has no auto-detect installer.
+- Next: test the matching AVX-512 archive with real microphone/capture and playback acceptance before any stable promotion.
 - Approach: prefer the selected EAPO endpoint for WASAPI preview capture, fall back to default console/communications mic endpoints plus default system playback, mix copied blocks into the visible editor-owned plugin instance, and discard output.
 - Scope note: this animates analyzer-style plugin GUIs while the panel is open; real APO audio processing remains in the service-owned instance.
 

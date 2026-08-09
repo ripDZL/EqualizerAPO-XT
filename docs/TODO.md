@@ -37,5 +37,7 @@
 - [x] Review and integrate upstream PRs #258, #259, and #260 as the isolated engine/DSP batch.
 - [x] Review and integrate upstream PR #263 Subwoofer Routing editor usability.
 - [x] Confirmed hosted beta CI for #258/#259/#260/#263 after the compact-skin gallery correction (`31322362583`).
+- [x] Published `v2.36.0-beta.1` portable beta release from the CI-tested commit with AVX-512/AVX2 packages and checksums.
+- [ ] Install/test the matching AVX-512 beta package after backing up the current installation.
 - [ ] Complete real microphone/capture and playback acceptance before promoting the engine/DSP batch to `main`.
 - [ ] Revoke temporary GitHub token when the user ends the session.
