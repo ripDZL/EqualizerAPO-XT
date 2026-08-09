@@ -34,5 +34,6 @@
 - [x] Clean LegacyRows dark-window theming and add simple legacy-safe themes.
 - [x] Run `Editor --skin-gallery` after alpha-token QSS conversion.
 - [x] Confirmed hosted beta CI run `31288693820` for upstream PRs #261/#262.
-- [ ] Review upstream PRs #258, #259, and #260 together as a separate engine/DSP batch before merging.
+- [x] Review and integrate upstream PRs #258, #259, and #260 as the isolated engine/DSP batch.
+- [ ] Confirm hosted beta CI for #258/#259/#260, then retain beta until real microphone/capture and playback acceptance.
 - [ ] Revoke temporary GitHub token when the user ends the session.

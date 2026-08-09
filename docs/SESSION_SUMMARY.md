@@ -143,4 +143,6 @@
 - 2026-08-08 upstream staged integration, phase 1: cherry-picked #261 and #262 into `beta` as `ad6b5ed` and `94447d0`. Preserved all fork-only VST preview/theme runner calls while splitting EditorLogic tests; new MultiConvolution golden reference passes.
 - Stage-1 proof: `git diff --check`, source/variant sync, EditorLogic 3509, AudioRegression 31/31, HybridConv 1635, EngineOrchestration 1198, fresh AVX-512 Editor link, normal `--selftest-vst` PASS. Forced-offscreen Qt self-tests time out on both the pre-stage and rebuilt binaries, so beta CI is the authoritative UI gate.
 - Stage-1 beta CI run `31288693820` passed Pester, cppcheck, all six native variants, offscreen UI gates, and cross-variant comparison.
-- Next: separately review #258/#259/#260. Do not promote engine/DSP work to `main` until hosted CI and real audio behavior are accepted.
+- 2026-08-08 upstream staged integration, phase 2: cherry-picked #258/#259/#260 as `6dfefa7`, `b8eda48`, and `ff99381`. Review fixes keep first capture locks on the input channel mask, flush/reset Hilbert mismatch state across reinitialize, and exercise EngineSetup identity/stage routing.
+- Stage-2 local proof: source/variant sync; HybridConv 1635; EngineOrchestration 1221; AudioRegression 31/31; EditorLogic 3509; rebuilt Common/APO/Benchmark/Voicemeeter/Editor; normal `--selftest-vst` passed.
+- Next: hosted beta matrix, then real microphone/capture and playback acceptance. Do not promote engine/DSP work to `main` first.

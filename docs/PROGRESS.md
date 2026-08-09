@@ -124,9 +124,10 @@
 - [x] Published stable `v2.35.0` from `a4a3c78`, including the auto-detect installer, six channel installers, source archive, and `SHA256SUMS.txt`; release tag and target both resolve to `a4a3c78`.
 - [x] Fixed release targeting: Velopack now receives the version-bump SHA, with a Pester assertion preventing a return to the pre-bump trigger SHA.
 - [x] Integrated reviewed upstream PR #257 (`61f7238`) into beta and made CLSID registration transactional: late-write rollback removes new trees and restores existing trees (1198 checks); Common, APO, Editor, and DeviceSelector rebuilt; source/variant sync and headless skin-switch gate passed.
-- [ ] Review upstream PR #258 separately before merging its DSP changes.
+- [x] Integrated reviewed upstream PRs #258/#259/#260 on `beta`; preserved capture channel-mask behavior before engine initialization, Hilbert reinitialize diagnostics, and EngineSetup stage/device routing with regressions.
 - [x] Promoted tested CLSID rollback beta `f7ee020` to `main`; GitHub Actions run `31284692146` passed on retry after one AVX2 UI timing outlier and published `v2.35.1` at `23fdf8e` with installers, source archive, and checksums.
 - [x] Staged upstream PR #261 (`ad6b5ed`) and #262 (`94447d0`) on `beta`: crash-log placement, MultiConvolution golden coverage, obsolete HybridConv cleanup, and focused EditorLogic test files while retaining fork VST-preview/theme tests.
 - [x] Validated stage 1 locally: `git diff --check`; source/variant sync; EditorLogic 3509; AudioRegression 31/31; HybridConv 1635; EngineOrchestration 1198; rebuilt AVX-512 Editor; normal VST self-test passed.
 - [x] Hosted beta CI run `31288693820` passed stage 1: Pester, cppcheck, SSE2/AVX/AVX2/AVX-512/AVX10.1/ARM64, offscreen UI gates, and cross-variant comparison.
-- [ ] Review upstream PRs #258, #259, and #260 as a separate engine/DSP batch after stage-1 CI.
+- [x] Validated stage 2 locally: source/variant sync; HybridConv 1635; EngineOrchestration 1221; AudioRegression 31/31; EditorLogic 3509; rebuilt Common/APO/Benchmark/Voicemeeter/Editor; normal VST self-test passed.
+- [ ] Run hosted beta CI for the #258/#259/#260 engine/DSP batch, then get real microphone/capture and playback acceptance before main.
