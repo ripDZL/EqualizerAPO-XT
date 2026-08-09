@@ -33,6 +33,6 @@
 - [x] Package the current theming cleanup into the beta update.
 - [x] Clean LegacyRows dark-window theming and add simple legacy-safe themes.
 - [x] Run `Editor --skin-gallery` after alpha-token QSS conversion.
-- [ ] Confirm hosted beta CI for upstream PRs #261/#262 before the next integration stage.
+- [x] Confirmed hosted beta CI run `31288693820` for upstream PRs #261/#262.
 - [ ] Review upstream PRs #258, #259, and #260 together as a separate engine/DSP batch before merging.
 - [ ] Revoke temporary GitHub token when the user ends the session.
