@@ -19,10 +19,9 @@
 #include "FilterTableMimeData.h"
 #include "Editor/helpers/GUIHelper.h"
 #include "Editor/helpers/VSTPreviewEndpoint.h"
-#include "text/StringHelper.h"
-#include "services/logging/LogHelper.h"
-#include "audio/ChannelHelper.h"
-#include "services/registry/RegistryHelper.h"
+#include "services/logging/Logging.h"
+#include "audio/ChannelLayout.h"
+#include "services/registry/WindowsRegistry.h"
 #include "FilterTable.h"
 #include "Editor/widgets/FilterCardRow.h"
 

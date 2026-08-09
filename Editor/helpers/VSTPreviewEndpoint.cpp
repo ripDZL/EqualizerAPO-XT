@@ -6,7 +6,7 @@
 
 #include "devices/AbstractAPOInfo.h"
 #include "filters/DeviceCommand.h"
-#include "text/StringHelper.h"
+#include "text/WideString.h"
 
 namespace
 {
@@ -20,7 +20,7 @@ bool startsWith(const std::wstring& value, const wchar_t* prefix)
 
 bool parseConfigCommand(const std::wstring& line, std::wstring& command, std::wstring& parameters)
 {
-	const std::wstring trimmed = StringHelper::trim(line);
+	const std::wstring trimmed = text::trim(line);
 	if (trimmed.empty() || trimmed[0] == L'#')
 		return false;
 
@@ -28,7 +28,7 @@ bool parseConfigCommand(const std::wstring& line, std::wstring& command, std::ws
 	if (separator == std::wstring::npos)
 		return false;
 
-	command = StringHelper::trim(trimmed.substr(0, separator));
+	command = text::trim(trimmed.substr(0, separator));
 	parameters = trimmed.substr(separator + 1);
 	return true;
 }
@@ -37,7 +37,7 @@ bool isAllDevicesCommand(const DeviceCommand& command)
 {
 	return command.patterns.size() == 1
 		&& command.patterns[0].size() == 1
-		&& StringHelper::toLowerCase(command.patterns[0][0]) == L"all";
+		&& text::toLower(command.patterns[0][0]) == L"all";
 }
 
 void appendMatchingDevices(std::vector<std::shared_ptr<AbstractAPOInfo>>& matches,

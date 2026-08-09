@@ -18,6 +18,7 @@
 	streams its operands into a narrow ostream, which std::wstring cannot.
 */
 
+#include "services/registry/RegistryPaths.h"
 #include <string>
 #include <vector>
 
@@ -26,7 +27,7 @@
 #include "services/install/ApoRegistration.h"
 #include "services/registry/ClsidRegistration.h"
 #include "platform/windows/WindowsPath.h"
-#include "services/registry/RegistryHelper.h"
+#include "services/registry/WindowsRegistry.h"
 #include "Tests/TestHarness.h"
 
 #include "FakeRegistry.h"
@@ -171,7 +172,7 @@ void testClsidTreeFailuresReachTheCallerForRollback(test::Harness& harness)
 		ClsidRegistration::registerClsidTree(registry, clsid,
 			L"EqualizerAPO Post-Mix Class", L"C:\\Install\\EqualizerAPO.dll");
 	}
-	catch (const RegistryException&)
+	catch (const RegistryError&)
 	{
 		threw = true;
 	}
@@ -198,7 +199,7 @@ void testClsidTreeFailureRestoresAnExistingRegistration(test::Harness& harness)
 		ClsidRegistration::registerClsidTree(registry, clsid,
 			L"EqualizerAPO Post-Mix Class", L"C:\\Install\\EqualizerAPO.dll");
 	}
-	catch (const RegistryException&)
+	catch (const RegistryError&)
 	{
 		threw = true;
 	}
@@ -236,7 +237,7 @@ void testClsidBatchFailureRollsBackEarlierClasses(test::Harness& harness)
 	{
 		ClsidRegistration::registerClsidTrees(registry, trees);
 	}
-	catch (const RegistryException&)
+	catch (const RegistryError&)
 	{
 		threw = true;
 	}
@@ -270,7 +271,7 @@ void testClsidBatchFailureRestoresExistingClasses(test::Harness& harness)
 	{
 		ClsidRegistration::registerClsidTrees(registry, trees);
 	}
-	catch (const RegistryException&)
+	catch (const RegistryError&)
 	{
 		threw = true;
 	}

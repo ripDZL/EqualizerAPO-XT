@@ -4,7 +4,7 @@
 
 #include "stdafx.h"
 #include "services/registry/ClsidRegistration.h"
-#include "services/registry/RegistryHelper.h"
+#include "services/registry/RegistryError.h"
 #include "services/registry/RegistryTransaction.h"
 
 namespace
@@ -25,15 +25,15 @@ void writeClsidTree(IRegistry& registry, const std::wstring& clsidString,
 }
 
 [[noreturn]] void rollbackAndReport(RegistryTransaction& transaction,
-	const RegistryException& registrationError)
+const RegistryError& registrationError)
 {
 	transaction.rollback();
 	if (!transaction.rollbackFailures().empty())
 	{
-		throw RegistryException(registrationError.getMessage()
+		throw RegistryError(registrationError.getMessage()
 			+ L"; CLSID rollback failed: " + transaction.rollbackFailures().front());
 	}
-	throw RegistryException(registrationError.getMessage());
+	throw RegistryError(registrationError.getMessage());
 }
 }
 
@@ -48,7 +48,7 @@ void registerClsidTree(IRegistry& registry, const std::wstring& clsidString,
 		writeClsidTree(transaction, clsidString, className, dllPath);
 		transaction.commit();
 	}
-	catch (const RegistryException& error)
+	catch (const RegistryError& error)
 	{
 		rollbackAndReport(transaction, error);
 	}
@@ -63,7 +63,7 @@ void registerClsidTrees(IRegistry& registry, const std::vector<ClsidTree>& trees
 			writeClsidTree(transaction, tree.clsidString, tree.className, tree.dllPath);
 		transaction.commit();
 	}
-	catch (const RegistryException& error)
+	catch (const RegistryError& error)
 	{
 		rollbackAndReport(transaction, error);
 	}

@@ -17,7 +17,7 @@
 
 #include "filters/HilbertCommand.h"
 #include "filters/HilbertFilter.h"
-#include "services/logging/LogHelper.h"
+#include "services/logging/Logging.h"
 #include "filters/VelvetCommand.h"
 #include "filters/velvet/Processor.h"
 #include "Tests/TestHarness.h"
@@ -273,7 +273,7 @@ void testHilbertMismatchIsLoggedOnDestruction()
 		harness.fail("could not create mismatch log capture");
 		return;
 	}
-	LogHelper::useStream(logFile, false, true, false);
+	Logging::useStream(logFile, false, true, false);
 
 	{
 		HilbertCommand command;
@@ -294,7 +294,7 @@ void testHilbertMismatchIsLoggedOnDestruction()
 
 	const std::wstring log = readCapturedLog(logFile);
 	std::fclose(logFile);
-	LogHelper::useStream(stdout, true, true, false);
+	Logging::useStream(stdout, true, true, false);
 
 	const std::wstring marker = HilbertFilter::kFrameCountMismatchLogPrefix;
 	harness.expectTrue(log.find(marker) != std::wstring::npos,
@@ -309,7 +309,7 @@ void testHilbertMismatchIsReportedBeforeReinitialize()
 		harness.fail("could not create reinitialize mismatch log capture");
 		return;
 	}
-	LogHelper::useStream(logFile, false, true, false);
+	Logging::useStream(logFile, false, true, false);
 
 	{
 		HilbertCommand command;
@@ -329,7 +329,7 @@ void testHilbertMismatchIsReportedBeforeReinitialize()
 
 	const std::wstring log = readCapturedLog(logFile);
 	std::fclose(logFile);
-	LogHelper::useStream(stdout, true, true, false);
+	Logging::useStream(stdout, true, true, false);
 
 	const std::wstring expected = std::wstring(HilbertFilter::kFrameCountMismatchLogPrefix)
 		+ L" 128 differs from initialized 512";

@@ -12,7 +12,7 @@
 #include "Editor/helpers/AnalysisWorkerRecovery.h"
 #include "Editor/widgets/EditableValueText.h"
 #include "Editor/widgets/cards/FileReferenceController.h"
-#include "runtime/memory/MemoryHelper.h"
+#include "runtime/memory/AlignedMemory.h"
 
 void testEditableValueTextUsesDisplayedDecimalFormatFirst()
 {
@@ -116,13 +116,13 @@ void testMemoryHelperConstructReleasesStorageWhenConstructorThrows()
 		}
 	};
 
-	// The counters live in MemoryHelper itself; this binary links Common.lib
+	// The counters live in AlignedMemory itself; this binary links Common.lib
 	// whole-archive and therefore cannot substitute its own alloc()/free().
-	MemoryHelper::resetAllocationCountsForTesting();
+	AlignedMemory::resetAllocationCountsForTesting();
 	bool threw = false;
 	try
 	{
-		MemoryHelper::construct<ThrowingConstructor>();
+		AlignedMemory::construct<ThrowingConstructor>();
 	}
 	catch (const std::runtime_error&)
 	{
@@ -130,6 +130,6 @@ void testMemoryHelperConstructReleasesStorageWhenConstructorThrows()
 	}
 
 	expectTrue(threw, "construct propagates a constructor exception");
-	expectEqual((int)MemoryHelper::allocationCountForTesting(), 1, "construct allocates storage once");
-	expectEqual((int)MemoryHelper::freeCountForTesting(), 1, "construct releases storage when construction fails");
+	expectEqual((int)AlignedMemory::allocationCountForTesting(), 1, "construct allocates storage once");
+	expectEqual((int)AlignedMemory::freeCountForTesting(), 1, "construct releases storage when construction fails");
 }

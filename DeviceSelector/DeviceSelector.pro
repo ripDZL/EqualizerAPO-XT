@@ -39,7 +39,7 @@ SOURCES += \
 	skins/SoftDeviceSkin.cpp \
 	skins/RackDeviceSkin.cpp \
 	skins/MatrixDeviceSkin.cpp \
-	../services/windows/ServiceHelper.cpp \
+	../services/windows/WindowsService.cpp \
 	../services/install/ApoRegistration.cpp \
 	../services/shell/StartMenuShortcuts.cpp \
 	../services/security/AudioEngineAccess.cpp \
@@ -60,7 +60,7 @@ HEADERS += \
 	ReceiveThread.h \
 	SkinButton.h \
 	skins/DeviceSkinPainter.h \
-	../services/windows/ServiceHelper.h \
+	../services/windows/WindowsService.h \
 	../services/install/ApoRegistration.h \
 	../services/shell/StartMenuShortcuts.h \
 	../services/security/AudioEngineAccess.h \

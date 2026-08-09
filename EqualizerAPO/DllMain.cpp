@@ -18,6 +18,8 @@
 */
 
 #include "stdafx.h"
+#include "platform/windows/GuidText.h"
+#include "services/registry/RegistryPaths.h"
 #include <new>
 #include <string>
 #include <vector>
@@ -27,8 +29,8 @@
 #include "EqualizerAPO.h"
 #include "ClassFactory.h"
 #include "../services/registry/ClsidRegistration.h"
-#include "../services/registry/RegistryHelper.h"
-#include "../services/logging/LogHelper.h"
+#include "../services/registry/WindowsRegistry.h"
+#include "../services/logging/Logging.h"
 
 using std::string;
 using std::wstring;
@@ -111,14 +113,14 @@ STDAPI DllRegisterServer()
 		// registry port, where a fake registry can pin them. Register both as one
 		// transaction so a later write failure cannot leave an earlier class tree.
 		const std::vector<ClsidRegistration::ClsidTree> clsidTrees = {
-			{RegistryHelper::getGuidString(EQUALIZERAPO_POST_MIX_GUID),
+			{winutil::guidToString(EQUALIZERAPO_POST_MIX_GUID),
 				L"EqualizerAPO Post-Mix Class", filename},
-			{RegistryHelper::getGuidString(EQUALIZERAPO_PRE_MIX_GUID),
+			{winutil::guidToString(EQUALIZERAPO_PRE_MIX_GUID),
 				L"EqualizerAPO Pre-Mix Class", filename}
 		};
 		ClsidRegistration::registerClsidTrees(systemRegistry(), clsidTrees);
 	}
-	catch (const RegistryException& error)
+	catch (const RegistryError& error)
 	{
 		LogFStatic(L"CLSID registration failed: %s", error.getMessage().c_str());
 		UnregisterAPO(EQUALIZERAPO_POST_MIX_GUID);
@@ -134,11 +136,11 @@ STDAPI DllUnregisterServer()
 	try
 	{
 		ClsidRegistration::unregisterClsidTree(systemRegistry(),
-			RegistryHelper::getGuidString(EQUALIZERAPO_POST_MIX_GUID));
+			winutil::guidToString(EQUALIZERAPO_POST_MIX_GUID));
 		ClsidRegistration::unregisterClsidTree(systemRegistry(),
-			RegistryHelper::getGuidString(EQUALIZERAPO_PRE_MIX_GUID));
+			winutil::guidToString(EQUALIZERAPO_PRE_MIX_GUID));
 	}
-	catch (const RegistryException&)
+	catch (const RegistryError&)
 	{
 		return E_FAIL;
 	}
