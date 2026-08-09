@@ -53,6 +53,9 @@
     <ClCompile Include="..\..\Editor\widgets\FilterCommandCatalog.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Editor\widgets\FilterPickerModel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\helpers\AudioEngineAccess.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -66,6 +69,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="SkinThemeTests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="FilterPickerModelTests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ReferenceCardStateTests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="AutoInstallerLogicTests.cpp">
@@ -122,6 +131,9 @@
     <ClCompile Include="..\..\Editor\widgets\cards\FileReferenceController.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Editor\widgets\cards\ReferenceCardState.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Benchmark\BatchPlan.h">
@@ -146,6 +158,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Editor\widgets\FilterCommandCatalog.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Editor\widgets\FilterPickerModel.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Editor\helpers\VstChunkScan.h">

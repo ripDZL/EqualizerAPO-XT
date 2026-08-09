@@ -131,10 +131,10 @@ class RackReferenceCardView : public ReferenceCardView
 public:
 	explicit RackReferenceCardView(const QString& kind, QWidget* parent = nullptr);
 
-	void addActionButton(ActionRole role, QAbstractButton* button) override;
 	void addLeadingWidget(QWidget* widget) override;
 
 protected:
+	void placeActionButton(ActionRole role, QAbstractButton* button) override;
 	void applyState(const ReferenceCardState& state) override;
 
 private:
@@ -149,5 +149,4 @@ private:
 	RackEngravedLabel* dirLabel = nullptr;
 	RackEngravedLabel* statusLabel = nullptr;
 	RackLcdWindow* lcdWindow = nullptr;
-	QAbstractButton* browseButton = nullptr;
 };
