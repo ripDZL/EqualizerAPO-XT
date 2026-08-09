@@ -100,21 +100,28 @@ HilbertFilter::HilbertFilter(const HilbertCommand& command)
 
 HilbertFilter::~HilbertFilter()
 {
+	cleanup();
+}
+
+void HilbertFilter::cleanup()
+{
 	// Deferred report of the mute path process() took on the audio thread,
 	// like the other convolvers' cleanup(); only for instances that muted.
 	if (frameCountMismatchLogged)
 		LogF(kConvolverMuteReportFormat, kFrameCountMismatchLogPrefix,
 			muteDiagnostics.firstMuteFrameCount.load(std::memory_order_relaxed), filterFrameCount,
 			muteDiagnostics.muteCallCount.load(std::memory_order_relaxed));
+	filters = nullptr;
+	filterFrameCount = 0;
+	frameCountMismatchLogged = false;
 }
 
 std::vector<std::wstring> HilbertFilter::initialize(float sampleRate,
 	unsigned maxFrameCount, std::vector<std::wstring> channelNames)
 {
 	(void)sampleRate;
-	filters = nullptr;
+	cleanup();
 	channelCount = static_cast<unsigned>(channelNames.size());
-	filterFrameCount = 0;
 	delayOffset = 0;
 	shifted = resolve(command.shiftedChannels, channelNames, true);
 	aligned = resolve(command.alignedChannels, channelNames, false);

@@ -30,6 +30,7 @@
 #endif
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include "EqualizerAPO/ChannelMaskSelection.h"
 #include "devices/DeviceAPOInfo.h"
 #include "devices/DeviceAPOInfoKeys.h"
 #include "engine/ConfigLoadTrace.h"
@@ -65,6 +66,23 @@ void testDeviceApoRegistryVocabulary(test::Harness& harness)
 		harness.expect(std::find(ownedBegin, ownedEnd, valueName) != ownedEnd,
 			"every installed processing value is in the uninstall ownership table");
 	}
+}
+
+// Initialize() knows the endpoint direction before LockForProcess creates the
+// FilterEngine. Capture must therefore use EngineSetup::capture when choosing
+// the first stream's channel mask, not the engine's default render state.
+void testApoChannelMaskSelectionUsesSetupCapture(test::Harness& harness)
+{
+	constexpr unsigned inputMask = 0x0000000B;
+	constexpr unsigned outputMask = 0x0000003F;
+	harness.expectEqual(resolveApoChannelMask(true, 4, inputMask, 2, outputMask), inputMask,
+		"capture setup selects the input channel mask before engine initialization");
+	harness.expectEqual(resolveApoChannelMask(true, 2, 0, 2, outputMask), outputMask,
+		"capture setup borrows an equal-width output mask only when input mask is absent");
+	harness.expectEqual(resolveApoChannelMask(false, 2, inputMask, 4, outputMask), outputMask,
+		"render setup selects the output channel mask");
+	harness.expectEqual(resolveApoChannelMask(false, 2, inputMask, 2, 0), inputMask,
+		"render setup borrows an equal-width input mask only when output mask is absent");
 }
 
 void testInstallStateComparisonIgnoresPadding(test::Harness& harness)
@@ -1009,6 +1027,58 @@ void testConfigRegistryReadsGoThroughThePort(test::Harness& harness)
 		"readRegDWORD resolves through the injected fake registry");
 }
 
+// EngineSetup replaces the old multi-call initialization ritual. This drives
+// the actual Device:/Stage: factories so the setup's identity and all three
+// stage facts remain tied to behavior instead of only stored getters.
+void testEngineSetupRoutesDeviceAndStages(test::Harness& harness)
+{
+	const std::wstring deviceGuid = L"{12345678-1111-2222-3333-444444444444}";
+	const std::wstring configPath = writeConfig(harness, L"engine-setup-routing.txt",
+		"Device: Bus Test Endpoint {12345678-1111-2222-3333-444444444444}\n"
+		"Preamp: -1 dB\n"
+		"Stage: pre-mix\n"
+		"Preamp: -3 dB\n"
+		"Stage: post-mix\n"
+		"Preamp: -6 dB\n"
+		"Stage: capture\n"
+		"Preamp: -9 dB\n");
+
+	auto run = [&](bool preMix, bool capture, bool postMixInstalled,
+		double expectedDb, const char* label) {
+		FilterEngine engine;
+		EngineSetup setup;
+		setup.sampleRate = 48000.0f;
+		setup.inputChannelCount = 2;
+		setup.realChannelCount = 2;
+		setup.outputChannelCount = 2;
+		setup.maxFrameCount = 16;
+		setup.customPath = configPath;
+		setup.preMix = preMix;
+		setup.capture = capture;
+		setup.postMixInstalled = postMixInstalled;
+		setup.deviceName = L"Test Endpoint";
+		setup.connectionName = L"Bus";
+		setup.deviceGuid = deviceGuid;
+		engine.initialize(setup);
+
+		harness.expect(engine.getDeviceString()
+			== std::wstring(L"Bus Test Endpoint ") + deviceGuid,
+			"EngineSetup assembles the Device: match key once");
+		harness.expect(engine.isPreMix() == preMix && engine.isCapture() == capture
+			&& engine.isPostMixInstalled() == postMixInstalled, label);
+
+		const std::vector<float> output = processDcBlock(engine, 1.0f, 1.0f, 16);
+		const float expected = static_cast<float>(std::pow(10.0, expectedDb / 20.0));
+		harness.expect(std::fabs(output[(size_t)15 * 2] - expected) < 1e-4f, label);
+	};
+
+	run(true, false, true, -3.0, "pre-mix setup applies only the pre-mix stage");
+	run(false, false, true, -7.0, "post-mix setup keeps unscoped and post-mix filters");
+	run(true, true, true, -10.0, "capture setup keeps unscoped and capture filters");
+	run(true, false, false, -4.0,
+		"a pre-mix setup without a post-mix endpoint keeps unscoped filters");
+}
+
 void testAnalysisFreezesDynamicVelvetAndLabelsTheSnapshot(
 	test::Harness& harness)
 {
@@ -1082,6 +1152,7 @@ int runEngineOrchestrationTests()
 	testRegistryExportHeaderPreservesQualifiedRoot(harness);
 	testSynchronizedStateSerializesReplacement(harness);
 	testDeviceApoRegistryVocabulary(harness);
+	testApoChannelMaskSelectionUsesSetupCapture(harness);
 	testInstallStateComparisonIgnoresPadding(harness);
 	runRegistryTransactionTests(harness);
 	runDeviceApoInfoTests(harness);
@@ -1105,6 +1176,7 @@ int runEngineOrchestrationTests()
 	testConfigLoadTrace(harness);
 	testParseErrorsAreReportedPerLineAndProseIsNot(harness);
 	testConfigRegistryReadsGoThroughThePort(harness);
+	testEngineSetupRoutesDeviceAndStages(harness);
 	testAnalysisFreezesDynamicVelvetAndLabelsTheSnapshot(harness);
 
 	removeTestDirectory();

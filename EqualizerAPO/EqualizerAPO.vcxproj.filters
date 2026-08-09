@@ -11,6 +11,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ClassFactory.h" />
+	<ClInclude Include="ChannelMaskSelection.h" />
     <ClInclude Include="EqualizerAPO.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="..\helpers\MemoryHelper.h">

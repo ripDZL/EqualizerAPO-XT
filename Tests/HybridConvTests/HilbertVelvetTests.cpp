@@ -27,6 +27,17 @@ namespace
 constexpr double Pi = 3.1415926535897932384626433832795;
 test::Harness harness("HilbertVelvetTests");
 
+std::wstring readCapturedLog(FILE* logFile)
+{
+	std::fflush(logFile);
+	std::rewind(logFile);
+	std::wstring log;
+	wchar_t buffer[1024];
+	while (std::fgetws(buffer, 1024, logFile) != nullptr)
+		log.append(buffer);
+	return log;
+}
+
 std::complex<double> responseAt(const std::vector<double>& taps, double omega)
 {
 	std::complex<double> response;
@@ -281,18 +292,53 @@ void testHilbertMismatchIsLoggedOnDestruction()
 			"a mismatched Hilbert block mutes the shifted channel");
 	}
 
-	std::fflush(logFile);
-	std::rewind(logFile);
-	std::wstring log;
-	wchar_t buffer[1024];
-	while (std::fgetws(buffer, 1024, logFile) != nullptr)
-		log.append(buffer);
+	const std::wstring log = readCapturedLog(logFile);
 	std::fclose(logFile);
 	LogHelper::useStream(stdout, true, true, false);
 
 	const std::wstring marker = HilbertFilter::kFrameCountMismatchLogPrefix;
 	harness.expectTrue(log.find(marker) != std::wstring::npos,
 		"Hilbert frame-count mismatch is logged on destruction");
+}
+
+void testHilbertMismatchIsReportedBeforeReinitialize()
+{
+	FILE* logFile = nullptr;
+	if (tmpfile_s(&logFile) != 0 || logFile == nullptr)
+	{
+		harness.fail("could not create reinitialize mismatch log capture");
+		return;
+	}
+	LogHelper::useStream(logFile, false, true, false);
+
+	{
+		HilbertCommand command;
+		harness.require(HilbertCommand::parse(L"Hilbert",
+			L"Shift=ALL Direction=-90", command), "Hilbert reinitialize command parses");
+		HilbertFilter filter(command);
+		filter.initialize(48000.0f, 512, { L"L", L"R" });
+
+		constexpr unsigned shortBlock = 128;
+		std::vector<double> inL(shortBlock, 0.25), inR(shortBlock, 0.25);
+		std::vector<double> outL(shortBlock, 1.0), outR(shortBlock, 1.0);
+		double* input[] = { inL.data(), inR.data() };
+		double* output[] = { outL.data(), outR.data() };
+		filter.process(output, input, shortBlock);
+		filter.initialize(48000.0f, 1024, { L"L", L"R" });
+	}
+
+	const std::wstring log = readCapturedLog(logFile);
+	std::fclose(logFile);
+	LogHelper::useStream(stdout, true, true, false);
+
+	const std::wstring expected = std::wstring(HilbertFilter::kFrameCountMismatchLogPrefix)
+		+ L" 128 differs from initialized 512";
+	const std::wstring stale = std::wstring(HilbertFilter::kFrameCountMismatchLogPrefix)
+		+ L" 128 differs from initialized 1024";
+	harness.expectTrue(log.find(expected) != std::wstring::npos,
+		"Hilbert reports a mute before replacing its initialized frame count");
+	harness.expectTrue(log.find(stale) == std::wstring::npos,
+		"Hilbert does not report an old mute against its replacement frame count");
 }
 }
 
@@ -305,5 +351,6 @@ void runHilbertVelvetTests()
 	testVelvetStreamIsBlockSizeInvariant();
 	testVelvetDynamicRenewalIsFiniteAndSmooth();
 	testHilbertMismatchIsLoggedOnDestruction();
+	testHilbertMismatchIsReportedBeforeReinitialize();
 	harness.report();
 }

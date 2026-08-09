@@ -34,6 +34,7 @@
 #include "../helpers/Win32Resource.h"
 #include "../devices/DeviceAPOInfo.h"
 #include "../devices/DeviceAPOInfoKeys.h"
+#include "ChannelMaskSelection.h"
 #include "EqualizerAPO.h"
 
 namespace
@@ -525,19 +526,11 @@ HRESULT EqualizerAPO::LockForProcess(UINT32 u32NumInputConnections,
 	else
 		realChannelCount = inFormat.dwSamplesPerFrame;
 
-	unsigned channelMask;
-	if (engine.isCapture())
-	{
-		channelMask = inFormat.dwChannelMask;
-		if (channelMask == 0 && inFormat.dwSamplesPerFrame == outFormat.dwSamplesPerFrame)
-			channelMask = outFormat.dwChannelMask;
-	}
-	else
-	{
-		channelMask = outFormat.dwChannelMask;
-		if (channelMask == 0 && inFormat.dwSamplesPerFrame == outFormat.dwSamplesPerFrame)
-			channelMask = inFormat.dwChannelMask;
-	}
+	// Initialize() learned the endpoint direction before the engine is built;
+	// querying engine.isCapture() here would still see its constructor default.
+	const unsigned channelMask = resolveApoChannelMask(engineSetup.capture,
+		inFormat.dwSamplesPerFrame, inFormat.dwChannelMask,
+		outFormat.dwSamplesPerFrame, outFormat.dwChannelMask);
 
 	try
 	{

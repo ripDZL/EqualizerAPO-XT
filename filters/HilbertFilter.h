@@ -30,6 +30,7 @@ public:
 	void process(double** output, double** input, unsigned frameCount) override;
 
 private:
+	void cleanup();
 	HilbertCommand command;
 	std::vector<double> coefficients;
 	HConvSingleArray filters;

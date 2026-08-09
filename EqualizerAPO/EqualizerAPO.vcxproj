@@ -346,6 +346,7 @@
     <ClInclude Include="..\helpers\MemoryHelper.h" />
     <ClInclude Include="..\stdafx.h" />
     <ClInclude Include="..\version.h" />
+	<ClInclude Include="ChannelMaskSelection.h" />
     <ClInclude Include="ClassFactory.h" />
     <ClInclude Include="EqualizerAPO.h" />
     <ClInclude Include="resource.h" />
