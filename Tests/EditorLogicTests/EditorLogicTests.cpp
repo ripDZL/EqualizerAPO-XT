@@ -134,8 +134,16 @@ int main(int argc, char** argv)
 		testConfigFileCodecPreservesExistingFileWhenAtomicReplaceFails();
 		testConfigFileCodecRejectsPartialRead();
 		testMemoryHelperConstructReleasesStorageWhenConstructorThrows();
-		testOwnedBackgroundTaskJoinsAndStartsOnlyOnce();
-		testUpdateElevationPolicyUsesOnePromptForEditorUpdates();
+		testUpdateSessionPublishesStagedVersionAfterJoin();
+		testUpdateSessionLaunchesElevatedCoordinatorWithoutApplyingDirectly();
+		testUpdateSessionContainsBackgroundFailure();
+		testUpdateCoordinatorAppliesPendingRestartThroughAdapter();
+		testUpdateSessionReportsUpToDateAndStartsOnlyOnce();
+		testUpdateSessionAppliesDirectlyWhenAlreadyElevated();
+		testUpdateSessionContainsApplyFailure();
+		testUpdateSessionKeepsPendingUpdateWhenElevationIsCancelled();
+		testUpdateCoordinatorReportsNoPendingRestart();
+		testUpdateCoordinatorContainsAdapterFailure();
 		testTheSkinRosterIsTheOneList();
 		testSkinTokensCarryExplicitMode();
 		testTokenSubstitutionOffersAnAlphaForm();
