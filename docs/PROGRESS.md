@@ -132,4 +132,5 @@
 - [x] Validated stage 2 locally: source/variant sync; HybridConv 1635; EngineOrchestration 1221; AudioRegression 31/31; EditorLogic 3509; rebuilt Common/APO/Benchmark/Voicemeeter/Editor; normal VST self-test passed.
 - [x] Integrated upstream #263 Subwoofer Routing usability: expanded routing content scrolls inside the right pane, dialog actions remain visible, and Copy add-channel Return stays local to the inline field.
 - [x] Validated #263 locally: source/variant sync; rebuilt x64 AVX2 Editor; VST self-test; focused five-skin offscreen gallery (1280 PNGs) with initial-focus, overflow/action, and add-channel commit checks.
-- [ ] Run hosted beta CI for the #258/#259/#260/#263 batch, then get real microphone/capture and playback acceptance before main.
+- [x] Corrected CI gallery false negative for compact Studio-derived skins by detecting actual overflow; AVX2 rebuild, VST self-test, source/variant sync, and all-skin gallery (5120 PNGs) passed locally.
+- [ ] Rerun hosted beta CI for the #258/#259/#260/#263 batch, then get real microphone/capture and playback acceptance before main.

@@ -992,10 +992,16 @@ int renderSkin(const QDir& outDir, const QString& skinId, const QString& configP
 					QStringLiteral("SubwooferRoutingContentScroll"));
 				QWidget* buttons = dialog.findChild<QWidget*>(
 					QStringLiteral("SubwooferRoutingButtonBox"));
-				const bool needsVerticalScroll =
-					skinId != QStringLiteral("studio");
+				// A compact renderer may fit all of its expanded ports in the
+				// available right pane. Require a vertical bar only when the
+				// actual content needs one; variants that share Studio's compact
+				// renderer should not fail merely because their skin id differs.
+				const bool contentOverflows = contentScroll != nullptr
+					&& contentScroll->widget() != nullptr
+					&& contentScroll->widget()->minimumSizeHint().height()
+						> contentScroll->viewport()->height();
 				if (contentScroll == nullptr
-					|| (needsVerticalScroll
+					|| (contentOverflows
 						&& contentScroll->verticalScrollBar()->maximum() <= 0)
 					|| buttons == nullptr || !buttons->isVisibleTo(&dialog)
 					|| buttons->geometry().bottom()
