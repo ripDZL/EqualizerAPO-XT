@@ -133,4 +133,5 @@
 - [x] Integrated upstream #263 Subwoofer Routing usability: expanded routing content scrolls inside the right pane, dialog actions remain visible, and Copy add-channel Return stays local to the inline field.
 - [x] Validated #263 locally: source/variant sync; rebuilt x64 AVX2 Editor; VST self-test; focused five-skin offscreen gallery (1280 PNGs) with initial-focus, overflow/action, and add-channel commit checks.
 - [x] Corrected CI gallery false negative for compact Studio-derived skins by detecting actual overflow; AVX2 rebuild, VST self-test, source/variant sync, and all-skin gallery (5120 PNGs) passed locally.
-- [ ] Rerun hosted beta CI for the #258/#259/#260/#263 batch, then get real microphone/capture and playback acceptance before main.
+- [x] Hosted beta CI run `31322362583` passed the #258/#259/#260/#263 batch: Pester, cppcheck, SSE2/AVX/AVX2/AVX-512/AVX10.1/ARM64, offscreen UI gates, packaging, and cross-variant comparison.
+- [ ] Get real microphone/capture and playback acceptance before main.

@@ -36,5 +36,6 @@
 - [x] Confirmed hosted beta CI run `31288693820` for upstream PRs #261/#262.
 - [x] Review and integrate upstream PRs #258, #259, and #260 as the isolated engine/DSP batch.
 - [x] Review and integrate upstream PR #263 Subwoofer Routing editor usability.
-- [ ] Confirm rerun hosted beta CI for #258/#259/#260/#263 after the compact-skin gallery correction, then retain beta until real microphone/capture and playback acceptance.
+- [x] Confirmed hosted beta CI for #258/#259/#260/#263 after the compact-skin gallery correction (`31322362583`).
+- [ ] Complete real microphone/capture and playback acceptance before promoting the engine/DSP batch to `main`.
 - [ ] Revoke temporary GitHub token when the user ends the session.
