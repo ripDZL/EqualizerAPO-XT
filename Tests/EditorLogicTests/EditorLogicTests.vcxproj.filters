@@ -62,6 +62,12 @@
     <ClCompile Include="FilterCommandCatalogTests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="VSTPreviewEndpointTests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SkinThemeTests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="AutoInstallerLogicTests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

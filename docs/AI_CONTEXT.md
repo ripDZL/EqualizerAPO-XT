@@ -1,10 +1,13 @@
 # AI Context
 
-- Active task: `v2.35.1` published from tested beta promotion; `main`/`beta` are synchronized through the version bump.
+- Active task: `v2.35.1` is published; `beta` now carries a separately reviewed first upstream maintenance batch and awaits hosted CI before further engine work.
 - Current change: preserve beta VST analyzer preview, LegacyRows/theme work, artifact hygiene, and whole-archive test linking while taking upstream `v2.34.1` Subwoofer Routing, VST3, installer, and CI work.
 - 2026-08-08 release: promoted `beta` `0d26e5b` to `main`; GitHub Actions run `31278644890` bumped `a4a3c78` to `2.35.0`, passed all gates, and published the auto-detect installer, all SIMD installers, source archive, and checksums.
 - 2026-08-08 release safeguard: corrected `v2.35.0` to target `a4a3c78`; release workflow now passes `needs.version-bump.outputs.bumped_sha || github.sha` to Velopack. Reviewed upstream PR #257 (`61f7238`) is integrated into beta with transactional CLSID rollback: a late write removes new partial/companion trees or restores existing ones; fake-registry coverage proves both paths. Upstream PR #258 remains unreviewed.
 - 2026-08-09 release: promoted tested `beta` `f7ee020` to `main`; retry of one AVX2 skin-switch timing outlier passed, and run `31284692146` published `v2.35.1` at `23fdf8e` with auto-detect/SIMD installers, source archive, and checksums.
+- 2026-08-08 upstream stage 1: cherry-picked upstream PR #261 (`ad6b5ed`) and #262 (`94447d0`) onto `beta`. The batch moves Editor crash artifacts under `%LOCALAPPDATA%\\EqualizerAPO\\logs\\crash`, removes only unused original HybridConv copies, adds a MultiConvolution golden case, and splits EditorLogicTests while retaining fork VST-preview/theme coverage.
+- Stage-1 local validation: `git diff --check`; source/variant sync; EditorLogic 3509; AudioRegression 31/31; HybridConv 1635; EngineOrchestration 1198; rebuilt AVX-512 Editor; normal `--selftest-vst` passed. Forced-offscreen Qt self-tests hang for both pre-stage and rebuilt binaries locally, so the hosted beta UI matrix remains the offscreen acceptance gate.
+- Next upstream batch: review/integrate PRs #258, #259, and #260 only after the #261/#262 beta CI result is clean; they modify engine/DSP behavior and require real audio acceptance before any stable promotion.
 - Approach: prefer the selected EAPO endpoint for WASAPI preview capture, fall back to default console/communications mic endpoints plus default system playback, mix copied blocks into the visible editor-owned plugin instance, and discard output.
 - Scope note: this animates analyzer-style plugin GUIs while the panel is open; real APO audio processing remains in the service-owned instance.
 
