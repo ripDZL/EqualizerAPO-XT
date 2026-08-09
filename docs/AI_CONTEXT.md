@@ -1,9 +1,10 @@
 # AI Context
 
-- Active task: completed upstream `b3b8544` integration, stable promotion, and `v2.35.0` release; `main`/`beta` are synchronized through the version bump.
+- Active task: `v2.35.1` published from tested beta promotion; `main`/`beta` are synchronized through the version bump.
 - Current change: preserve beta VST analyzer preview, LegacyRows/theme work, artifact hygiene, and whole-archive test linking while taking upstream `v2.34.1` Subwoofer Routing, VST3, installer, and CI work.
 - 2026-08-08 release: promoted `beta` `0d26e5b` to `main`; GitHub Actions run `31278644890` bumped `a4a3c78` to `2.35.0`, passed all gates, and published the auto-detect installer, all SIMD installers, source archive, and checksums.
 - 2026-08-08 release safeguard: corrected `v2.35.0` to target `a4a3c78`; release workflow now passes `needs.version-bump.outputs.bumped_sha || github.sha` to Velopack. Reviewed upstream PR #257 (`61f7238`) is integrated into beta with transactional CLSID rollback: a late write removes new partial/companion trees or restores existing ones; fake-registry coverage proves both paths. Upstream PR #258 remains unreviewed.
+- 2026-08-09 release: promoted tested `beta` `f7ee020` to `main`; retry of one AVX2 skin-switch timing outlier passed, and run `31284692146` published `v2.35.1` at `23fdf8e` with auto-detect/SIMD installers, source archive, and checksums.
 - Approach: prefer the selected EAPO endpoint for WASAPI preview capture, fall back to default console/communications mic endpoints plus default system playback, mix copied blocks into the visible editor-owned plugin instance, and discard output.
 - Scope note: this animates analyzer-style plugin GUIs while the panel is open; real APO audio processing remains in the service-owned instance.
 

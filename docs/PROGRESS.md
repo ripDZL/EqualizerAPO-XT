@@ -125,3 +125,4 @@
 - [x] Fixed release targeting: Velopack now receives the version-bump SHA, with a Pester assertion preventing a return to the pre-bump trigger SHA.
 - [x] Integrated reviewed upstream PR #257 (`61f7238`) into beta and made CLSID registration transactional: late-write rollback removes new trees and restores existing trees (1198 checks); Common, APO, Editor, and DeviceSelector rebuilt; source/variant sync and headless skin-switch gate passed.
 - [ ] Review upstream PR #258 separately before merging its DSP changes.
+- [x] Promoted tested CLSID rollback beta `f7ee020` to `main`; GitHub Actions run `31284692146` passed on retry after one AVX2 UI timing outlier and published `v2.35.1` at `23fdf8e` with installers, source archive, and checksums.
