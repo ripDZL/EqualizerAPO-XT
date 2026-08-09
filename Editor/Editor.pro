@@ -240,22 +240,11 @@ SOURCES += main.cpp\
 	SkinGallery.cpp \
 	SkinManager.cpp \
 	skins/ISkin.cpp \
-	skins/pickers/MatrixFilterPicker.cpp \
-	skins/RackChrome.cpp \
 	skins/CustomThemeStore.cpp \
 	skins/SkinDisplayNames.cpp \
 	skins/Skins.cpp \
-	skins/SkinFileIcons.cpp \
+	skins/shared/SkinFileIcons.cpp \
 	skins/SkinThemeData.cpp \
-	skins/StudioSkin.cpp \
-	skins/MinimalSkin.cpp \
-	skins/SoftSkin.cpp \
-	skins/RackSkin.cpp \
-	skins/MatrixSkin.cpp \
-	skins/pickers/StudioFilterPicker.cpp \
-	skins/pickers/MinimalFilterPicker.cpp \
-	skins/pickers/SoftFilterPicker.cpp \
-	skins/pickers/RackFilterPicker.cpp \
 	widgets/AddCardRow.cpp \
 	widgets/ActivatableListChrome.cpp \
 	widgets/AudioKnob.cpp \
@@ -299,16 +288,6 @@ SOURCES += main.cpp\
 	widgets/cards/ReferenceCardState.cpp \
 	widgets/cards/DefaultReferenceCardView.cpp \
 	widgets/cards/VSTCardEditor.cpp \
-	skins/cards/StudioReferenceCardView.cpp \
-	skins/cards/StudioSubwooferRoutingCardView.cpp \
-	skins/cards/MinimalSubwooferRoutingCardView.cpp \
-	skins/cards/SoftSubwooferRoutingCardView.cpp \
-	skins/cards/RackSubwooferRoutingCardView.cpp \
-	skins/cards/MatrixSubwooferRoutingCardView.cpp \
-	skins/cards/MinimalReferenceCardView.cpp \
-	skins/cards/SoftReferenceCardView.cpp \
-	skins/cards/RackReferenceCardView.cpp \
-	skins/cards/MatrixReferenceCardView.cpp \
 	widgets/ElidedLabel.cpp \
 	widgets/EditableValue.cpp \
 	widgets/EditableValueText.cpp \
@@ -331,12 +310,7 @@ SOURCES += main.cpp\
 	widgets/routing/CopyRoutingAdapter.cpp \
 	widgets/routing/RoutingFold.cpp \
 	widgets/routing/MultiConvolutionRoutingAdapter.cpp \
-	widgets/routing/CrosspointMatrixRoutingRenderer.cpp \
-	widgets/routing/StepListRoutingRenderer.cpp \
-	widgets/routing/BlockChipRoutingRenderer.cpp \
-	widgets/routing/LightTraceRoutingRenderer.cpp \
 	widgets/routing/StudioRoutingModel.cpp \
-	widgets/routing/HardwarePatchbayRoutingRenderer.cpp \
 	widgets/MiddleClickTabWidget.cpp \
 	import/ConfigDependencyScanner.cpp \
 	import/ImportDialog.cpp \
@@ -529,20 +503,14 @@ HEADERS  += \
 	SkinTokens.h \
 	SkinManager.h \
 	skins/ISkin.h \
-	skins/pickers/MatrixFilterPicker.h \
-	skins/RackChrome.h \
 	skins/CustomThemeStore.h \
 	skins/SkinDisplayNames.h \
 	skins/Skins.h \
-	skins/SkinFileIcons.h \
-	skins/SkinChromeOverlay.h \
-	skins/SkinPaint.h \
-	skins/SkinSupport.h \
+	skins/shared/SkinFileIcons.h \
+	skins/shared/SkinChromeOverlay.h \
+	skins/shared/SkinPaint.h \
+	skins/shared/SkinSupport.h \
 	skins/SkinThemeData.h \
-	skins/pickers/StudioFilterPicker.h \
-	skins/pickers/MinimalFilterPicker.h \
-	skins/pickers/SoftFilterPicker.h \
-	skins/pickers/RackFilterPicker.h \
 	widgets/AddCardRow.h \
 	widgets/ActivatableListChrome.h \
 	widgets/AudioKnob.h \
@@ -583,16 +551,6 @@ HEADERS  += \
 	widgets/cards/ReferenceCardView.h \
 	widgets/cards/DefaultReferenceCardView.h \
 	widgets/cards/VSTCardEditor.h \
-	skins/cards/StudioReferenceCardView.h \
-	skins/cards/StudioSubwooferRoutingCardView.h \
-	skins/cards/MinimalSubwooferRoutingCardView.h \
-	skins/cards/SoftSubwooferRoutingCardView.h \
-	skins/cards/RackSubwooferRoutingCardView.h \
-	skins/cards/MatrixSubwooferRoutingCardView.h \
-	skins/cards/MinimalReferenceCardView.h \
-	skins/cards/SoftReferenceCardView.h \
-	skins/cards/RackReferenceCardView.h \
-	skins/cards/MatrixReferenceCardView.h \
 	widgets/ElidedLabel.h \
 	widgets/EditableValue.h \
 	widgets/EditableValueText.h \
@@ -617,12 +575,7 @@ HEADERS  += \
 	widgets/routing/RoutingAddChannelEditor.h \
 	widgets/routing/MultiConvolutionRoutingAdapter.h \
 	widgets/routing/IRoutingRenderer.h \
-	widgets/routing/CrosspointMatrixRoutingRenderer.h \
-	widgets/routing/StepListRoutingRenderer.h \
-	widgets/routing/BlockChipRoutingRenderer.h \
-	widgets/routing/LightTraceRoutingRenderer.h \
 	widgets/routing/StudioRoutingModel.h \
-	widgets/routing/HardwarePatchbayRoutingRenderer.h \
 	widgets/MiddleClickTabWidget.h \
 	import/ConfigDependencyScanner.h \
 	import/ImportDialog.h \
@@ -730,6 +683,11 @@ build_pass:CONFIG(debug, debug|release) {
 }
 
 include($$PWD/../common.pri)
+include(skins/studio/studio.pri)
+include(skins/minimal/minimal.pri)
+include(skins/soft/soft.pri)
+include(skins/rack/rack.pri)
+include(skins/matrix/matrix.pri)
 QMAKE_LIBDIR += $$LIBSNDFILE_LIB $$FFTW_LIB $$MUPARSERX_LIB $$VELOPACK_LIB
 
 # The Editor deliberately does NOT link Common.lib: every engine source it

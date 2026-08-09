@@ -20,7 +20,7 @@
 #include <QStyleFactory>
 
 // finishTokens; header-only, no link dependency on the skin classes.
-#include "SkinSupport.h"
+#include "shared/SkinSupport.h"
 
 namespace
 {

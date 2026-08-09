@@ -46,11 +46,12 @@ UI 문자열이 아니다(검색 placeholder처럼 진짜 UI 입력 요소만 tr
    (#F4B860/#B66A00), accent2는 LED 녹색(#5ED0A0/#177A55).
 5. **각인 활자.** 라벨은 자간을 띄운 소문자 회피·대문자 각인풍. 콘덴스드
    폰트가 저장소에 없어 자간 띄운 DM Sans로 근사한다(알려진 wish 항목).
-6. **이어 존 존중.** 페이스플레이트 양끝의 랙 이어 폭(`RackChrome::earWidth()`)
+6. **이어 존 존중.** 페이스플레이트 양끝의 랙 이어 폭(`RackSkinDetail::EarWidth`)
    은 콘텐츠 금지 구역이다. `prepareCommandRow`가 헤더/본문 여백을 그만큼
-   들여 쓴다. VST 행은 명판 폭(`nameplateReserve()`)을 추가로 비운다.
-7. **chrome은 RackChrome에.** 그리기 코드는 `RackChrome.{h,cpp}`(약 500줄)에
-   모으고 스킨 클래스는 얇은 등록 심(shim)으로 유지한다.
+   들여 쓴다. VST 행은 명판 폭(`RackSkinDetail::NameplateWidth`)을 추가로 비운다.
+7. **chrome은 Rack 모듈에.** 공유 물리 레시피는 `RackSkinDetail.{h,cpp}`에,
+   스킨 훅은 `RackSkin.*.cpp` 분할 모듈에 둔다. `RackSkin` 클래스는 얇은 등록
+   심(shim)으로 유지한다.
 
 ## 빛과 상태의 문법
 
@@ -80,7 +81,7 @@ DottedLine, 배지는 WireframeBorder(채움 없는 와이어 — 패널에 인�
 
 ### 노브 — 포인터 노브와 패널 인쇄 눈금 (Annex K)
 
-`RackChrome::paintKnob`. 물리 포인터 노브이고, **눈금은 노브가 아니라 패널에
+`RackSkin::paintKnob`. 물리 포인터 노브이고, **눈금은 노브가 아니라 패널에
 인쇄**된다 — 실제 하드웨어가 그렇듯이. 노브 몸통은 돌출(깊이 위계), 포인터가
 값을 가리키고, 활성 상태는 앰버가 맡는다. **노브 캡 위에 값 표시창을 얹지
 않는다**(재작업 라운드): 캡을 가로지르는 표시판은 만들 수 없는 하드웨어이고
@@ -97,7 +98,7 @@ DottedLine, 배지는 WireframeBorder(채움 없는 와이어 — 패널에 인�
 ### 카드(행) chrome
 
 QSS는 기계 가공된 베이스 플레이트(배경+1px 보더+3px 라운드)와 호버 광택만
-제공한다. 그 위에 `RackChrome::paintCardChrome`이 페이스플레이트 질감, 랙
+제공한다. 그 위에 `RackSkin::paintCardChrome`이 페이스플레이트 질감, 랙
 이어, 네 나사(슬롯 각도가 제각각 — 사람 손으로 조인 나사), 상태 LED,
 Include의 패치베이 잭, VST의 황동 명판을 그린다. 광택 오버레이는 반투명이라
 QSS 호버가 비쳐 보인다. 헤더 스트립은 투명(브러시드 메탈이 보여야 하므로).
@@ -151,7 +152,7 @@ QWidget으로 보고되어 규칙이 빗나간다). 함몰면은 표시창 조�
 
 Include/Convolution/MultiConvolution/VST 행의 본문은
 `RackReferenceCardView`가 그리는 물리 부품 구성이다: 왼쪽 베젤 상태 램프
-(RackChrome::paintLed 문법) → (멀티컨볼루션이면 R2 각인 선택기 문법의
+(`RackSkinDetail::paintLed` 문법) → (멀티컨볼루션이면 R2 각인 선택기 문법의
 출력 채널 콤보) → 각인 라벨 스트립(자간 띄운 캡션 `PATCH`/`IR PROGRAM`/
 `MODULE` + 와이어프레임 스탬프 `VST2`/`VST3`/`ABS` + 혼합대소문자 이름
 각인 + muted 위치 서브 각인 — 컨테이너 접두 `Surround\` 형태로, 폴더가
@@ -248,8 +249,8 @@ Comment의 물성은 다이모 엠보싱 라벨 테이프다: 각인은 공장 �
 ### GraphicEQ 카드 — 오실로스코프 표시창 (라운드 3 재작업)
 
 응답 플롯은 GraphicEQPlotWidget의 픽셀 전부를 스킨이 그리는 **오실로스코프
-표시창**이다(`RackChrome::paintGraphicEqPlot`, 헌법 7조대로 그리기는
-RackChrome에 두고 RackSkin은 얇은 심). 두 마감 모두 어두운 인광 유리
+표시창**이다(`RackSkin::paintGraphicEqPlot`, 구현은 `RackSkin.GraphicEq.cpp`
+분할 모듈에 둔다). 두 마감 모두 어두운 인광 유리
 우물이다 — 크림 패널에 박힌 스코프도 스코프다(표시창 조항). 베젤은 함몰
 문법(그늘진 윗변의 처마 그림자 + 점등된 아랫입술)이고, 포커스는 LCD와 같은
 앰버 서비스 엣지로 답한다.
@@ -348,7 +349,7 @@ ElseIf/Else/EndIf 행은 `logicSiblingsIndentAsMembers = true`로 멤버
 시점에만 읽고 구성 시점에 굽지 않는다.
 
 rack의 답은 거터의 **릴레이 전원 버스**다(게이트 이슈 #179 판정 A;
-그리기는 헌법 7조대로 RackChrome). 버스는 랙 개구부의 어두운 솔기 케이싱에
+그리기는 `RackSkin.CommandRows.cpp`의 Rack 문법을 따른다). 버스는 랙 개구부의 어두운 솔기 케이싱에
 앰버 코어를 물린 급전선으로, If 헤드 유닛의 아래 여백에서 짧은 급전점
 (장착 솔기에 앉은 작은 주얼 램프가 조건을 보고한다)으로 태어나 멤버 행들을
 지나 EndIf의 접점 블록에서 끝난다. ElseIf/Else는 버스 위의 금속 접점 블록
@@ -385,7 +386,7 @@ Channel×If 중첩이 읽힌다. Eval 행의 본문은 맨텍스트 행과 같�
   않도록, 시선은 점등(선택)과 예열(호버) 램프만 끈다.
 - 갤러리 쇼케이스: hover는 두 번째 슬롯의 램프 예열(선택 슬롯의 점등과 한
   장에 대비), 빈 검색은 LCD에 죽은 검색어 + 플레이트의 `NO SIGNAL` 각인.
-- 모든 chrome은 RackChrome의 그리기 문법을 재현해 카드 페이스플레이트와
+- 모든 chrome은 RackSkin 분할 모듈과 RackSkinDetail의 그리기 문법을 재현해 카드 페이스플레이트와
   시각적으로 연속이다.
 
 ## 하지 말 것
@@ -413,17 +414,15 @@ Channel×If 중첩이 읽힌다. Eval 행의 본문은 맨텍스트 행과 같�
 
 ## 구현 지도
 
-- 클래스: `RackSkin` — [RackSkin.cpp](../../Editor/skins/RackSkin.cpp)
-  (얇은 심 + 분석 그래프의 `paintAnalysisMonitor`; 로스터 조립은
+- 클래스: `RackSkin` — [RackSkin.cpp](../../Editor/skins/rack/RackSkin.cpp)
+  (얇은 파사드; 로스터 조립은
   [Skins.cpp](../../Editor/skins/Skins.cpp))
-- 그리기: `Editor/skins/RackChrome.{h,cpp}` — 페이스플레이트/나사/LED/잭/
+- 그리기: `Editor/skins/rack/RackSkin.*.cpp` — 페이스플레이트/나사/LED/잭/
   명판/노브 페인터, `earWidth()`/`nameplateReserve()` 예약 폭
-- QSS: `Editor/skins/rack_dark.qss`, `rack_light.qss`
-- 픽커: `Editor/skins/pickers/RackFilterPicker.{h,cpp}`
-- 참조 카드: `Editor/skins/cards/RackReferenceCardView.{h,cpp}` (RackChrome의
-  램프·각인·LCD 문법을 파일 지역 헬퍼로 재현; RackChrome 자체는 프레임
-  전용으로 유지)
-- Copy: `Editor/widgets/routing/HardwarePatchbayRoutingRenderer.{h,cpp}`
+- QSS: `Editor/skins/rack/qss/rack_dark.qss`, `rack_light.qss`
+- 픽커: `Editor/skins/rack/picker/RackFilterPicker.{h,cpp}`
+- 참조 카드: `Editor/skins/rack/cards/RackReferenceCardView.{h,cpp}`
+- Copy: `Editor/skins/rack/routing/HardwarePatchbayRoutingRenderer.{h,cpp}`
 - Device Selector: `DeviceSelector/skins/RackDeviceSkin.cpp` (공용 폼 계약은
   `DeviceSelector/skins/DeviceSkinPainter.{h,cpp}`)
 

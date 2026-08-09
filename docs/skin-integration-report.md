@@ -5,6 +5,12 @@ agents each implemented one skin on `skin/<id>` branches (Phase 1); this
 report records the judging and the integration of those branches into one
 tree (Phase 2).
 
+> **Current placement (upstream module split).** This is a historical Phase 2
+> report. `RackChrome.{h,cpp}` was subsequently replaced by
+> `Editor/skins/rack/RackSkinDetail.{h,cpp}`, while the Rack skin hooks were
+> divided among `RackSkin.*.cpp` modules. Historical references below retain
+> their original names.
+
 ## Branches integrated
 
 Merged into `integrate/skins` cheapest-first, exactly in this order:

@@ -42,9 +42,9 @@ virtual void paintKnob(QPainter& painter, const QRect& rect,
   pixel-identically and deliberately ignores the hover/drag/focus flags.
 
 `SkinManager::paintKnob` routes the widget to the active skin; a skin implements
-the override on its `ISkin` subclass, which lives in its own translation unit
-(`Editor/skins/StudioSkin.cpp` and its four siblings). `Skins.cpp` only holds the
-roster lookup - it stopped holding the skin classes when they were split apart.
+the override on its `ISkin` subclass, whose definitions are grouped by visual
+responsibility under `Editor/skins/<id>/`. `Skins.cpp` only holds the roster
+lookup; concrete skin code stays inside its module folder.
 
 ## Command-row chrome hook
 
@@ -90,7 +90,7 @@ header carry dynamic properties `filterKind` (lower-cased command),
 `filterEnabled`, `selected`, `focused`, `scopeDepth`.
 
 Scope-gutter paint uses shared geometry from `SkinScopeGutterLayout`
-(`Editor/skins/SkinPaint.h`). It classifies If head, ElseIf/Else branch,
+(`Editor/skins/shared/SkinPaint.h`). It classifies If head, ElseIf/Else branch,
 EndIf tail and member rows, computes the channel-vs-If rail split, applies
 the `logicSiblingsIndentAsMembers` branch/tail mount rule, and exposes shared
 rail centers/card edge/junction positions. Skins still own the material
@@ -100,7 +100,8 @@ The same header also owns fixed paint material effects:
 `@SHADOW_Axx@` / `@HIGHLIGHT_Axx@` for bevels, recesses, sheens and lighting
 math only; do not use them for semantic text, badges or status colours.
 Rack-specific hardware recipes that repeat outside the command-row frame live in
-`RackChrome`: `engraveText`, `paintScrew`, boolean `paintLed`, and
+`RackSkinDetail` (`Editor/skins/rack/RackSkinDetail.{h,cpp}`): `engraveText`,
+`paintScrew`, boolean `paintLed`, and
 the glow/halo overload of `paintLed`, plus `paintBrushing`. Use them only for
 Rack widgets with the same physical grammar. For LED variants, keep the
 electrical state law, halo radius and receded-off choice explicit at the call
@@ -163,7 +164,7 @@ LegacyRows GraphicEQ GUI keeps the original QGraphicsView stack untouched.
 
 Analysis-style plugin graph painters still own their skin-specific strokes,
 fills, labels, and glow/material language. Shared axis/cursor math lives in
-`SkinAnalysisGraphLayout` (`Editor/skins/SkinPaint.h`): plot edges, zero-row
+`SkinAnalysisGraphLayout` (`Editor/skins/shared/SkinPaint.h`): plot edges, zero-row
 clamping, hover clamping, x/y label rectangles, footer rectangles, and
 grid-label thinning helpers. New analysis graph paint code should use those
 helpers for geometry instead of recalculating label placement per skin.
@@ -217,8 +218,8 @@ panel). Hosts hand action buttons over with semantic roles
 (`addActionButton`) and never lose control of their behavior or visibility;
 the Browse button doubles as the "Locate..." recovery entry while the
 reference is missing. The default is the neutral
-`DefaultReferenceCardView`; the shipped skins override it in
-`Editor/skins/cards/<Skin>ReferenceCardView.{h,cpp}`. Paths elide at paint
+`DefaultReferenceCardView`; the five shipped skins override it in
+`Editor/skins/<id>/cards/<Skin>ReferenceCardView.{h,cpp}`. Paths elide at paint
 time (`Editor/widgets/ElidedLabel.h`), never at set time.
 
 ## Routing renderer hook
@@ -332,7 +333,7 @@ tail row mounts one unit deeper than its head is already folded into `laneCount`
 because the same call sets the row widget's own left margin - a gutter can no
 longer disagree with the card face beside it.
 
-`skinXTickLabelRect` / `skinYTickLabelRect` in `SkinPaint.h` build a tick label
+`skinXTickLabelRect` / `skinYTickLabelRect` in `Editor/skins/shared/SkinPaint.h` build a tick label
 box centred on a grid line. The y variant keeps its inset and width as arguments:
 the skins use 4, 5, 6 and 8 px and nobody decided they should differ, but nobody
 decided they should agree either, so settling it is a skin round's call rather

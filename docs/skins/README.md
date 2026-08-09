@@ -52,7 +52,7 @@ Editor의 5개 스킨이 각자 무엇을 믿고, 무엇을 금지하며, 새 UI
   `SkinAnalysisGraphLayout`이 계산한다. 스킨은 재질과 표현만 결정한다.
 - **같은 스킨 안의 반복 레시피는 스킨의 chrome 모듈로 모은다.** Rack 의 각인,
   나사, boolean LED, brushing grain 처럼 여러 translation unit 에 반복되는 같은
-  물리 문법은 `RackChrome` helper 를 쓴다. hover-fade LED 나 넓은 halo lamp 처럼
+  물리 문법은 `RackSkinDetail` helper 를 쓴다. hover-fade LED 나 넓은 halo lamp 처럼
   상태 모델이나 기하가 다른 변형은 억지로 합치지 않는다. grain 의 ink/base alpha
   처럼 소재별 결정은 호출부에 남긴다.
 
