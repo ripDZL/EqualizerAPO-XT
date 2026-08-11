@@ -1,5 +1,6 @@
 # TODO
 
+- [ ] Await hosted CI for `codex/upstream-264-integration`; do not promote it to `beta` or `main` before hosted CI and explicit approval.
 - [ ] Obtain a Codex environment that provides the bundled workspace dependency runtime, or explicitly approve a revised workflow.
 - [ ] Prepare the Matrix hatch-pet run.
 - [ ] Generate and approve the canonical base image.
