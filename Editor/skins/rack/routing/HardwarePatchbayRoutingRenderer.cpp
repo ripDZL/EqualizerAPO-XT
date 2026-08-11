@@ -3,7 +3,7 @@
 */
 
 #include "HardwarePatchbayRoutingRenderer.h"
-#include "RoutingAddChannelEditor.h"
+#include "Editor/widgets/routing/RoutingAddChannelEditor.h"
 
 #include <QPainter>
 #include <QMouseEvent>

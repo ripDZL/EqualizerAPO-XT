@@ -137,19 +137,35 @@ QString substituteRgbTokens(QString qss, const QVector<TokenSubstitution>& table
 	return qss;
 }
 
-QString readQss(const QString& resourcePath, const QString& sourceDirectory, bool& loaded)
+QString readQss(const QString& resourcePath, const QString& sourceDirectory,
+	const QString& sourceSkinId, bool& loaded)
 {
-	const QString filePath = sourceDirectory.isEmpty()
-		? resourcePath
-		: QDir(sourceDirectory).filePath(QFileInfo(resourcePath).fileName());
-	QFile sheet(filePath);
-	if (!sheet.open(QIODevice::ReadOnly | QIODevice::Text))
+	QStringList paths;
+	if (sourceDirectory.isEmpty())
 	{
-		loaded = false;
-		return QString();
+		paths.append(resourcePath);
 	}
-	loaded = true;
-	return QString::fromUtf8(sheet.readAll());
+	else
+	{
+		const QString fileName = QFileInfo(resourcePath).fileName();
+		paths.append(QDir(sourceDirectory).filePath(
+			QStringLiteral("%1/qss/%2").arg(sourceSkinId, fileName)));
+		// Keep the previous flat lookup for callers that pass a QSS directory.
+		paths.append(QDir(sourceDirectory).filePath(fileName));
+	}
+
+	for (const QString& path : paths)
+	{
+		QFile sheet(path);
+		if (sheet.open(QIODevice::ReadOnly | QIODevice::Text))
+		{
+			loaded = true;
+			return QString::fromUtf8(sheet.readAll());
+		}
+	}
+
+	loaded = false;
+	return QString();
 }
 
 // Constitution: docs/skins/studio.md
@@ -1141,12 +1157,14 @@ ResolvedStyleSheet styleSheetForTokens(const QString& id, bool dark, const SkinT
 	result.dark = dark;
 
 	bool loaded = false;
-	QString qss = readQss(result.resourcePath, sourceDirectory, loaded);
+	QString qss = readQss(result.resourcePath, sourceDirectory,
+		entry(result.resolvedId).paintBaseId, loaded);
 	if (!loaded && result.resolvedId != QLatin1String("studio"))
 	{
 		result.usedStudioFallback = true;
 		result.resourcePath = qssResource(QStringLiteral("studio"), dark);
-		qss = readQss(result.resourcePath, sourceDirectory, loaded);
+		qss = readQss(result.resourcePath, sourceDirectory,
+			QStringLiteral("studio"), loaded);
 	}
 
 	result.loaded = loaded;

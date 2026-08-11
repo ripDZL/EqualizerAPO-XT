@@ -9,8 +9,8 @@
 #include <QTemporaryDir>
 
 #include "Editor/skins/CustomThemeStore.h"
-#include "Editor/skins/SkinPaint.h"
-#include "Editor/skins/SkinSupport.h"
+#include "Editor/skins/shared/SkinPaint.h"
+#include "Editor/skins/shared/SkinSupport.h"
 #include "Editor/skins/SkinThemeData.h"
 
 // The roster is the one list of which skins exist, so what is worth pinning is

@@ -3,7 +3,7 @@
 */
 
 #include "BlockChipRoutingRenderer.h"
-#include "RoutingAddChannelEditor.h"
+#include "Editor/widgets/routing/RoutingAddChannelEditor.h"
 
 #include <QMenu>
 #include <QPainter>

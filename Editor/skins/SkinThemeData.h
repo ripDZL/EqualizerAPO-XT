@@ -96,7 +96,8 @@ QString qssResource(const QString& id, bool dark);
 
 // Loads a complete app stylesheet for a skin: canonical id, resource lookup,
 // token substitution, Studio sheet fallback and common widget overrides. Tests
-// may pass the on-disk skins directory because they do not link the Qt .qrc.
+// may pass the on-disk skins directory root because they do not link the Qt
+// .qrc; the loader resolves the selected theme's paint-base module beneath it.
 ResolvedStyleSheet styleSheet(const QString& id, bool dark,
 	const QString& sourceDirectory = QString());
 

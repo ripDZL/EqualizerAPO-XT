@@ -13,7 +13,7 @@
 #include <QSet>
 #include <QVector>
 
-#include "Editor/skins/SkinSupport.h"
+#include "Editor/skins/shared/SkinSupport.h"
 #include "Editor/skins/SkinThemeData.h"
 
 namespace

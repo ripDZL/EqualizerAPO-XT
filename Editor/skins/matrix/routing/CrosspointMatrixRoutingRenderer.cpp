@@ -3,7 +3,7 @@
 */
 
 #include "CrosspointMatrixRoutingRenderer.h"
-#include "RoutingAddChannelEditor.h"
+#include "Editor/widgets/routing/RoutingAddChannelEditor.h"
 
 #include <QPainter>
 #include <QMouseEvent>
