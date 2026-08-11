@@ -1,6 +1,6 @@
 # Progress
 
-- [x] Integrated upstream #264 on isolated `codex/upstream-264-integration`; retained fork VST preview/LegacyRows/theme work and passed local code, UI, and audio-regression gates. `beta` and `main` remain untouched.
+- [x] Integrated and pushed upstream #264 on isolated `codex/upstream-264-integration`; retained fork VST preview/LegacyRows/theme work and passed local code, UI, and audio-regression gates. `beta` and `main` remain untouched.
 - [x] Received and inspected the Matrix reference image.
 - [x] Copied the reference into the project run folder.
 - [ ] Preparation paused because bundled workspace dependencies remain unavailable after retry on 2026-07-13.
