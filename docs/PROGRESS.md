@@ -2,6 +2,7 @@
 
 - [x] Integrated and pushed upstream #264 on isolated `codex/upstream-264-integration`; retained fork VST preview/LegacyRows/theme work and passed local code, UI, and audio-regression gates. `beta` and `main` remain untouched.
 - [x] Hosted run `31493866788` passed Pester, cppcheck, all six native variants, cross-variant comparison, and artifact publication for `codex/upstream-264-integration`; release creation was skipped by design.
+- [x] Backed up and overlaid the matching hosted x64-avx512 artifact onto the local Equalizer APO install; all 30 files hash-verified, Windows Audio restored, and installed `Editor.exe --selftest-vst` passed.
 - [x] Received and inspected the Matrix reference image.
 - [x] Copied the reference into the project run folder.
 - [ ] Preparation paused because bundled workspace dependencies remain unavailable after retry on 2026-07-13.

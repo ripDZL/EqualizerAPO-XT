@@ -1,6 +1,6 @@
 # TODO
 
-- [ ] Install and manually accept the matching hosted artifact from `codex/upstream-264-integration`; do not promote it to `beta` or `main` without explicit approval.
+- [ ] Manually verify installed ReaFIR/TDR Nova analyzer movement plus LegacyRows/themes from `codex/upstream-264-integration`; do not promote it to `beta` or `main` without explicit approval.
 - [ ] Obtain a Codex environment that provides the bundled workspace dependency runtime, or explicitly approve a revised workflow.
 - [ ] Prepare the Matrix hatch-pet run.
 - [ ] Generate and approve the canonical base image.
