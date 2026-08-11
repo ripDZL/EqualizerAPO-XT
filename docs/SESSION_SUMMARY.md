@@ -1,6 +1,6 @@
 # Session Summary
 
-- 2026-08-11: isolated upstream #264 integration was reviewed and pushed as `codex/upstream-264-integration`; see `docs/AI_CONTEXT.md` for validation. Do not promote to beta/main without hosted CI and user direction.
+- 2026-08-11: isolated upstream #264 integration was reviewed, pushed, and passed hosted run `31493866788` as `codex/upstream-264-integration`; see `docs/AI_CONTEXT.md` for validation. Manual hosted-artifact acceptance and user direction remain required before beta/main promotion.
 - User requested a Matrix-from-ReBoot Codex pet via the hatch-pet skill.
 - Reference stored at `pet-runs/matrix/references/Matrix_with_Gun.webp`.
 - `codex_app__load_workspace_dependencies` returned no configured runtime.
