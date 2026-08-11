@@ -1,5 +1,6 @@
 # Progress
 
+- [x] Staged upstream draft #265 on isolated `codex/upstream-265-vst3-layouts`: `VSTPlugin:` now supports opaque VST3 `Input`/`Output` main-bus layouts while VST2 quietly stays on its existing path. Corrected draft regressions for paired numeric reserved-looking parameters, legacy non-finite values, and 6.1 Music-first/Cine-fallback; added parser and VST3 host coverage. Local validation: source/variant sync, HybridConv 1635, EditorLogic 3544, EngineOrchestration 1221, AudioRegression 31/31, rebuilt AVX2 Editor `--selftest-vst` and `--skin-switch-test`; standards/spec re-review clean. Pending hosted CI and manual multichannel VST3 acceptance.
 - [x] Integrated and pushed upstream #264 on isolated `codex/upstream-264-integration`; retained fork VST preview/LegacyRows/theme work and passed local code, UI, and audio-regression gates. User-approved integration fast-forwarded to `beta`; `main` remains untouched.
 - [x] Hosted run `31493866788` passed Pester, cppcheck, all six native variants, cross-variant comparison, and artifact publication for `codex/upstream-264-integration`; release creation was skipped by design.
 - [x] Backed up and overlaid the matching hosted x64-avx512 artifact onto the local Equalizer APO install; all 30 files hash-verified, Windows Audio restored, and installed `Editor.exe --selftest-vst` passed.

@@ -1,5 +1,6 @@
 # TODO
 
+- [ ] Push and validate isolated `codex/upstream-265-vst3-layouts`: run hosted CI, then manually test a real multichannel VST3 with `Input`/`Output` layouts before any promotion to `beta` or `main`.
 - [x] User accepted installed ReaFIR/TDR Nova analyzer movement plus LegacyRows/themes from `codex/upstream-264-integration`; promoted to `beta`. Do not promote `beta` to `main` without explicit approval.
 - [ ] Obtain a Codex environment that provides the bundled workspace dependency runtime, or explicitly approve a revised workflow.
 - [ ] Prepare the Matrix hatch-pet run.

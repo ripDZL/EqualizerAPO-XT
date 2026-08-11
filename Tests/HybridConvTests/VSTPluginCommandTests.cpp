@@ -19,6 +19,7 @@
 	its main() via runVSTPluginCommandTests().
 */
 
+#include <cmath>
 #include <string>
 #include <unordered_map>
 
@@ -95,6 +96,20 @@ void testNamedParams()
 		"legacy numeric Output parameter is not mistaken for a bus contract");
 	harness.expectEqual(paramValue(outputParameter.paramMap, L"Output", "named-params Output"),
 		0.5f, "named-params: reserved-looking Output value");
+
+	VSTPluginCommand pairedReservedParameters = VSTPluginCommand::parse(
+		L"", L"Library C:\\plugins\\reverb.dll Input 0.25 Output 0.5");
+	harness.expectTrue(pairedReservedParameters.valid && !pairedReservedParameters.hasBusContract,
+		"legacy numeric Input/Output parameters are not mistaken for a bus contract");
+	harness.expectEqual(paramValue(pairedReservedParameters.paramMap, L"Input", "named-params Input"),
+		0.25f, "named-params: paired reserved-looking Input value");
+	harness.expectEqual(paramValue(pairedReservedParameters.paramMap, L"Output", "named-params paired Output"),
+		0.5f, "named-params: paired reserved-looking Output value");
+
+	VSTPluginCommand legacyNonFinite = VSTPluginCommand::parse(
+		L"", L"Library C:\\plugins\\reverb.dll Gain nan");
+	harness.expectTrue(legacyNonFinite.valid && std::isnan(paramValue(legacyNonFinite.paramMap,
+		L"Gain", "named-params legacy nan")), "legacy non-finite parameter semantics are preserved");
 }
 
 void testQuotedName()
@@ -287,7 +302,7 @@ void testVSTPluginBusContract()
 	expectInvalidBusContract(L"Library C:\\plugins\\x.vst3 Output 7.1", L"Input");
 	expectInvalidBusContract(L"Library C:\\plugins\\x.vst3 Input Stereo", L"Output");
 	expectInvalidBusContract(L"Input Stereo Output 7.1", L"Library");
-	expectInvalidBusContract(L"Library C:\\plugins\\x.vst3 Input 2 Output 8", L"layout");
+	expectInvalidBusContract(L"Library C:\\plugins\\x.vst3 Input Stereo Output 8", L"layout");
 	expectInvalidBusContract(L"Library C:\\plugins\\x.vst3 Input Stereo Input Mono Output 7.1", L"duplicate Input");
 	expectInvalidBusContract(L"Library C:\\plugins\\x.vst3 Input Stereo Output 7.1 Output 5.1", L"duplicate Output");
 	expectInvalidBusContract(L"Library C:\\plugins\\x.vst3 Input Stereo Output 7.1 Gain 0.5 Gain 0.7", L"duplicate parameter");

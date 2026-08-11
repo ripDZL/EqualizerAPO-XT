@@ -1,5 +1,6 @@
 # Session Summary
 
+- 2026-08-11: staged upstream draft #265 on `codex/upstream-265-vst3-layouts` from beta `9bf6974`. The existing `VSTPlugin:` grammar gains paired VST3 `Input`/`Output` layouts, both Editor row implementations preserve them opaquely, and VST2 ignores them at runtime. Review caught and fixed numeric `Input`/`Output` legacy parameter parsing, legacy non-finite parameter compatibility, and 6.1 candidate ordering; new tests prove Music-first/Cine-fallback. Local source/variant sync, HybridConv 1635, EditorLogic 3544, EngineOrchestration 1221, AudioRegression 31/31, AVX2 Editor self-test, and skin switch passed. `beta`/`main` remain unchanged; next gates are hosted CI and a real multichannel VST3 manual test.
 - 2026-08-11: isolated upstream #264 integration was reviewed, pushed, and passed hosted run `31493866788` as `codex/upstream-264-integration`; matching x64-avx512 artifact is installed with a hash-verified backup and installed VST self-test passed. User accepted the manual ReaFIR/TDR Nova analyzer and LegacyRows/theme checks, and the integration was promoted to `beta`; `main` and release creation remain separate explicit decisions.
 - User requested a Matrix-from-ReBoot Codex pet via the hatch-pet skill.
 - Reference stored at `pet-runs/matrix/references/Matrix_with_Gun.webp`.

@@ -113,7 +113,7 @@ int runVstRoundTripSelfTest()
 		const bool stereo0 = f0->getStereoInput();
 		const std::optional<VST3BusContract> bus0 = f0->getBusContract();
 
-		VSTPluginFilterGUI gui(f0->getLibrary(), chunk0, map0, stereo0, bus0);
+		VSTPluginFilterGUI gui(f0->getLibrary(), chunk0, map0, stereo0, VSTPreviewEndpoint{}, bus0);
 		QString outCommand, outParams;
 		gui.store(outCommand, outParams);
 

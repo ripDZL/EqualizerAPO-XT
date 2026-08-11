@@ -753,10 +753,11 @@ private:
 	SpeakerArrangement outputArrangement = SpeakerArr::k71Music;
 };
 
-// Surround41.vst3 mode: a symmetric component that accepts stereo, 4.1 Music
-// and 5.0 layouts, records the accepted arrangement for the host tests, and
-// writes a distinct constant into every output slot keyed by that slot's
-// speaker role - so a test can prove which EAPO channel received which role.
+// Surround41.vst3 mode: a symmetric component that accepts stereo, 4.1 Music,
+// 5.0, and both 6.1 alternatives. Its Cine-only companion accepts the Cine
+// alternatives. The component records the accepted arrangement for the host
+// tests and writes a distinct constant into every output slot keyed by that
+// slot's speaker role, so a test can prove which EAPO channel received it.
 class TestSurround41Component final : public IComponent, public IAudioProcessor, private RefCounted
 {
 public:
@@ -824,8 +825,10 @@ public:
 			return kResultFalse;
 		const bool accepted = surround41CineOnlyMode
 			? outputs[0] == SpeakerArr::kStereo || outputs[0] == SpeakerArr::k41Cine
+				|| outputs[0] == SpeakerArr::k61Cine
 			: outputs[0] == SpeakerArr::kStereo
-				|| outputs[0] == SpeakerArr::k41Music || outputs[0] == SpeakerArr::k50;
+				|| outputs[0] == SpeakerArr::k41Music || outputs[0] == SpeakerArr::k50
+				|| outputs[0] == SpeakerArr::k61Music || outputs[0] == SpeakerArr::k61Cine;
 		if (!accepted)
 			return kResultFalse;
 		arrangement = outputs[0];

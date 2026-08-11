@@ -689,6 +689,39 @@ void runVst3HostTests()
 			"semantic 5.0 names negotiate k50");
 	}
 
+	{
+		VSTPluginInstance surround61Probe(surround41Library, 2);
+		const std::vector<wstring> surround61Channels = vst3BusLayoutChannelNames(VST3BusLayout::Surround61);
+		harness.expectTrue(surround61Probe.initialize(), "Surround41 component reinitializes for semantic 6.1");
+		surround61Probe.setChannelNameHints(surround61Channels);
+		harness.expectTrue(surround61Probe.negotiateChannelCount(7),
+			"semantic 6.1 names negotiate a seven-channel bus");
+		harness.expectTrue(surround41AcceptedArrangement != nullptr
+			&& surround41AcceptedArrangement()
+				== static_cast<unsigned long long>(Steinberg::Vst::SpeakerArr::k61Music),
+			"semantic 6.1 names prefer k61Music before k61Cine");
+
+		surround61Probe.setBusChannelNameHints(surround61Channels, surround61Channels);
+		harness.expectTrue(surround61Probe.negotiateBusLayouts(VST3BusLayout::Surround61,
+			VST3BusLayout::Surround61, 7), "explicit VSTPlugin 6.1 layout is supported");
+		harness.expectTrue(surround41AcceptedArrangement != nullptr
+			&& surround41AcceptedArrangement()
+				== static_cast<unsigned long long>(Steinberg::Vst::SpeakerArr::k61Music),
+			"explicit VSTPlugin 6.1 prefers k61Music before k61Cine");
+	}
+
+	{
+		VSTPluginInstance automatic61Probe(surround41Library, 2);
+		harness.expectTrue(automatic61Probe.initialize(), "Surround41 component reinitializes for automatic 6.1");
+		automatic61Probe.setChannelNameHints({});
+		harness.expectTrue(automatic61Probe.negotiateChannelCount(7),
+			"automatic seven-channel negotiation succeeds");
+		harness.expectTrue(surround41AcceptedArrangement != nullptr
+			&& surround41AcceptedArrangement()
+				== static_cast<unsigned long long>(Steinberg::Vst::SpeakerArr::k61Music),
+			"automatic seven-channel negotiation prefers k61Music before k61Cine");
+	}
+
 	const wstring surround41CineOnlyBundle = prepareBundle(directory,
 		L"Surround41CineOnlyBundle.vst3", L"TestVst3Surround41CineOnly.vst3");
 	shared_ptr<VSTPluginLibrary> surround41CineOnlyLibrary =
@@ -714,6 +747,20 @@ void runVst3HostTests()
 			&& surround41CineOnlyAcceptedArrangement()
 				== static_cast<unsigned long long>(Steinberg::Vst::SpeakerArr::k41Cine),
 			"explicit 4.1 records the accepted k41Cine alternative");
+	}
+
+	{
+		VSTPluginInstance cineOnly61Probe(surround41CineOnlyLibrary, 2);
+		harness.expectTrue(cineOnly61Probe.initialize(), "4.1 Cine-only component reinitializes for 6.1");
+		cineOnly61Probe.setBusChannelNameHints(vst3BusLayoutChannelNames(VST3BusLayout::Surround61),
+			vst3BusLayoutChannelNames(VST3BusLayout::Surround61));
+		harness.expectTrue(cineOnly61Probe.negotiateBusLayouts(VST3BusLayout::Surround61,
+			VST3BusLayout::Surround61, 7),
+			"explicit 6.1 tries the allowed same-layout Cine alternative");
+		harness.expectTrue(surround41CineOnlyAcceptedArrangement != nullptr
+			&& surround41CineOnlyAcceptedArrangement()
+				== static_cast<unsigned long long>(Steinberg::Vst::SpeakerArr::k61Cine),
+			"explicit 6.1 records the accepted k61Cine alternative");
 	}
 
 	{
