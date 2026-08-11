@@ -1,6 +1,6 @@
 # Session Summary
 
-- 2026-08-11: isolated upstream #264 integration was reviewed, pushed, and passed hosted run `31493866788` as `codex/upstream-264-integration`; matching x64-avx512 artifact is installed with a hash-verified backup and installed VST self-test passed. Manual ReaFIR/TDR Nova analyzer and LegacyRows/theme acceptance plus user direction remain required before beta/main promotion.
+- 2026-08-11: isolated upstream #264 integration was reviewed, pushed, and passed hosted run `31493866788` as `codex/upstream-264-integration`; matching x64-avx512 artifact is installed with a hash-verified backup and installed VST self-test passed. User accepted the manual ReaFIR/TDR Nova analyzer and LegacyRows/theme checks, and the integration was promoted to `beta`; `main` and release creation remain separate explicit decisions.
 - User requested a Matrix-from-ReBoot Codex pet via the hatch-pet skill.
 - Reference stored at `pet-runs/matrix/references/Matrix_with_Gun.webp`.
 - `codex_app__load_workspace_dependencies` returned no configured runtime.
