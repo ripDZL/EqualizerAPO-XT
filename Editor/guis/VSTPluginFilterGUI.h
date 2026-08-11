@@ -20,6 +20,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <QElapsedTimer>
 #include "Editor/IFilterGUI.h"
 #include "Editor/helpers/VSTPluginLivePreview.h"
@@ -36,7 +37,8 @@ class VSTPluginFilterGUI : public IFilterGUI
 
 public:
 	explicit VSTPluginFilterGUI(std::shared_ptr<VSTPluginLibrary> library, const std::wstring& chunkData, const std::unordered_map<std::wstring, float>& paramMap,
-		bool stereoInput = false, const VSTPreviewEndpoint& previewEndpoint = {});
+		bool stereoInput = false, const VSTPreviewEndpoint& previewEndpoint = {},
+		const std::optional<VST3BusContract>& busContract = std::nullopt);
 	~VSTPluginFilterGUI() override;
 
 	void store(QString& command, QString& parameters) override;
@@ -73,6 +75,8 @@ private:
 	bool stereoInput = false;
 	VSTPreviewEndpoint previewEndpoint;
 	VSTPluginLivePreview livePreview;
+	// Preserved opaquely until the dedicated Input/Output controls land.
+	std::optional<VST3BusContract> busContract;
 	QAction* stereoInputAction = nullptr;
 	QAction* livePreviewAction = nullptr;
 	QElapsedTimer lastReadTimer;
