@@ -335,4 +335,728 @@ jobs:
       # x64 runners; we still build them but skip the runtime test step.
       # The gate is the manifest's per-variant RunnerCanExecute flag.
       if: matrix.can_execute == true
-      shelo≠u“⁄$z{-ÆÈ‹j◊ù•πúÅÕ—Â±îÄ°E–Å¡Ö…ïπ–ΩÕ•ùπÖ∞ÅπÖµïÃ∞Åç—Ω»Å¡Ö…Öµï—ï…ÃÅπÖµïêÅ±•≠î(ÄÄÄÄåÄÄÅµïµâï…Ã§Å›Ω’±êÅµïÖ∏Åç°’…∏ÅÖç…ΩÕÃÅ±ΩπúµÕ—Öπë•πúÅ’¡Õ—…ïÖ¥ÅçΩëî∏(ÄÄÄÄåÄ¥Å’ÕïM—±±ùΩ…•—°¥Ω¡ΩÕ—ô•·=¡ï…Ö—Ω»ËÅ…Ö‹Å±ΩΩ¡ÃÅÖπêÅ•–¨¨ÅÖ…îÅ—°îÅ°Ω’Õî(ÄÄÄÄåÄÄÅÕ—Â±îÅ•π°ï…•—ïêÅô…Ω¥Å’¡Õ—…ïÖ¥ÏÅπºÅâï°ÖŸ•Ω»ÅΩ»ÅµïÖÕ’…Öâ±îÅ¡ï…òÅ•µ¡Öç–∏(ÄÄÄÄåÄ¥ÅπΩ·¡±•ç•—ΩπÕ—…’ç—Ω»ËÅÕ•πù±îµÖ…ù’µïπ–ÅçΩπÕ—…’ç—Ω…ÃÄ°E–Å›•ëùï—Ã∞(ÄÄÄÄåÄÄÅï·çï¡—•Ω∏Å—Â¡ïÃ∞Åô•±—ï…Ã§ÅÖ…îÅ•π—ïπ—•ΩπÖ±±‰Å•µ¡±•ç•–Å’¡Õ—…ïÖ¥∏(ÄÄÄÄåÄ¥Å1ΩçÖ±±±ΩçÖ±±ïêËÅ1ΩçÖ±±±ΩåΩ1ΩçÖ±…ïîÅ¡Ö•…ÃÅÖ…îÅµÖπëÖ—ïêÅâ‰Å—°î(ÄÄÄÄåÄÄÅ]•∏Ã»ÅÕïç’…•—‰ÅA%ÃÅ’ÕïêÄ°Mï—π—…•ïÕ%πç∞∞Åï—9ÖµïëMïç’…•—Â%πôΩ\§∏(ÄÄÄÄåÄ¥Å’π≠πΩ›π5Öç…ºÅΩ∏Å—°îÅYMPÃÅ•πÕ—ÖπçîÅô•±ïÃËÅEUIe}%9QIÅçΩµïÃÅô…Ω¥(ÄÄÄÄåÄÄÅ—°îÅYMPÃÅM,Å’πëï»Åëï¡Ãº∞Å›°•ç†Å•ÃÅï·ç±’ëïêÅô…Ω¥ÅÖπÖ±ÂÕ•Ã∏(ÄÄÄÄåÄ¥Å’π’ÕïëM—…’ç—5ïµâï»ÅΩ∏Å•±—ï…πù•πîπA…ΩçïÕÃπç¡¿ËÅ—°îÅ%ΩQ…Ö•—ÃÅ±Öâï∞ÅÖπê(ÄÄÄÄåÄÄÅ$Ω<Åµïµâï…ÃÅÖ…îÅçΩπÕ’µïêÅ•πÕ•ëîÅ—°îÅ¡…ΩçïÕÕ%µ¡∞Åµïµâï»Å—ïµ¡±Ö—îÏ(ÄÄÄÄåÄÄÅç¡¡ç°ïç¨ÅëΩïÃÅπΩ–ÅÖπÖ±ÂÈîÅ—ïµ¡±Ö—îÅ•πÕ—Öπ—•Ö—•ΩπÃ∞ÅÕºÅ•–Å…ï¡Ω…—ÃÅïŸï…‰(ÄÄÄÄåÄÄÅ—…Ö•–Åµïµâï»ÅÖÃÅ’π’ÕïêÄ°ôÖ±ÕîÅ¡ΩÕ•—•Ÿî§∏(ÄÄÄÄåÄ¥Å±•â!Ââ…•ëΩπÿ¥¿∏ƒ∏ƒÄ°Ö’ë•–Äå»‘¿Å¿ÿƒΩ¿»‘§ËÅ—°îÅπΩ∏µâ’•±ë•πú(ÄÄÄÄåÄÄÄâ¡…•Õ—•πîàÅ¡Ö•»Å›ÖÃÅëï±ï—ïêÄ¥Å•–Å°ÖêÅë•Ÿï…ùïêÅô…Ω¥Å•—ÃÅΩ›∏Å°ïÖëï»ÅÖπê(ÄÄÄÄåÄÄÅçΩ’±êÅπºÅ±Ωπùï»ÅÕï…ŸîÅÖÃÅÑÅ…ïôï…ïπçîÄ°µÖ•π—Ö•πï»Åëïç•Õ•Ω∏Ä»¿»ÿ¥¿‡¥¿‰§∏(ÄÄÄÄåÄÄÅQ°îÅ}ïÖ¡ºÅôΩ…¨Å•ÃÅô•…Õ–µ¡Ö…—‰ÅM@Å’πëï»ÅÖç—•ŸîÅç°Öπùî∞(ÄÄÄÄåÄÄÅÕºÅ•–Å•ÃÅÖπÖ±ÂÈïêÅ±•≠îÅ—°îÅ…ïÕ–ÅΩòÅ—°îÅ—…ïî∏Å%—ÃÅµÕ—Â±îÅÕ—…’ç—ÃÅÖ…î(ÄÄÄÄåÄÄÅ•π•—•Ö±•ÈïêÅâ‰Å°ç%π•—M•πù±îΩ°ç…ïîÅâ‰ÅëïÕ•ù∏∞Å°ïπçîÅ—°îÅÕçΩ¡ïê(ÄÄÄÄåÄÄÅ’π•π•—5ïµâï…YÖ…9Ω—Ω»ÅÕ’¡¡…ïÕÕ•Ω∏∏(ÄÄÄÄ¥ÅπÖµîËÅI’∏Åç¡¡ç°ïç¨(ÄÄÄÄÄÅ…’∏ËÅ(ÄÄÄÄÄÄÄÄàë!=5Ωç¡¡ç°ïç¨µ•πÕ—Ö±∞Ωâ•∏Ωç¡¡ç°ïç¨àÅp(ÄÄÄÄÄÄÄÄÄÄ¥µïπÖâ±îı›Ö…π•πú±Õ—Â±î±¡ï…ôΩ…µÖπçî±¡Ω…—Öâ•±•—‰Åp(ÄÄÄÄÄÄÄÄÄÄ¥µ•π±•πîµÕ’¡¡»Åp(ÄÄÄÄÄÄÄÄÄÄ¥µ±•â…Ö…‰ı≈–Åp(ÄÄÄÄÄÄÄÄÄÄ¥µ±•â…Ö…‰ı›•πëΩ›ÃÅp(ÄÄÄÄÄÄÄÄÄÄ¥µÕ’¡¡…ïÕÃıµ•ÕÕ•πù%πç±’ëïMÂÕ—ï¥Åp(ÄÄÄÄÄÄÄÄÄÄ¥µÕ’¡¡…ïÕÃı’π’Õïë’πç—•Ω∏Åp(ÄÄÄÄÄÄÄÄÄÄ¥µÕ’¡¡…ïÕÃı’πµÖ—ç°ïëM’¡¡…ïÕÕ•Ω∏Åp(ÄÄÄÄÄÄÄÄÄÄ¥µÕ’¡¡…ïÕÃıçÕ—Â±ïÖÕ–Åp(ÄÄÄÄÄÄÄÄÄÄ¥µÕ’¡¡…ïÕÃıÕ°ÖëΩ›’πç—•Ω∏Åp(ÄÄÄÄÄÄÄÄÄÄ¥µÕ’¡¡…ïÕÃıÕ°ÖëΩ›YÖ…•Öâ±îÅp(ÄÄÄÄÄÄÄÄÄÄ¥µÕ’¡¡…ïÕÃıÕ°ÖëΩ›5ïµâï»Åp(ÄÄÄÄÄÄÄÄÄÄ¥µÕ’¡¡…ïÕÃı’ÕïM—±±ùΩ…•—°¥Åp(ÄÄÄÄÄÄÄÄÄÄ¥µÕ’¡¡…ïÕÃı¡ΩÕ—ô•·=¡ï…Ö—Ω»Åp(ÄÄÄÄÄÄÄÄÄÄ¥µÕ’¡¡…ïÕÃıπΩ·¡±•ç•—ΩπÕ—…’ç—Ω»Åp(ÄÄÄÄÄÄÄÄÄÄ¥µÕ’¡¡…ïÕÃı1ΩçÖ±±±ΩçÖ±±ïêÅp(ÄÄÄÄÄÄÄÄÄÄ¥µÕ’¡¡…ïÕÃı’π≠πΩ›π5Öç…ºÈŸÕ–ΩYMQA±’ù•π%πÕ—Öπçîπç¡¿Åp(ÄÄÄÄÄÄÄÄÄÄ¥µÕ’¡¡…ïÕÃı’π≠πΩ›π5Öç…ºÈŸÕ–ΩYMQA±’ù•π%πÕ—Öπçï%π—ï…πÖ∞π†Åp(ÄÄÄÄÄÄÄÄÄÄ¥µÕ’¡¡…ïÕÃı’π≠πΩ›π5Öç…ºÈŸÕ–ΩYMQA±’ù•π1•â…Ö…‰πç¡¿Åp(ÄÄÄÄÄÄÄÄÄÄ¥µÕ’¡¡…ïÕÃı’π’ÕïëM—…’ç—5ïµâï»Èïπù•πîΩ•±—ï…πù•πîπA…ΩçïÕÃπç¡¿Åp(ÄÄÄÄÄÄÄÄÄÄ¥µÕ’¡¡…ïÕÃı’π•π•—5ïµâï…YÖ…9Ω—Ω»È±•â!Ââ…•ëΩπÿ¥¿∏ƒ∏ƒº®Åp(ÄÄÄÄÄÄÄÄÄÄ¥µÕ’¡¡…ïÕÃÙ®Èëï¡Ãº®Åp(ÄÄÄÄÄÄÄÄÄÄ¥µï……Ω»µï·•—çΩëîÙƒÅp(ÄÄÄÄÄÄÄÄÄÄ¥µ≈’•ï–Åp(ÄÄÄÄÄÄÄÄÄÄ¥µÕ—êıå¨¨ƒ‹Åp(ÄÄÄÄÄÄÄÄÄÄµ§Åëï¡ÃÅp(ÄÄÄÄÄÄÄÄÄÄ¥µΩ’—¡’–µô•±îıç¡¡ç°ïç¨µ…ï¡Ω…–π—·–Åp(ÄÄÄÄÄÄÄÄÄÄ∏ÅÒÅôÖ•±ïêÙƒ(ÄÄÄÄÄÄÄÅïç°ºÄà¥¥¥Åç¡¡ç°ïç¨Å…ï¡Ω…–Ä¥¥¥à(ÄÄÄÄÄÄÄÅçÖ–Åç¡¡ç°ïç¨µ…ï¡Ω…–π—·–ÅÒÅ—…’î(ÄÄÄÄÄÄÄÅ•òÅlÄàëÌôÖ•±ïêË¥¡ÙàÄÙÄàƒàÅtÏÅ—°ï∏(ÄÄÄÄÄÄÄÄÄÅ±•πï}çΩ’π–Ùê°›åÄµ∞ÄÅç¡¡ç°ïç¨µ…ï¡Ω…–π—·–§(ÄÄÄÄÄÄÄÄÄÅïç°ºÄàËÈï……Ω»ËÈç¡¡ç°ïç¨ÅôΩ’πêÅπï‹Å•ÕÕ’ïÃÄ†ëÌ±•πï}çΩ’π—ÙÅ±•πïÃ§∏Å•‡Å—°ï¥ÅΩ»∞ÅôΩ»ÅÑÅ©’Õ—•ô•ïêÅôÖ±ÕîÅ¡ΩÕ•—•Ÿî∞ÅÖëêÅÖ∏Å•π±•πîÅΩ»Å©Ωàµ±ïŸï∞ÅÕ’¡¡…ïÕÕ•Ω∏Å›•—†ÅÑÅ…Ö—•ΩπÖ±î∏à(ÄÄÄÄÄÄÄÄÄÅï·•–Äƒ(ÄÄÄÄÄÄÄÅô§((ÄÄÄÄ¥ÅπÖµîËÅU¡±ΩÖêÅç¡¡ç°ïç¨Å…ï¡Ω…–(ÄÄÄÄÄÅ•òËÅÖ±›ÖÂÃ†§(ÄÄÄÄÄÅ’ÕïÃËÅÖç—•ΩπÃΩ’¡±ΩÖêµÖ…—•ôÖç—ÿ‹(ÄÄÄÄÄÅ›•—†Ë(ÄÄÄÄÄÄÄÅπÖµîËÅç¡¡ç°ïç¨µ…ï¡Ω…–(ÄÄÄÄÄÄÄÅ¡Ö—†ËÅç¡¡ç°ïç¨µ…ï¡Ω…–π—·–(ÄÄÄÄÄÄÄÅ…ï—ïπ—•Ω∏µëÖÂÃËÄÃ¿((ÄÅ¡ïÕ—ï»Ë(ÄÄÄÄåÅUπ•–µ—ïÕ—ÃÅ—°îÅ…ï±ïÖÕîµ≠ïÂÕ—ΩπîÅÕç…•¡—ÃÅ—°îÅŸï…Õ•Ω∏µâ’µ¿Å©ΩàÅ…’πÃË(ÄÄÄÄåÅ	’µ¿µYï…Õ•Ω∏π¡ÃƒÄ°—°îÅΩπŸïπ—•ΩπÖ∞ÅΩµµ•–Ä¥¯ÅMïµYï»ÅµÖ¡¡•πúÅ—°Ö–Åëïç•ëïÃ(ÄÄÄÄåÅïŸï…‰Å…ï±ïÖÕî§ÅÖπêÅU¡ëÖ—îµ°Öπùï±Ωúπ¡ÃƒÄ°µΩŸ•πúÅ—°îÅUπ…ï±ïÖÕïêÅïπ—…•ïÃ(ÄÄÄÄåÅ’πëï»Å—°îÅâ’µ¡ïêÅŸï…Õ•Ω∏§∏Å1•≠îÅç¡¡ç°ïç¨Å—°•ÃÅ•ÃÅÖ∏Å•πëï¡ïπëïπ–ÅùÖ—îÅ›•—†(ÄÄÄÄåÅπºÅÅ•òÈÄ∞ÅÕºÅ•–Å…’πÃÅΩ∏Å¡’±∞Å…ï≈’ïÕ—ÃÅ—Ωº∞Å›°ï…îÅ—°îÅŸï…Õ•Ω∏µâ’µ¿Å©ΩàÅ•Ã(ÄÄÄÄåÅÕ≠•¡¡ïê∏ÅAïÕ—ï»Ä‘Å•ÃÅ¡•ππïêÅôΩ»Å…ï¡…Ωë’ç•â•±•—‰Å—°îÅÕÖµîÅ›Ö‰Å—°îÅç¡¡ç°ïç¨(ÄÄÄÄåÅŸï…Õ•Ω∏Å•Ã∏(ÄÄÄÅ…’πÃµΩ∏ËÅ›•πëΩ›Ãµ±Ö—ïÕ–(ÄÄÄÅÕ—ï¡ÃË(ÄÄÄÄ¥ÅπÖµîËÅ°ïç≠Ω’–Å…ï¡ΩÕ•—Ω…‰(ÄÄÄÄÄÅ’ÕïÃËÅÖç—•ΩπÃΩç°ïç≠Ω’—ÿÿ((ÄÄÄÄ¥ÅπÖµîËÅ%πÕ—Ö±∞ÅAïÕ—ï»Ä‘(ÄÄÄÄÄÅÕ°ï±∞ËÅ¡›Õ†(ÄÄÄÄÄÅ…’∏ËÅ(ÄÄÄÄÄÄÄÄåÅMΩµîÅ…’ππï»Å•µÖùïÃÅçΩµîÅ’¿Å›•—°Ω’–ÅAMÖ±±ï…‰Å…ïù•Õ—ï…ïêÄ°Õïï∏(ÄÄÄÄÄÄÄÄåÄ»¿»ÿ¥¿‹¥¿‰ËÄâ9ºÅ…ï¡ΩÕ•—Ω…‰Å›•—†Å—°îÅπÖµîÄùAMÖ±±ï…‰úÅ›ÖÃÅôΩ’πêà§Ï(ÄÄÄÄÄÄÄÄåÅ…îµ…ïù•Õ—ï»Å—°îÅëïôÖ’±—ÃÅâïôΩ…îÅ—…’Õ—•πúÅ•–∏(ÄÄÄÄÄÄÄÅ•òÄ†ëπ’±∞ÄµïƒÄ°ï–µAMIï¡ΩÕ•—Ω…‰Äµ9ÖµîÅAMÖ±±ï…‰Äµ……Ω…ç—•Ω∏ÅM•±ïπ—±ÂΩπ—•π’î§§ÅÏ(ÄÄÄÄÄÄÄÄÄÅIïù•Õ—ï»µAMIï¡ΩÕ•—Ω…‰ÄµïôÖ’±–(ÄÄÄÄÄÄÄÅÙ(ÄÄÄÄÄÄÄÅMï–µAMIï¡ΩÕ•—Ω…‰Äµ9ÖµîÅAMÖ±±ï…‰Äµ%πÕ—Ö±±Ö—•ΩπAΩ±•ç‰ÅQ…’Õ—ïê(ÄÄÄÄÄÄÄÅ%πÕ—Ö±∞µ5Ωë’±îÅAïÕ—ï»ÄµIï≈’•…ïëYï…Õ•Ω∏Ä‘∏ÿ∏ƒÄµΩ…çîÄµM≠•¡A’â±•Õ°ï…°ïç¨ÄµMçΩ¡îÅ’……ïπ—UÕï»((ÄÄÄÄ¥ÅπÖµîËÅI’∏Å	’µ¿µYï…Õ•Ω∏Å—ïÕ—Ã(ÄÄÄÄÄÅÕ°ï±∞ËÅ¡›Õ†(ÄÄÄÄÄÅ…’∏ËÅ(ÄÄÄÄÄÄÄÄë……Ω…ç—•ΩπA…ïôï…ïπçîÄÙÄâM—Ω¿à(ÄÄÄÄÄÄÄÅ%µ¡Ω…–µ5Ωë’±îÅAïÕ—ï»ÄµIï≈’•…ïëYï…Õ•Ω∏Ä‘∏ÿ∏ƒ(ÄÄÄÄÄÄÄÄëçΩπô•úÄÙÅ9ï‹µAïÕ—ï…Ωπô•ù’…Ö—•Ω∏(ÄÄÄÄÄÄÄÄëçΩπô•úπI’∏πAÖ—†ÄÙÄàπù•—°’àΩÕç…•¡—ÃΩQïÕ—Ãà(ÄÄÄÄÄÄÄÄëçΩπô•úπI’∏π·•–ÄÙÄë—…’î(ÄÄÄÄÄÄÄÄëçΩπô•úπ=’—¡’–πYï…âΩÕ•—‰ÄÙÄâï—Ö•±ïêà(ÄÄÄÄÄÄÄÄëçΩπô•úπQïÕ—IïÕ’±–ππÖâ±ïêÄÙÄë—…’î(ÄÄÄÄÄÄÄÄëçΩπô•úπQïÕ—IïÕ’±–π=’—¡’—AÖ—†ÄÙÄâ¡ïÕ—ï»µ…ïÕ’±—Ãπ·µ∞à(ÄÄÄÄÄÄÄÅ%πŸΩ≠îµAïÕ—ï»ÄµΩπô•ù’…Ö—•Ω∏ÄëçΩπô•ú((ÄÄÄÄ¥ÅπÖµîËÅU¡±ΩÖêÅAïÕ—ï»Å…ïÕ’±—Ã(ÄÄÄÄÄÅ•òËÅÖ±›ÖÂÃ†§(ÄÄÄÄÄÅ’ÕïÃËÅÖç—•ΩπÃΩ’¡±ΩÖêµÖ…—•ôÖç—ÿ‹(ÄÄÄÄÄÅ›•—†Ë(ÄÄÄÄÄÄÄÅπÖµîËÅ¡ïÕ—ï»µ…ïÕ’±—Ã(ÄÄÄÄÄÄÄÅ¡Ö—†ËÅ¡ïÕ—ï»µ…ïÕ’±—Ãπ·µ∞(ÄÄÄÄÄÄÄÅ…ï—ïπ—•Ω∏µëÖÂÃËÄÃ¿((ÄÅç…ΩÕÃµŸÖ…•Öπ–µçΩµ¡Ö…îË(ÄÄÄÅπïïëÃËÅmâ’•±ê∞Å¡…ï¡Ö…îµµÖ—…•·t(ÄÄÄÅ…’πÃµΩ∏ËÅ’â’π—‘µ±Ö—ïÕ–(ÄÄÄÄåÅQ°îÅAHÅ¡•¡ï±•πîÅΩπ±‰Åâ’•±ëÃÅY`»∞ÅÕºÅ—°ï…îÅ•ÃÅπΩ—°•πúÅ—ºÅçΩµ¡Ö…î(ÄÄÄÄåÅÖç…ΩÕÃÅŸÖ…•Öπ—Ã∏ÅQ°îÅÖ±›ÖÂÃ†§Åù’Ö…êÅµÖ——ï…ÃÅΩ∏Å›Ω…≠ô±Ω›}ë•Õ¡Ö—ç†Å…’πÃË(ÄÄÄÄåÅŸï…Õ•Ω∏µâ’µ¿Å•ÃÅÕ≠•¡¡ïêÅ—°ï…î∞ÅÖπêÅ•—!’àÅ¡…Ω¡ÖùÖ—ïÃÅÑÅÕ≠•¿Å—°…Ω’ù†Å—°î(ÄÄÄÄåÅπïïëÃÅç°Ö•∏Å’π±ïÕÃÅ—°îÅëï¡ïπëïπ–Å©ΩàùÃÅçΩπë•—•Ω∏ÅΩŸï……•ëïÃÅ•–Ä¥Å›•—°Ω’–(ÄÄÄÄåÅÖ±›ÖÂÃ†§Å—°îÅë•Õ¡Ö—ç†ÅŸÖ±•ëÖ—•Ω∏Å¡Ö—†ÅÕ•±ïπ—±‰Å±ΩÕ–Å—°•ÃÅçΩµ¡Ö…•ÕΩ∏(ÄÄÄÄåÄ°ô•…Õ–ÅÕïï∏ÅΩ∏Å—°îÅ…’∏ÅŸÖ±•ëÖ—•πúÅ—°îÅÖ…¥ÿ–ÅµÕâ’•±êÅô•‡§∏(ÄÄÄÅ•òËÅÖ±›ÖÂÃ†§ÄòòÅπïïëÃπâ’•±êπ…ïÕ’±–ÄÙÙÄùÕ’ççïÕÃúÄòòÅù•—°’àπïŸïπ—}πÖµîÄÑÙÄù¡’±±}…ï≈’ïÕ–ú(ÄÄÄÅÕ—ï¡ÃË(ÄÄÄÄ¥ÅπÖµîËÅ°ïç≠Ω’–Å…ï¡ΩÕ•—Ω…‰(ÄÄÄÄÄÅ’ÕïÃËÅÖç—•ΩπÃΩç°ïç≠Ω’—ÿÿ((ÄÄÄÄ¥ÅπÖµîËÅΩ›π±ΩÖêÅ¡ï»µŸÖ…•Öπ–ÅÖ’ë•ºÅΩ’—¡’—Ã(ÄÄÄÄÄÅ’ÕïÃËÅÖç—•ΩπÃΩëΩ›π±ΩÖêµÖ…—•ôÖç—ÿ‹(ÄÄÄÄÄÅ›•—†Ë(ÄÄÄÄÄÄÄÅ¡Ö——ï…∏ËÅÖ’ë•ºµ…ïù…ïÕÕ•Ω∏µΩ’—¡’–¥®(ÄÄÄÄÄÄÄÅ¡Ö—†ËÅÖ…—•ôÖç—Ã((ÄÄÄÄ¥ÅπÖµîËÅ%πÕ—Ö±∞Åπ’µ¡‰(ÄÄÄÄÄÄåÅ’ë•–Äå»‘¿Å¿ÿ¿ËÅ¡•ππïêÅ±•≠îÅ—°îÅ…ïÕ–ÅΩòÅ—°îÅ—ΩΩ±ç°Ö•∏∏(ÄÄÄÄÄÅ…’∏ËÅ¡Â—°Ω∏ÃÄµ¥Å¡•¿Å•πÕ—Ö±∞Ä¥µ≈’•ï–Åπ’µ¡‰ÙÙ»∏Ã∏»((ÄÄÄÄ¥ÅπÖµîËÅΩµ¡Ö…îÅM%5ÅŸÖ…•Öπ—Ã(ÄÄÄÄÄÅïπÿË(ÄÄÄÄÄÄÄÄåÅÖ—•πúÅŸÖ…•Öπ–Å±•Õ–Åëï…•ŸïêÅô…Ω¥Äπù•—°’àΩÕ•µêµŸÖ…•Öπ—Ãπ¡ÕêƒÅâ‰(ÄÄÄÄÄÄÄÄåÅ9ï‹µ	’•±ë5Ö—…•‡π¡ÃƒÏÅ—°îÅÕç…•¡–ÅôÖ±±ÃÅâÖç¨Å—ºÅ•—ÃÅ°Ö…êµçΩëïêÅ±•Õ–(ÄÄÄÄÄÄÄÄåÄ°›•—†ÅÑÅ›Ö…π•πú§ÅΩπ±‰Å›°ï∏Å—°•ÃÅŸÖ…•Öâ±îÅ•ÃÅÖâÕïπ–∏(ÄÄÄÄÄÄÄÅIU99I}aUQ	1}YI%9QLËÄëÌÏÅπïïëÃπ¡…ï¡Ö…îµµÖ—…•‡πΩ’—¡’—Ãπ…’ππï…}ï·ïç’—Öâ±ï}ŸÖ…•Öπ—ÃÅıÙ(ÄÄÄÄÄÅ…’∏ËÅ¡Â—°Ω∏ÃÅQïÕ—ÃΩ’ë•ΩIïù…ïÕÕ•ΩπQïÕ—ÃΩÕç…•¡—ÃΩç…ΩÕÕ}ŸÖ…•Öπ—}çΩµ¡Ö…îπ¡‰((ÄÅç…ïÖ—îµ…ï±ïÖÕîË(ÄÄÄÅπïïëÃËÅmâ’•±ê∞ÅŸï…Õ•Ω∏µâ’µ¡t(ÄÄÄÅ…’πÃµΩ∏ËÅ›•πëΩ›Ã¥»¿»‘µŸÃ»¿»ÿ(ÄÄÄÄåÅÅŸï…Õ•Ω∏µâ’µ¡•πúÅµÖ•∏Å¡’Õ†Å¡’â±•Õ°ïÃÅÖ’—ΩµÖ—•çÖ±±‰∏ÄÅ∏Åï·¡±•ç•—±‰(ÄÄÄÄåÅë•Õ¡Ö—ç°ïêÅ…’∏ÅΩ∏ÅµÖ•∏ÅçÖ∏ÅÖ±ÕºÅ¡’â±•Õ†Å—°îÅç’……ïπ–ÅŸï…Õ•Ω∏∞Å›°•ç†Å•Ã(ÄÄÄÄåÅπïïëïêÅ—ºÅ¡…ΩµΩ—îÅÖ∏ÅÖ±…ïÖë‰µâ’•±–Å¡…ï…ï±ïÖÕîÅ›•—°Ω’–Å•πŸïπ—•πúÅÖπΩ—°ï»(ÄÄÄÄåÅMïµYï»Åâ’µ¿∏ÅÅÖ±›ÖÂÃ†•ÄÅ≠ïï¡ÃÅ—°îÅÕ≠•¡¡ïêÅŸï…Õ•Ω∏µâ’µ¿Å©ΩàÅô…Ω¥(ÄÄÄÄåÅ¡…Ω¡ÖùÖ—•πúÅÑÅÕ≠•¿Å—ºÅ—°•ÃÅë•Õ¡Ö—ç†µΩπ±‰Å…ï±ïÖÕîÅ¡Ö—†∏(ÄÄÄÅ•òËÅ(ÄÄÄÄÄÅÖ±›ÖÂÃ†§Äòò(ÄÄÄÄÄÅù•—°’àπ…ïòÄÙÙÄù…ïôÃΩ°ïÖëÃΩµÖ•∏úÄòò(ÄÄÄÄÄÅπïïëÃπâ’•±êπ…ïÕ’±–ÄÙÙÄùÕ’ççïÕÃúÄòò(ÄÄÄÄÄÄ°ù•—°’àπïŸïπ—}πÖµîÄÙÙÄù¡’Õ†úÅÒÅù•—°’àπïŸïπ—}πÖµîÄÙÙÄù›Ω…≠ô±Ω›}ë•Õ¡Ö—ç†ú§(ÄÄÄÅ¡ï…µ•ÕÕ•ΩπÃË(ÄÄÄÄÄÅÖç—•ΩπÃËÅ…ïÖê(ÄÄÄÄÄÅçΩπ—ïπ—ÃËÅ›…•—î((ÄÄÄÅÕ—ï¡ÃË(ÄÄÄÄ¥ÅπÖµîËÅ°ïç≠Ω’–Å…ï¡ΩÕ•—Ω…‰(ÄÄÄÄÄÅ’ÕïÃËÅÖç—•ΩπÃΩç°ïç≠Ω’—ÿÿ(ÄÄÄÄÄÅ›•—†Ë(ÄÄÄÄÄÄÄÄåÅA•ç¨Å’¿Å—°îÅâ’µ¡ïêÅŸï…Õ•Ω∏π†∞ÅπΩ–Å—°îÅ¡…îµâ’µ¿ÅM!Å—°Ö–Å—…•ùùï…ïêÅ—°îÅ…’∏∏(ÄÄÄÄÄÄÄÅ…ïòËÄëÌÏÅπïïëÃπŸï…Õ•Ω∏µâ’µ¿πΩ’—¡’—Ãπâ’µ¡ïë}Õ°ÑÅÒÅù•—°’àπÕ°ÑÅıÙ((ÄÄÄÄ¥ÅπÖµîËÅΩ›π±ΩÖêÅâ’•±êÅÖ…—•ôÖç—Ã(ÄÄÄÄÄÅ’ÕïÃËÅÖç—•ΩπÃΩëΩ›π±ΩÖêµÖ…—•ôÖç—ÿ‹(ÄÄÄÄÄÅ›•—†Ë(ÄÄÄÄÄÄÄÅ¡Ö——ï…∏ËÅ≈’Ö±•Èï…A<¥®(ÄÄÄÄÄÄÄÅ¡Ö—†ËÄëÌÏÅù•—°’àπ›Ω…≠Õ¡ÖçîÅııq…ï±ïÖÕîµ•π¡’–((ÄÄÄÄåÅ5M	’•±êÅôΩ»Å—°îÅ‡‡ÿÅÖ’—ºµëï—ïç–Å•πÕ—Ö±±ï»Åâ’•±–Å•∏Å—°•ÃÅ©ΩàÄ°—°îÅµÖ—…•‡(ÄÄÄÄåÅâ’•±ëÃÅ—°îÅ¡ï»µŸÖ…•Öπ–Åâ•πÖ…•ïÃÏÅ—°•ÃÅô…Ωπ–µëΩΩ»Å•πÕ—Ö±±ï»Å•ÃÅÑÅÕ•πù±î(ÄÄÄÄåÅÖ…ç°•—ïç—’…îµÖùπΩÕ—•åÅâ•πÖ…‰Åâ’•±–ÅΩπçîÅ°ï…î§∏(ÄÄÄÄ¥ÅπÖµîËÅëêÅ5M	’•±êÅ—ºÅAQ (ÄÄÄÄÄÅ’ÕïÃËÅµ•ç…ΩÕΩô–ΩÕï—’¿µµÕâ’•±ëÿÃ((ÄÄÄÄ¥ÅπÖµîËÅIïÕΩ±ŸîÅ…ï±ïÖÕîÅŸï…Õ•Ω∏(ÄÄÄÄÄÅ•êËÅŸï…Õ•Ω∏(ÄÄÄÄÄÅÕ°ï±∞ËÅ¡›Õ†(ÄÄÄÄÄÅïπÿË(ÄÄÄÄÄÄÄÅ!}Q=-8ËÄëÌÏÅÕïç…ï—Ãπ%Q!U	}Q=-8ÅıÙ(ÄÄÄÄÄÅ…’∏ËÅ(ÄÄÄÄÄÄÄÄåÅÖπΩπ•çÖ∞ÅŸï…Õ•Ω∏π†Å…ïÖëï»∞ÅÕ°Ö…ïêÅ›•—†Å—°îÅŸï…Õ•Ω∏µâ’µ¿Å©Ωà∏(ÄÄÄÄÄÄÄÄ∏Äπpπù•—°’âqÕç…•¡—Õqï–µYï…Õ•ΩπAÖ…–π¡Ãƒ((ÄÄÄÄÄÄÄÄëµÖ©Ω»ÄÙÅï–µYï…Õ•ΩπAÖ…–Äâ5)=Hà(ÄÄÄÄÄÄÄÄëµ•πΩ»ÄÙÅï–µYï…Õ•ΩπAÖ…–Äâ5%9=Hà(ÄÄÄÄÄÄÄÄë…ïŸ•Õ•Ω∏ÄÙÅï–µYï…Õ•ΩπAÖ…–ÄâIY%M%=8à(ÄÄÄÄÄÄÄÄëâÖÕïYï…Õ•Ω∏ÄÙÄàëµÖ©Ω»∏ëµ•πΩ»∏ë…ïŸ•Õ•Ω∏à(ÄÄÄÄÄÄÄÄåÅ±ïÖ∏ÅMïµYï»Å…ï±ïÖÕîÅŸï…Õ•Ω∏Ä°πºÄµµÖ•∏∏Ò…’∏¯Å¡…ï…ï±ïÖÕîÅÕ’ôô•‡§∏ÅŸï…Õ•Ω∏µâ’µ¿(ÄÄÄÄÄÄÄÄåÅÖ±…ïÖë‰ÅÖëŸÖπçïÃÅŸï…Õ•Ω∏π†Å¡ï»ÅµÖ•∏Å¡’Õ†∞ÅÕºÅ—°îÅâÖÕîÅŸï…Õ•Ω∏Å•ÃÅ’π•≈’îÅïπΩ’ù†∞(ÄÄÄÄÄÄÄÄåÅÖπêÅ•—!’àÅ¡’â±•Õ°ïÃÅÑÅ—ÖúÅ›•—°Ω’–ÅÑÅ¡…ï…ï±ïÖÕîÅ•ëïπ—•ô•ï»ÅÖÃÅÑÅô’±∞Å…ï±ïÖÕî∏(ÄÄÄÄÄÄÄÄë¡Öç≠Yï…Õ•Ω∏ÄÙÄëâÖÕïYï…Õ•Ω∏(ÄÄÄÄÄÄÄÄë—ÖúÄÙÄâÿë¡Öç≠Yï…Õ•Ω∏à((ÄÄÄÄÄÄÄÄââÖÕï}Ÿï…Õ•Ω∏ÙëâÖÕïYï…Õ•Ω∏àÄ¯¯ÄëïπÿÈ%Q!U	}=UQAUP(ÄÄÄÄÄÄÄÄâ¡Öç≠}Ÿï…Õ•Ω∏Ùë¡Öç≠Yï…Õ•Ω∏àÄ¯¯ÄëïπÿÈ%Q!U	}=UQAUP(ÄÄÄÄÄÄÄÄâ—ÖúÙë—ÖúàÄ¯¯ÄëïπÿÈ%Q!U	}=UQAUP(ÄÄÄÄÄÄÄÄπpπù•—°’âqÕç…•¡—ÕqA’â±•Õ†µIï±ïÖÕîπ¡ÃƒÅÄ(ÄÄÄÄÄÄÄÄÄÄµIï¡ΩÕ•—Ω…‰ÄàëÌÏÅù•—°’àπ…ï¡ΩÕ•—Ω…‰ÅıÙàÅÄ(ÄÄÄÄÄÄÄÄÄÄµQÖúÄë—ÖúÅÄ(ÄÄÄÄÄÄÄÄÄÄµAÖç≠Yï…Õ•Ω∏Äë¡Öç≠Yï…Õ•Ω∏((ÄÄÄÄÄÄÄÅ]…•—îµ!ΩÕ–Äâ	ÖÕîÅŸï…Õ•Ω∏ËÄëâÖÕïYï…Õ•Ω∏à(ÄÄÄÄÄÄÄÅ]…•—îµ!ΩÕ–ÄâIï±ïÖÕîÅŸï…Õ•Ω∏ËÄë¡Öç≠Yï…Õ•Ω∏à(ÄÄÄÄÄÄÄÅ]…•—îµ!ΩÕ–ÄâIï±ïÖÕîÅ—ÖúËÄë—Öúà((ÄÄÄÄ¥ÅπÖµîËÅ…ïÖ—îÅÕΩ’…çîÅÖ…ç°•Ÿî(ÄÄÄÄÄÅ•òËÅÕ—ï¡ÃπŸï…Õ•Ω∏πΩ’—¡’—ÃππïïëÕ}ÕΩ’…çîÄÙÙÄù—…’îú(ÄÄÄÄÄÅÕ°ï±∞ËÅ¡›Õ†(ÄÄÄÄÄÅ…’∏ËÅ(ÄÄÄÄÄÄÄÅ%µ¡Ω…–µ5Ωë’±îÄπpπù•—°’âqÕç…•¡—ÕqIï±ïÖÕïÕÕï—Ãπ¡Õ¥ƒ(ÄÄÄÄÄÄÄÄëÕΩ’…çïi•¿ÄÙÅ)Ω•∏µAÖ—†ÄàëÌÏÅù•—°’àπ›Ω…≠Õ¡ÖçîÅıÙàÄ°ï–µMΩ’…çïi•¡ÕÕï—9ÖµîÄµAÖç≠Yï…Õ•Ω∏ÄàëÌÏÅÕ—ï¡ÃπŸï…Õ•Ω∏πΩ’—¡’—Ãπ¡Öç≠}Ÿï…Õ•Ω∏ÅıÙà§(ÄÄÄÄÄÄÄÅù•–ÅÖ…ç°•ŸîÄ¥µôΩ…µÖ–ıÈ•¿Ä¥µΩ’—¡’–ÙàëÕΩ’…çïi•¿àÅ!(ÄÄÄÄÄÄÄÅ•òÄ†ë1MQa%Q=ÄµπîÄ¿§ÅÏ(ÄÄÄÄÄÄÄÄÄÅï·•–Äë1MQa%Q=(ÄÄÄÄÄÄÄÅÙ(ÄÄÄÄÄÄÄÅ•òÄ†µπΩ–Ä°QïÕ–µAÖ—†ÄëÕΩ’…çïi•¿§§ÅÏ(ÄÄÄÄÄÄÄÄÄÅ]…•—îµ……Ω»ÄâMΩ’…çîÅÖ…ç°•ŸîÅ›ÖÃÅπΩ–Åç…ïÖ—ïêà(ÄÄÄÄÄÄÄÄÄÅï·•–Äƒ(ÄÄÄÄÄÄÄÅÙ(ÄÄÄÄÄÄÄÅ]…•—îµ!ΩÕ–Äâ…ïÖ—ïêÅÕΩ’…çîÅÖ…ç°•ŸîËÄëÕΩ’…çïi•¿à((ÄÄÄÄ¥ÅπÖµîËÅ…ïÖ—îÅYï±Ω¡Öç¨Å…ï±ïÖÕî(ÄÄÄÄÄÅ•òËÅÕ—ï¡ÃπŸï…Õ•Ω∏πΩ’—¡’—Ãπµ•ÕÕ•πù}ç°Öππï±ÃÄÑÙÄúúÅÒÅÕ—ï¡ÃπŸï…Õ•Ω∏πΩ’—¡’—ÃππïïëÕ}ÕΩ’…çîÄÙÙÄù—…’îú(ÄÄÄÄÄÅÕ°ï±∞ËÅ¡›Õ†(ÄÄÄÄÄÅïπÿË(ÄÄÄÄÄÄÄÅ%Q!U	}Q=-8ËÄëÌÏÅÕïç…ï—Ãπ%Q!U	}Q=-8ÅıÙ(ÄÄÄÄÄÄÄÅ!}Q=-8ËÄëÌÏÅÕïç…ï—Ãπ%Q!U	}Q=-8ÅıÙ(ÄÄÄÄÄÅ…’∏ËÅ(ÄÄÄÄÄÄÄÄëµ•ÕÕ•πù°Öππï±ÃÄÙÅ †àëÌÏÅÕ—ï¡ÃπŸï…Õ•Ω∏πΩ’—¡’—Ãπµ•ÕÕ•πù}ç°Öππï±ÃÅıÙàπM¡±•–†(ÄÄÄÄÄÄÄÄÄÄú∞ú∞ÅmMÂÕ—ï¥πM—…•πùM¡±•—=¡—•ΩπÕtËÈIïµΩŸïµ¡—Âπ—…•ïÃ§§(ÄÄÄÄÄÄÄÄπpπù•—°’âqÕç…•¡—Õq9ï‹µYï±Ω¡Öç≠Iï±ïÖÕîπ¡ÃƒÅÄ(ÄÄÄÄÄÄÄÄÄÄµIï¡ΩÕ•—Ω…‰ÄàëÌÏÅù•—°’àπ…ï¡ΩÕ•—Ω…‰ÅıÙàÅÄ(ÄÄÄÄÄÄÄÄÄÄµQÖúÄàëÌÏÅÕ—ï¡ÃπŸï…Õ•Ω∏πΩ’—¡’—Ãπ—ÖúÅıÙàÅÄ(ÄÄÄÄÄÄÄÄÄÄµAÖç≠Yï…Õ•Ω∏ÄàëÌÏÅÕ—ï¡ÃπŸï…Õ•Ω∏πΩ’—¡’—Ãπ¡Öç≠}Ÿï…Õ•Ω∏ÅıÙàÅÄ(ÄÄÄÄÄÄÄÄÄÄµQÖ…ùï—Ωµµ•–ÄàëÌÏÅπïïëÃπŸï…Õ•Ω∏µâ’µ¿πΩ’—¡’—Ãπâ’µ¡ïë}Õ°ÑÅÒÅù•—°’àπÕ°ÑÅıÙàÅÄ(ÄÄÄÄÄÄÄÄÄÄµ]Ω…≠Õ¡ÖçïIΩΩ–ÄàëÌÏÅù•—°’àπ›Ω…≠Õ¡ÖçîÅıÙàÅÄ(ÄÄÄÄÄÄÄÄÄÄµ5•ÕÕ•πù°Öππï±ÃÄëµ•ÕÕ•πù°Öππï±ÃÅÄ(ÄÄÄÄÄÄÄÄÄÄµ9ïïëÕMΩ’…çîË†àëÌÏÅÕ—ï¡ÃπŸï…Õ•Ω∏πΩ’—¡’—ÃππïïëÕ}ÕΩ’…çîÅıÙàÄµïƒÄâ—…’îà§((ÄÄÄÄ¥ÅπÖµîËÅ	’•±êÅÖπêÅ¡’â±•Õ†ÅÖ’—ºµëï—ïç–Å•πÕ—Ö±±ï»(ÄÄÄÄÄÅ•òËÅÕ—ï¡ÃπŸï…Õ•Ω∏πΩ’—¡’—ÃππïïëÕ}•πÕ—Ö±±ï»ÄÙÙÄù—…’îú(ÄÄÄÄÄÅÕ°ï±∞ËÅ¡›Õ†(ÄÄÄÄÄÅïπÿË(ÄÄÄÄÄÄÄÅ!}Q=-8ËÄëÌÏÅÕïç…ï—Ãπ%Q!U	}Q=-8ÅıÙ(ÄÄÄÄÄÅ…’∏ËÅ(ÄÄÄÄÄÄÄÄåÅ≈’Ö±•Èï…A<µaPµMï—’¿πï·îÅ•ÃÅ—°îÅ‡‡ÿÅô…Ωπ–µëΩΩ»Å•πÕ—Ö±±ï»ËÅ•–Åëï—ïç—ÃÅ—°î(ÄÄÄÄÄÄÄÄåÅATÄ°Ö…ç°•—ïç—’…îÄ¨ÅY`Å±ïŸï∞§ÅÖπêÅëΩ›π±ΩÖëÃΩ…’πÃÅ—°îÅµÖ—ç°•πúÅ¡ï»µç°Öππï∞(ÄÄÄÄÄÄÄÄåÅMï—’¿∏Å%–Å°ÖÃÅπºÅï·—ï…πÖ∞Åëï¡ïπëïπç•ïÃ∞ÅÕºÅ•–Åâ’•±ëÃÅÕ—ÖπëÖ±ΩπîÅ°ï…î∏(ÄÄÄÄÄÄÄÄåÅMïîÅëΩçÃΩ’—Ωï—ïç—%πÕ—Ö±±ï»πµê∏(ÄÄÄÄÄÄÄÄë—ÖúÄÙÄàëÌÏÅÕ—ï¡ÃπŸï…Õ•Ω∏πΩ’—¡’—Ãπ—ÖúÅıÙà((ÄÄÄÄÄÄÄÅµÕâ’•±êÅ%πÕ—Ö±±ï…q%πÕ—Ö±±ï»πŸç·¡…Ω®ÅÄ(ÄÄÄÄÄÄÄÄÄÄΩ¿ÈΩπô•ù’…Ö—•Ω∏ıIï±ïÖÕîÅÄ(ÄÄÄÄÄÄÄÄÄÄΩ¿ÈA±Ö—ôΩ…¥ı]•∏Ã»ÅÄ(ÄÄÄÄÄÄÄÄÄÄΩ¥ÄΩÿÈµ•π•µÖ∞ÄΩπΩ±Ωùº(ÄÄÄÄÄÄÄÅ•òÄ†ë1MQa%Q=ÄµπîÄ¿§ÅÏ(ÄÄÄÄÄÄÄÄÄÅï·•–Äë1MQa%Q=(ÄÄÄÄÄÄÄÅÙ((ÄÄÄÄÄÄÄÄëÕï—’¡·îÄÙÄàëÌÏÅù•—°’àπ›Ω…≠Õ¡ÖçîÅııq%πÕ—Ö±±ï…qIï±ïÖÕïq≈’Ö±•Èï…A<µaPµMï—’¿πï·îà(ÄÄÄÄÄÄÄÅ•òÄ†µπΩ–Ä°QïÕ–µAÖ—†ÄëÕï—’¡·î§§ÅÏ(ÄÄÄÄÄÄÄÄÄÅ]…•—îµ……Ω»Äâ’—ºµëï—ïç–Å•πÕ—Ö±±ï»Å›ÖÃÅπΩ–Å¡…Ωë’çïêÅÖ–ÄëÕï—’¡·îà(ÄÄÄÄÄÄÄÄÄÅï·•–Äƒ(ÄÄÄÄÄÄÄÅÙ((ÄÄÄÄÄÄÄÅù†Å…ï±ïÖÕîÅ’¡±ΩÖêÄë—ÖúÄëÕï—’¡·îÄ¥µç±Ωââï»Ä¥µ…ï¡ºÄàëÌÏÅù•—°’àπ…ï¡ΩÕ•—Ω…‰ÅıÙà(ÄÄÄÄÄÄÄÅ•òÄ†ë1MQa%Q=ÄµπîÄ¿§ÅÏ(ÄÄÄÄÄÄÄÄÄÅï·•–Äë1MQa%Q=(ÄÄÄÄÄÄÄÅÙ((ÄÄÄÄåÅQ°îÅÖ’—ºµëï—ïç–Å•πÕ—Ö±±ï»Å…ïô’ÕïÃÅ—ºÅ…’∏ÅÑÅëΩ›π±ΩÖëïêÅ¡ï»µç°Öππï∞ÅMï—’¿πï·î(ÄÄÄÄåÅ›°ΩÕîÅM!¥»‘ÿÅëΩïÃÅπΩ–ÅµÖ—ç†Å—°•ÃÅô•±îÄ°%πÕ—Ö±±ï»Ω’—Ω%πÕ—Ö±±ï»πç¡¿§∞ÅÕºÅ•–(ÄÄÄÄåÅµ’Õ–Å±•Õ–ÅïŸï…‰Ä®µMï—’¿πï·îÅÖÕÕï–ÅÖπêÅâîÅ’¡±ΩÖëïêÅ—ºÅ—°îÅÕÖµîÅ…ï±ïÖÕî∏ÅQ°î(ÄÄÄÄåÅÖÕÕï—ÃÅÖ…îÅ…îµëΩ›π±ΩÖëïêÅô…Ω¥Å—°îÅ…ï±ïÖÕîÅ…Ö—°ï»Å—°Ö∏Å°ÖÕ°ïêÅô…Ω¥Å±ΩçÖ∞(ÄÄÄÄåÅâ’•±êÅë•…ïç—Ω…•ïÃÅÕºÅ—°îÅ°ÖÕ°ïÃÅçΩŸï»Åï·Öç—±‰Å—°îÅâÂ—ïÃÅ’Õï…ÃÅ›•±∞Åùï–∏(ÄÄÄÄ¥ÅπÖµîËÅA’â±•Õ†Å…ï±ïÖÕîÅç°ïç≠Õ’µÃ(ÄÄÄÄÄÅ•òËÅÕ—ï¡ÃπŸï…Õ•Ω∏πΩ’—¡’—ÃππïïëÕ}ç°ïç≠Õ’µÃÄÙÙÄù—…’îú(ÄÄÄÄÄÅÕ°ï±∞ËÅ¡›Õ†(ÄÄÄÄÄÅïπÿË(ÄÄÄÄÄÄÄÅ!}Q=-8ËÄëÌÏÅÕïç…ï—Ãπ%Q!U	}Q=-8ÅıÙ(ÄÄÄÄÄÅ…’∏ËÅ(ÄÄÄÄÄÄÄÄë……Ω…ç—•ΩπA…ïôï…ïπçîÄÙÄâM—Ω¿à(ÄÄÄÄÄÄÄÄë—ÖúÄÙÄàëÌÏÅÕ—ï¡ÃπŸï…Õ•Ω∏πΩ’—¡’—Ãπ—ÖúÅıÙà(ÄÄÄÄÄÄÄÄë…ï¡ºÄÙÄàëÌÏÅù•—°’àπ…ï¡ΩÕ•—Ω…‰ÅıÙà((ÄÄÄÄÄÄÄÄëÖÕÕï—9ÖµïÃÄÙÅ °ù†Å…ï±ïÖÕîÅŸ•ï‹Äë—ÖúÄ¥µ…ï¡ºÄë…ï¡ºÄ¥µ©ÕΩ∏ÅÖÕÕï—ÃÄ¥µ©ƒÄúπÖÕÕï—ÕmtππÖµîúÅ(ÄÄÄÄÄÄÄÄÄÄÄÅ]°ï…îµ=â©ïç–ÅÏÄë|ÄµµÖ—ç†ÄúµMï—’¡pπï·îêúÅÙ§(ÄÄÄÄÄÄÄÅ•òÄ†ëÖÕÕï—9ÖµïÃπΩ’π–ÄµïƒÄ¿§ÅÏ(ÄÄÄÄÄÄÄÄÄÅ—°…Ω‹Äâ9ºÅÕï—’¿Åï·ïç’—Öâ±ïÃÅôΩ’πêÅΩ∏Å…ï±ïÖÕîÄë—ÖúÏÅπΩ—°•πúÅ—ºÅç°ïç≠Õ’¥∏à(ÄÄÄÄÄÄÄÅÙ((ÄÄÄÄÄÄÄÄëëΩ›π±ΩÖë•»ÄÙÅ)Ω•∏µAÖ—†ÄàëÌÏÅù•—°’àπ›Ω…≠Õ¡ÖçîÅıÙàÄâç°ïç≠Õ’¥µ•π¡’–à(ÄÄÄÄÄÄÄÅ9ï‹µ%—ï¥Äµ%—ïµQÂ¡îÅ•…ïç—Ω…‰ÄµΩ…çîÄµAÖ—†ÄëëΩ›π±ΩÖë•»ÅÅ=’–µ9’±∞((ÄÄÄÄÄÄÄÄë±•πïÃÄÙÅ †§(ÄÄÄÄÄÄÄÅôΩ…ïÖç†Ä†ëπÖµîÅ•∏Ä†ëÖÕÕï—9ÖµïÃÅÅMΩ…–µ=â©ïç–§§ÅÏ(ÄÄÄÄÄÄÄÄÄÅù†Å…ï±ïÖÕîÅëΩ›π±ΩÖêÄë—ÖúÄ¥µ…ï¡ºÄë…ï¡ºÄ¥µ¡Ö——ï…∏ÄëπÖµîÄ¥µë•»ÄëëΩ›π±ΩÖë•»Ä¥µç±Ωââï»(ÄÄÄÄÄÄÄÄÄÅ•òÄ†ë1MQa%Q=ÄµπîÄ¿§ÅÏ(ÄÄÄÄÄÄÄÄÄÄÄÅ—°…Ω‹ÄâÖ•±ïêÅ—ºÅëΩ›π±ΩÖêÅ…ï±ïÖÕîÅÖÕÕï–ÄëπÖµîÅôΩ»Åç°ïç≠Õ’µµ•πúà(ÄÄÄÄÄÄÄÄÄÅÙ(ÄÄÄÄÄÄÄÄÄÄë°ÖÕ†ÄÙÄ°ï–µ•±ï!ÖÕ†ÄµAÖ—†Ä°)Ω•∏µAÖ—†ÄëëΩ›π±ΩÖë•»ÄëπÖµî§Äµ±ùΩ…•—°¥ÅM!»‘ÿ§π!ÖÕ†πQΩ1Ω›ï…%πŸÖ…•Öπ–†§(ÄÄÄÄÄÄÄÄÄÄë±•πïÃÄ¨ÙÄàë°ÖÕ†ÄÄëπÖµîà(ÄÄÄÄÄÄÄÄÄÅ]…•—îµ!ΩÕ–Äàë°ÖÕ†ÄÄëπÖµîà(ÄÄÄÄÄÄÄÅÙ((ÄÄÄÄÄÄÄÄåÅÕ°Ñ»‘ŸÕ’¥µçΩµ¡Ö—•â±îÅôΩ…µÖ–ËÄÒ±Ω›ï…çÖÕîµ°ï‡¯∞Å—›ºÅÕ¡ÖçïÃ∞ÄÒπÖµî¯∞Å1∏(ÄÄÄÄÄÄÄÄëÕ’µÕAÖ—†ÄÙÅ)Ω•∏µAÖ—†ÄàëÌÏÅù•—°’àπ›Ω…≠Õ¡ÖçîÅıÙàÄâM!»‘ŸMU5Lπ—·–à(ÄÄÄÄÄÄÄÅmMÂÕ—ï¥π%<π•±ïtËÈ]…•—ï±±Qï·–†ëÕ’µÕAÖ—†∞Ä††ë±•πïÃÄµ©Ω•∏ÄâÅ∏à§Ä¨ÄâÅ∏à§§((ÄÄÄÄÄÄÄÅù†Å…ï±ïÖÕîÅ’¡±ΩÖêÄë—ÖúÄëÕ’µÕAÖ—†Ä¥µç±Ωââï»Ä¥µ…ï¡ºÄë…ï¡º(ÄÄÄÄÄÄÄÅ•òÄ†ë1MQa%Q=ÄµπîÄ¿§ÅÏ(ÄÄÄÄÄÄÄÄÄÅï·•–Äë1MQa%Q=(ÄÄÄÄÄÄÄÅÙ((ÄÄÄÄ¥ÅπÖµîËÅ]…•—îÅ…ï±ïÖÕîÅπΩ—ïÃ(ÄÄÄÄÄÅ•òËÅÕ—ï¡ÃπŸï…Õ•Ω∏πΩ’—¡’—ÃππïïëÕ}πΩ—ïÃÄÙÙÄù—…’îú(ÄÄÄÄÄÅÕ°ï±∞ËÅ¡›Õ†(ÄÄÄÄÄÅïπÿË(ÄÄÄÄÄÄÄÅ!}Q=-8ËÄëÌÏÅÕïç…ï—Ãπ%Q!U	}Q=-8ÅıÙ(ÄÄÄÄÄÅ…’∏ËÅ(ÄÄÄÄÄÄÄÄëπΩ—ïÕAÖ—†ÄÙÄàëÌÏÅù•—°’àπ›Ω…≠Õ¡ÖçîÅııq…ï±ïÖÕîµπΩ—ïÃπµêà(ÄÄÄÄÄÄÄÄπpπù•—°’âqÕç…•¡—Õq9ï‹µIï±ïÖÕï9Ω—ïÃπ¡ÃƒÅÄ(ÄÄÄÄÄÄÄÄÄÄµIï¡ΩÕ•—Ω…‰ÄàëÌÏÅù•—°’àπ…ï¡ΩÕ•—Ω…‰ÅıÙàÅÄ(ÄÄÄÄÄÄÄÄÄÄµQÖúÄàëÌÏÅÕ—ï¡ÃπŸï…Õ•Ω∏πΩ’—¡’—Ãπ—ÖúÅıÙàÅÄ(ÄÄÄÄÄÄÄÄÄÄµAÖç≠Yï…Õ•Ω∏ÄàëÌÏÅÕ—ï¡ÃπŸï…Õ•Ω∏πΩ’—¡’—Ãπ¡Öç≠}Ÿï…Õ•Ω∏ÅıÙàÅÄ(ÄÄÄÄÄÄÄÄÄÄµ]Ω…≠ô±Ω›I’π%êÄàëÌÏÅù•—°’àπ…’π}•êÅıÙàÅÄ(ÄÄÄÄÄÄÄÄÄÄµQÖ…ùï—Ωµµ•–ÄàëÌÏÅù•—°’àπÕ°ÑÅıÙàÅÄ(ÄÄÄÄÄÄÄÄÄÄµ=’—¡’—AÖ—†ÄëπΩ—ïÕAÖ—†(ÄÄÄÄÄÄÄÅ•òÄ†ë1MQa%Q=ÄµπîÄ¿§ÅÏ(ÄÄÄÄÄÄÄÄÄÅï·•–Äë1MQa%Q=(ÄÄÄÄÄÄÄÅÙ((ÄÄÄÄÄÄÄÄåÄ¥µ¡…ï…ï±ïÖÕîıôÖ±ÕîËÅ—°îÅç±ïÖ∏Å`πdπhÅ—ÖúÅ•ÃÅÑÅô’±∞Å…ï±ïÖÕîÏÅµÖ≠îÅÕ’…îÅŸ¡¨ùÃ(ÄÄÄÄÄÄÄÄåÅ’¡±ΩÖêÄ°›°•ç†ÅµÖ‰ÅëïôÖ’±–Å—ºÅ¡…ï…ï±ïÖÕî§ÅëΩïÃÅπΩ–Å±ïÖŸîÅ•–ÅµÖ…≠ïêÅÖÃÅΩπî∏(ÄÄÄÄÄÄÄÅù†Å…ï±ïÖÕîÅïë•–ÄàëÌÏÅÕ—ï¡ÃπŸï…Õ•Ω∏πΩ’—¡’—Ãπ—ÖúÅıÙàÅÄ(ÄÄÄÄÄÄÄÄÄÄ¥µ…ï¡ºÄàëÌÏÅù•—°’àπ…ï¡ΩÕ•—Ω…‰ÅıÙàÅÄ(ÄÄÄÄÄÄÄÄÄÄ¥µπΩ—ïÃµô•±îÄëπΩ—ïÕAÖ—†ÅÄ(ÄÄÄÄÄÄÄÄÄÄ¥µ¡…ï…ï±ïÖÕîıôÖ±ÕîÅÄ(ÄÄÄÄÄÄÄÄÄÄ¥µ±Ö—ïÕ–(ÄÄÄÄÄÄÄÅ•òÄ†ë1MQa%Q=ÄµπîÄ¿§ÅÏ(ÄÄÄÄÄÄÄÄÄÅï·•–Äë1MQa%Q=(ÄÄÄÄÄÄÄÅÙ(
+      shell: pwsh
+      run: |
+        $variant = "${{ matrix.simd_variant }}"
+        $platform = "${{ matrix.platform }}"
+        $exe = "${{ github.workspace }}\Tests\AudioRegressionTests\$platform\Release\AudioRegressionTests.exe"
+        if (-not (Test-Path $exe)) {
+          Write-Error "AudioRegressionTests executable not found at $exe"
+          exit 1
+        }
+
+        $env:PATH = "$env:FFTW_LIB;$env:LIBSNDFILE_LIB;$env:MUPARSERX_LIB;$env:PATH"
+
+        $repoRefDir = "${{ github.workspace }}\Tests\AudioRegressionTests\references"
+        $hasRefs = Test-Path (Join-Path $repoRefDir "cases.json")
+        # The primary (reference-seeding) variant is flagged in simd-variants.psd1.
+        $isPrimary = "${{ matrix.primary }}" -eq "true"
+
+        Push-Location "${{ github.workspace }}\Tests\AudioRegressionTests"
+        try {
+          if ($hasRefs) {
+            Write-Host "Reference set present in tree; running verify mode for variant '$variant'"
+            & $exe --variant $variant --config-dir configs --ref-dir references --out-dir output
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "AudioRegressionTests verify failed for variant '$variant'"
+              exit $LASTEXITCODE
+            }
+          } elseif ($isPrimary) {
+            Write-Host "No reference set in tree; primary variant '$variant' will record fresh references"
+            & $exe --variant $variant --config-dir configs --ref-dir references --out-dir output --generate-references
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "AudioRegressionTests reference generation failed"
+              exit $LASTEXITCODE
+            }
+          } else {
+            Write-Host "No reference set in tree; recording variant output only (non-primary variant)"
+            & $exe --variant $variant --config-dir configs --ref-dir references --out-dir output --generate-references
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "AudioRegressionTests output recording failed for variant '$variant'"
+              exit $LASTEXITCODE
+            }
+          }
+        } finally {
+          Pop-Location
+        }
+
+    - name: Upload audio regression outputs
+      if: matrix.can_execute == true
+      uses: actions/upload-artifact@v7
+      with:
+        name: audio-regression-output-${{ matrix.simd_variant }}
+        path: Tests/AudioRegressionTests/output
+        retention-days: 14
+        if-no-files-found: warn
+
+    - name: Upload audio regression references (primary variant)
+      if: matrix.primary == true
+      uses: actions/upload-artifact@v7
+      with:
+        name: audio-regression-references
+        path: Tests/AudioRegressionTests/references
+        retention-days: 30
+        if-no-files-found: warn
+
+    # Build Qt projects with qmake (Editor, DeviceSelector, UpdateChecker)
+    - name: Build Qt Applications
+      shell: pwsh
+      run: |
+        & "${{ github.workspace }}\.github\scripts\Build-QtApps.ps1" `
+          -WorkspaceRoot "${{ github.workspace }}" `
+          -Platform "${{ matrix.platform }}" `
+          -SimdVariant "${{ matrix.simd_variant }}" `
+          -QtArchFlag "${{ matrix.qt_arch_flag }}" `
+          -MsvcDevPlatform "${{ matrix.msvcdevplatform }}" `
+          -UpdateChannel "${{ matrix.channel }}"
+
+
+    - name: Run VST Editor self-test (offscreen)
+      if: matrix.simd_variant == 'avx2'
+      timeout-minutes: 3
+      shell: pwsh
+      run: |
+        Copy-Item "${{ github.workspace }}\deps\velopack_libc\lib\velopack_libc_win_x64_msvc.dll" `
+          -Destination "build-Editor-x64\release\velopack_libc.dll" -Force
+        $env:PATH = "$env:FFTW_LIB;$env:LIBSNDFILE_LIB;$env:QT_ROOT\bin;$env:PATH"
+        $env:QT_QPA_PLATFORM_PLUGIN_PATH = "$env:QT_ROOT\plugins\platforms"
+        $env:QT_QPA_PLATFORM = "offscreen"
+        $proc = Start-Process -FilePath "build-Editor-x64\release\Editor.exe" `
+          -ArgumentList @("--selftest-vst") -PassThru -Wait -NoNewWindow
+        if ($proc.ExitCode -ne 0) {
+          Write-Error "VST Editor self-test failed (exit code $($proc.ExitCode))"
+          exit 1
+        }
+
+
+    # Offscreen skin gallery: proves the Editor renders every skin headless and
+    # publishes the judging material for the skin program (issues #66-#68).
+    # Primary avx2 variant only: the gallery is QSS/QPainter output and does
+    # not vary by SIMD variant.
+    - name: Run skin gallery (offscreen)
+      if: matrix.simd_variant == 'avx2'
+      # A hard step timeout: if the Editor ever blocks on a fatal-error dialog
+      # again, the job must fail in minutes instead of hanging for hours.
+      timeout-minutes: 10
+      shell: pwsh
+      run: |
+        # The import lib embeds the SONAME velopack_libc.dll (see the Package
+        # binaries step); the gallery runs from the build dir, so the renamed
+        # DLL must sit next to Editor.exe here too.
+        Copy-Item "${{ github.workspace }}\deps\velopack_libc\lib\velopack_libc_win_x64_msvc.dll" `
+          -Destination "build-Editor-x64\release\velopack_libc.dll" -Force
+
+        $env:PATH = "$env:FFTW_LIB;$env:LIBSNDFILE_LIB;$env:QT_ROOT\bin;$env:PATH"
+        # windeployqt deployed only the qwindows platform plugin next to
+        # Editor.exe, and the deployed Qt6Core.dll in the app dir wins the DLL
+        # search, which limits plugin resolution to the deployed set - the
+        # offscreen plugin then fails to load and Qt parks a fatal-error dialog
+        # forever on the headless runner. Point the platform-plugin search at
+        # the full Qt install instead (verified: without this the gallery
+        # hangs; with it, all 120 PNGs render).
+        $env:QT_QPA_PLATFORM_PLUGIN_PATH = "$env:QT_ROOT\plugins\platforms"
+        $env:QT_QPA_PLATFORM = "offscreen"
+        $env:EAPO_GALLERY_VST3_PLUGIN = "${{ github.workspace }}\Tests\TestVst3Plugin\${{ matrix.platform }}\Release\TestVst3Plugin.vst3"
+        $env:EAPO_GALLERY_VST2_PLUGIN = "${{ github.workspace }}\Tests\TestVst2Plugin\${{ matrix.platform }}\Release\TestVst2Plugin.dll"
+        $env:EAPO_GALLERY_VST3_UPMIXER = "$env:RUNNER_TEMP\Upmixer.vst3"
+        foreach ($fixture in @($env:EAPO_GALLERY_VST3_PLUGIN, $env:EAPO_GALLERY_VST2_PLUGIN)) {
+          if (-not (Test-Path $fixture)) {
+            Write-Error "VST gallery fixture not found: $fixture"
+            exit 1
+          }
+        }
+        Copy-Item $env:EAPO_GALLERY_VST3_PLUGIN -Destination $env:EAPO_GALLERY_VST3_UPMIXER -Force
+        $outDir = "${{ github.workspace }}\skin-gallery"
+        # Editor.exe is a GUI-subsystem binary; Start-Process -Wait is the
+        # reliable way to collect its exit code from PowerShell.
+        $proc = Start-Process -FilePath "build-Editor-x64\release\Editor.exe" `
+          -ArgumentList @("--skin-gallery", $outDir) -PassThru -Wait -NoNewWindow
+        if ($proc.ExitCode -ne 0) {
+          Write-Error "Skin gallery failed (exit code $($proc.ExitCode))"
+          exit 1
+        }
+        $pngs = @(Get-ChildItem $outDir -Filter *.png)
+        Write-Host "Gallery wrote $($pngs.Count) PNGs"
+        # SkinGallery self-checks the shot count (skins x 2 modes x (rows x 3 +
+        # fixed chrome)) and exits non-zero on any mismatch, so the exit-code
+        # check above already catches a missing or extra shot. Adding a gallery
+        # row no longer needs a hard-coded count here; just guard against an
+        # empty run.
+        if ($pngs.Count -lt 1) {
+          Write-Error "Gallery produced no PNGs"
+          exit 1
+        }
+
+    # Live skin-switch robustness gate: replays MainWindow::skinSelected's
+    # exact sequence (clearRows -> applySkin -> palette -> updateGuis) over a
+    # 100+ row synthetic config, 3 rounds x 5 skins x 2 modes. Fails on a
+    # crash, a wrong resulting skin id, or a switch slower than the in-test
+    # ceiling - both regression classes (switch crashes, seconds-per-switch
+    # repolish storms) have shipped before. avx2 only, like the gallery: the
+    # switch path does not vary by SIMD variant.
+    - name: Run skin switch test (offscreen)
+      if: matrix.simd_variant == 'avx2'
+      timeout-minutes: 10
+      shell: pwsh
+      run: |
+        $env:PATH = "$env:FFTW_LIB;$env:LIBSNDFILE_LIB;$env:QT_ROOT\bin;$env:PATH"
+        $env:QT_QPA_PLATFORM_PLUGIN_PATH = "$env:QT_ROOT\plugins\platforms"
+        $env:QT_QPA_PLATFORM = "offscreen"
+        # GUI-subsystem exe: qWarning only reaches redirected stderr with this set
+        $env:QT_FORCE_STDERR_LOGGING = "1"
+        # Keep the measured 100+ row card rebuild within a useful regression
+        # budget. The historical default (8 s) was a crash-storm guard; after
+        # the construct-in-place/no-repolish startup work the same rebuild
+        # runs in well under half the previous 4 s budget.
+        $env:EAPO_SWITCH_WARN_MS = "2500"
+        $env:EAPO_SWITCH_LIMIT_MS = "5000"
+        $log = "${{ github.workspace }}\skin-switch-test.log"
+        $proc = Start-Process -FilePath "build-Editor-x64\release\Editor.exe" `
+          -ArgumentList @("--skin-switch-test") -PassThru -Wait -NoNewWindow `
+          -RedirectStandardError $log
+        if (Test-Path $log) { Get-Content $log | Write-Host }
+        if ($proc.ExitCode -ne 0) {
+          Write-Error "Skin switch test failed (exit code $($proc.ExitCode))"
+          exit 1
+        }
+
+    # Analysis dock layout gate: reproduces the right-side placement at the
+    # Editor's 1024x768 default, checks that the filter workspace keeps a
+    # usable majority, the controls fill the dock, and moving back to the
+    # bottom restores the compact horizontal control cell.
+    - name: Run analysis dock layout test (offscreen)
+      if: matrix.simd_variant == 'avx2'
+      timeout-minutes: 5
+      shell: pwsh
+      run: |
+        Copy-Item "${{ github.workspace }}\deps\velopack_libc\lib\velopack_libc_win_x64_msvc.dll" `
+          -Destination "build-Editor-x64\release\velopack_libc.dll" -Force
+        $env:PATH = "$env:FFTW_LIB;$env:LIBSNDFILE_LIB;$env:QT_ROOT\bin;$env:PATH"
+        $env:QT_QPA_PLATFORM_PLUGIN_PATH = "$env:QT_ROOT\plugins\platforms"
+        $env:QT_QPA_PLATFORM = "offscreen"
+        $env:QT_FORCE_STDERR_LOGGING = "1"
+        $outDir = "${{ github.workspace }}\analysis-layout"
+        New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+        $shot = Join-Path $outDir "right-dock.png"
+        $log = Join-Path $outDir "analysis-layout-test.log"
+        $fixture = "${{ github.workspace }}\Setup\config\config.txt"
+        $proc = Start-Process -FilePath "build-Editor-x64\release\Editor.exe" `
+          -ArgumentList @("--analysis-layout-test", $shot, $fixture) `
+          -PassThru -Wait -NoNewWindow -RedirectStandardError $log
+        if (Test-Path $log) { Get-Content $log | Write-Host }
+        if ($proc.ExitCode -ne 0) {
+          Write-Error "Analysis dock layout test failed (exit code $($proc.ExitCode))"
+          exit 1
+        }
+        if (-not (Test-Path $shot)) {
+          Write-Error "Analysis dock layout test produced no screenshot"
+          exit 1
+        }
+
+    # Card drag-move latency gate: one card moved down and back up on a 100+
+    # row document, per skin x mode. Field report: a single card move cost
+    # 5-6 s on a 12600K because the internal drag-move rebuilt every card
+    # row; the incremental splice moves in 24-82 ms locally and well under
+    # the warning here. The limit sits below the measured full-rebuild cost
+    # on this runner (1.4-1.6 s per move), so a return to the rebuild fails
+    # the gate while leaving the incremental path 6x headroom for slow days.
+    - name: Run card move test (offscreen)
+      if: matrix.simd_variant == 'avx2'
+      timeout-minutes: 10
+      shell: pwsh
+      run: |
+        $env:PATH = "$env:FFTW_LIB;$env:LIBSNDFILE_LIB;$env:QT_ROOT\bin;$env:PATH"
+        $env:QT_QPA_PLATFORM_PLUGIN_PATH = "$env:QT_ROOT\plugins\platforms"
+        $env:QT_QPA_PLATFORM = "offscreen"
+        # GUI-subsystem exe: qWarning only reaches redirected stderr with this set
+        $env:QT_FORCE_STDERR_LOGGING = "1"
+        $env:EAPO_MOVE_WARN_MS = "250"
+        $env:EAPO_MOVE_LIMIT_MS = "1000"
+        $log = "${{ github.workspace }}\card-move-test.log"
+        $proc = Start-Process -FilePath "build-Editor-x64\release\Editor.exe" `
+          -ArgumentList @("--card-move-test") -PassThru -Wait -NoNewWindow `
+          -RedirectStandardError $log
+        if (Test-Path $log) { Get-Content $log | Write-Host }
+        if ($proc.ExitCode -ne 0) {
+          Write-Error "Card move test failed (exit code $($proc.ExitCode))"
+          exit 1
+        }
+
+    # Card pointer-selection gate: ordinary header clicks and clicks consumed
+    # by an in-card editor control must both leave one model selection, one
+    # focused item, and exactly one matching card chrome across every skin.
+    - name: Run card selection test (offscreen)
+      if: matrix.simd_variant == 'avx2'
+      timeout-minutes: 5
+      shell: pwsh
+      run: |
+        $env:PATH = "$env:FFTW_LIB;$env:LIBSNDFILE_LIB;$env:QT_ROOT\bin;$env:PATH"
+        $env:QT_QPA_PLATFORM_PLUGIN_PATH = "$env:QT_ROOT\plugins\platforms"
+        $env:QT_QPA_PLATFORM = "offscreen"
+        $env:QT_FORCE_STDERR_LOGGING = "1"
+        $outDir = "${{ github.workspace }}\card-selection"
+        New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+        $log = Join-Path $outDir "card-selection-test.log"
+        $proc = Start-Process -FilePath "build-Editor-x64\release\Editor.exe" `
+          -ArgumentList @("--card-selection-test", $outDir) `
+          -PassThru -Wait -NoNewWindow -RedirectStandardError $log
+        if (Test-Path $log) { Get-Content $log | Write-Host }
+        if ($proc.ExitCode -ne 0) {
+          Write-Error "Card selection test failed (exit code $($proc.ExitCode))"
+          exit 1
+        }
+
+    - name: Upload skin gallery
+      if: matrix.simd_variant == 'avx2'
+      uses: actions/upload-artifact@v7
+      with:
+        name: skin-gallery
+        path: skin-gallery/*.png
+
+    - name: Upload analysis dock layout proof
+      if: matrix.simd_variant == 'avx2'
+      uses: actions/upload-artifact@v7
+      with:
+        name: analysis-layout
+        path: analysis-layout/*
+
+    - name: Upload card selection proof
+      if: matrix.simd_variant == 'avx2'
+      uses: actions/upload-artifact@v7
+      with:
+        name: card-selection
+        path: card-selection/*
+
+    # Pull the debug symbols out of the release dirs so the installers stay
+    # lean, and keep them as a run artifact: field crash minidumps written by
+    # the Editor's CrashHandler can only be symbolized against the PDB of the
+    # exact shipped binary.
+    - name: Collect debug symbols
+      shell: pwsh
+      run: |
+        $symDir = "${{ github.workspace }}\symbols"
+        New-Item -ItemType Directory -Force -Path $symDir | Out-Null
+        foreach ($app in @("Editor", "DeviceSelector", "UpdateChecker")) {
+          $pdb = "build-$app-${{ matrix.platform }}\release\$app.pdb"
+          if (Test-Path $pdb) {
+            Move-Item $pdb (Join-Path $symDir "$app.pdb") -Force
+          } else {
+            Write-Warning "$pdb not found (force_debug_info missing?)"
+          }
+        }
+        $apoPdb = "EqualizerAPO\${{ matrix.platform }}\Release\EqualizerAPO.pdb"
+        if (Test-Path $apoPdb) {
+          Copy-Item $apoPdb (Join-Path $symDir "EqualizerAPO.pdb") -Force
+        }
+        Get-ChildItem $symDir
+
+    - name: Upload debug symbols
+      uses: actions/upload-artifact@v7
+      with:
+        name: symbols-${{ matrix.platform }}-${{ matrix.simd_variant }}
+        path: symbols/*.pdb
+
+    # Package artifacts
+    - name: Package binaries
+      shell: pwsh
+      run: |
+        & "${{ github.workspace }}\.github\scripts\Package-Artifacts.ps1" `
+          -WorkspaceRoot "${{ github.workspace }}" `
+          -Platform "${{ matrix.platform }}" `
+          -SimdVariant "${{ matrix.simd_variant }}"
+
+
+    # Upload artifacts
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v7
+      with:
+        name: EqualizerAPO-${{ matrix.platform }}-${{ matrix.simd_variant }}
+        path: |
+          ${{ github.workspace }}\artifacts\EqualizerAPO-${{ matrix.platform }}-${{ matrix.simd_variant }}/*.dll
+          ${{ github.workspace }}\artifacts\EqualizerAPO-${{ matrix.platform }}-${{ matrix.simd_variant }}/*.exe
+          ${{ github.workspace }}\artifacts\EqualizerAPO-${{ matrix.platform }}-${{ matrix.simd_variant }}/iconengines/
+          ${{ github.workspace }}\artifacts\EqualizerAPO-${{ matrix.platform }}-${{ matrix.simd_variant }}/imageformats/
+          ${{ github.workspace }}\artifacts\EqualizerAPO-${{ matrix.platform }}-${{ matrix.simd_variant }}/platforms/
+          ${{ github.workspace }}\artifacts\EqualizerAPO-${{ matrix.platform }}-${{ matrix.simd_variant }}/styles/
+          ${{ github.workspace }}\artifacts\EqualizerAPO-${{ matrix.platform }}-${{ matrix.simd_variant }}/tls/
+          ${{ github.workspace }}\artifacts\EqualizerAPO-${{ matrix.platform }}-${{ matrix.simd_variant }}/VST3/
+        if-no-files-found: error
+        retention-days: 90
+
+  cppcheck:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+
+    # cppcheck is built from a pinned release tag instead of apt because the
+    # apt package version drifts with the runner image and the finding set
+    # changes between cppcheck releases. The gate below must stay reproducible
+    # against the same version developers run locally.
+    - name: Cache cppcheck
+      id: cache-cppcheck
+      uses: actions/cache@v6
+      with:
+        path: ~/cppcheck-install
+        key: cppcheck-2.21.0-${{ runner.os }}
+
+    - name: Build cppcheck 2.21.0
+      if: steps.cache-cppcheck.outputs.cache-hit != 'true'
+      run: |
+        git clone --depth 1 --branch 2.21.0 https://github.com/danmar/cppcheck.git "$HOME/cppcheck-src"
+        cmake -S "$HOME/cppcheck-src" -B "$HOME/cppcheck-build" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$HOME/cppcheck-install"
+        cmake --build "$HOME/cppcheck-build" -j"$(nproc)"
+        cmake --install "$HOME/cppcheck-build"
+
+    # The baseline is zero findings and the step fails on any new one.
+    # Policy suppressions (kept out of the code on purpose):
+    # - cstyleCast/shadow*: Win32/COM/VST interop casts and the upstream
+    #   naming style (Qt parent/signal names, ctor parameters named like
+    #   members) would mean churn across long-standing upstream code.
+    # - useStlAlgorithm/postfixOperator: raw loops and it++ are the house
+    #   style inherited from upstream; no behavior or measurable perf impact.
+    # - noExplicitConstructor: single-argument constructors (Qt widgets,
+    #   exception types, filters) are intentionally implicit upstream.
+    # - LocalAllocCalled: LocalAlloc/LocalFree pairs are mandated by the
+    #   Win32 security APIs used (SetEntriesInAcl, GetNamedSecurityInfoW).
+    # - unknownMacro on the VST3 instance files: QUERY_INTERFACE comes from
+    #   the VST3 SDK under deps/, which is excluded from analysis.
+    # - unusedStructMember on FilterEngine.Process.cpp: the IoTraits label and
+    #   I/O members are consumed inside the processImpl member template;
+    #   cppcheck does not analyze template instantiations, so it reports every
+    #   trait member as unused (false positive).
+    # - libHybridConv-0.1.1 (audit #250 F061/F025): the non-building
+    #   "pristine" pair was deleted - it had diverged from its own header and
+    #   could no longer serve as a reference (maintainer decision 2026-08-09).
+    #   The _eapo fork is first-party DSP under active change,
+    #   so it is analyzed like the rest of the tree. Its C-style structs are
+    #   initialized by hcInitSingle/hcFree by design, hence the scoped
+    #   uninitMemberVarNoCtor suppression.
+    - name: Run cppcheck
+      run: |
+        "$HOME/cppcheck-install/bin/cppcheck" \
+          --enable=warning,style,performance,portability \
+          --inline-suppr \
+          --library=qt \
+          --library=windows \
+          --suppress=missingIncludeSystem \
+          --suppress=unusedFunction \
+          --suppress=unmatchedSuppression \
+          --suppress=cstyleCast \
+          --suppress=shadowFunction \
+          --suppress=shadowVariable \
+          --suppress=shadowMember \
+          --suppress=useStlAlgorithm \
+          --suppress=postfixOperator \
+          --suppress=noExplicitConstructor \
+          --suppress=LocalAllocCalled \
+          --suppress=unknownMacro:vst/VSTPluginInstance.cpp \
+          --suppress=unknownMacro:vst/VSTPluginInstanceInternal.h \
+          --suppress=unknownMacro:vst/VSTPluginLibrary.cpp \
+          --suppress=unusedStructMember:engine/FilterEngine.Process.cpp \
+          --suppress=uninitMemberVarNoCtor:libHybridConv-0.1.1/* \
+          --suppress=*:deps/* \
+          --error-exitcode=1 \
+          --quiet \
+          --std=c++17 \
+          -i deps \
+          --output-file=cppcheck-report.txt \
+          . || failed=1
+        echo "--- cppcheck report ---"
+        cat cppcheck-report.txt || true
+        if [ "${failed:-0}" = "1" ]; then
+          line_count=$(wc -l < cppcheck-report.txt)
+          echo "::error::cppcheck found new issues (${line_count} lines). Fix them or, for a justified false positive, add an inline or job-level suppression with a rationale."
+          exit 1
+        fi
+
+    - name: Upload cppcheck report
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: cppcheck-report
+        path: cppcheck-report.txt
+        retention-days: 30
+
+  pester:
+    # Unit-tests the release-keystone scripts the version-bump job runs:
+    # Bump-Version.ps1 (the Conventional Commit -> SemVer mapping that decides
+    # every release) and Update-Changelog.ps1 (moving the Unreleased entries
+    # under the bumped version). Like cppcheck this is an independent gate with
+    # no `if:`, so it runs on pull requests too, where the version-bump job is
+    # skipped. Pester 5 is pinned for reproducibility the same way the cppcheck
+    # version is.
+    runs-on: windows-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+
+    - name: Install Pester 5
+      shell: pwsh
+      run: |
+        # Some runner images come up without PSGallery registered (seen
+        # 2026-07-09: "No repository with the name 'PSGallery' was found");
+        # re-register the defaults before trusting it.
+        if ($null -eq (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
+          Register-PSRepository -Default
+        }
+        Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+        Install-Module Pester -RequiredVersion 5.6.1 -Force -SkipPublisherCheck -Scope CurrentUser
+
+    - name: Run Bump-Version tests
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = "Stop"
+        Import-Module Pester -RequiredVersion 5.6.1
+        $config = New-PesterConfiguration
+        $config.Run.Path = ".github/scripts/Tests"
+        $config.Run.Exit = $true
+        $config.Output.Verbosity = "Detailed"
+        $config.TestResult.Enabled = $true
+        $config.TestResult.OutputPath = "pester-results.xml"
+        Invoke-Pester -Configuration $config
+
+    - name: Upload Pester results
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: pester-results
+        path: pester-results.xml
+        retention-days: 30
+
+  cross-variant-compare:
+    needs: [build, prepare-matrix]
+    runs-on: ubuntu-latest
+    # The PR pipeline only builds AVX2, so there is nothing to compare
+    # across variants. The always() guard matters on workflow_dispatch runs:
+    # version-bump is skipped there, and GitHub propagates a skip through the
+    # needs chain unless the dependent job's condition overrides it - without
+    # always() the dispatch validation path silently lost this comparison
+    # (first seen on the run validating the arm64 msbuild fix).
+    if: always() && needs.build.result == 'success' && github.event_name != 'pull_request'
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+
+    - name: Download per-variant audio outputs
+      uses: actions/download-artifact@v7
+      with:
+        pattern: audio-regression-output-*
+        path: artifacts
+
+    - name: Install numpy
+      # Audit #250 F060: pinned like the rest of the toolchain.
+      run: python3 -m pip install --quiet numpy==2.3.2
+
+    - name: Compare SIMD variants
+      env:
+        # Gating variant list derived from .github/simd-variants.psd1 by
+        # New-BuildMatrix.ps1; the script falls back to its hard-coded list
+        # (with a warning) only when this variable is absent.
+        RUNNER_EXECUTABLE_VARIANTS: ${{ needs.prepare-matrix.outputs.runner_executable_variants }}
+      run: python3 Tests/AudioRegressionTests/scripts/cross_variant_compare.py
+
+  create-release:
+    needs: [build, version-bump]
+    runs-on: windows-2025-vs2026
+    # A version-bumping main push publishes automatically.  An explicitly
+    # dispatched run on main can also publish the current version, which is
+    # needed to promote an already-built prerelease without inventing another
+    # SemVer bump. `always()` keeps the skipped version-bump job from
+    # propagating a skip to this dispatch-only release path.
+    if: |
+      always() &&
+      github.ref == 'refs/heads/main' &&
+      needs.build.result == 'success' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+      with:
+        # Pick up the bumped version.h, not the pre-bump SHA that triggered the run.
+        ref: ${{ needs.version-bump.outputs.bumped_sha || github.sha }}
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v7
+      with:
+        pattern: EqualizerAPO-*
+        path: ${{ github.workspace }}\release-input
+
+    # MSBuild for the x86 auto-detect installer built in this job (the matrix
+    # builds the per-variant binaries; this front-door installer is a single
+    # architecture-agnostic binary built once here).
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v3
+
+    - name: Resolve release version
+      id: version
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Canonical version.h reader, shared with the version-bump job.
+        . .\.github\scripts\Get-VersionPart.ps1
+
+        $major = Get-VersionPart "MAJOR"
+        $minor = Get-VersionPart "MINOR"
+        $revision = Get-VersionPart "REVISION"
+        $baseVersion = "$major.$minor.$revision"
+        # Clean SemVer release version (no -main.<run> prerelease suffix). version-bump
+        # already advances version.h per main push, so the base version is unique enough,
+        # and GitHub publishes a tag without a prerelease identifier as a full release.
+        $packVersion = $baseVersion
+        $tag = "v$packVersion"
+
+        "base_version=$baseVersion" >> $env:GITHUB_OUTPUT
+        "pack_version=$packVersion" >> $env:GITHUB_OUTPUT
+        "tag=$tag" >> $env:GITHUB_OUTPUT
+        .\.github\scripts\Publish-Release.ps1 `
+          -Repository "${{ github.repository }}" `
+          -Tag $tag `
+          -PackVersion $packVersion
+
+        Write-Host "Base version: $baseVersion"
+        Write-Host "Release version: $packVersion"
+        Write-Host "Release tag: $tag"
+
+    - name: Create source archive
+      if: steps.version.outputs.needs_source == 'true'
+      shell: pwsh
+      run: |
+        Import-Module .\.github\scripts\ReleaseAssets.psm1
+        $sourceZip = Join-Path "${{ github.workspace }}" (Get-SourceZipAssetName -PackVersion "${{ steps.version.outputs.pack_version }}")
+        git archive --format=zip --output="$sourceZip" HEAD
+        if ($LASTEXITCODE -ne 0) {
+          exit $LASTEXITCODE
+        }
+        if (-not (Test-Path $sourceZip)) {
+          Write-Error "Source archive was not created"
+          exit 1
+        }
+        Write-Host "Created source archive: $sourceZip"
+
+    - name: Create Velopack release
+      if: steps.version.outputs.missing_channels != '' || steps.version.outputs.needs_source == 'true'
+      shell: pwsh
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        $missingChannels = @("${{ steps.version.outputs.missing_channels }}".Split(
+          ',', [System.StringSplitOptions]::RemoveEmptyEntries))
+        .\.github\scripts\New-VelopackRelease.ps1 `
+          -Repository "${{ github.repository }}" `
+          -Tag "${{ steps.version.outputs.tag }}" `
+          -PackVersion "${{ steps.version.outputs.pack_version }}" `
+          -TargetCommit "${{ needs.version-bump.outputs.bumped_sha || github.sha }}" `
+          -WorkspaceRoot "${{ github.workspace }}" `
+          -MissingChannels $missingChannels `
+          -NeedsSource:("${{ steps.version.outputs.needs_source }}" -eq "true")
+
+    - name: Build and publish auto-detect installer
+      if: steps.version.outputs.needs_installer == 'true'
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # EqualizerAPO-XT-Setup.exe is the x86 front-door installer: it detects the
+        # CPU (architecture + AVX level) and downloads/runs the matching per-channel
+        # Setup. It has no external dependencies, so it builds standalone here.
+        # See docs/AutoDetectInstaller.md.
+        $tag = "${{ steps.version.outputs.tag }}"
+
+        msbuild Installer\Installer.vcxproj `
+          /p:Configuration=Release `
+          /p:Platform=Win32 `
+          /m /v:minimal /nologo
+        if ($LASTEXITCODE -ne 0) {
+          exit $LASTEXITCODE
+        }
+
+        $setupExe = "${{ github.workspace }}\Installer\Release\EqualizerAPO-XT-Setup.exe"
+        if (-not (Test-Path $setupExe)) {
+          Write-Error "Auto-detect installer was not produced at $setupExe"
+          exit 1
+        }
+
+        gh release upload $tag $setupExe --clobber --repo "${{ github.repository }}"
+        if ($LASTEXITCODE -ne 0) {
+          exit $LASTEXITCODE
+        }
+
+    # The auto-detect installer refuses to run a downloaded per-channel Setup.exe
+    # whose SHA-256 does not match this file (Installer/AutoInstaller.cpp), so it
+    # must list every *-Setup.exe asset and be uploaded to the same release. The
+    # assets are re-downloaded from the release rather than hashed from local
+    # build directories so the hashes cover exactly the bytes users will get.
+    - name: Publish release checksums
+      if: steps.version.outputs.needs_checksums == 'true'
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        $ErrorActionPreference = "Stop"
+        $tag = "${{ steps.version.outputs.tag }}"
+        $repo = "${{ github.repository }}"
+
+        $assetNames = @(gh release view $tag --repo $repo --json assets --jq '.assets[].name' |
+            Where-Object { $_ -match '-Setup\.exe$' })
+        if ($assetNames.Count -eq 0) {
+          throw "No setup executables found on release $tag; nothing to checksum."
+        }
+
+        $downloadDir = Join-Path "${{ github.workspace }}" "checksum-input"
+        New-Item -ItemType Directory -Force -Path $downloadDir | Out-Null
+
+        $lines = @()
+        foreach ($name in ($assetNames | Sort-Object)) {
+          gh release download $tag --repo $repo --pattern $name --dir $downloadDir --clobber
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to download release asset $name for checksumming"
+          }
+          $hash = (Get-FileHash -Path (Join-Path $downloadDir $name) -Algorithm SHA256).Hash.ToLowerInvariant()
+          $lines += "$hash  $name"
+          Write-Host "$hash  $name"
+        }
+
+        # sha256sum-compatible format: <lowercase-hex>, two spaces, <name>, LF.
+        $sumsPath = Join-Path "${{ github.workspace }}" "SHA256SUMS.txt"
+        [System.IO.File]::WriteAllText($sumsPath, (($lines -join "`n") + "`n"))
+
+        gh release upload $tag $sumsPath --clobber --repo $repo
+        if ($LASTEXITCODE -ne 0) {
+          exit $LASTEXITCODE
+        }
+
+    - name: Write release notes
+      if: steps.version.outputs.needs_notes == 'true'
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        $notesPath = "${{ github.workspace }}\release-notes.md"
+        .\.github\scripts\New-ReleaseNotes.ps1 `
+          -Repository "${{ github.repository }}" `
+          -Tag "${{ steps.version.outputs.tag }}" `
+          -PackVersion "${{ steps.version.outputs.pack_version }}" `
+          -WorkflowRunId "${{ github.run_id }}" `
+          -TargetCommit "${{ github.sha }}" `
+          -OutputPath $notesPath
+        if ($LASTEXITCODE -ne 0) {
+          exit $LASTEXITCODE
+        }
+
+        # --prerelease=false: the clean X.Y.Z tag is a full release; make sure vpk's
+        # upload (which may default to prerelease) does not leave it marked as one.
+        gh release edit "${{ steps.version.outputs.tag }}" `
+          --repo "${{ github.repository }}" `
+          --notes-file $notesPath `
+          --prerelease=false `
+          --latest
+        if ($LASTEXITCODE -ne 0) {
+          exit $LASTEXITCODE
+        }
