@@ -1,8 +1,8 @@
 # TODO
 
 - [x] Hosted run `31711097531` passed after an unchanged AVX2-only retry: all native variants, offscreen UI gates, Pester, cppcheck, and cross-variant comparison are green; do not promote it to `beta` or `main` yet.
-- [x] Installed the matching hosted AVX-512 #265 payload into the active per-user runtime after backing up seven replaced files; installed `Editor.exe --selftest-vst` passed.
-- [ ] Manually test real audio through a multichannel VST3 with `Input`/`Output` layouts from `codex/upstream-265-vst3-layouts` before any promotion to `beta` or `main`; FabFilter Pro-Q 4 preflight now accepts symmetric Stereo and 7.1, while the active AVX-512 install remains unchanged.
+- [x] Installed the matching 30-file AVX-512 payload from hosted run `31711097531` into the active per-user runtime; backed up `current` at `artifacts\install-backups\pre-upstream-265-vst3-layouts-ci-31711097531-20260813-161800`, hash-verified every artifact file, restored Windows Audio, and passed installed `Editor.exe --selftest-vst`.
+- [x] User reports the installed real multichannel VST3 test with `Input Stereo` and `Output 7.1` appears to work; promotion to `beta` or `main` remains a separate explicit decision.
 - [x] User accepted installed ReaFIR/TDR Nova analyzer movement plus LegacyRows/themes from `codex/upstream-264-integration`; promoted to `beta`. Do not promote `beta` to `main` without explicit approval.
 - [ ] Obtain a Codex environment that provides the bundled workspace dependency runtime, or explicitly approve a revised workflow.
 - [ ] Prepare the Matrix hatch-pet run.
