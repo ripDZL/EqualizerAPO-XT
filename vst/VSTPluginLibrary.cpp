@@ -256,7 +256,11 @@ int VSTPluginLibrary::customInitialize()
 		auto factory3 = Steinberg::IPtr<Steinberg::IPluginFactory3>::adopt(rawFactory3);
 		vst3FactoryHostContext = Steinberg::IPtr<Steinberg::FUnknown>::adopt(
 			static_cast<Steinberg::Vst::IHostApplication*>(new VST3FactoryHostContext()));
-		if (factory3->setHostContext(vst3FactoryHostContext.get()) != Steinberg::kResultOk)
+		// The factory host context is an optional capability. Some established
+		// VST3 factories explicitly return kNotImplemented because they do not
+		// consume it; they remain valid factories and must not be rejected.
+		const Steinberg::tresult hostContextResult = factory3->setHostContext(vst3FactoryHostContext.get());
+		if (hostContextResult != Steinberg::kResultOk && hostContextResult != Steinberg::kNotImplemented)
 			return LOADING_FAILED;
 	}
 

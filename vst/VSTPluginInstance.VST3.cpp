@@ -56,6 +56,14 @@ bool appendArrangementCandidate(SpeakerArrangement arrangement, SpeakerArrangeme
 	candidates[count++] = arrangement;
 	return true;
 }
+
+// VST3 permits a plug-in to return kResultFalse after adapting its busses to
+// the nearest supported layout. That layout must be read back before deciding
+// whether it satisfies the host contract.
+bool arrangementProposalCanBeReadBack(tresult result)
+{
+	return result == kResultTrue || result == kResultFalse;
+}
 }
 
 bool VSTPluginInstance::initializeVST3()
@@ -256,6 +264,30 @@ void VSTPluginInstance::configureVST3Buses(int requestedChannelCount)
 	configureVST3Buses(requestedChannelCount, requestedChannelCount);
 }
 
+// VST3 requires a layout entry for every bus advertised by IComponent, even
+// when only the first main bus is active. Preserve each auxiliary bus's
+// current layout: an inactive sidechain can still require its advertised
+// stereo arrangement rather than SpeakerArr::kEmpty.
+tresult VSTPluginInstance::setVST3MainBusArrangements(SpeakerArrangement inputArrangement,
+	SpeakerArrangement outputArrangement)
+{
+	vector<SpeakerArrangement> inputArrangements(max(0, vst3InputBusCount), SpeakerArr::kEmpty);
+	vector<SpeakerArrangement> outputArrangements(max(0, vst3OutputBusCount), SpeakerArr::kEmpty);
+	for (int i = 0; i < static_cast<int>(inputArrangements.size()); i++)
+		vst3Processor->getBusArrangement(kInput, i, inputArrangements[i]);
+	for (int i = 0; i < static_cast<int>(outputArrangements.size()); i++)
+		vst3Processor->getBusArrangement(kOutput, i, outputArrangements[i]);
+	if (!inputArrangements.empty())
+		inputArrangements[0] = inputArrangement;
+	if (!outputArrangements.empty())
+		outputArrangements[0] = outputArrangement;
+	return vst3Processor->setBusArrangements(
+		inputArrangements.empty() ? nullptr : inputArrangements.data(),
+		static_cast<int32>(inputArrangements.size()),
+		outputArrangements.empty() ? nullptr : outputArrangements.data(),
+		static_cast<int32>(outputArrangements.size()));
+}
+
 void VSTPluginInstance::configureVST3Buses(int requestedInputChannelCount, int requestedOutputChannelCount)
 {
 	if (vst3Component == NULL || vst3Processor == NULL)
@@ -281,18 +313,15 @@ void VSTPluginInstance::configureVST3Buses(int requestedInputChannelCount, int r
 		{
 			SpeakerArrangement inputArrangement = inputCandidates[i];
 			SpeakerArrangement outputArrangement = outputCandidates[j];
-			const tresult result = vst3Processor->setBusArrangements(
-				vst3InputBusCount > 0 ? &inputArrangement : NULL, vst3InputBusCount > 0 ? 1 : 0,
-				vst3OutputBusCount > 0 ? &outputArrangement : NULL, vst3OutputBusCount > 0 ? 1 : 0);
-			if (result == kResultTrue)
-			{
-				const bool arrangementsAvailable = refreshAcceptedVST3Arrangements();
-				accepted = arrangementsAvailable
-					&& (vst3InputBusCount == 0
-						|| SpeakerArr::getChannelCount(vst3InputArrangement) == inputChannelCount)
-					&& (vst3OutputBusCount == 0
-						|| SpeakerArr::getChannelCount(vst3OutputArrangement) == outputChannelCount);
-			}
+			const tresult result = setVST3MainBusArrangements(inputArrangement, outputArrangement);
+			if (!arrangementProposalCanBeReadBack(result))
+				continue;
+			const bool arrangementsAvailable = refreshAcceptedVST3Arrangements();
+			accepted = arrangementsAvailable
+				&& (vst3InputBusCount == 0
+					|| SpeakerArr::getChannelCount(vst3InputArrangement) == inputChannelCount)
+				&& (vst3OutputBusCount == 0
+					|| SpeakerArr::getChannelCount(vst3OutputArrangement) == outputChannelCount);
 		}
 	}
 
@@ -309,12 +338,8 @@ void VSTPluginInstance::configureVST3Buses(int requestedInputChannelCount, int r
 			vst3Processor->getBusArrangement(kOutput, 0, outputArrangement);
 		if (inputArrangement != SpeakerArr::kEmpty || outputArrangement != SpeakerArr::kEmpty)
 		{
-			const tresult result = vst3Processor->setBusArrangements(
-				vst3InputBusCount > 0 && inputArrangement != SpeakerArr::kEmpty ? &inputArrangement : NULL,
-				vst3InputBusCount > 0 && inputArrangement != SpeakerArr::kEmpty ? 1 : 0,
-				vst3OutputBusCount > 0 && outputArrangement != SpeakerArr::kEmpty ? &outputArrangement : NULL,
-				vst3OutputBusCount > 0 && outputArrangement != SpeakerArr::kEmpty ? 1 : 0);
-			if (result == kResultTrue)
+			const tresult result = setVST3MainBusArrangements(inputArrangement, outputArrangement);
+			if (arrangementProposalCanBeReadBack(result))
 				refreshAcceptedVST3Arrangements();
 		}
 	}
@@ -531,8 +556,8 @@ bool VSTPluginInstance::negotiateBusLayouts(VST3BusLayout inputLayout, VST3BusLa
 		{
 			SpeakerArrangement inputArrangement = inputCandidates[i];
 			SpeakerArrangement outputArrangement = outputCandidates[j];
-			if (vst3Processor->setBusArrangements(&inputArrangement, 1,
-				&outputArrangement, 1) != kResultTrue)
+			if (!arrangementProposalCanBeReadBack(
+				setVST3MainBusArrangements(inputArrangement, outputArrangement)))
 				continue;
 			if (!refreshAcceptedVST3Arrangements())
 				continue;
