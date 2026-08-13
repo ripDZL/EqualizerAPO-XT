@@ -89,7 +89,7 @@ StudioReferenceCardView::StudioReferenceCardView(const QString& kind, QWidget* p
 	windowPane->setObjectName(QStringLiteral("StudioRefWindow"));
 	windowPane->setAttribute(Qt::WA_StyledBackground, true);
 	windowPane->setVisible(false);
-	QHBoxLayout* windowLayout = new QHBoxLayout(windowPane);
+	windowLayout = new QHBoxLayout(windowPane);
 	// The left margin indents the data one character from the pane's edge -
 	// print does not start at the very edge of the page.
 	windowLayout->setContentsMargins(18, 3, 10, 3);
@@ -146,6 +146,13 @@ void StudioReferenceCardView::addLeadingWidget(QWidget* widget)
 	identityLayout->insertWidget(0, widget, 0, Qt::AlignVCenter);
 }
 
+void StudioReferenceCardView::placeBusStrip(QWidget* strip)
+{
+	busStrip = strip;
+	strip->setParent(windowPane);
+	windowLayout->insertWidget(1, strip, 0, Qt::AlignVCenter);
+}
+
 void StudioReferenceCardView::applyState(const ReferenceCardState& state)
 {
 	// Identity: luminance says whether the target answers. A resolved name
@@ -200,7 +207,8 @@ void StudioReferenceCardView::applyState(const ReferenceCardState& state)
 	const bool hasFacts = !state.readout.isEmpty();
 	factsLabel->setVisible(hasFacts);
 	factsLabel->setText(state.readout.join(QStringLiteral(" %1 ").arg(QChar(0x00B7))));
-	windowPane->setVisible(!windowText.isEmpty() || hasFacts);
+	const bool hasBus = busStrip != nullptr && busStrip->isVisibleTo(windowPane);
+	windowPane->setVisible(!windowText.isEmpty() || hasFacts || hasBus);
 
 	statusRow->setVisible(!state.statusText.isEmpty());
 	statusLabel->setText(state.statusText);

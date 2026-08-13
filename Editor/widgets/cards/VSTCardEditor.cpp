@@ -9,6 +9,8 @@
 #include "VSTCardEditor.h"
 #include "services/registry/RegistryPaths.h"
 
+#include <algorithm>
+
 #include <QAbstractEventDispatcher>
 #include <QAction>
 #include <QDir>
@@ -39,6 +41,7 @@
 #include "Editor/guis/VSTPluginFilterGUIDialog.h"
 #include "ReferenceCardView.h"
 #include "FileReferenceController.h"
+#include "VSTBusStrip.h"
 
 using std::shared_ptr;
 using std::unordered_map;
@@ -57,13 +60,18 @@ QString displayPathForLibrary(const wstring& libPath)
 		relativePath = absolutePath;
 	return relativePath;
 }
+
+QString layoutName(VST3BusLayout layout)
+{
+	return QString::fromWCharArray(vst3BusLayoutName(layout));
+}
 }
 
 VSTCardEditor::VSTCardEditor(shared_ptr<VSTPluginLibrary> library, const wstring& chunkData,
 	const unordered_map<wstring, float>& paramMap, bool stereoInput, const VSTPreviewEndpoint& previewEndpoint,
-	const std::optional<VST3BusContract>& busContract, QWidget* parent)
-	: IFilterGUI(parent), library(library), chunkData(chunkData), paramMap(paramMap), stereoInput(stereoInput),
-	previewEndpoint(previewEndpoint), busContract(busContract)
+	const std::optional<VST3BusContract>& busContract, std::vector<std::wstring> deviceChannelNames, QWidget* parent)
+	: IFilterGUI(parent), library(library), chunkData(chunkData), paramMap(paramMap),
+	busModel(busContract, stereoInput), previewEndpoint(previewEndpoint), deviceChannelNames(std::move(deviceChannelNames))
 {
 	setObjectName(QStringLiteral("VSTCardEditor"));
 	setAttribute(Qt::WA_StyledBackground, true);
@@ -101,14 +109,10 @@ VSTCardEditor::VSTCardEditor(shared_ptr<VSTPluginLibrary> library, const wstring
 	embedAction = menu->addAction(tr("Embed panel in card"));
 	embedAction->setCheckable(true);
 	connect(embedAction, SIGNAL(toggled(bool)), this, SLOT(embedToggled(bool)));
-	// Same shared Options-menu placement as the legacy row: the interaction
-	// layer is skin-independent, so no per-skin chrome answer is needed and
-	// both editors behave identically.
-	stereoInputAction = menu->addAction(tr("Stereo input"));
-	stereoInputAction->setCheckable(true);
-	stereoInputAction->setChecked(stereoInput);
-	stereoInputAction->setToolTip(tr("Use for upmixers that expand a stereo signal to multichannel."));
-	connect(stereoInputAction, SIGNAL(toggled(bool)), this, SLOT(stereoInputToggled(bool)));
+	removeBusAction = menu->addAction(tr("Remove Input/Output layouts"));
+	removeBusAction->setToolTip(tr("Deletes the saved VST3 bus layouts from this line."));
+	removeBusAction->setEnabled(false);
+	connect(removeBusAction, SIGNAL(triggered()), this, SLOT(removeBusLayouts()));
 	livePreviewAction = menu->addAction(tr("Live analyzer feed"));
 	livePreviewAction->setCheckable(true);
 	livePreviewAction->setChecked(true);
@@ -123,6 +127,11 @@ VSTCardEditor::VSTCardEditor(shared_ptr<VSTPluginLibrary> library, const wstring
 	editButton->setToolTip(tr("Edit the path as text"));
 	connect(editButton, &QToolButton::clicked, view, &ReferenceCardView::enterEditMode);
 	view->addActionButton(ReferenceCardView::ActionRole::EditPath, editButton);
+
+	busStrip = new VSTBusStrip(view);
+	busStrip->setBusLayouts(busModel.input(), busModel.output());
+	connect(busStrip, &VSTBusStrip::busLayoutsPicked, this, &VSTCardEditor::busLayoutsPicked);
+	view->placeBusStrip(busStrip);
 
 	frame = new QFrame(this);
 	frame->setObjectName(QStringLiteral("VSTCardEmbedFrame"));
@@ -146,6 +155,7 @@ VSTCardEditor::VSTCardEditor(shared_ptr<VSTPluginLibrary> library, const wstring
 	rowInfo.command = QStringLiteral("vstplugin");
 	SkinManager::instance()->prepareCommandRow(rowInfo, nullptr, nullptr, this);
 
+	updateBusControls();
 	updateReferenceState();
 	updatePermissionWarning();
 }
@@ -171,25 +181,37 @@ void VSTCardEditor::store(QString& command, QString& parameters)
 	parameters = "Library " + relativePath;
 
 	// The Library token stays here for its QDir-based path resolution; the
-	// body (opaque Input/Output or legacy StereoInput, then state) comes from the shared
-	// serializer, so this card and the legacy row emit the same grammar.
+	// paired Input/Output body comes from the shared serializer. A legacy
+	// StereoInput flag migrates to Input Stereo / Output Auto in VSTBusModel.
 	VSTPluginCommand cmd;
 	cmd.chunkData = chunkData;
 	cmd.paramMap = paramMap;
-	cmd.stereoInput = stereoInput;
-	if (busContract)
+	cmd.stereoInput = false;
+	if (busModel.contract())
 	{
-		cmd.busContract = *busContract;
+		cmd.busContract = *busModel.contract();
 		cmd.hasBusContract = true;
 	}
 	parameters += QString::fromStdWString(cmd.serialize());
 }
 
-void VSTCardEditor::stereoInputToggled(bool checked)
+void VSTCardEditor::busLayoutsPicked(VST3BusLayout input, VST3BusLayout output)
 {
-	if (stereoInput == checked)
+	if (busModel.contract() && busModel.input() == input && busModel.output() == output)
 		return;
-	stereoInput = checked;
+	busModel.setLayouts(input, output);
+	updateBusControls();
+	updateReferenceState();
+	updateModel();
+}
+
+void VSTCardEditor::removeBusLayouts()
+{
+	if (!busModel.contract())
+		return;
+	busModel.clear();
+	updateBusControls();
+	updateReferenceState();
 	updateModel();
 }
 
@@ -208,6 +230,7 @@ void VSTCardEditor::loadPreferences(const QVariantMap& prefs)
 		embedAction->setChecked(true);   // will also call initPlugin via embedToggled
 	else
 		initPlugin();
+	updateBusControls();
 	updateReferenceState();
 }
 
@@ -227,6 +250,7 @@ void VSTCardEditor::openPanel()
 		return;
 
 	initPlugin();
+	updateBusControls();
 	updateReferenceState();
 
 	if (effect != nullptr)
@@ -326,20 +350,16 @@ void VSTCardEditor::updateReferenceState()
 {
 	reference->setResolvedPath(QString::fromStdWString(library->getLibPath()));
 	ReferenceCardState state = reference->describe(tr("No plugin selected"));
+	// VST libraries routinely live in Common Files; that is not a portability
+	// hazard worth competing with the actual plug-in state.
+	state.absolutePath = false;
 	if (!reference->writtenPath().isEmpty())
 	{
-		const QString normalized = QDir::fromNativeSeparators(reference->writtenPath());
-		const QFileInfo asWritten(normalized);
-
-		const QString suffix = asWritten.suffix().toLower();
-		if (suffix == QStringLiteral("vst3"))
-			state.formatBadge = QStringLiteral("VST3");
-		else if (suffix == QStringLiteral("dll"))
-			state.formatBadge = QStringLiteral("VST2");
-
 		state.missing = state.missing || libraryMissing;
 		if (effect != nullptr)
 		{
+			// The loaded ABI, not the filename extension, determines the badge.
+			state.formatBadge = library->isVST3() ? QStringLiteral("VST3") : QStringLiteral("VST2");
 			const QString pluginName = QString::fromStdWString(effect->getName());
 			if (!pluginName.trimmed().isEmpty())
 				state.name = pluginName;
@@ -358,12 +378,96 @@ void VSTCardEditor::updateReferenceState()
 		}
 	}
 
+	if (state.statusText.isEmpty() && !busStatusText.isEmpty())
+	{
+		state.statusText = busStatusText;
+		state.statusSeverity = busStatusSeverity;
+	}
+
 	const bool locate = state.missing && !reference->writtenPath().isEmpty();
 	selectButton->setText(locate ? tr("Locate...") : QString());
 	selectButton->setToolTip(locate ? tr("Locate the missing plugin library") : tr("Select VST plugin"));
 	openPanelButton->setEnabled(!state.missing && !reference->writtenPath().isEmpty());
 
 	view->setState(state);
+}
+
+void VSTCardEditor::updateBusControls()
+{
+	busStatusText.clear();
+	busStatusSeverity = ReferenceCardState::Severity::None;
+	removeBusAction->setEnabled(busModel.contract().has_value());
+	busStrip->setBusLayouts(busModel.input(), busModel.output());
+
+	const bool showStrip = effect != nullptr || busModel.contract().has_value();
+	busStrip->setVisible(showStrip);
+	if (!showStrip)
+		return;
+
+	if (effect == nullptr)
+	{
+		busStrip->setSelectorsEnabled(false, tr("The bus layout can be changed after the plugin loads."));
+		busStrip->setVerdict(QString(), VstBusFrameState::Tone::Neutral);
+		return;
+	}
+
+	if (!library->isVST3())
+	{
+		busStrip->setSelectorsEnabled(false, tr("Input and Output layouts are only supported for VST3 plugins."));
+		if (busModel.contract())
+		{
+			busStrip->setVerdict(QStringLiteral("VST2"), VstBusFrameState::Tone::Warning);
+			busStatusText = tr("This module loaded as VST2 and ignores the saved Input/Output layouts. Remove them via Options.");
+			busStatusSeverity = ReferenceCardState::Severity::Warning;
+		}
+		else
+			busStrip->setVerdict(QStringLiteral("VST2"), VstBusFrameState::Tone::Neutral);
+		return;
+	}
+
+	if (embedded)
+	{
+		busStrip->setSelectorsEnabled(false, tr("Close the plugin panel to change the bus layout."));
+		return;
+	}
+
+	busStrip->setSelectorsEnabled(true);
+	const VST3BusLayout requestedInput = busModel.input();
+	const VST3BusLayout requestedOutput = busModel.output();
+	const std::vector<std::wstring> inputHints = requestedInput == VST3BusLayout::Auto
+		? deviceChannelNames : vst3BusLayoutChannelNames(requestedInput);
+	const std::vector<std::wstring> outputHints = requestedOutput == VST3BusLayout::Auto
+		? deviceChannelNames : vst3BusLayoutChannelNames(requestedOutput);
+	effect->setBusChannelNameHints(inputHints, outputHints);
+	const int automaticChannelCount = !deviceChannelNames.empty()
+		? static_cast<int>(deviceChannelNames.size())
+		: std::max({2, effect->numInputs(), effect->numOutputs()});
+	const bool accepted = effect->negotiateBusLayouts(requestedInput, requestedOutput, automaticChannelCount);
+
+	if (!accepted)
+	{
+		busStrip->setVerdict(tr("Rejected"), VstBusFrameState::Tone::Critical);
+		busStatusText = tr("The plugin rejected the %1 in / %2 out contract. All channels pass through unchanged until the layout changes or is removed.")
+			.arg(layoutName(requestedInput), layoutName(requestedOutput));
+		busStatusSeverity = ReferenceCardState::Severity::Critical;
+		return;
+	}
+
+	const bool anyAuto = requestedInput == VST3BusLayout::Auto || requestedOutput == VST3BusLayout::Auto;
+	if (anyAuto)
+	{
+		const std::optional<VST3BusLayout> activeInput = effect->getNegotiatedVST3InputLayout();
+		const std::optional<VST3BusLayout> activeOutput = effect->getNegotiatedVST3OutputLayout();
+		const QString inputText = activeInput ? layoutName(*activeInput) : tr("%1 ch").arg(effect->numInputs());
+		const QString outputText = activeOutput ? layoutName(*activeOutput) : tr("%1 ch").arg(effect->numOutputs());
+		busStrip->setVerdictPair(inputText, outputText,
+			busModel.contract() ? VstBusFrameState::Tone::Success : VstBusFrameState::Tone::Neutral);
+	}
+	else
+		busStrip->setVerdict(QString(), VstBusFrameState::Tone::Success);
+
+	if (busModel.migratedLegacyStereoInput())
+		busStatusText = tr("The legacy Stereo input option now reads as Input Stereo, Output Auto and will be saved that way.");
 }
 
 void VSTCardEditor::pathCommitted(const QString& text)
@@ -400,6 +504,7 @@ void VSTCardEditor::pathCommitted(const QString& text)
 		if (embedAction->isChecked())
 			embedToggled(true);
 	}
+	updateBusControls();
 	updateReferenceState();
 }
 
@@ -441,7 +546,6 @@ void VSTCardEditor::panelButtonClicked()
 void VSTCardEditor::embedToggled(bool checked)
 {
 	initPlugin();
-	updateReferenceState();
 
 	bool enable = checked;
 	if (effect == nullptr)
@@ -493,6 +597,8 @@ void VSTCardEditor::embedToggled(bool checked)
 	// left the embed removable only through the options menu, which read as
 	// "the panel cannot be closed".
 	openPanelButton->setText(embedded ? tr("Close panel") : tr("Open panel"));
+	updateBusControls();
+	updateReferenceState();
 }
 
 void VSTCardEditor::onIdle()
@@ -624,7 +730,8 @@ REGISTER_FILTER_CARD_EDITOR(VSTPlugin, [](FilterTable* filterTable, const QStrin
 	{
 		VSTPluginFilter* filter = static_cast<VSTPluginFilter*>(filters[0].get());
 		editor = new VSTCardEditor(filter->getLibrary(), filter->getChunkData(), filter->getParamMap(),
-			filter->getStereoInput(), previewEndpoint, filter->getBusContract());
+			filter->getStereoInput(), previewEndpoint, filter->getBusContract(),
+			filterTable != nullptr ? filterTable->getChannelNames() : std::vector<std::wstring>());
 	}
 	else
 	{

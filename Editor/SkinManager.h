@@ -22,6 +22,8 @@ struct GraphicEQPlotState;
 struct KnobState;
 struct ListChromeState;
 struct SegmentedControlState;
+struct VstBusFrameState;
+struct VstBusSelectorState;
 
 class SkinManager : public QObject
 {
@@ -85,6 +87,8 @@ public:
 	// the analysis graph, heritage mode answers with the neutral base rendering
 	// so no skin instrument leaks into legacy rows.
 	void paintSegmentedControl(QPainter& painter, const SegmentedControlState& state) const;
+	void paintVstBusSelector(QPainter& painter, const VstBusSelectorState& state) const;
+	void paintVstBusFrame(QPainter& painter, const VstBusFrameState& state) const;
 
 	// The "add filter" picker view for the active skin (ISkin::createFilterPicker).
 	FilterPickerView* createFilterPicker(QWidget* parent) const;

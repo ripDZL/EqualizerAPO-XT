@@ -158,6 +158,12 @@ void MinimalReferenceCardView::addLeadingWidget(QWidget* widget)
 	repolishChild(widget);
 }
 
+void MinimalReferenceCardView::placeBusStrip(QWidget* strip)
+{
+	strip->setParent(contentWidget());
+	lineLayout->insertWidget(lineLayout->indexOf(statusLabel), strip, 0, Qt::AlignVCenter);
+}
+
 void MinimalReferenceCardView::applyState(const ReferenceCardState& state)
 {
 	nameLabel->setFullText(state.name);

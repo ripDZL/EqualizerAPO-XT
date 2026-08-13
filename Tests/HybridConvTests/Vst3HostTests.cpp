@@ -171,6 +171,12 @@ void runVst3HostTests()
 			"VST3 host reads back the adapted input layout");
 		harness.expectEqual(adaptedArrangementInstance.numOutputs(), 8,
 			"VST3 host reads back the adapted output layout");
+		const std::optional<VST3BusLayout> adaptedInput = adaptedArrangementInstance.getNegotiatedVST3InputLayout();
+		const std::optional<VST3BusLayout> adaptedOutput = adaptedArrangementInstance.getNegotiatedVST3OutputLayout();
+		harness.expectTrue(adaptedInput.has_value() && *adaptedInput == VST3BusLayout::Surround71,
+			"VST3 host reports the logical input layout after an adaptation");
+		harness.expectTrue(adaptedOutput.has_value() && *adaptedOutput == VST3BusLayout::Surround71,
+			"VST3 host reports the logical output layout after an adaptation");
 	}
 
 	const wstring rawVst3Module = directory + L"\\TestVst3RawModule.dll";

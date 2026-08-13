@@ -9,7 +9,9 @@
 
 #include <QAction>
 #include <QFileDialog>
+#include <QFontMetricsF>
 #include <QPainter>
+#include <QPainterPath>
 #include <QPainterStateGuard>
 #include <QToolBar>
 #include <QToolButton>
@@ -430,6 +432,105 @@ void ISkin::paintSegmentedControl(QPainter& painter, const SegmentedControlState
 		painter.setPen(ink);
 		painter.drawText(cell, Qt::AlignCenter, state.labels.at(i));
 	}
+}
+
+void ISkin::paintVstBusSelector(QPainter& painter, const VstBusSelectorState& state, const SkinTokens& tokens) const
+{
+	QPainterStateGuard guard(&painter);
+	painter.setRenderHint(QPainter::Antialiasing, true);
+	painter.setRenderHint(QPainter::TextAntialiasing, true);
+	const QRectF cell = QRectF(state.rect).adjusted(0.5, 0.5, -0.5, -0.5);
+	QColor border(state.focused || state.menuOpen ? tokens.focusRing : tokens.border);
+	if (!state.enabled)
+		border.setAlpha(130);
+	else if (state.hovered)
+		border = QColor(tokens.mutedText);
+	painter.setPen(QPen(border, 1));
+	painter.setBrush(QColor(state.pressed || state.menuOpen ? tokens.cardHover : tokens.surface));
+	const qreal radius = qMin(cell.height() / 4.0, qreal(qMax(2, tokens.borderRadius / 2)));
+	painter.drawRoundedRect(cell, radius, radius);
+
+	QColor roleInk(tokens.mutedText);
+	QColor valueInk(tokens.text);
+	if (!state.enabled)
+	{
+		roleInk.setAlpha(130);
+		valueInk = QColor(tokens.mutedText);
+		valueInk.setAlpha(170);
+	}
+	QRectF textRect = cell.adjusted(GUIHelper::scale(8.0), 0, -GUIHelper::scale(8.0), 0);
+	QFont roleFont = painter.font();
+	roleFont.setPixelSize(GUIHelper::scale(9.0));
+	painter.setFont(roleFont);
+	painter.setPen(roleInk);
+	painter.drawText(textRect, Qt::AlignLeft | Qt::AlignVCenter, state.roleText);
+	const qreal roleWidth = QFontMetricsF(roleFont).horizontalAdvance(state.roleText);
+	const qreal caretWidth = GUIHelper::scale(7.0);
+	const QPointF caretCenter(textRect.right() - caretWidth / 2.0, cell.center().y() + 0.5);
+	QPainterPath caret;
+	caret.moveTo(caretCenter + QPointF(-caretWidth / 2.0, -caretWidth / 4.0));
+	caret.lineTo(caretCenter + QPointF(caretWidth / 2.0, -caretWidth / 4.0));
+	caret.lineTo(caretCenter + QPointF(0, caretWidth / 2.0));
+	caret.closeSubpath();
+	painter.fillPath(caret, roleInk);
+	QFont valueFont = painter.font();
+	valueFont.setPixelSize(GUIHelper::scale(12.0));
+	painter.setFont(valueFont);
+	painter.setPen(valueInk);
+	QString value = state.layoutText;
+	if (state.channelCount > 0)
+		value += QStringLiteral(" %1").arg(state.channelCount);
+	textRect.setLeft(textRect.left() + roleWidth + GUIHelper::scale(6.0));
+	textRect.setRight(textRect.right() - caretWidth - GUIHelper::scale(4.0));
+	painter.drawText(textRect, Qt::AlignLeft | Qt::AlignVCenter, value);
+}
+
+void ISkin::paintVstBusFrame(QPainter& painter, const VstBusFrameState& state, const SkinTokens& tokens) const
+{
+	QPainterStateGuard guard(&painter);
+	painter.setRenderHint(QPainter::Antialiasing, true);
+	painter.setRenderHint(QPainter::TextAntialiasing, true);
+	QColor muted(tokens.mutedText);
+	if (!state.enabled)
+		muted.setAlpha(150);
+	const qreal y = state.jointRect.center().y() + 0.5;
+	const QPointF tail(state.jointRect.left() + qMax(2.0, state.jointRect.width() / 5.0), y);
+	const QPointF head(state.jointRect.right() - qMax(2.0, state.jointRect.width() / 5.0), y);
+	painter.setPen(QPen(muted, 1.2, Qt::SolidLine, Qt::RoundCap));
+	painter.drawLine(tail, head);
+	painter.drawLine(head, head + QPointF(-3.5, -3.5));
+	painter.drawLine(head, head + QPointF(-3.5, 3.5));
+
+	const bool pair = !state.verdictInputText.isEmpty() || !state.verdictOutputText.isEmpty();
+	const bool hasText = pair || !state.verdictText.isEmpty();
+	if (state.verdictRect.isEmpty() || (!hasText && state.tone == VstBusFrameState::Tone::Neutral))
+		return;
+	QColor lamp(tokens.mutedText);
+	if (state.tone == VstBusFrameState::Tone::Success)
+		lamp = QColor(tokens.success);
+	else if (state.tone == VstBusFrameState::Tone::Warning)
+		lamp = QColor(tokens.warning);
+	else if (state.tone == VstBusFrameState::Tone::Critical)
+		lamp = QColor(tokens.danger);
+	if (!state.enabled)
+		lamp.setAlpha(150);
+	const qreal radius = GUIHelper::scale(2.5);
+	painter.setPen(Qt::NoPen);
+	painter.setBrush(lamp);
+	painter.drawEllipse(QPointF(state.verdictRect.left() + radius, state.verdictRect.center().y() + 0.5), radius, radius);
+	if (!hasText)
+		return;
+	QFont font = painter.font();
+	font.setPixelSize(GUIHelper::scale(10.0));
+	painter.setFont(font);
+	painter.setPen(state.tone == VstBusFrameState::Tone::Critical ? lamp : muted);
+	QRectF textRect(state.verdictRect);
+	textRect.setLeft(textRect.left() + radius * 2.0 + GUIHelper::scale(5.0));
+	const QString text = pair
+		? state.verdictInputText + QStringLiteral(" -> ") + state.verdictOutputText
+		: state.verdictText;
+	painter.drawText(textRect, Qt::AlignLeft | Qt::AlignVCenter,
+		QFontMetrics(font).elidedText(text, Qt::ElideRight, qRound(textRect.width())));
 }
 
 void ISkin::paintInsertSeam(QPainter& painter, const QRect& rect, const ListChromeState& state, const SkinTokens& tokens) const

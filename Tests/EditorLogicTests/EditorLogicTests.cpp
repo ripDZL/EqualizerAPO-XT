@@ -157,6 +157,7 @@ int main(int argc, char** argv)
 		testBenchmarkBatchPlanUsesOnlyComparableFullBatches();
 		testFileReferenceControllerOwnsPathState();
 		testReferenceCardDerivesSharedPresentationState();
+		testVSTBusModelMigratesAndEdits();
 		testFilterListModel();
 		testFilterListUndo();
 		testFilterCommandCatalogRoster();

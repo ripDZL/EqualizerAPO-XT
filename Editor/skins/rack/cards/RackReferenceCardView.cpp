@@ -473,6 +473,12 @@ void RackReferenceCardView::addLeadingWidget(QWidget* widget)
 	rootLayout->insertWidget(1, widget, 0, Qt::AlignVCenter);
 }
 
+void RackReferenceCardView::placeBusStrip(QWidget* strip)
+{
+	strip->setParent(contentWidget());
+	rootLayout->insertWidget(rootLayout->indexOf(lcdWindow), strip, 0, Qt::AlignVCenter);
+}
+
 void RackReferenceCardView::applyState(const ReferenceCardState& state)
 {
 	const bool emptyRef = state.editText.trimmed().isEmpty();

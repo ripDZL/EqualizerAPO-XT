@@ -120,6 +120,9 @@ public:
 	// itself (MultiConvolution's output-channel selector). Placement is the
 	// view's decision.
 	virtual void addLeadingWidget(QWidget* widget) = 0;
+	// The VST card's Input/Output contract selectors. The default appends the
+	// strip to a box-layout card; skins with custom geometry may override it.
+	virtual void placeBusStrip(QWidget* strip);
 
 	// Stores the state, lets the subclass apply it, and re-evaluates QSS
 	// against the refreshed dynamic properties (refKind/refMissing).

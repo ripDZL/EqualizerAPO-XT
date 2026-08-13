@@ -21,11 +21,14 @@
 #include <memory>
 #include <optional>
 #include <unordered_map>
+#include <vector>
 
 #include <QElapsedTimer>
 
 #include "Editor/IFilterGUI.h"
 #include "Editor/helpers/VSTPluginLivePreview.h"
+#include "Editor/widgets/cards/ReferenceCardView.h"
+#include "Editor/widgets/cards/VSTBusModel.h"
 #include "vst/VSTPluginInstance.h"
 #include "vst/VSTPluginLibrary.h"
 
@@ -35,7 +38,7 @@ class QFrame;
 class QPlainTextEdit;
 class QAction;
 class FileReferenceController;
-class ReferenceCardView;
+class VSTBusStrip;
 
 class VSTCardEditor : public IFilterGUI
 {
@@ -45,7 +48,8 @@ public:
 	VSTCardEditor(std::shared_ptr<VSTPluginLibrary> library, const std::wstring& chunkData,
 		const std::unordered_map<std::wstring, float>& paramMap, bool stereoInput = false,
 		const VSTPreviewEndpoint& previewEndpoint = {},
-		const std::optional<VST3BusContract>& busContract = std::nullopt, QWidget* parent = nullptr);
+		const std::optional<VST3BusContract>& busContract = std::nullopt,
+		std::vector<std::wstring> deviceChannelNames = std::vector<std::wstring>(), QWidget* parent = nullptr);
 	~VSTCardEditor();
 
 	void store(QString& command, QString& parameters) override;
@@ -60,7 +64,8 @@ private slots:
 	void pathCommitted(const QString& text);
 	void selectFile();
 	void embedToggled(bool checked);
-	void stereoInputToggled(bool checked);
+	void busLayoutsPicked(VST3BusLayout input, VST3BusLayout output);
+	void removeBusLayouts();
 	void livePreviewToggled(bool checked);
 	void onIdle();
 
@@ -69,6 +74,7 @@ private:
 	bool embedPlugin();
 	void updateLivePreview();
 	void updateReferenceState();
+	void updateBusControls();
 	void updatePermissionWarning();
 	void onAutomate();
 	void onSizeWindow(int w, int h);
@@ -80,11 +86,12 @@ private:
 	bool embedded = false;
 	bool panelDialogOpen = false;
 	bool autoApplyDialog = false;
-	bool stereoInput = false;
+	VSTBusModel busModel;
 	VSTPreviewEndpoint previewEndpoint;
+	std::vector<std::wstring> deviceChannelNames;
 	VSTPluginLivePreview livePreview;
-	// Preserved opaquely until the dedicated Input/Output controls land.
-	std::optional<VST3BusContract> busContract;
+	QString busStatusText;
+	ReferenceCardState::Severity busStatusSeverity = ReferenceCardState::Severity::None;
 	QElapsedTimer lastReadTimer;
 
 	FileReferenceController* reference = nullptr;
@@ -97,8 +104,9 @@ private:
 	QPushButton* openPanelButton = nullptr;
 	QToolButton* optionsButton = nullptr;
 	QAction* embedAction = nullptr;
-	QAction* stereoInputAction = nullptr;
+	QAction* removeBusAction = nullptr;
 	QAction* livePreviewAction = nullptr;
+	VSTBusStrip* busStrip = nullptr;
 	QFrame* frame = nullptr;
 	QPlainTextEdit* warningTextEdit = nullptr;
 };

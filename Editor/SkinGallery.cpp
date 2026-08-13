@@ -128,9 +128,31 @@ QString subwooferRoutingPresetRowLine()
 			static_cast<int>(encoded.text->size()));
 }
 
+void appendVstBusRows(QList<GalleryRow>& rows)
+{
+	const QString quotedLibrary = QStringLiteral("VSTPlugin: Library \"%1\"");
+	const QString vst3 = qEnvironmentVariable("EAPO_GALLERY_VST3_PLUGIN");
+	if (!vst3.isEmpty() && QFileInfo::exists(vst3))
+	{
+		rows.append({QStringLiteral("vst3_bus_accepted"),
+			quotedLibrary.arg(vst3) + QStringLiteral(" Input Stereo Output Stereo")});
+		rows.append({QStringLiteral("vst3_bus_auto"), quotedLibrary.arg(vst3)});
+		rows.append({QStringLiteral("vst3_bus_rejected"),
+			quotedLibrary.arg(vst3) + QStringLiteral(" Input Stereo Output 7.1")});
+	}
+	const QString upmixer = qEnvironmentVariable("EAPO_GALLERY_VST3_UPMIXER");
+	if (!upmixer.isEmpty() && QFileInfo::exists(upmixer))
+		rows.append({QStringLiteral("vst3_bus_upmix"),
+			quotedLibrary.arg(upmixer) + QStringLiteral(" Input Stereo Output 7.1")});
+	const QString vst2 = qEnvironmentVariable("EAPO_GALLERY_VST2_PLUGIN");
+	if (!vst2.isEmpty() && QFileInfo::exists(vst2))
+		rows.append({QStringLiteral("vst2_bus_ignored"),
+			quotedLibrary.arg(vst2) + QStringLiteral(" Input Stereo Output 7.1")});
+}
+
 QList<GalleryRow> galleryRows()
 {
-	return {
+	QList<GalleryRow> rows = {
 		{ QStringLiteral("filter"), QStringLiteral("Filter 1: ON PK Fc 1000 Hz Gain 6 dB Q 0.71") },
 		{ QStringLiteral("shelf"), QStringLiteral("Filter 2: ON HSC Fc 8000 Hz Gain -2.5 dB Q 0.71") },
 		{ QStringLiteral("gain0db"), QStringLiteral("Filter 3: ON PK Fc 1000 Hz Gain 0 dB Q 1") },
@@ -196,6 +218,8 @@ QList<GalleryRow> galleryRows()
 		{ QStringLiteral("subwooferrouting"), subwooferRoutingPresetRowLine() },
 		{ QStringLiteral("subwooferrouting_missing"), QStringLiteral("SubwooferRouting: Profile \"missing.swxt.json\"") }
 	};
+	appendVstBusRows(rows);
+	return rows;
 }
 
 // Synthetic audio endpoints for the Device rows. Offscreen runners have no

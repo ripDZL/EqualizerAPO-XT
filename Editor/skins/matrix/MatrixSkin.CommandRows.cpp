@@ -254,6 +254,16 @@ void MatrixSkin::paintCardChrome(QPainter& painter, const QRect& rect, const Com
 		// Header band fill (the header widget itself is transparent).
 		painter.fillRect(headerBand, QColor(info.selected ? tokens.surfaceRaised : tokens.cardHover));
 
+		// Every card body is one dark board panel. The body editors assemble
+		// that panel from several widgets standing on the window ground, but
+		// their layout margins and spacing can let the lighter card face peek
+		// through as flakes floating mid-card. Flood the whole body band with
+		// the same ground the editors already paint so their panels, strips,
+		// and cells remain one visual block.
+		if (content.height() > headerHeight)
+			painter.fillRect(QRect(content.left(), content.top() + headerHeight,
+				content.width(), content.height() - headerHeight), QColor(tokens.background));
+
 		// A remark row (pure comment) is addressable but carries no signal
 		// state: full grid ink and hover pre-light like an enabled row, but
 		// no status lamp.

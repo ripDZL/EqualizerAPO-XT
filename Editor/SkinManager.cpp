@@ -359,6 +359,26 @@ void SkinManager::paintSegmentedControl(QPainter& painter, const SegmentedContro
 	activeSkin->paintSegmentedControl(painter, state, currentTokens);
 }
 
+void SkinManager::paintVstBusSelector(QPainter& painter, const VstBusSelectorState& state) const
+{
+	if (heritageMode)
+	{
+		activeSkin->ISkin::paintVstBusSelector(painter, state, currentTokens);
+		return;
+	}
+	activeSkin->paintVstBusSelector(painter, state, currentTokens);
+}
+
+void SkinManager::paintVstBusFrame(QPainter& painter, const VstBusFrameState& state) const
+{
+	if (heritageMode)
+	{
+		activeSkin->ISkin::paintVstBusFrame(painter, state, currentTokens);
+		return;
+	}
+	activeSkin->paintVstBusFrame(painter, state, currentTokens);
+}
+
 FilterPickerView* SkinManager::createFilterPicker(QWidget* parent) const
 {
 	return activeSkin->createFilterPicker(parent);

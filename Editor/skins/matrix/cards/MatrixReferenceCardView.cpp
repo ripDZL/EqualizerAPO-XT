@@ -155,6 +155,12 @@ void MatrixReferenceCardView::addLeadingWidget(QWidget* widget)
 	feedLayout->insertWidget(1, widget, 0, Qt::AlignVCenter);
 }
 
+void MatrixReferenceCardView::placeBusStrip(QWidget* strip)
+{
+	strip->setParent(contentWidget());
+	feedLayout->insertWidget(feedLayout->indexOf(formatCell) + 1, strip, 0, Qt::AlignVCenter);
+}
+
 void MatrixReferenceCardView::applyState(const ReferenceCardState& state)
 {
 	// Feed marker: the board designation while the feed resolves; the danger

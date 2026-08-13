@@ -291,6 +291,12 @@ void SoftReferenceCardView::addLeadingWidget(QWidget* widget)
 	rootLayout->insertWidget(1, widget, 0, Qt::AlignVCenter);
 }
 
+void SoftReferenceCardView::placeBusStrip(QWidget* strip)
+{
+	strip->setParent(contentWidget());
+	rootLayout->insertWidget(rootLayout->count() - 1, strip, 0, Qt::AlignVCenter);
+}
+
 void SoftReferenceCardView::applyState(const ReferenceCardState& state)
 {
 	const SkinTokens& t = SkinManager::instance()->tokens();

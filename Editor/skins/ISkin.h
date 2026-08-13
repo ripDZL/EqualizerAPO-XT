@@ -260,6 +260,46 @@ struct SegmentedControlState
 	QRectF segmentRect(double index) const;
 };
 
+// Snapshot of one VSTBusStrip format selector. The widget owns input and
+// focus behavior; skins receive only what they need to paint the control.
+struct VstBusSelectorState
+{
+	QRect rect;
+	bool output = false;
+	QString roleToken;
+	QString roleText;
+	QString layoutText;
+	int channelCount = 0;
+	bool enabled = true;
+	bool hovered = false;
+	bool pressed = false;
+	bool focused = false;
+	bool menuOpen = false;
+};
+
+// Snapshot of the strip around its selectors: the signal-flow joint and the
+// compact negotiation verdict that follows the output selector.
+struct VstBusFrameState
+{
+	QRect rect;
+	QRect inputRect;
+	QRect outputRect;
+	QRect jointRect;
+	QRect verdictRect;
+	QString verdictText;
+	QString verdictInputText;
+	QString verdictOutputText;
+	enum class Tone
+	{
+		Neutral,
+		Success,
+		Warning,
+		Critical
+	};
+	Tone tone = Tone::Neutral;
+	bool enabled = true;
+};
+
 // Snapshot of an AudioKnob's state handed to ISkin::paintKnob. The widget owns
 // all input handling; the skin only paints.
 struct KnobState
@@ -406,6 +446,8 @@ public:
 	// through three choices reads as one travelling mark instead of three
 	// jumps.
 	virtual void paintSegmentedControl(QPainter& painter, const SegmentedControlState& state, const SkinTokens& tokens) const;
+	virtual void paintVstBusSelector(QPainter& painter, const VstBusSelectorState& state, const SkinTokens& tokens) const;
+	virtual void paintVstBusFrame(QPainter& painter, const VstBusFrameState& state, const SkinTokens& tokens) const;
 
 	// The "add filter" picker that matches this skin's philosophy. The caller
 	// (FilterTable::chooseFilterTemplate) hosts the returned view in a
