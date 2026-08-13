@@ -378,6 +378,19 @@ void VSTCardEditor::updateReferenceState()
 		}
 	}
 
+	// The audio service reads the library under its own account. Evaluate the
+	// saved path even when no plugin panel is open so a stable ACL problem does
+	// not look like a transient editor error. Import is intentionally omitted:
+	// the shared importer only supports individual files, not VST3 bundles.
+	if (!reference->writtenPath().isEmpty() && !state.missing
+		&& !FileReferenceController::isReadableByAudioService(
+			QString::fromStdWString(library->getLibPath()))
+		&& state.statusText.isEmpty())
+	{
+		state.statusText = tr("Not readable by the audio service");
+		state.statusSeverity = ReferenceCardState::Severity::Critical;
+	}
+
 	if (state.statusText.isEmpty() && !busStatusText.isEmpty())
 	{
 		state.statusText = busStatusText;
@@ -670,23 +683,9 @@ void VSTCardEditor::updateLivePreview()
 
 void VSTCardEditor::updatePermissionWarning()
 {
-	if (effect == nullptr)
-	{
-		warningTextEdit->setVisible(false);
-		return;
-	}
-
-	if (!FileReferenceController::isReadableByAudioService(
-		QString::fromStdWString(library->getLibPath())))
-	{
-		QString text = tr("The library is not readable by the audio service.\nChange the file permissions or copy the file to the VSTPlugins directory.");
-		warningTextEdit->setPlainText(text);
-		QSize textSize = warningTextEdit->fontMetrics().size(0, text);
-		warningTextEdit->setFixedSize(textSize + GUIHelper::scale(QSize(40, 15)));
-		warningTextEdit->setVisible(true);
-		return;
-	}
-
+	// The library verdict lives in the reference-card status line, where it is
+	// evaluated from the path alone. This warning remains for files named by
+	// the saved plugin chunk and likewise needs no loaded plugin instance.
 	const QStringList files = vstChunkUnreadablePaths(chunkData);
 
 	if (files.isEmpty())

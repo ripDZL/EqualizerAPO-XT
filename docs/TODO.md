@@ -3,6 +3,8 @@
 - [x] Promoted tested VST3 #265/#271 integration to `beta`; hosted run `31711097531` passed all native variants, offscreen UI gates, Pester, cppcheck, and cross-variant comparison. `main` remains unchanged.
 - [x] Installed the matching 30-file AVX-512 payload from hosted run `31711097531` into the active per-user runtime; backed up `current` at `artifacts\install-backups\pre-upstream-265-vst3-layouts-ci-31711097531-20260813-161800`, hash-verified every artifact file, restored Windows Audio, and passed installed `Editor.exe --selftest-vst`.
 - [x] User reports the installed real multichannel VST3 test with `Input Stereo` and `Output 7.1` appears to work; stable promotion to `main` remains a separate explicit decision.
+- [ ] Run the hosted matrix for `codex/upstream-266-272-review`; if green, manually verify the persistent unreadable-library indication for both a VST2 DLL and a VST3 bundle. Keep the branch out of `beta` until that gate passes.
+- [ ] Design and test a bundle-safe `.vst3` importer before adopting upstream #270's Import action; the current shared importer supports individual files only.
 - [x] User accepted installed ReaFIR/TDR Nova analyzer movement plus LegacyRows/themes from `codex/upstream-264-integration`; promoted to `beta`. Do not promote `beta` to `main` without explicit approval.
 - [ ] Obtain a Codex environment that provides the bundled workspace dependency runtime, or explicitly approve a revised workflow.
 - [ ] Prepare the Matrix hatch-pet run.
