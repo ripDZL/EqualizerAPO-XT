@@ -1,8 +1,10 @@
 #include "FilterCardRow.h"
 
+#include <QAbstractButton>
 #include <QEvent>
 #include <QIcon>
 #include <QMenu>
+#include <QMouseEvent>
 #include <QPainter>
 #include <QPixmap>
 #include <QPixmapCache>
@@ -82,7 +84,7 @@ FilterCardRow::FilterCardRow(FilterTable* table, int number, FilterTable::Item* 
 	// Children created below inherit the sheets as they appear, and the
 	// applyDescriptor() re-run finds identical strings and properties, so it
 	// skips both the re-set and the construction-time repolish entirely.
-	refreshStateProperties();
+	syncVisualState();
 
 	QHBoxLayout* headerLayout = new QHBoxLayout(headerWidget);
 	headerLayout->setContentsMargins(8, 4, 8, 4);
@@ -311,647 +313,4 @@ FilterCardRow::FilterCardRow(FilterTable* table, int number, FilterTable::Item* 
 			.arg(tk.mutedText, tk.monoFontFamily));
 		rawLayout->addWidget(glyph, 0, Qt::AlignTop);
 
-		QLabel* rawLabel = new QLabel(rawContainer);
-		rawLabel->setObjectName(QStringLiteral("FilterCardRawText"));
-		rawLabel->setText(item->text);
-		rawLabel->setWordWrap(true);
-		rawLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
-		rawLabel->setStyleSheet(QStringLiteral("QLabel#FilterCardRawText { background:%1; color:%2; border:1px solid %3; border-radius:%4px; padding:6px 10px; font-family:\"%5\"; }")
-			.arg(tk.surfaceSunken, tk.text, tk.border)
-			.arg(tk.borderRadius / 2)
-			.arg(tk.monoFontFamily));
-		rawLayout->addWidget(rawLabel, 1);
-
-		bodyStack->addWidget(rawContainer);
-		bodyStack->setCurrentWidget(rawContainer);
-	}
-
-	bodyStack->setVisible(expandButton->isChecked());
-	connect(SkinManager::instance(), &SkinManager::skinChanged, this, [this](const SkinTokens&) {
-		refreshStateProperties();
-		update();
-	});
-	// Per-command-type chrome hook: rows are recreated on every skin switch
-	// (FilterTable::updateGuis), so construction time is the right moment for
-	// the active skin to tag or extend this row.
-	SkinManager::instance()->prepareCommandRow(currentRowInfo(), cardFrame, headerWidget, bodyStack);
-	applyDescriptor();
-}
-
-void FilterCardRow::configureChannels(std::vector<std::wstring>& channelNames)
-{
-	if (routingView != nullptr && descriptor.type == QStringLiteral("copy"))
-	{
-		if (descriptor.enabled)
-			propagateCopyChannels(CopyRoutingAdapter::parse(descriptor.parameters), channelNames);
-		return;
-	}
-
-	if (gui != nullptr)
-		gui->configureChannels(channelNames);
-}
-
-CommandRowInfo FilterCardRow::currentRowInfo() const
-{
-	CommandRowInfo info;
-	info.type = descriptor.type;
-	info.command = descriptor.command.toLower();
-	info.enabled = descriptor.enabled;
-	info.selected = table != nullptr && table->getSelectedItems().contains(item);
-	info.focused = table != nullptr && table->getFocusedItem() == item;
-	info.depth = descriptor.depth;
-	info.logicDepth = descriptor.logicDepth;
-	info.dynamicLine = descriptor.dynamicLine;
-
-	// The lane geometry, resolved here because this widget is what decides it:
-	// rowIndentUnits() is the same call its own layout margin uses, so a skin's
-	// gutter can no longer disagree with the card face it sits beside.
-	info.laneUnit = SkinManager::instance()->tokens().channelGroupIndent;
-	info.laneCount = rowIndentUnits();
-	info.cardLeft = 8 + info.laneCount * info.laneUnit;
-
-	// Fold in the analysis engine's load facts for this line (dynamic
-	// commands): branch truth for the If family, computed values for
-	// Eval/inline expressions, and whether a false branch swallowed the line.
-	// Advisory by contract - facts go stale between an edit and the next
-	// analysis run. When both an Eval result and an inline substitution exist
-	// on one line, the Eval result wins regardless of hash order.
-	if (table != nullptr)
-	{
-		const QList<ConfigLoadTraceEntry> facts = table->loadTraceFactsForRow(rowNumber - 1);
-		for (const ConfigLoadTraceEntry& fact : facts)
-		{
-			switch (fact.kind)
-			{
-			case ConfigLoadTraceEntry::Kind::Condition:
-				info.branchState = fact.result == ConfigLoadTraceEntry::Result::True ? 1
-					: fact.result == ConfigLoadTraceEntry::Result::False ? 0
-					: fact.result == ConfigLoadTraceEntry::Result::Error ? 3 : 2;
-				break;
-			case ConfigLoadTraceEntry::Kind::ElseBranch:
-				info.branchState = fact.active ? 1 : 0;
-				break;
-			case ConfigLoadTraceEntry::Kind::Eval:
-				info.evalText = QString::fromStdWString(fact.text);
-				info.valueError = info.valueError || fact.error;
-				break;
-			case ConfigLoadTraceEntry::Kind::InlineValue:
-				// The engine preserves the space after the colon; trim at
-				// this UI boundary so readouts do not start with a gap.
-				if (info.evalText.isEmpty())
-					info.evalText = QString::fromStdWString(fact.text).trimmed();
-				info.valueError = info.valueError || fact.error;
-				break;
-			case ConfigLoadTraceEntry::Kind::SkippedLine:
-				info.lineSkipped = true;
-				break;
-			case ConfigLoadTraceEntry::Kind::ParseError:
-				// Several can arrive for one line if a factory reports more than
-				// once; the first is the one that stopped it.
-				if (info.parseError.isEmpty())
-					info.parseError = QString::fromStdWString(fact.text);
-				break;
-			}
-		}
-	}
-	return info;
-}
-
-QRect FilterCardRow::getHeaderRect() const
-{
-	// In this row's coordinates: headerWidget->pos() alone is relative to
-	// cardFrame and would miss the outer card margins, shifting the drag
-	// hit-test area away from the header the user actually sees.
-	return QRect(headerWidget->mapTo(this, QPoint(0, 0)), headerWidget->size());
-}
-
-void FilterCardRow::editText()
-{
-	if (!editButton->isChecked())
-		editButton->setChecked(true);
-}
-
-void FilterCardRow::updateRowPosition(int rowNumber, FilterCardRowScope scope)
-{
-	// The constructor puts the number into numberLabel and the scope into
-	// the outer layout's left margin, the descriptor (scope rail painting)
-	// and the skin styling hooks. Refresh those in place.
-	this->rowNumber = rowNumber;
-	if (numberLabel != nullptr)
-	{
-		// A skin's prepareCommandRow may have rewritten the plain number into
-		// its own coordinate grammar at construction (MatrixSkin: "3" -> "B3",
-		// bus letter + line). The prefix only depends on the command type,
-		// which does not change for a shifted row, so keep any non-digit
-		// prefix and replace just the trailing line number - the same text a
-		// full rebuild would produce.
-		const QString text = numberLabel->text();
-		int digitStart = int(text.size());
-		while (digitStart > 0 && text.at(digitStart - 1).isDigit())
-			digitStart--;
-		numberLabel->setText(text.left(digitStart) + QString::number(rowNumber));
-	}
-
-	if (descriptor.depth != scope.indent || descriptor.logicDepth != scope.logic
-		|| descriptor.scopeChannels != scope.channels)
-	{
-		descriptor.depth = scope.indent;
-		descriptor.logicDepth = scope.logic;
-		descriptor.scopeChannels = scope.channels;
-		if (layout() != nullptr)
-			layout()->setContentsMargins(8 + rowIndentUnits() * SkinManager::instance()->tokens().channelGroupIndent, 4, 8, 4);
-		applyDescriptor();
-	}
-	else
-	{
-		update();
-	}
-}
-
-QSize FilterCardRow::sizeHint() const
-{
-	// Blank lines collapse to a thin spacer; no header, no body, just a few
-	// pixels of breathing room so visual grouping in the config survives.
-	if (descriptor.type == QStringLiteral("spacer"))
-	{
-		int preferredWidth = table != nullptr ? table->getPreferredWidth() : 0;
-		return QSize(preferredWidth, 10);
-	}
-
-	// Use only the header's preferred width and the viewport - never the body's
-	// content-driven sizeHint. Some legacy filter GUIs (DeviceFilterGUI with
-	// QTreeWidget AdjustToContents, VST / Convolution / Stage editors) report
-	// a sizeHint matching their full content (thousands of pixels), which
-	// would otherwise inflate the entire QGridLayout column in FilterTable and
-	// push the right-side header toolbar far off screen.
-	int height = QWidget::sizeHint().height();
-	int width = headerWidget ? headerWidget->sizeHint().width() : QWidget::sizeHint().width();
-	if (layout() != nullptr)
-		width += layout()->contentsMargins().left() + layout()->contentsMargins().right();
-	int preferredWidth = table != nullptr ? table->getPreferredWidth() : 0;
-	if (width < preferredWidth)
-		width = preferredWidth;
-	return QSize(width, height);
-}
-
-QSize FilterCardRow::minimumSizeHint() const
-{
-	// Spacer rows force a small fixed height so QGridLayout does not promote
-	// them up to the body-driven minimum of neighbouring cards.
-	if (descriptor.type == QStringLiteral("spacer"))
-		return QSize(0, 10);
-
-	// Cap the cell's minimum width at a small constant so the QGridLayout in
-	// FilterTable does not inherit any content-driven minimum from a card's
-	// body editor. Without this, ONE row with a wide legacy filter GUI forces
-	// EVERY card column wide enough to push the right-side header toolbar far
-	// off screen. Height stays layout-driven so cards still vertically size to
-	// fit their bodies.
-	int height = QWidget::minimumSizeHint().height();
-	return QSize(0, height);
-}
-
-// The editor scroll wrapper pins the body's WIDTH (Ignored policy), but its
-// height cannot come from Qt's own hint plumbing: QScrollArea samples the
-// editor's sizeHint before the editor ever has a real width, and for a
-// wrapping layout (the Device card's FlowLayout) that early hint is one item
-// wide - its height-for-width answer is a stacked column, and the stale
-// answer never gets re-queried once the real width arrives. So the row
-// follows the content explicitly: whenever the scroll or its content resizes
-// or relayouts, the scroll's height is fixed to what the content needs at
-// the width it actually has.
-void FilterCardRow::watchEditorScroll(QScrollArea* scroll)
-{
-	scroll->installEventFilter(this);
-	if (scroll->widget() != nullptr)
-		scroll->widget()->installEventFilter(this);
-	syncEditorScrollHeight(scroll);
-}
-
-void FilterCardRow::syncEditorScrollHeight(QScrollArea* scroll)
-{
-	QWidget* content = scroll->widget();
-	if (content == nullptr)
-		return;
-
-	const int width = scroll->viewport()->width();
-	int desired = content->hasHeightForWidth() && width > 0
-		? content->heightForWidth(width)
-		: content->sizeHint().height();
-	// Generous cap: legacy filter GUIs can report content heights of
-	// thousands of pixels (the same hints the width clamp exists for); a
-	// runaway body must not swallow the whole table.
-	desired = qBound(24, desired, 600);
-	if (scroll->minimumHeight() != desired || scroll->maximumHeight() != desired)
-	{
-		scroll->setFixedHeight(desired);
-		// The new height must reach the FilterTable grid, but the layout
-		// chain above the scroll (editor container -> body stack -> card
-		// frame -> row) re-validates lazily hop by hop and the cascade can
-		// stall with a stale cached minimum mid-chain - observed as "the
-		// card never grows" when the routing views' channel fold expands.
-		// Invalidate the whole chain explicitly so the next grid pass
-		// re-queries a fresh row minimum.
-		for (QWidget* w = scroll->parentWidget(); w != nullptr && w != this; w = w->parentWidget())
-			if (w->layout() != nullptr)
-				w->layout()->invalidate();
-		if (layout() != nullptr)
-			layout()->invalidate();
-		updateGeometry();
-	}
-}
-
-bool FilterCardRow::eventFilter(QObject* watched, QEvent* event)
-{
-	switch (event->type())
-	{
-	case QEvent::Resize:
-	case QEvent::Show:
-	case QEvent::LayoutRequest:
-	{
-		// Watched objects are the editor scroll itself and its content widget
-		// (whose parent chain is content -> viewport -> scroll).
-		QScrollArea* scroll = qobject_cast<QScrollArea*>(watched);
-		if (scroll == nullptr && watched->parent() != nullptr)
-			scroll = qobject_cast<QScrollArea*>(watched->parent()->parent());
-		if (scroll != nullptr)
-			syncEditorScrollHeight(scroll);
-		break;
-	}
-	default:
-		break;
-	}
-	return QWidget::eventFilter(watched, event);
-}
-
-int FilterCardRow::rowIndentUnits() const
-{
-	// Member level is one unit past the branch/tail row's own semantic level
-	// (depth already carries any enclosing channel group, so +1 keeps mixed
-	// Channel x If nesting aligned with the block members).
-	if (descriptor.type == QStringLiteral("if") && descriptor.badge != QStringLiteral("IF")
-		&& SkinManager::instance()->logicSiblingsIndentAsMembers())
-		return descriptor.depth + 1;
-	return descriptor.depth;
-}
-
-void FilterCardRow::paintEvent(QPaintEvent*)
-{
-	// The active skin may own the whole scope gutter (the If-block lanes);
-	// the shared channel rail below stays the default for skins that do not
-	// answer.
-	{
-		QPainter gutterPainter(this);
-		if (SkinManager::instance()->paintScopeGutter(gutterPainter, size(), visualInfo))
-			return;
-	}
-
-	const SkinTokens& tokens = SkinManager::instance()->tokens();
-	if (descriptor.depth <= 0)
-		return;
-
-	QPainter painter(this);
-	painter.setRenderHint(QPainter::Antialiasing);
-	QColor color(descriptor.color);
-	int indent = 8 + (descriptor.depth - 1) * tokens.channelGroupIndent;
-	QRect lineRect(indent, 0, tokens.channelGroupIndent, height());
-
-	switch (tokens.channelGroupStyle)
-	{
-	case SkinTokens::TreeLines:
-		painter.setPen(QPen(QColor(tokens.border), 1));
-		painter.drawLine(lineRect.left() + 7, 0, lineRect.left() + 7, height());
-		painter.drawText(QRect(lineRect.left() + 1, 0, 16, tokens.rowHeight), Qt::AlignCenter, QStringLiteral("|"));
-		break;
-	case SkinTokens::DottedLine:
-		painter.setPen(QPen(color, 1, Qt::DotLine));
-		painter.drawLine(lineRect.left() + 5, 0, lineRect.left() + 5, height());
-		break;
-	case SkinTokens::SoftShadow:
-	{
-		QLinearGradient shadow(lineRect.left(), 0, lineRect.right(), 0);
-		QColor start = color;
-		start.setAlpha(38);
-		QColor end = color;
-		end.setAlpha(0);
-		shadow.setColorAt(0, start);
-		shadow.setColorAt(1, end);
-		painter.fillRect(lineRect, shadow);
-		break;
-	}
-	case SkinTokens::GradientBar:
-	default:
-	{
-		QLinearGradient gradient(lineRect.left(), 0, lineRect.left(), height());
-		QColor start = color;
-		start.setAlpha(55);
-		QColor end = color;
-		end.setAlpha(12);
-		gradient.setColorAt(0, start);
-		gradient.setColorAt(1, end);
-		painter.fillRect(QRect(lineRect.left() + 7, 0, 3, height()), gradient);
-		break;
-	}
-	}
-}
-
-// Renders the badge pictogram at the label's device pixel ratio in the
-// skin-resolved ink. The toolbar's GUIHelper::tintedIcon
-// bakes a DPR-1 pixmap for QIcon consumers; a QLabel needs an explicit
-// DPR-aware pixmap or the glyph blurs on scaled displays. Overshooting the
-// fill past the device-independent size is harmless - untouched pixels have
-// no coverage for CompositionMode_SourceIn to paint on.
-static QPixmap badgePictogram(const QString& resource, const QColor& ink, int size, qreal devicePixelRatio)
-{
-	const QString cacheKey = QStringLiteral("FilterCardBadge:%1:%2:%3:%4")
-		.arg(resource, ink.name(QColor::HexArgb))
-		.arg(size)
-		.arg(devicePixelRatio, 0, 'f', 3);
-	QPixmap cached;
-	if (QPixmapCache::find(cacheKey, &cached))
-		return cached;
-
-	QPixmap pixmap = QIcon(resource).pixmap(QSize(size, size), devicePixelRatio);
-	if (pixmap.isNull())
-		return pixmap;
-	QPainter painter(&pixmap);
-	painter.setCompositionMode(QPainter::CompositionMode_SourceIn);
-	painter.fillRect(pixmap.rect(), ink);
-	painter.end();
-	QPixmapCache::insert(cacheKey, pixmap);
-	return pixmap;
-}
-
-void FilterCardRow::rebuildSummary()
-{
-	// describeLine() cannot see neighbouring lines, so the If-scope count is
-	// carried over from the previous descriptor (assigned by the constructor /
-	// updateRowPosition from calculateScopes).
-	const int logicDepth = descriptor.logicDepth;
-	const QStringList scopeChannels = descriptor.scopeChannels;
-	descriptor = FilterCardModel::describeLine(item->text, descriptor.depth);
-	descriptor.logicDepth = logicDepth;
-	descriptor.scopeChannels = scopeChannels;
-	applyDescriptor();
-}
-
-void FilterCardRow::applyDescriptor()
-{
-
-	// Blank lines render as a thin spacer: no header, no body, no raw preview.
-	// The card frame itself stays visible (so its background fills the gap and
-	// scope-rail painting still works for indented blocks) but is collapsed
-	// to a small fixed height by sizeHint() / minimumSizeHint() below.
-	const bool isSpacer = descriptor.type == QStringLiteral("spacer");
-	if (headerWidget != nullptr)
-		headerWidget->setVisible(!isSpacer);
-	if (bodyStack != nullptr)
-		bodyStack->setVisible(!isSpacer && expandButton != nullptr && expandButton->isChecked());
-	if (isSpacer)
-	{
-		if (rawPreviewLabel != nullptr)
-			rawPreviewLabel->setVisible(false);
-		refreshStateProperties();
-		updateGeometry();
-		update();
-		return;
-	}
-
-	const BadgeTreatment badgeTreatment = SkinManager::instance()->badgeTreatment(
-		currentRowInfo(), descriptor.color, descriptor.badge);
-	// The badge chrome and pictogram ink are one skin-owned decision.
-	// Only touch the widget when the style actually changed: setStyleSheet
-	// unconditionally rebuilds the widget's style, and applyDescriptor runs
-	// again on every summary rebuild.
-	if (typeBadge->styleSheet() != badgeTreatment.qss)
-		typeBadge->setStyleSheet(badgeTreatment.qss);
-	// The monogram survives only for lines the icon
-	// catalog does not map (raw text), so unknown commands keep reading
-	// instead of going blank.
-	const QString badgeIcon = FilterCardModel::badgeIconResource(descriptor.type, descriptor.badge);
-	if (badgeIcon.isEmpty())
-	{
-		typeBadge->setPixmap(QPixmap());
-		typeBadge->setText(descriptor.badge);
-	}
-	else
-	{
-		typeBadge->setText(QString());
-		typeBadge->setPixmap(badgePictogram(badgeIcon, badgeTreatment.ink, 16, devicePixelRatioF()));
-	}
-	titleLabel->setFullText(descriptor.title);
-	summaryLabel->setFullText(descriptor.summary);
-	// A line the engine could not use says why on hover. The analysis run is what
-	// produces the reason, so this is empty until one has happened and goes stale
-	// on edit, like every other load fact.
-	const QString parseError = currentRowInfo().parseError;
-	summaryLabel->setToolTip(parseError.isEmpty() ? descriptor.summary
-		: tr("This line was not applied: %1").arg(parseError));
-	// The text stays current even while the label is hidden: skins may read
-	// it as the live raw-spec source instead of showing the label itself
-	// (MatrixRowCaption's caption strip does).
-	rawPreviewLabel->setText(tr("Raw") + QStringLiteral("  ") + item->text);
-	const SkinTokens& tokens = SkinManager::instance()->tokens();
-	rawPreviewLabel->setVisible(tokens.showRawPreview);
-	// Skins without a raw preview never show the label, and rows are rebuilt
-	// on every skin switch - skip the per-widget stylesheet for them.
-	if (tokens.showRawPreview)
-	{
-		const QString previewStyle = QStringLiteral("QLabel#FilterCardRawPreview { background: %1; color: %2; border-top: 1px solid %3; padding: 4px 12px; font-family: \"%4\"; font-size: 9pt; }")
-			.arg(tokens.surfaceSunken, tokens.mutedText, tokens.border, tokens.monoFontFamily);
-		if (rawPreviewLabel->styleSheet() != previewStyle)
-			rawPreviewLabel->setStyleSheet(previewStyle);
-	}
-	enabledButton->blockSignals(true);
-	enabledButton->setChecked(descriptor.enabled);
-	enabledButton->setIcon(QIcon(descriptor.enabled ? QStringLiteral(":/icons/power_on.svg") : QStringLiteral(":/icons/power_off.svg")));
-	enabledButton->blockSignals(false);
-	enabledButton->setVisible(descriptor.canToggleEnabled);
-	// Disable only the body editor when the line is commented out. This keeps
-	// the card frame (and its header buttons - including the enable toggle and
-	// the raw-edit affordance) interactive so the user can flip the line back on.
-	// A pure comment row is "disabled" by definition (the line starts with '#'),
-	// but its body IS the note editor - keep it editable.
-	if (gui != nullptr)
-		gui->setEnabled(descriptor.enabled || descriptor.type == QStringLiteral("comment"));
-	// A row's own channel list (the Channel card's selection, Copy's
-	// destinations) wins. Other rows inside a Channel: selection inherit the
-	// selection's badges, so the group's reach is readable on every member
-	// row instead of only on its head - but only for row types the engine
-	// actually narrows to the selection; control rows, notes and raw text
-	// would claim an influence they do not have.
-	QStringList badgeChannels = descriptor.channelBadges;
-	if (badgeChannels.isEmpty() && channelSelectionGatesType(descriptor.type))
-		badgeChannels = descriptor.scopeChannels;
-	buildChannelBadges(badgeChannels);
-	refreshStateProperties();
-	update();
-}
-
-void FilterCardRow::buildChannelBadges(const QStringList& channels)
-{
-	if (channels == renderedChannelBadges)
-		return;
-	renderedChannelBadges = channels;
-
-	while (QLayoutItem* child = channelBadgeLayout->takeAt(0))
-	{
-		delete child->widget();
-		delete child;
-	}
-
-	for (const QString& channel : channels.mid(0, 8))
-		channelBadgeLayout->addWidget(new ChBadge(channel, channelBadgeContainer));
-	channelBadgeContainer->setVisible(!channels.isEmpty());
-}
-
-void FilterCardRow::updateModel()
-{
-	IFilterGUI* senderGui = qobject_cast<IFilterGUI*>(QObject::sender());
-	if (senderGui == nullptr)
-		return;
-
-	QString command;
-	QString parameters;
-	senderGui->store(command, parameters);
-	// "#" is the comment card's sentinel: a pure comment line has no colon, so
-	// it is reassembled as "# <text>" (a bare "#" when the note is empty).
-	if (command == QStringLiteral("#"))
-		item->text = parameters.isEmpty() ? QStringLiteral("#") : QStringLiteral("# ") + parameters;
-	else
-		item->text = command + QStringLiteral(": ") + parameters;
-	rebuildSummary();
-	table->updateModel();
-}
-
-void FilterCardRow::routingEdited()
-{
-	if (routingView == nullptr)
-		return;
-
-	const QString parameters = CopyRoutingAdapter::serialize(routingView->assignments());
-	item->text = QStringLiteral("Copy: ") + parameters;
-	rebuildSummary();
-	table->updateModel();
-}
-
-void FilterCardRow::addAbove()
-{
-	FilterTemplate filterTemplate;
-	if (table->chooseFilterTemplate(&filterTemplate, addButton->mapToGlobal(QPoint(0, addButton->height()))))
-	{
-		// A card header's + belongs to that card's leading edge: addLine takes
-		// an insert-before anchor, so this row itself is the desired anchor.
-		table->addLine(filterTemplate.getLine(), item);
-		FilterTable* targetTable = table;
-		QTimer::singleShot(0, targetTable, [targetTable]() {
-			targetTable->updateGuis();
-		});
-	}
-}
-
-void FilterCardRow::removeThis()
-{
-	FilterTable* targetTable = table;
-	FilterTable::Item* targetItem = item;
-	QTimer::singleShot(0, targetTable, [targetTable, targetItem]() {
-		targetTable->removeItem(targetItem);
-		targetTable->updateGuis();
-	});
-}
-
-void FilterCardRow::editTextToggled(bool checked)
-{
-	setEditing(checked);
-}
-
-void FilterCardRow::setEditing(bool editing)
-{
-	if (editing)
-	{
-		lineEdit->setText(item->text);
-		bodyStack->setCurrentWidget(lineEdit);
-		bodyStack->setVisible(true);
-		expandButton->setChecked(true);
-		lineEdit->setFocus();
-		lineEdit->selectAll();
-	}
-	else if (gui != nullptr)
-	{
-		bodyStack->setCurrentIndex(1);
-	}
-	else if (bodyStack->count() > 1)
-	{
-		bodyStack->setCurrentIndex(1);
-	}
-}
-
-void FilterCardRow::lineEditingFinished()
-{
-	if (bodyStack->currentWidget() == lineEdit && !editingDone)
-	{
-		editingDone = true;
-		if (lineEdit->text() != item->text)
-		{
-			item->text = lineEdit->text();
-			table->updateModel();
-			editingDone = false;
-			FilterTable* targetTable = table;
-			QTimer::singleShot(0, targetTable, [targetTable]() {
-				targetTable->updateGuis();
-			});
-			return;
-		}
-		editButton->setChecked(false);
-		editingDone = false;
-	}
-}
-
-QString FilterCardRow::uncommentedLine() const
-{
-	QRegularExpression commentPrefix(QStringLiteral("^(\\s*)#\\s?"));
-	QRegularExpressionMatch match = commentPrefix.match(item->text);
-	if (match.hasMatch())
-		return match.captured(1) + item->text.mid(match.capturedEnd(0));
-	return item->text;
-}
-
-void FilterCardRow::enabledToggled(bool checked)
-{
-	if (!descriptor.canToggleEnabled)
-		return;
-
-	if (enabledButton != nullptr)
-		enabledButton->setIcon(QIcon(checked ? QStringLiteral(":/icons/power_on.svg") : QStringLiteral(":/icons/power_off.svg")));
-
-	QString trimmed = item->text.trimmed();
-	if (checked && trimmed.startsWith('#'))
-		item->text = uncommentedLine();
-	else if (!checked && !trimmed.startsWith('#'))
-		item->text = QStringLiteral("# ") + item->text;
-
-	table->updateModel();
-	FilterTable* targetTable = table;
-	FilterTable::Item* targetItem = item;
-	// In-place refresh: only the toggled row's GUI needs to change. A full
-	// updateGuis() on a 500+ row config is the dominant source of toggle
-	// latency.
-	QTimer::singleShot(0, targetTable, [targetTable, targetItem]() {
-		targetTable->updateSingleRowGui(targetItem);
-	});
-}
-
-void FilterCardRow::expandedToggled(bool checked)
-{
-	expandButton->setText(checked ? QStringLiteral("v") : QStringLiteral(">"));
-	bodyStack->setVisible(checked);
-}
-
-void FilterCardRow::refreshStateProperties()
-{
-	if (cardFrame == nullptr)
-		return;
-
-	visualInfo = currentRowInfo();
-	cardFrame->applyRowInfo(visualInfo, headerWidget);
-}
+		QLabel* rawLaß~½¶‰žËkºwµçTÍ…µ”¡¥¹ÑÌÑ¡”Ý¥‘Ñ ±…µÀ•á¥ÍÑÌ™½È¤ì„($¼¼ÉÕ¹…Ý…ä‰½‘äµÕÍÐ¹½ÐÍÝ…±±½ÜÑ¡”Ý¡½±”Ñ…‰±”¸(%‘•Í¥É•€ôÅ	½Õ¹ ÈÐ°‘•Í¥É•°€ØÀÀ¤ì(%¥˜€¡ÍÉ½±°´ùµ¥¹¥µÕµ!•¥¡Ð ¤€„ô‘•Í¥É•ñðÍÉ½±°´ùµ…á¥µÕµ!•¥¡Ð ¤€„ô‘•Í¥É•¤(%ì($%ÍÉ½±°´ùÍ•Ñ¥á•‘!•¥¡Ð¡‘•Í¥É•¤ì($$¼¼Q¡”¹•Ü¡•¥¡ÐµÕÍÐÉ•… Ñ¡”¥±Ñ•ÉQ…‰±”É¥°‰ÕÐÑ¡”±…å½ÕÐ($$¼¼¡…¥¸…‰½Ù”Ñ¡”ÍÉ½±°€¡•‘¥Ñ½È½¹Ñ…¥¹•È€´ø‰½‘äÍÑ…¬€´ø…É($$¼¼™É…µ”€´øÉ½Ü¤É”µÙ…±¥‘…Ñ•Ì±…é¥±ä¡½À‰ä¡½À…¹Ñ¡”…Í…‘”…¸($$¼¼ÍÑ…±°Ý¥Ñ „ÍÑ…±”…¡•µ¥¹¥µÕ´µ¥µ¡…¥¸€´½‰Í•ÉÙ•…Ì€‰Ñ¡”($$¼¼…É¹•Ù•ÈÉ½ÝÌˆÝ¡•¸Ñ¡”É½ÕÑ¥¹œÙ¥•ÝÌœ¡…¹¹•°™½±•áÁ…¹‘Ì¸($$¼¼%¹Ù…±¥‘…Ñ”Ñ¡”Ý¡½±”¡…¥¸•áÁ±¥¥Ñ±äÍ¼Ñ¡”¹•áÐÉ¥Á…ÍÌ($$¼¼É”µÅÕ•É¥•Ì„™É•Í É½Üµ¥¹¥µÕ´¸($%™½È€¡E]¥‘•Ð¨Ü€ôÍÉ½±°´ùÁ…É•¹Ñ]¥‘•Ð ¤ìÜ€„ô¹Õ±±ÁÑÈ€˜˜Ü€„ôÑ¡¥ÌìÜ€ôÜ´ùÁ…É•¹Ñ]¥‘•Ð ¤¤($$%¥˜€¡Ü´ù±…å½ÕÐ ¤€„ô¹Õ±±ÁÑÈ¤($$$%Ü´ù±…å½ÕÐ ¤´ù¥¹Ù…±¥‘…Ñ” ¤ì($%¥˜€¡±…å½ÕÐ ¤€„ô¹Õ±±ÁÑÈ¤($$%±…å½ÕÐ ¤´ù¥¹Ù…±¥‘…Ñ” ¤ì($%ÕÁ‘…Ñ••½µ•ÑÉä ¤ì(%ô)ô()‰½½°¥±Ñ•É…É‘I½Üèé•Ù•¹Ñ¥±Ñ•È¡E=‰©•Ð¨Ý…Ñ¡•°EÙ•¹Ð¨•Ù•¹Ð¤)ì(%ÍÝ¥Ñ €¡•Ù•¹Ð´ùÑåÁ” ¤¤(%ì(%…Í”EÙ•¹Ðèé¡¥±‘A½±¥Í¡•è(%ì($%E¡¥±‘Ù•¹Ð¨¡¥±‘Ù•¹Ð€ôÍÑ…Ñ¥}…ÍÐñE¡¥±‘Ù•¹Ð¨ø¡•Ù•¹Ð¤ì($%Ý…Ñ¡A½¥¹Ñ•ÉM•±•Ñ¥½¸¡Å½‰©•Ñ}…ÍÐñE]¥‘•Ð¨ø¡¡¥±‘Ù•¹Ð´ù¡¥± ¤¤¤ì($%‰É•…¬ì(%ô(%…Í”EÙ•¹Ðèé5½ÕÍ•	ÕÑÑ½¹AÉ•ÍÌè(%ì($%E5½ÕÍ•Ù•¹Ð¨µ½ÕÍ•Ù•¹Ð€ôÍÑ…Ñ¥}…ÍÐñE5½ÕÍ•Ù•¹Ð¨ø¡•Ù•¹Ð¤ì($%¥˜€¡µ½ÕÍ•Ù•¹Ð´ù‰ÕÑÑ½¸ ¤€ôôEÐèé1•™Ñ	ÕÑÑ½¸($$$˜˜µ½ÕÍ•Ù•¹Ð´ùµ½‘¥™¥•ÉÌ ¤€ôôEÐèé9½5½‘¥™¥•È($$$˜˜Ñ…‰±”€„ô¹Õ±±ÁÑÈ€˜˜¥Ñ•´€„ô¹Õ±±ÁÑÈ¤($%ì($$%Ñ…‰±”´ùÍ•±•Ñ=¹±åÉ½µ…É¡¥Ñ•´¤ì($%ô($%‰É•…¬ì(%ô(%…Í”EÙ•¹ÐèéI•Í¥é”è(%…Í”EÙ•¹ÐèéM¡½Üè(%…Í”EÙ•¹Ðèé1…å½ÕÑI•ÅÕ•ÍÐè(%ì($$¼¼]…Ñ¡•½‰©•ÑÌ…É”Ñ¡”•‘¥Ñ½ÈÍÉ½±°¥ÑÍ•±˜…¹¥ÑÌ½¹Ñ•¹ÐÝ¥‘•Ð($$¼¼€¡Ý¡½Í”Á…É•¹Ð¡…¥¸¥Ì½¹Ñ•¹Ð€´øÙ¥•ÝÁ½ÉÐ€´øÍÉ½±°¤¸($%EMÉ½±±É•„¨ÍÉ½±°€ôÅ½‰©•Ñ}…ÍÐñEMÉ½±±É•„¨ø¡Ý…Ñ¡•¤ì($%¥˜€¡ÍÉ½±°€ôô¹Õ±±ÁÑÈ€˜˜Ý…Ñ¡•´ùÁ…É•¹Ð ¤€„ô¹Õ±±ÁÑÈ¤($$%ÍÉ½±°€ôÅ½‰©•Ñ}…ÍÐñEMÉ½±±É•„¨ø¡Ý…Ñ¡•´ùÁ…É•¹Ð ¤´ùÁ…É•¹Ð ¤¤ì($%¥˜€¡ÍÉ½±°€„ô¹Õ±±ÁÑÈ¤($$%Íå¹‘¥Ñ½ÉMÉ½±±!•¥¡Ð¡ÍÉ½±°¤ì($%‰É•…¬ì(%ô(%‘•™…Õ±Ðè($%‰É•…¬ì(%ô(%É•ÑÕÉ¸E]¥‘•Ðèé•Ù•¹Ñ¥±Ñ•È¡Ý…Ñ¡•°•Ù•¹Ð¤ì)ô()¥¹Ð¥±Ñ•É…É‘I½ÜèéÉ½Ý%¹‘•¹ÑU¹¥ÑÌ ¤½¹ÍÐ)ì($¼¼5•µ‰•È±•Ù•°¥Ì½¹”Õ¹¥ÐÁ…ÍÐÑ¡”‰É…¹ ½Ñ…¥°É½ÜÌ½Ý¸Í•µ…¹Ñ¥Œ±•Ù•°($¼¼€¡‘•ÁÑ …±É•…‘ä…ÉÉ¥•Ì…¹ä•¹±½Í¥¹œ¡…¹¹•°É½ÕÀ°Í¼€¬Ä­••ÁÌµ¥á•($¼¼¡…¹¹•°à%˜¹•ÍÑ¥¹œ…±¥¹•Ý¥Ñ Ñ¡”‰±½¬µ•µ‰•ÉÌ¤¸(%¥˜€¡‘•ÍÉ¥ÁÑ½È¹ÑåÁ”€ôôEMÑÉ¥¹1¥Ñ•É…° ‰¥˜ˆ¤€˜˜‘•ÍÉ¥ÁÑ½È¹‰…‘”€„ôEMÑÉ¥¹1¥Ñ•É…° ‰%ˆ¤($$˜˜M­¥¹5…¹…•Èèé¥¹ÍÑ…¹” ¤´ù±½¥M¥‰±¥¹Í%¹‘•¹ÑÍ5•µ‰•ÉÌ ¤¤($%É•ÑÕÉ¸‘•ÍÉ¥ÁÑ½È¹‘•ÁÑ €¬€Äì(%É•ÑÕÉ¸‘•ÍÉ¥ÁÑ½È¹‘•ÁÑ ì)ô()Ù½¥¥±Ñ•É…É‘I½ÜèéÁ…¥¹ÑÙ•¹Ð¡EA…¥¹ÑÙ•¹Ð¨¤)ì($¼¼Q¡”…Ñ¥Ù”Í­¥¸µ…ä½Ý¸Ñ¡”Ý¡½±”Í½Á”ÕÑÑ•È€¡Ñ¡”%˜µ‰±½¬±…¹•Ì¤ì($¼¼Ñ¡”Í¡…É•¡…¹¹•°É…¥°‰•±½ÜÍÑ…åÌÑ¡”‘•™…Õ±Ð™½ÈÍ­¥¹ÌÑ¡…Ð‘¼¹½Ð($¼¼…¹ÍÝ•È¸(%ì($%EA…¥¹Ñ•ÈÕÑÑ•ÉA…¥¹Ñ•È¡Ñ¡¥Ì¤ì($%¥˜€¡M­¥¹5…¹…•Èèé¥¹ÍÑ…¹” ¤´ùÁ…¥¹ÑM½Á•ÕÑÑ•È¡ÕÑÑ•ÉA…¥¹Ñ•È°Í¥é” ¤°Ù¥ÍÕ…±%¹™¼¤¤($$%É•ÑÕÉ¸ì(%ô((%½¹ÍÐM­¥¹Q½­•¹Ì˜Ñ½­•¹Ì€ôM­¥¹5…¹…•Èèé¥¹ÍÑ…¹” ¤´ùÑ½­•¹Ì ¤ì(%¥˜€¡‘•ÍÉ¥ÁÑ½È¹‘•ÁÑ €ðô€À¤($%É•ÑÕÉ¸ì((%EA…¥¹Ñ•ÈÁ…¥¹Ñ•È¡Ñ¡¥Ì¤ì(%Á…¥¹Ñ•È¹Í•ÑI•¹‘•É!¥¹Ð¡EA…¥¹Ñ•Èèé¹Ñ¥…±¥…Í¥¹œ¤ì(%E½±½È½±½È¡‘•ÍÉ¥ÁÑ½È¹½±½È¤ì(%¥¹Ð¥¹‘•¹Ð€ô€à€¬€¡‘•ÍÉ¥ÁÑ½È¹‘•ÁÑ €´€Ä¤€¨Ñ½­•¹Ì¹¡…¹¹•±É½ÕÁ%¹‘•¹Ðì(%EI•Ð±¥¹•I•Ð¡¥¹‘•¹Ð°€À°Ñ½­•¹Ì¹¡…¹¹•±É½ÕÁ%¹‘•¹Ð°¡•¥¡Ð ¤¤ì((%ÍÝ¥Ñ €¡Ñ½­•¹Ì¹¡…¹¹•±É½ÕÁMÑå±”¤(%ì(%…Í”M­¥¹Q½­•¹ÌèéQÉ••1¥¹•Ìè($%Á…¥¹Ñ•È¹Í•ÑA•¸¡EA•¸¡E½±½È¡Ñ½­•¹Ì¹‰½É‘•È¤°€Ä¤¤ì($%Á…¥¹Ñ•È¹‘É…Ý1¥¹”¡±¥¹•I•Ð¹±•™Ð ¤€¬€Ü°€À°±¥¹•I•Ð¹±•™Ð ¤€¬€Ü°¡•¥¡Ð ¤¤ì($%Á…¥¹Ñ•È¹‘É…ÝQ•áÐ¡EI•Ð¡±¥¹•I•Ð¹±•™Ð ¤€¬€Ä°€À°€ÄØ°Ñ½­•¹Ì¹É½Ý!•¥¡Ð¤°EÐèé±¥¹•¹Ñ•È°EMÑÉ¥¹1¥Ñ•É…° ‰ðˆ¤¤ì($%‰É•…¬ì(%…Í”M­¥¹Q½­•¹Ìèé½ÑÑ•‘1¥¹”è($%Á…¥¹Ñ•È¹Í•ÑA•¸¡EA•¸¡½±½È°€Ä°EÐèé½Ñ1¥¹”¤¤ì($%Á…¥¹Ñ•È¹‘É…Ý1¥¹”¡±¥¹•I•Ð¹±•™Ð ¤€¬€Ô°€À°±¥¹•I•Ð¹±•™Ð ¤€¬€Ô°¡•¥¡Ð ¤¤ì($%‰É•…¬ì(%…Í”M­¥¹Q½­•¹ÌèéM½™ÑM¡…‘½Üè(%ì($%E1¥¹•…ÉÉ…‘¥•¹ÐÍ¡…‘½Ü¡±¥¹•I•Ð¹±•™Ð ¤°€À°±¥¹•I•Ð¹É¥¡Ð ¤°€À¤ì($%E½±½ÈÍÑ…ÉÐ€ô½±½Èì($%ÍÑ…ÉÐ¹Í•Ñ±Á¡„ Ìà¤ì($%E½±½È•¹€ô½±½Èì($%•¹¹Í•Ñ±Á¡„ À¤ì($%Í¡…‘½Ü¹Í•Ñ½±½ÉÐ À°ÍÑ…ÉÐ¤ì($%Í¡…‘½Ü¹Í•Ñ½±½ÉÐ Ä°•¹¤ì($%Á…¥¹Ñ•È¹™¥±±I•Ð¡±¥¹•I•Ð°Í¡…‘½Ü¤ì($%‰É•…¬ì(%ô(%…Í”M­¥¹Q½­•¹ÌèéÉ…‘¥•¹Ñ	…Èè(%‘•™…Õ±Ðè(%ì($%E1¥¹•…ÉÉ…‘¥•¹ÐÉ…‘¥•¹Ð¡±¥¹•I•Ð¹±•™Ð ¤°€À°±¥¹•I•Ð¹±•™Ð ¤°¡•¥¡Ð ¤¤ì($%E½±½ÈÍÑ…ÉÐ€ô½±½Èì($%ÍÑ…ÉÐ¹Í•Ñ±Á¡„ ÔÔ¤ì($%E½±½È•¹€ô½±½Èì($%•¹¹Í•Ñ±Á¡„ ÄÈ¤ì($%É…‘¥•¹Ð¹Í•Ñ½±½ÉÐ À°ÍÑ…ÉÐ¤ì($%É…‘¥•¹Ð¹Í•Ñ½±½ÉÐ Ä°•¹¤ì($%Á…¥¹Ñ•È¹™¥±±I•Ð¡EI•Ð¡±¥¹•I•Ð¹±•™Ð ¤€¬€Ü°€À°€Ì°¡•¥¡Ð ¤¤°É…‘¥•¹Ð¤ì($%‰É•…¬ì(%ô(%ô)ô((¼¼I•¹‘•ÉÌÑ¡”‰…‘”Á¥Ñ½É…´…ÐÑ¡”±…‰•°Ì‘•Ù¥”Á¥á•°É…Ñ¥¼¥¸Ñ¡”(¼¼Í­¥¸µÉ•Í½±Ù•¥¹¬¸Q¡”Ñ½½±‰…ÈÌU%!•±Á•ÈèéÑ¥¹Ñ•‘%½¸(¼¼‰…­•Ì„AH´ÄÁ¥áµ…À™½ÈE%½¸½¹ÍÕµ•ÉÌì„E1…‰•°¹••‘Ì…¸•áÁ±¥¥Ð(¼¼AHµ…Ý…É”Á¥áµ…À½ÈÑ¡”±åÁ ‰±ÕÉÌ½¸Í…±•‘¥ÍÁ±…åÌ¸=Ù•ÉÍ¡½½Ñ¥¹œÑ¡”(¼¼™¥±°Á…ÍÐÑ¡”‘•Ù¥”µ¥¹‘•Á•¹‘•¹ÐÍ¥é”¥Ì¡…Éµ±•ÍÌ€´Õ¹Ñ½Õ¡•Á¥á•±Ì¡…Ù”(¼¼¹¼½Ù•É…”™½È½µÁ½Í¥Ñ¥½¹5½‘•}M½ÕÉ•%¸Ñ¼Á…¥¹Ð½¸¸)ÍÑ…Ñ¥ŒEA¥áµ…À‰…‘•A¥Ñ½É…´¡½¹ÍÐEMÑÉ¥¹œ˜É•Í½ÕÉ”°½¹ÍÐE½±½È˜¥¹¬°¥¹ÐÍ¥é”°ÅÉ•…°‘•Ù¥•A¥á•±I…Ñ¥¼¤)ì(%½¹ÍÐEMÑÉ¥¹œ…¡•-•ä€ôEMÑÉ¥¹1¥Ñ•É…° ‰¥±Ñ•É…É‘	…‘”è”Äè”Èè”Ìè”Ðˆ¤($$¹…Éœ¡É•Í½ÕÉ”°¥¹¬¹¹…µ”¡E½±½Èèé!•áÉˆ¤¤($$¹…Éœ¡Í¥é”¤($$¹…Éœ¡‘•Ù¥•A¥á•±I…Ñ¥¼°€À°€˜œ°€Ì¤ì(%EA¥áµ…À…¡•ì(%¥˜€¡EA¥áµ…Á…¡”èé™¥¹¡…¡•-•ä°€™…¡•¤¤($%É•ÑÕÉ¸…¡•ì((%EA¥áµ…ÀÁ¥áµ…À€ôE%½¸¡É•Í½ÕÉ”¤¹Á¥áµ…À¡EM¥é”¡Í¥é”°Í¥é”¤°‘•Ù¥•A¥á•±I…Ñ¥¼¤ì(%¥˜€¡Á¥áµ…À¹¥Í9Õ±° ¤¤($%É•ÑÕÉ¸Á¥áµ…Àì(%EA…¥¹Ñ•ÈÁ…¥¹Ñ•È ™Á¥áµ…À¤ì(%Á…¥¹Ñ•È¹Í•Ñ½µÁ½Í¥Ñ¥½¹5½‘”¡EA…¥¹Ñ•Èèé½µÁ½Í¥Ñ¥½¹5½‘•}M½ÕÉ•%¸¤ì(%Á…¥¹Ñ•È¹™¥±±I•Ð¡Á¥áµ…À¹É•Ð ¤°¥¹¬¤ì(%Á…¥¹Ñ•È¹•¹ ¤ì(%EA¥áµ…Á…¡”èé¥¹Í•ÉÐ¡…¡•-•ä°Á¥áµ…À¤ì(%É•ÑÕÉ¸Á¥áµ…Àì)ô()Ù½¥¥±Ñ•É…É‘I½ÜèéÉ•‰Õ¥±‘MÕµµ…Éä ¤)ì($¼¼‘•ÍÉ¥‰•1¥¹” ¤…¹¹½ÐÍ•”¹•¥¡‰½ÕÉ¥¹œ±¥¹•Ì°Í¼Ñ¡”%˜µÍ½Á”½Õ¹Ð¥Ì($¼¼…ÉÉ¥•½Ù•È™É½´Ñ¡”ÁÉ•Ù¥½ÕÌ‘•ÍÉ¥ÁÑ½È€¡…ÍÍ¥¹•‰äÑ¡”½¹ÍÑÉÕÑ½È€¼($¼¼ÕÁ‘…Ñ•I½ÝA½Í¥Ñ¥½¸™É½´…±Õ±…Ñ•M½Á•Ì¤¸(%½¹ÍÐ¥¹Ð±½¥•ÁÑ €ô‘•ÍÉ¥ÁÑ½È¹±½¥•ÁÑ ì(%½¹ÍÐEMÑÉ¥¹1¥ÍÐÍ½Á•¡…¹¹•±Ì€ô‘•ÍÉ¥ÁÑ½È¹Í½Á•¡…¹¹•±Ìì(%‘•ÍÉ¥ÁÑ½È€ô¥±Ñ•É…É‘5½‘•°èé‘•ÍÉ¥‰•1¥¹”¡¥Ñ•´´ùÑ•áÐ°‘•ÍÉ¥ÁÑ½È¹‘•ÁÑ ¤ì(%‘•ÍÉ¥ÁÑ½È¹±½¥•ÁÑ €ô±½¥•ÁÑ ì(%‘•ÍÉ¥ÁÑ½È¹Í½Á•¡…¹¹•±Ì€ôÍ½Á•¡…¹¹•±Ìì(%…ÁÁ±å•ÍÉ¥ÁÑ½È ¤ì)ô()Ù½¥¥±Ñ•É…É‘I½Üèé…ÁÁ±å•ÍÉ¥ÁÑ½È ¤)ì(($¼¼	±…¹¬±¥¹•ÌÉ•¹‘•È…Ì„Ñ¡¥¸ÍÁ…•Èè¹¼¡•…‘•È°¹¼‰½‘ä°¹¼É…ÜÁÉ•Ù¥•Ü¸($¼¼Q¡”…É™É…µ”¥ÑÍ•±˜ÍÑ…åÌÙ¥Í¥‰±”€¡Í¼¥ÑÌ‰…­É½Õ¹™¥±±ÌÑ¡”…À…¹($¼¼Í½Á”µÉ…¥°Á…¥¹Ñ¥¹œÍÑ¥±°Ý½É­Ì™½È¥¹‘•¹Ñ•‰±½­Ì¤‰ÕÐ¥Ì½±±…ÁÍ•($¼¼Ñ¼„Íµ…±°™¥á•¡•¥¡Ð‰äÍ¥é•!¥¹Ð ¤€¼µ¥¹¥µÕµM¥é•!¥¹Ð ¤‰•±½Ü¸(%½¹ÍÐ‰½½°¥ÍMÁ…•È€ô‘•ÍÉ¥ÁÑ½È¹ÑåÁ”€ôôEMÑÉ¥¹1¥Ñ•É…° ‰ÍÁ…•Èˆ¤ì(%¥˜€¡¡•…‘•É]¥‘•Ð€„ô¹Õ±±ÁÑÈ¤($%¡•…‘•É]¥‘•Ð´ùÍ•ÑY¥Í¥‰±” …¥ÍMÁ…•È¤ì(%¥˜€¡‰½‘åMÑ…¬€„ô¹Õ±±ÁÑÈ¤($%‰½‘åMÑ…¬´ùÍ•ÑY¥Í¥‰±” …¥ÍMÁ…•È€˜˜•áÁ…¹‘	ÕÑÑ½¸€„ô¹Õ±±ÁÑÈ€˜˜•áÁ…¹‘	ÕÑÑ½¸´ù¥Í¡•­• ¤¤ì(%¥˜€¡¥ÍMÁ…•È¤(%ì($%¥˜€¡É…ÝAÉ•Ù¥•Ý1…‰•°€„ô¹Õ±±ÁÑÈ¤($$%É…ÝAÉ•Ù¥•Ý1…‰•°´ùÍ•ÑY¥Í¥‰±”¡™…±Í”¤ì($%Íå¹Y¥ÍÕ…±MÑ…Ñ” ¤ì($%ÕÁ‘…Ñ••½µ•ÑÉä ¤ì($%ÕÁ‘…Ñ” ¤ì($%É•ÑÕÉ¸ì(%ô((%½¹ÍÐ	…‘•QÉ•…Ñµ•¹Ð‰…‘•QÉ•…Ñµ•¹Ð€ôM­¥¹5…¹…•Èèé¥¹ÍÑ…¹” ¤´ù‰…‘•QÉ•…Ñµ•¹Ð ($%ÕÉÉ•¹ÑI½Ý%¹™¼ ¤°‘•ÍÉ¥ÁÑ½È¹½±½È°‘•ÍÉ¥ÁÑ½È¹‰…‘”¤ì($¼¼Q¡”‰…‘”¡É½µ”…¹Á¥Ñ½É…´¥¹¬…É”½¹”Í­¥¸µ½Ý¹•‘•¥Í¥½¸¸($¼¼=¹±äÑ½Õ Ñ¡”Ý¥‘•ÐÝ¡•¸Ñ¡”ÍÑå±”…ÑÕ…±±ä¡…¹•èÍ•ÑMÑå±•M¡••Ð($¼¼Õ¹½¹‘¥Ñ¥½¹…±±äÉ•‰Õ¥±‘ÌÑ¡”Ý¥‘•ÐÌÍÑå±”°…¹…ÁÁ±å•ÍÉ¥ÁÑ½ÈÉÕ¹Ì($¼¼……¥¸½¸•Ù•ÉäÍÕµµ…ÉäÉ•‰Õ¥±¸(%¥˜€¡ÑåÁ•	…‘”´ùÍÑå±•M¡••Ð ¤€„ô‰…‘•QÉ•…Ñµ•¹Ð¹ÅÍÌ¤($%ÑåÁ•	…‘”´ùÍ•ÑMÑå±•M¡••Ð¡‰…‘•QÉ•…Ñµ•¹Ð¹ÅÍÌ¤ì($¼¼Q¡”µ½¹½É…´ÍÕÉÙ¥Ù•Ì½¹±ä™½È±¥¹•ÌÑ¡”¥½¸($¼¼…Ñ…±½œ‘½•Ì¹½Ðµ…À€¡É…ÜÑ•áÐ¤°Í¼Õ¹­¹½Ý¸½µµ…¹‘Ì­••ÀÉ•…‘¥¹œ($¼¼¥¹ÍÑ•…½˜½¥¹œ‰±…¹¬¸(%½¹ÍÐEMÑÉ¥¹œ‰…‘•%½¸€ô¥±Ñ•É…É‘5½‘•°èé‰…‘•%½¹I•Í½ÕÉ”¡‘•ÍÉ¥ÁÑ½È¹ÑåÁ”°‘•ÍÉ¥ÁÑ½È¹‰…‘”¤ì(%¥˜€¡‰…‘•%½¸¹¥ÍµÁÑä ¤¤(%ì($%ÑåÁ•	…‘”´ùÍ•ÑA¥áµ…À¡EA¥áµ…À ¤¤ì($%ÑåÁ•	…‘”´ùÍ•ÑQ•áÐ¡‘•ÍÉ¥ÁÑ½È¹‰…‘”¤ì(%ô(%•±Í”(%ì($%ÑåÁ•	…‘”´ùÍ•ÑQ•áÐ¡EMÑÉ¥¹œ ¤¤ì($%ÑåÁ•	…‘”´ùÍ•ÑA¥áµ…À¡‰…‘•A¥Ñ½É…´¡‰…‘•%½¸°‰…‘•QÉ•…Ñµ•¹Ð¹¥¹¬°€ÄØ°‘•Ù¥•A¥á•±I…Ñ¥½ ¤¤¤ì(%ô(%Ñ¥Ñ±•1…‰•°´ùÍ•ÑÕ±±Q•áÐ¡‘•ÍÉ¥ÁÑ½È¹Ñ¥Ñ±”¤ì(%ÍÕµµ…Éå1…‰•°´ùÍ•ÑÕ±±Q•áÐ¡‘•ÍÉ¥ÁÑ½È¹ÍÕµµ…Éä¤ì($¼¼±¥¹”Ñ¡”•¹¥¹”½Õ±¹½ÐÕÍ”Í…åÌÝ¡ä½¸¡½Ù•È¸Q¡”…¹…±åÍ¥ÌÉÕ¸¥ÌÝ¡…Ð($¼¼ÁÉ½‘Õ•ÌÑ¡”É•…Í½¸°Í¼Ñ¡¥Ì¥Ì•µÁÑäÕ¹Ñ¥°½¹”¡…Ì¡…ÁÁ•¹•…¹½•ÌÍÑ…±”($¼¼½¸•‘¥Ð°±¥­”•Ù•Éä½Ñ¡•È±½…™…Ð¸(%½¹ÍÐEMÑÉ¥¹œÁ…ÉÍ•ÉÉ½È€ôÕÉÉ•¹ÑI½Ý%¹™¼ ¤¹Á…ÉÍ•ÉÉ½Èì(%ÍÕµµ…Éå1…‰•°´ùÍ•ÑQ½½±Q¥À¡Á…ÉÍ•ÉÉ½È¹¥ÍµÁÑä ¤€ü‘•ÍÉ¥ÁÑ½È¹ÍÕµµ…Éä($$èÑÈ ‰Q¡¥Ì±¥¹”Ý…Ì¹½Ð…ÁÁ±¥•è€”Äˆ¤¹…Éœ¡Á…ÉÍ•ÉÉ½È¤¤ì($¼¼Q¡”Ñ•áÐÍÑ…åÌÕÉÉ•¹Ð•Ù•¸Ý¡¥±”Ñ¡”±…‰•°¥Ì¡¥‘‘•¸èÍ­¥¹Ìµ…äÉ•…($¼¼¥Ð…ÌÑ¡”±¥Ù”É…ÜµÍÁ•ŒÍ½ÕÉ”¥¹ÍÑ•…½˜Í¡½Ý¥¹œÑ¡”±…‰•°¥ÑÍ•±˜($¼¼€¡5…ÑÉ¥áI½Ý…ÁÑ¥½¸Ì…ÁÑ¥½¸ÍÑÉ¥À‘½•Ì¤¸(%É…ÝAÉ•Ù¥•Ý1…‰•°´ùÍ•ÑQ•áÐ¡ÑÈ ‰I…Üˆ¤€¬EMÑÉ¥¹1¥Ñ•É…° ˆ€€ˆ¤€¬¥Ñ•´´ùÑ•áÐ¤ì(%½¹ÍÐM­¥¹Q½­•¹Ì˜Ñ½­•¹Ì€ôM­¥¹5…¹…•Èèé¥¹ÍÑ…¹” ¤´ùÑ½­•¹Ì ¤ì(%É…ÝAÉ•Ù¥•Ý1…‰•°´ùÍ•ÑY¥Í¥‰±”¡Ñ½­•¹Ì¹Í¡½ÝI…ÝAÉ•Ù¥•Ü¤ì($¼¼M­¥¹ÌÝ¥Ñ¡½ÕÐ„É…ÜÁÉ•Ù¥•Ü¹•Ù•ÈÍ¡½ÜÑ¡”±…‰•°°…¹É½ÝÌ…É”É•‰Õ¥±Ð($¼¼½¸•Ù•ÉäÍ­¥¸ÍÝ¥Ñ €´Í­¥ÀÑ¡”Á•ÈµÝ¥‘•ÐÍÑå±•Í¡••Ð™½ÈÑ¡•´¸(%¥˜€¡Ñ½­•¹Ì¹Í¡½ÝI…ÝAÉ•Ù¥•Ü¤(%ì($%½¹ÍÐEMÑÉ¥¹œÁÉ•Ù¥•ÝMÑå±”€ôEMÑÉ¥¹1¥Ñ•É…° ‰E1…‰•°¥±Ñ•É…É‘I…ÝAÉ•Ù¥•Üì‰…­É½Õ¹è€”Äì½±½Èè€”Èì‰½É‘•ÈµÑ½Àè€ÅÁàÍ½±¥€”ÌìÁ…‘‘¥¹œè€ÑÁà€ÄÉÁàì™½¹Ðµ™…µ¥±äèpˆ”Ñpˆì™½¹ÐµÍ¥é”è€åÁÐìôˆ¤($$$¹…Éœ¡Ñ½­•¹Ì¹ÍÕÉ™…•MÕ¹­•¸°Ñ½­•¹Ì¹µÕÑ•‘Q•áÐ°Ñ½­•¹Ì¹‰½É‘•È°Ñ½­•¹Ì¹µ½¹½½¹Ñ…µ¥±ä¤ì($%¥˜€¡É…ÝAÉ•Ù¥•Ý1…‰•°´ùÍÑå±•M¡••Ð ¤€„ôÁÉ•Ù¥•ÝMÑå±”¤($$%É…ÝAÉ•Ù¥•Ý1…‰•°´ùÍ•ÑMÑå±•M¡••Ð¡ÁÉ•Ù¥•ÝMÑå±”¤ì(%ô(%•¹…‰±•‘	ÕÑÑ½¸´ù‰±½­M¥¹…±Ì¡ÑÉÕ”¤ì(%•¹…‰±•‘	ÕÑÑ½¸´ùÍ•Ñ¡•­•¡‘•ÍÉ¥ÁÑ½È¹•¹…‰±•¤ì(%•¹…‰±•‘	ÕÑÑ½¸´ùÍ•Ñ%½¸¡E%½¸¡‘•ÍÉ¥ÁÑ½È¹•¹…‰±•€üEMÑÉ¥¹1¥Ñ•É…° ˆè½¥½¹Ì½Á½Ý•É}½¸¹ÍÙœˆ¤€èEMÑÉ¥¹1¥Ñ•É…° ˆè½¥½¹Ì½Á½Ý•É}½™˜¹ÍÙœˆ¤¤¤ì(%•¹…‰±•‘	ÕÑÑ½¸´ù‰±½­M¥¹…±Ì¡™…±Í”¤ì(%•¹…‰±•‘	ÕÑÑ½¸´ùÍ•ÑY¥Í¥‰±”¡‘•ÍÉ¥ÁÑ½È¹…¹Q½±•¹…‰±•¤ì($¼¼¥Í…‰±”½¹±äÑ¡”‰½‘ä•‘¥Ñ½ÈÝ¡•¸Ñ¡”±¥¹”¥Ì½µµ•¹Ñ•½ÕÐ¸Q¡¥Ì­••ÁÌ($¼¼Ñ¡”…É™É…µ”€¡…¹¥ÑÌ¡•…‘•È‰ÕÑÑ½¹Ì€´¥¹±Õ‘¥¹œÑ¡”•¹…‰±”Ñ½±”…¹($¼¼Ñ¡”É…Üµ•‘¥Ð…™™½É‘…¹”¤¥¹Ñ•É…Ñ¥Ù”Í¼Ñ¡”ÕÍ•È…¸™±¥ÀÑ¡”±¥¹”‰…¬½¸¸($¼¼ÁÕÉ”½µµ•¹ÐÉ½Ü¥Ì€‰‘¥Í…‰±•ˆ‰ä‘•™¥¹¥Ñ¥½¸€¡Ñ¡”±¥¹”ÍÑ…ÉÑÌÝ¥Ñ €œŒœ¤°($¼¼‰ÕÐ¥ÑÌ‰½‘ä%LÑ¡”¹½Ñ”•‘¥Ñ½È€´­••À¥Ð•‘¥Ñ…‰±”¸(%¥˜€¡Õ¤€„ô¹Õ±±ÁÑÈ¤($%Õ¤´ùÍ•Ñ¹…‰±•¡‘•ÍÉ¥ÁÑ½È¹•¹…‰±•ñð‘•ÍÉ¥ÁÑ½È¹ÑåÁ”€ôôEMÑÉ¥¹1¥Ñ•É…° ‰½µµ•¹Ðˆ¤¤ì($¼¼É½ÜÌ½Ý¸¡…¹¹•°±¥ÍÐ€¡Ñ¡”¡…¹¹•°…ÉÌÍ•±•Ñ¥½¸°½ÁäÌ($¼¼‘•ÍÑ¥¹…Ñ¥½¹Ì¤Ý¥¹Ì¸=Ñ¡•ÈÉ½ÝÌ¥¹Í¥‘”„¡…¹¹•°èÍ•±•Ñ¥½¸¥¹¡•É¥ÐÑ¡”($¼¼Í•±•Ñ¥½¸Ì‰…‘•Ì°Í¼Ñ¡”É½ÕÀÌÉ•… ¥ÌÉ•…‘…‰±”½¸•Ù•Éäµ•µ‰•È($¼¼É½Ü¥¹ÍÑ•…½˜½¹±ä½¸¥ÑÌ¡•…€´‰ÕÐ½¹±ä™½ÈÉ½ÜÑåÁ•ÌÑ¡”•¹¥¹”($¼¼…ÑÕ…±±ä¹…ÉÉ½ÝÌÑ¼Ñ¡”Í•±•Ñ¥½¸ì½¹ÑÉ½°É½ÝÌ°¹½Ñ•Ì…¹É…ÜÑ•áÐ($¼¼Ý½Õ±±…¥´…¸¥¹™±Õ•¹”Ñ¡•ä‘¼¹½Ð¡…Ù”¸(%EMÑÉ¥¹1¥ÍÐ‰…‘•¡…¹¹•±Ì€ô‘•ÍÉ¥ÁÑ½È¹¡…¹¹•±	…‘•Ìì(%¥˜€¡‰…‘•¡…¹¹•±Ì¹¥ÍµÁÑä ¤€˜˜¡…¹¹•±M•±•Ñ¥½¹…Ñ•ÍQåÁ”¡‘•ÍÉ¥ÁÑ½È¹ÑåÁ”¤¤($%‰…‘•¡…¹¹•±Ì€ô‘•ÍÉ¥ÁÑ½È¹Í½Á•¡…¹¹•±Ìì(%‰Õ¥±‘¡…¹¹•±	…‘•Ì¡‰…‘•¡…¹¹•±Ì¤ì(%Íå¹Y¥ÍÕ…±MÑ…Ñ” ¤ì(%ÕÁ‘…Ñ” ¤ì)ô()Ù½¥¥±Ñ•É…É‘I½Üèé‰Õ¥±‘¡…¹¹•±	…‘•Ì¡½¹ÍÐEMÑÉ¥¹1¥ÍÐ˜¡…¹¹•±Ì¤)ì(%¥˜€¡¡…¹¹•±Ì€ôôÉ•¹‘•É•‘¡…¹¹•±	…‘•Ì¤($%É•ÑÕÉ¸ì(%É•¹‘•É•‘¡…¹¹•±	…‘•Ì€ô¡…¹¹•±Ìì((%Ý¡¥±”€¡E1…å½ÕÑ%Ñ•´¨¡¥±€ô¡…¹¹•±	…‘•1…å½ÕÐ´ùÑ…­•Ð À¤¤(%ì($%‘•±•Ñ”¡¥±´ùÝ¥‘•Ð ¤ì($%‘•±•Ñ”¡¥±ì(%ô((%™½È€¡½¹ÍÐEMÑÉ¥¹œ˜¡…¹¹•°€è¡…¹¹•±Ì¹µ¥ À°€à¤¤($%¡…¹¹•±	…‘•1…å½ÕÐ´ù…‘‘]¥‘•Ð¡¹•Ü¡	…‘”¡¡…¹¹•°°¡…¹¹•±	…‘•½¹Ñ…¥¹•È¤¤ì(%¡…¹¹•±	…‘•½¹Ñ…¥¹•È´ùÍ•ÑY¥Í¥‰±” …¡…¹¹•±Ì¹¥ÍµÁÑä ¤¤ì)ô()Ù½¥¥±Ñ•É…É‘I½ÜèéÕÁ‘…Ñ•5½‘•° ¤)ì(%%¥±Ñ•ÉU$¨Í•¹‘•ÉÕ¤€ôÅ½‰©•Ñ}…ÍÐñ%¥±Ñ•ÉU$¨ø¡E=‰©•ÐèéÍ•¹‘•È ¤¤ì(%¥˜€¡Í•¹‘•ÉÕ¤€ôô¹Õ±±ÁÑÈ¤($%É•ÑÕÉ¸ì((%EMÑÉ¥¹œ½µµ…¹ì(%EMÑÉ¥¹œÁ…É…µ•Ñ•ÉÌì(%Í•¹‘•ÉÕ¤´ùÍÑ½É”¡½µµ…¹°Á…É…µ•Ñ•ÉÌ¤ì($¼¼€ˆŒˆ¥ÌÑ¡”½µµ•¹Ð…ÉÌÍ•¹Ñ¥¹•°è„ÁÕÉ”½µµ•¹Ð±¥¹”¡…Ì¹¼½±½¸°Í¼($¼¼¥Ð¥ÌÉ•…ÍÍ•µ‰±•…Ì€ˆŒ€ñÑ•áÐøˆ€¡„‰…É”€ˆŒˆÝ¡•¸Ñ¡”¹½Ñ”¥Ì•µÁÑä¤¸(%¥˜€¡½µµ…¹€ôôEMÑÉ¥¹1¥Ñ•É…° ˆŒˆ¤¤($%¥Ñ•´´ùÑ•áÐ€ôÁ…É…µ•Ñ•ÉÌ¹¥ÍµÁÑä ¤€üEMÑÉ¥¹1¥Ñ•É…° ˆŒˆ¤€èEMÑÉ¥¹1¥Ñ•É…° ˆŒ€ˆ¤€¬Á…É…µ•Ñ•ÉÌì(%•±Í”($%¥Ñ•´´ùÑ•áÐ€ô½µµ…¹€¬EMÑÉ¥¹1¥Ñ•É…° ˆè€ˆ¤€¬Á…É…µ•Ñ•ÉÌì(%É•‰Õ¥±‘MÕµµ…Éä ¤ì(%Ñ…‰±”´ùÕÁ‘…Ñ•5½‘•° ¤ì)ô()Ù½¥¥±Ñ•É…É‘I½ÜèéÉ½ÕÑ¥¹‘¥Ñ• ¤)ì(%¥˜€¡É½ÕÑ¥¹Y¥•Ü€ôô¹Õ±±ÁÑÈ¤($%É•ÑÕÉ¸ì((%½¹ÍÐEMÑÉ¥¹œÁ…É…µ•Ñ•ÉÌ€ô½ÁåI½ÕÑ¥¹‘…ÁÑ•ÈèéÍ•É¥…±¥é”¡É½ÕÑ¥¹Y¥•Ü´ù…ÍÍ¥¹µ•¹ÑÌ ¤¤ì(%¥Ñ•´´ùÑ•áÐ€ôEMÑÉ¥¹1¥Ñ•É…° ‰½Áäè€ˆ¤€¬Á…É…µ•Ñ•ÉÌì(%É•‰Õ¥±‘MÕµµ…Éä ¤ì(%Ñ…‰±”´ùÕÁ‘…Ñ•5½‘•° ¤ì)ô()Ù½¥¥±Ñ•É…É‘I½Üèé…‘‘‰½Ù” ¤)ì(%¥±Ñ•ÉQ•µÁ±…Ñ”™¥±Ñ•ÉQ•µÁ±…Ñ”ì(%¥˜€¡Ñ…‰±”´ù¡½½Í•¥±Ñ•ÉQ•µÁ±…Ñ” ™™¥±Ñ•ÉQ•µÁ±…Ñ”°…‘‘	ÕÑÑ½¸´ùµ…ÁQ½±½‰…°¡EA½¥¹Ð À°…‘‘	ÕÑÑ½¸´ù¡•¥¡Ð ¤¤¤¤¤(%ì($$¼¼…É¡•…‘•ÈÌ€¬‰•±½¹ÌÑ¼Ñ¡…Ð…ÉÌ±•…‘¥¹œ•‘”è…‘‘1¥¹”Ñ…­•Ì($$¼¼…¸¥¹Í•ÉÐµ‰•™½É”…¹¡½È°Í¼Ñ¡¥ÌÉ½Ü¥ÑÍ•±˜¥ÌÑ¡”‘•Í¥É•…¹¡½È¸($%Ñ…‰±”´ù…‘‘1¥¹”¡™¥±Ñ•ÉQ•µÁ±…Ñ”¹•Ñ1¥¹” ¤°¥Ñ•´¤ì($%¥±Ñ•ÉQ…‰±”¨Ñ…É•ÑQ…‰±”€ôÑ…‰±”ì($%EQ¥µ•ÈèéÍ¥¹±•M¡½Ð À°Ñ…É•ÑQ…‰±”°mÑ…É•ÑQ…‰±•t ¤ì($$%Ñ…É•ÑQ…‰±”´ùÕÁ‘…Ñ•Õ¥Ì ¤ì($%ô¤ì(%ô)ô()Ù½¥¥±Ñ•É…É‘I½ÜèéÉ•µ½Ù•Q¡¥Ì ¤)ì(%¥±Ñ•ÉQ…‰±”¨Ñ…É•ÑQ…‰±”€ôÑ…‰±”ì(%¥±Ñ•ÉQ…‰±”èé%Ñ•´¨Ñ…É•Ñ%Ñ•´€ô¥Ñ•´ì(%EQ¥µ•ÈèéÍ¥¹±•M¡½Ð À°Ñ…É•ÑQ…‰±”°mÑ…É•ÑQ…‰±”°Ñ…É•Ñ%Ñ•µt ¤ì($%Ñ…É•ÑQ…‰±”´ùÉ•µ½Ù•%Ñ•´¡Ñ…É•Ñ%Ñ•´¤ì($%Ñ…É•ÑQ…‰±”´ùÕÁ‘…Ñ•Õ¥Ì ¤ì(%ô¤ì)ô()Ù½¥¥±Ñ•É…É‘I½Üèé•‘¥ÑQ•áÑQ½±•¡‰½½°¡•­•¤)ì(%Í•Ñ‘¥Ñ¥¹œ¡¡•­•¤ì)ô()Ù½¥¥±Ñ•É…É‘I½ÜèéÍ•Ñ‘¥Ñ¥¹œ¡‰½½°•‘¥Ñ¥¹œ¤)ì(%¥˜€¡•‘¥Ñ¥¹œ¤(%ì($%±¥¹•‘¥Ð´ùÍ•ÑQ•áÐ¡¥Ñ•´´ùÑ•áÐ¤ì($%‰½‘åMÑ…¬´ùÍ•ÑÕÉÉ•¹Ñ]¥‘•Ð¡±¥¹•‘¥Ð¤ì($%‰½‘åMÑ…¬´ùÍ•ÑY¥Í¥‰±”¡ÑÉÕ”¤ì($%•áÁ…¹‘	ÕÑÑ½¸´ùÍ•Ñ¡•­•¡ÑÉÕ”¤ì($%±¥¹•‘¥Ð´ùÍ•Ñ½ÕÌ ¤ì($%±¥¹•‘¥Ð´ùÍ•±•Ñ±° ¤ì(%ô(%•±Í”¥˜€¡Õ¤€„ô¹Õ±±ÁÑÈ¤(%ì($%‰½‘åMÑ…¬´ùÍ•ÑÕÉÉ•¹Ñ%¹‘•à Ä¤ì(%ô(%•±Í”¥˜€¡‰½‘åMÑ…¬´ù½Õ¹Ð ¤€ø€Ä¤(%ì($%‰½‘åMÑ…¬´ùÍ•ÑÕÉÉ•¹Ñ%¹‘•à Ä¤ì(%ô)ô()Ù½¥¥±Ñ•É…É‘I½Üèé±¥¹•‘¥Ñ¥¹¥¹¥Í¡• ¤)ì(%¥˜€¡‰½‘åMÑ…¬´ùÕÉÉ•¹Ñ]¥‘•Ð ¤€ôô±¥¹•‘¥Ð€˜˜€…•‘¥Ñ¥¹½¹”¤(%ì($%•‘¥Ñ¥¹½¹”€ôÑÉÕ”ì($%¥˜€¡±¥¹•‘¥Ð´ùÑ•áÐ ¤€„ô¥Ñ•´´ùÑ•áÐ¤($%ì($$%¥Ñ•´´ùÑ•áÐ€ô±¥¹•‘¥Ð´ùÑ•áÐ ¤ì($$%Ñ…‰±”´ùÕÁ‘…Ñ•5½‘•° ¤ì($$%•‘¥Ñ¥¹½¹”€ô™…±Í”ì($$%¥±Ñ•ÉQ…‰±”¨Ñ…É•ÑQ…‰±”€ôÑ…‰±”ì($$%EQ¥µ•ÈèéÍ¥¹±•M¡½Ð À°Ñ…É•ÑQ…‰±”°mÑ…É•ÑQ…‰±•t ¤ì($$$%Ñ…É•ÑQ…‰±”´ùÕÁ‘…Ñ•Õ¥Ì ¤ì($$%ô¤ì($$%É•ÑÕÉ¸ì($%ô($%•‘¥Ñ	ÕÑÑ½¸´ùÍ•Ñ¡•­•¡™…±Í”¤ì($%•‘¥Ñ¥¹½¹”€ô™…±Í”ì(%ô)ô()EMÑÉ¥¹œ¥±Ñ•É…É‘I½ÜèéÕ¹½µµ•¹Ñ•‘1¥¹” ¤½¹ÍÐ)ì(%EI•Õ±…ÉáÁÉ•ÍÍ¥½¸½µµ•¹ÑAÉ•™¥à¡EMÑÉ¥¹1¥Ñ•É…° ‰x¡qqÌ¨¤qqÌüˆ¤¤ì(%EI•Õ±…ÉáÁÉ•ÍÍ¥½¹5…Ñ µ…Ñ €ô½µµ•¹ÑAÉ•™¥à¹µ…Ñ ¡¥Ñ•´´ùÑ•áÐ¤ì(%¥˜€¡µ…Ñ ¹¡…Í5…Ñ  ¤¤($%É•ÑÕÉ¸µ…Ñ ¹…ÁÑÕÉ• Ä¤€¬¥Ñ•´´ùÑ•áÐ¹µ¥¡µ…Ñ ¹…ÁÑÕÉ•‘¹ À¤¤ì(%É•ÑÕÉ¸¥Ñ•´´ùÑ•áÐì)ô()Ù½¥¥±Ñ•É…É‘I½Üèé•¹…‰±•‘Q½±•¡‰½½°¡•­•¤)ì(%¥˜€ …‘•ÍÉ¥ÁÑ½È¹…¹Q½±•¹…‰±•¤($%É•ÑÕÉ¸ì((%¥˜€¡•¹…‰±•‘	ÕÑÑ½¸€„ô¹Õ±±ÁÑÈ¤($%•¹…‰±•‘	ÕÑÑ½¸´ùÍ•Ñ%½¸¡E%½¸¡¡•­•€üEMÑÉ¥¹1¥Ñ•É…° ˆè½¥½¹Ì½Á½Ý•É}½¸¹ÍÙœˆ¤€èEMÑÉ¥¹1¥Ñ•É…° ˆè½¥½¹Ì½Á½Ý•É}½™˜¹ÍÙœˆ¤¤¤ì((%EMÑÉ¥¹œÑÉ¥µµ•€ô¥Ñ•´´ùÑ•áÐ¹ÑÉ¥µµ• ¤ì(%¥˜€¡¡•­•€˜˜ÑÉ¥µµ•¹ÍÑ…ÉÑÍ]¥Ñ  œŒœ¤¤($%¥Ñ•´´ùÑ•áÐ€ôÕ¹½µµ•¹Ñ•‘1¥¹” ¤ì(%•±Í”¥˜€ …¡•­•€˜˜€…ÑÉ¥µµ•¹ÍÑ…ÉÑÍ]¥Ñ  œŒœ¤¤($%¥Ñ•´´ùÑ•áÐ€ôEMÑÉ¥¹1¥Ñ•É…° ˆŒ€ˆ¤€¬¥Ñ•´´ùÑ•áÐì((%Ñ…‰±”´ùÕÁ‘…Ñ•5½‘•° ¤ì(%¥±Ñ•ÉQ…‰±”¨Ñ…É•ÑQ…‰±”€ôÑ…‰±”ì(%¥±Ñ•ÉQ…‰±”èé%Ñ•´¨Ñ…É•Ñ%Ñ•´€ô¥Ñ•´ì($¼¼%¸µÁ±…”É•™É•Í è½¹±äÑ¡”Ñ½±•É½ÜÌU$¹••‘ÌÑ¼¡…¹”¸™Õ±°($¼¼ÕÁ‘…Ñ•Õ¥Ì ¤½¸„€ÔÀÀ¬É½Ü½¹™¥œ¥ÌÑ¡”‘½µ¥¹…¹ÐÍ½ÕÉ”½˜Ñ½±”($¼¼±…Ñ•¹ä¸(%EQ¥µ•ÈèéÍ¥¹±•M¡½Ð À°Ñ…É•ÑQ…‰±”°mÑ…É•ÑQ…‰±”°Ñ…É•Ñ%Ñ•µt ¤ì($%Ñ…É•ÑQ…‰±”´ùÕÁ‘…Ñ•M¥¹±•I½ÝÕ¤¡Ñ…É•Ñ%Ñ•´¤ì(%ô¤ì)ô()Ù½¥¥±Ñ•É…É‘I½Üèé•áÁ…¹‘•‘Q½±•¡‰½½°¡•­•¤)ì(%•áÁ…¹‘	ÕÑÑ½¸´ùÍ•ÑQ•áÐ¡¡•­•€üEMÑÉ¥¹1¥Ñ•É…° ‰Øˆ¤€èEMÑÉ¥¹1¥Ñ•É…° ˆøˆ¤¤ì(%‰½‘åMÑ…¬´ùÍ•ÑY¥Í¥‰±”¡¡•­•¤ì)ô()Ù½¥¥±Ñ•É…É‘I½ÜèéÍå¹Y¥ÍÕ…±MÑ…Ñ” ¤)ì(%¥˜€¡…É‘É…µ”€ôô¹Õ±±ÁÑÈ¤($%É•ÑÕÉ¸ì((%Ù¥ÍÕ…±%¹™¼€ôÕÉÉ•¹ÑI½Ý%¹™¼ ¤ì(%…É‘É…µ”´ù…ÁÁ±åI½Ý%¹™¼¡Ù¥ÍÕ…±%¹™¼°¡•…‘•É]¥‘•Ð¤ì)ô
