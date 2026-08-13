@@ -1,6 +1,6 @@
 # TODO
 
-- [ ] Monitor hosted run `31711097531` for the final #265 VST3 editor slice, then perform manual multichannel VST3 acceptance; do not promote it to `beta` or `main` yet.
+- [x] Hosted run `31711097531` passed after an unchanged AVX2-only retry: all native variants, offscreen UI gates, Pester, cppcheck, and cross-variant comparison are green; do not promote it to `beta` or `main` yet.
 - [x] Installed the matching hosted AVX-512 #265 payload into the active per-user runtime after backing up seven replaced files; installed `Editor.exe --selftest-vst` passed.
 - [ ] Manually test real audio through a multichannel VST3 with `Input`/`Output` layouts from `codex/upstream-265-vst3-layouts` before any promotion to `beta` or `main`; FabFilter Pro-Q 4 preflight now accepts symmetric Stereo and 7.1, while the active AVX-512 install remains unchanged.
 - [x] User accepted installed ReaFIR/TDR Nova analyzer movement plus LegacyRows/themes from `codex/upstream-264-integration`; promoted to `beta`. Do not promote `beta` to `main` without explicit approval.
