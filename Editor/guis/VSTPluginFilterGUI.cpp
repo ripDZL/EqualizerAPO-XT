@@ -481,7 +481,10 @@ void VSTPluginFilterGUI::updateLivePreview()
 
 void VSTPluginFilterGUI::updatePermissionWarning()
 {
-	if (effect == nullptr)
+	// This depends on the saved library path and chunk, not on whether a panel
+	// happens to be open. Otherwise a real audio-service permission problem
+	// appears while loading and disappears on the next row rebuild.
+	if (library->getLibPath().empty())
 	{
 		ui->warningTextEdit->setVisible(false);
 		return;
