@@ -38,6 +38,7 @@ class QFrame;
 class QPlainTextEdit;
 class QAction;
 class FileReferenceController;
+class FilterTable;
 class VSTBusStrip;
 
 class VSTCardEditor : public IFilterGUI
@@ -49,7 +50,8 @@ public:
 		const std::unordered_map<std::wstring, float>& paramMap, bool stereoInput = false,
 		const VSTPreviewEndpoint& previewEndpoint = {},
 		const std::optional<VST3BusContract>& busContract = std::nullopt,
-		std::vector<std::wstring> deviceChannelNames = std::vector<std::wstring>(), QWidget* parent = nullptr);
+		std::vector<std::wstring> deviceChannelNames = std::vector<std::wstring>(),
+		FilterTable* filterTable = nullptr, QWidget* parent = nullptr);
 	~VSTCardEditor();
 
 	void store(QString& command, QString& parameters) override;
@@ -63,6 +65,7 @@ private slots:
 	void autoApplyToggled(bool checked);
 	void pathCommitted(const QString& text);
 	void selectFile();
+	void importToConfig();
 	void embedToggled(bool checked);
 	void busLayoutsPicked(VST3BusLayout input, VST3BusLayout output);
 	void removeBusLayouts();
@@ -95,11 +98,13 @@ private:
 	QElapsedTimer lastReadTimer;
 
 	FileReferenceController* reference = nullptr;
+	FilterTable* filterTable = nullptr;
 	QString initErrorText;
 	bool libraryMissing = false;
 
 	ReferenceCardView* view = nullptr;
 	QToolButton* selectButton = nullptr;
+	QToolButton* importButton = nullptr;
 	QToolButton* editButton = nullptr;
 	QPushButton* openPanelButton = nullptr;
 	QToolButton* optionsButton = nullptr;

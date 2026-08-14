@@ -69,9 +69,11 @@ QString layoutName(VST3BusLayout layout)
 
 VSTCardEditor::VSTCardEditor(shared_ptr<VSTPluginLibrary> library, const wstring& chunkData,
 	const unordered_map<wstring, float>& paramMap, bool stereoInput, const VSTPreviewEndpoint& previewEndpoint,
-	const std::optional<VST3BusContract>& busContract, std::vector<std::wstring> deviceChannelNames, QWidget* parent)
+	const std::optional<VST3BusContract>& busContract, std::vector<std::wstring> deviceChannelNames,
+	FilterTable* filterTable, QWidget* parent)
 	: IFilterGUI(parent), library(library), chunkData(chunkData), paramMap(paramMap),
-	busModel(busContract, stereoInput), previewEndpoint(previewEndpoint), deviceChannelNames(std::move(deviceChannelNames))
+	busModel(busContract, stereoInput), previewEndpoint(previewEndpoint), deviceChannelNames(std::move(deviceChannelNames)),
+	filterTable(filterTable)
 {
 	setObjectName(QStringLiteral("VSTCardEditor"));
 	setAttribute(Qt::WA_StyledBackground, true);
@@ -94,6 +96,18 @@ VSTCardEditor::VSTCardEditor(shared_ptr<VSTPluginLibrary> library, const wstring
 	selectButton->setIcon(GUIHelper::tintedIcon(QStringLiteral(":/icons/modern/folder-open.svg"), actionColor, 18));
 	connect(selectButton, SIGNAL(clicked()), this, SLOT(selectFile()));
 	view->addActionButton(ReferenceCardView::ActionRole::Browse, selectButton);
+
+	// Libraries under a user-only location can load in the Editor but fail in
+	// the audio service. Offer a copy into the config directory only for that
+	// unreadable saved-library case; the shared importer handles DLL files and
+	// VST3 directory bundles through the same confirmation/execution seam.
+	importButton = new QToolButton(view);
+	importButton->setObjectName(QStringLiteral("FilterCardIconButton"));
+	importButton->setIcon(GUIHelper::tintedIcon(QStringLiteral(":/icons/modern/import.svg"), actionColor, 18));
+	importButton->setToolTip(tr("Copy the library into the config directory so the audio service can read it"));
+	importButton->setVisible(false);
+	connect(importButton, SIGNAL(clicked()), this, SLOT(importToConfig()));
+	view->addActionButton(ReferenceCardView::ActionRole::Import, importButton);
 
 	openPanelButton = new QPushButton(tr("Open panel"), view);
 	openPanelButton->setObjectName(QStringLiteral("VSTCardPanelButton"));
@@ -380,16 +394,17 @@ void VSTCardEditor::updateReferenceState()
 
 	// The audio service reads the library under its own account. Evaluate the
 	// saved path even when no plugin panel is open so a stable ACL problem does
-	// not look like a transient editor error. Import is intentionally omitted:
-	// the shared importer only supports individual files, not VST3 bundles.
-	if (!reference->writtenPath().isEmpty() && !state.missing
+	// not look like a transient editor error, and expose the config-local copy
+	// remedy only when this card is attached to a live FilterTable.
+	const bool unreadableByAudioService = !reference->writtenPath().isEmpty() && !state.missing
 		&& !FileReferenceController::isReadableByAudioService(
-			QString::fromStdWString(library->getLibPath()))
-		&& state.statusText.isEmpty())
+			QString::fromStdWString(library->getLibPath()));
+	if (unreadableByAudioService && state.statusText.isEmpty())
 	{
 		state.statusText = tr("Not readable by the audio service");
 		state.statusSeverity = ReferenceCardState::Severity::Critical;
 	}
+	importButton->setVisible(unreadableByAudioService && filterTable != nullptr);
 
 	if (state.statusText.isEmpty() && !busStatusText.isEmpty())
 	{
@@ -543,6 +558,21 @@ void VSTCardEditor::selectFile()
 		settings.setValue("vst/lastDir", QDir::toNativeSeparators(QFileInfo(absolutePath).absolutePath()));
 		pathCommitted(reference->writtenPath());
 	}
+}
+
+void VSTCardEditor::importToConfig()
+{
+	if (filterTable == nullptr)
+		return;
+
+	reference->setResolvedPath(QString::fromStdWString(library->getLibPath()));
+	if (!reference->importIntoConfig(this, filterTable->getConfigPath()))
+		return;
+
+	// VSTPlugin resolves relative Library values under the install directory,
+	// so preserve the imported config copy as an absolute library path. Reload
+	// through the normal path lifecycle so its readability verdict is refreshed.
+	pathCommitted(QDir::toNativeSeparators(reference->resolvedPath()));
 }
 
 void VSTCardEditor::panelButtonClicked()
@@ -730,11 +760,12 @@ REGISTER_FILTER_CARD_EDITOR(VSTPlugin, [](FilterTable* filterTable, const QStrin
 		VSTPluginFilter* filter = static_cast<VSTPluginFilter*>(filters[0].get());
 		editor = new VSTCardEditor(filter->getLibrary(), filter->getChunkData(), filter->getParamMap(),
 			filter->getStereoInput(), previewEndpoint, filter->getBusContract(),
-			filterTable != nullptr ? filterTable->getChannelNames() : std::vector<std::wstring>());
+			filterTable != nullptr ? filterTable->getChannelNames() : std::vector<std::wstring>(), filterTable);
 	}
 	else
 	{
-		editor = new VSTCardEditor(VSTPluginLibrary::getInstance(L""), L"", std::unordered_map<std::wstring, float>(), false, previewEndpoint);
+		editor = new VSTCardEditor(VSTPluginLibrary::getInstance(L""), L"", std::unordered_map<std::wstring, float>(),
+			false, previewEndpoint, std::nullopt, std::vector<std::wstring>(), filterTable);
 	}
 	return editor;
 })

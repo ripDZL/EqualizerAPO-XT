@@ -242,6 +242,24 @@ void testConfigImport()
 	expectEqual(singleExec.filesCopied, 1, "single wav import copies exactly one file");
 	expectTrue(QFile::exists(convConfigDest + "/Surround/ir.wav"), "ir.wav missing after single-file import");
 
+	// The VST-card Import action follows this direct-library path for a VST2
+	// DLL, then rewrites its saved Library value to the imported absolute file.
+	const QString vst2Library = tempDir.path() + "/plugins/Portable.dll";
+	expectTrue(QDir().mkpath(QFileInfo(vst2Library).absolutePath()), "failed to create VST2 library directory");
+	writeBlob(vst2Library, 96);
+	const QString vst2ConfigDest = tempDir.path() + "/vst2-configdir";
+	auto vst2Manifest = EqAPO::Import::ConfigDependencyScanner::scan(vst2Library, vst2ConfigDest);
+	expectFalse(vst2Manifest.hasErrors, "direct VST2 library scan should not flag errors");
+	requireEqual(int(vst2Manifest.items.size()), 1, "direct VST2 library should be one import item");
+	expectTrue(vst2Manifest.items[0].payloadKind == EqAPO::Import::ImportPayloadKind::File,
+		"VST2 library must retain the file import payload");
+	expectEqual(vst2Manifest.rootDest, "plugins/Portable.dll",
+		"VST2 library destination should keep its source folder and file name");
+	const auto vst2Exec = EqAPO::Import::ImportExecutor::execute(vst2Manifest, vst2ConfigDest);
+	expectTrue(vst2Exec.success, "direct VST2 library import should succeed");
+	expectTrue(QFile::exists(vst2ConfigDest + "/plugins/Portable.dll"),
+		"VST2 library missing after direct import");
+
 	// A Windows VST3 library is a directory bundle. It must be scanned as one
 	// import item but copied with every module/resource file intact so a card's
 	// Import action can relocate it into the ACL-safe config tree.
