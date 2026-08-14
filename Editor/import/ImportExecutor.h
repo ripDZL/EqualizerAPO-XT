@@ -25,14 +25,18 @@ struct ExecutionResult
     int filesCopied = 0;
     qint64 bytesCopied = 0;
     QStringList errors;
+    // The import itself completed, but a recoverable cleanup task (such as
+    // deleting an old replaced bundle) needs the user's attention.
+    QStringList warnings;
 };
 
 class ImportExecutor
 {
 public:
-    // Apply the manifest to configDir. Items whose source is missing are
-    // skipped and reported as errors. Returns success only if every
-    // existing item was copied without trouble.
+    // Apply the manifest to configDir. File items retain the existing
+    // overwrite behavior; DirectoryTree items are staged, validated against
+    // reparse points, then atomically swapped into place. Returns success
+    // only if every item reached its destination.
     static ExecutionResult execute(const ImportManifest& manifest, const QString& configDir);
 };
 

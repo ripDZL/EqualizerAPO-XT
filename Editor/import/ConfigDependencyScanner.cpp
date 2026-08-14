@@ -11,11 +11,15 @@
 #include "filters/subwooferRouting/SubwooferRoutingCommand.h"
 
 #include <QDir>
+#include <QDirIterator>
 #include <QFileInfo>
 #include <QObject>
 #include <QSet>
 #include <QString>
 #include <QStringList>
+
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 
 namespace EqAPO::Import
 {
@@ -105,6 +109,14 @@ QString destForRelative(const QString& rel, const QString& rootSourceDir, DestLa
     return rootName.isEmpty() ? rel : rootName + QStringLiteral("/") + rel;
 }
 
+bool isReparsePoint(const QString& path)
+{
+    const DWORD attributes = GetFileAttributesW(
+        reinterpret_cast<LPCWSTR>(QDir::toNativeSeparators(path).utf16()));
+    return attributes != INVALID_FILE_ATTRIBUTES
+        && (attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
+}
+
 void appendItem(ImportManifest& manifest,
                 const QString& sourceAbs,
                 const QString& destRel,
@@ -126,7 +138,9 @@ void appendItem(ImportManifest& manifest,
     {
         item.exists = true;
         item.sizeBytes = info.size();
+        item.fileCount = 1;
         manifest.totalBytes += item.sizeBytes;
+        manifest.totalFiles += item.fileCount;
     }
     else
     {
@@ -136,6 +150,71 @@ void appendItem(ImportManifest& manifest,
     }
 
     manifest.items.append(item);
+}
+
+bool appendBundleItem(ImportManifest& manifest,
+                      const QString& sourceAbs,
+                      const QString& destRel,
+                      const QString& kind)
+{
+    QFileInfo rootInfo(sourceAbs);
+    if (!rootInfo.exists() || !rootInfo.isDir())
+    {
+        manifest.warnings.append(QObject::tr("Missing VST3 bundle: %1").arg(sourceAbs));
+        manifest.hasErrors = true;
+        return false;
+    }
+    if (isReparsePoint(rootInfo.absoluteFilePath()))
+    {
+        manifest.warnings.append(QObject::tr("VST3 bundle uses a reparse-point root and will not be imported: %1")
+            .arg(sourceAbs));
+        manifest.hasErrors = true;
+        return false;
+    }
+
+    ImportItem item;
+    item.sourceAbsolute = sourceAbs;
+    item.destRelative = destRel;
+    item.kind = kind;
+    item.payloadKind = ImportPayloadKind::DirectoryTree;
+    item.exists = true;
+
+    // Do not follow links or junctions. A bundle must be a self-contained
+    // tree; otherwise an import could quietly copy files outside its root.
+    QDirIterator iterator(sourceAbs,
+        QDir::Files | QDir::Dirs | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot,
+        QDirIterator::Subdirectories);
+    while (iterator.hasNext())
+    {
+        const QString entryPath = QDir::cleanPath(iterator.next());
+        const QFileInfo entryInfo(entryPath);
+        if (isReparsePoint(entryInfo.absoluteFilePath()))
+        {
+            manifest.warnings.append(QObject::tr(
+                "VST3 bundle contains a reparse point and will not be imported: %1")
+                .arg(entryPath));
+            manifest.hasErrors = true;
+            return false;
+        }
+        if (entryInfo.isDir())
+            continue;
+        if (!entryInfo.isFile())
+        {
+            manifest.warnings.append(QObject::tr(
+                "VST3 bundle contains an unsupported entry and will not be imported: %1")
+                .arg(entryPath));
+            manifest.hasErrors = true;
+            return false;
+        }
+
+        ++item.fileCount;
+        item.sizeBytes += entryInfo.size();
+    }
+
+    manifest.totalBytes += item.sizeBytes;
+    manifest.totalFiles += item.fileCount;
+    manifest.items.append(item);
+    return true;
 }
 
 void scanConfigFile(ImportManifest& manifest,
@@ -236,6 +315,20 @@ ImportManifest ConfigDependencyScanner::scan(const QString& rootSource, const QS
 
     manifest.rootSourceDir = rootInfo.absoluteDir().absolutePath();
     manifest.rootDest = destForRelative(rootInfo.fileName(), manifest.rootSourceDir, layout);
+
+    if (rootInfo.isDir())
+    {
+        if (rootInfo.suffix().compare(QStringLiteral("vst3"), Qt::CaseInsensitive) != 0)
+        {
+            manifest.warnings.append(QObject::tr("Only VST3 bundle directories can be imported: %1")
+                .arg(manifest.rootSource));
+            manifest.hasErrors = true;
+            return manifest;
+        }
+
+        appendBundleItem(manifest, manifest.rootSource, manifest.rootDest, QStringLiteral("Root"));
+        return manifest;
+    }
 
     appendItem(manifest, manifest.rootSource, manifest.rootDest, QStringLiteral("Root"));
 

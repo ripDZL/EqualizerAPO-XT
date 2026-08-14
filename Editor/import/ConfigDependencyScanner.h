@@ -42,9 +42,10 @@ public:
     // Build a manifest for importing rootSource into configDir.
     //
     // rootSource may be a config text file (.txt) — its references are
-    // walked recursively — or a single binary (.wav, .dll, etc.) in
-    // which case the manifest contains exactly one item. configDir is
-    // only used to compute dest paths; the scanner never writes there.
+    // walked recursively — a single file (.wav, .dll, etc.), or a VST3
+    // bundle directory. A direct VST3 bundle becomes one DirectoryTree item;
+    // VSTPlugin references found inside a config remain external by design.
+    // configDir is only used to compute dest paths; the scanner never writes.
     static ImportManifest scan(const QString& rootSource, const QString& configDir,
         DestLayout layout = DestLayout::NestUnderSourceFolder);
 };

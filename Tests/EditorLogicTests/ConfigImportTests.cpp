@@ -241,6 +241,63 @@ void testConfigImport()
 	expectTrue(singleExec.success, "single wav import should succeed");
 	expectEqual(singleExec.filesCopied, 1, "single wav import copies exactly one file");
 	expectTrue(QFile::exists(convConfigDest + "/Surround/ir.wav"), "ir.wav missing after single-file import");
+
+	// A Windows VST3 library is a directory bundle. It must be scanned as one
+	// import item but copied with every module/resource file intact so a card's
+	// Import action can relocate it into the ACL-safe config tree.
+	const QString bundleRoot = tempDir.path() + "/plugins/Portable.vst3";
+	const QString bundleModule = bundleRoot + "/Contents/x86_64-win/Portable.vst3";
+	const QString bundleMetadata = bundleRoot + "/Contents/Resources/moduleinfo.json";
+	const QString bundleObsolete = bundleRoot + "/Contents/Resources/obsolete.dat";
+	expectTrue(QDir().mkpath(QFileInfo(bundleModule).absolutePath()), "failed to create VST3 module directory");
+	expectTrue(QDir().mkpath(QFileInfo(bundleMetadata).absolutePath()), "failed to create VST3 resource directory");
+	writeBlob(bundleModule, 96);
+	writeBlob(bundleMetadata, 23);
+	writeBlob(bundleObsolete, 7);
+
+	const QString bundleConfigDest = tempDir.path() + "/bundle-configdir";
+	auto bundleManifest = EqAPO::Import::ConfigDependencyScanner::scan(bundleRoot, bundleConfigDest);
+	expectFalse(bundleManifest.hasErrors, "VST3 bundle scan should not flag errors");
+	requireEqual(int(bundleManifest.items.size()), 1, "VST3 bundle should be one manifest item");
+	expectTrue(bundleManifest.items[0].payloadKind
+		== EqAPO::Import::ImportPayloadKind::DirectoryTree,
+		"VST3 bundle must use the directory-tree import payload");
+	expectEqual(bundleManifest.items[0].fileCount, 3, "VST3 bundle should count every regular file");
+	expectEqual(bundleManifest.totalFiles, 3, "manifest should expose the total VST3 bundle file count");
+	expectEqual(bundleManifest.rootDest, "plugins/Portable.vst3", "VST3 bundle destination should keep its folder name");
+
+	const auto bundleExec = EqAPO::Import::ImportExecutor::execute(bundleManifest, bundleConfigDest);
+	expectTrue(bundleExec.success, "VST3 bundle import should succeed");
+	expectEqual(bundleExec.filesCopied, 3, "VST3 bundle import should copy its regular files");
+	const QString importedModule = bundleConfigDest + "/plugins/Portable.vst3/Contents/x86_64-win/Portable.vst3";
+	const QString importedMetadata = bundleConfigDest + "/plugins/Portable.vst3/Contents/Resources/moduleinfo.json";
+	const QString importedObsolete = bundleConfigDest + "/plugins/Portable.vst3/Contents/Resources/obsolete.dat";
+	expectTrue(QFile::exists(importedModule), "VST3 module missing after bundle import");
+	expectTrue(QFile::exists(importedMetadata), "VST3 metadata missing after bundle import");
+	expectTrue(QFile::exists(importedObsolete), "VST3 bundle file missing after bundle import");
+
+	// Re-importing replaces the whole directory tree through staging rather
+	// than merging stale files into the existing bundle.
+	writeBlob(bundleModule, 111);
+	expectTrue(QFile::remove(bundleObsolete), "failed to remove stale VST3 source member");
+	const auto bundleExec2 = EqAPO::Import::ImportExecutor::execute(bundleManifest, bundleConfigDest);
+	expectTrue(bundleExec2.success, "VST3 bundle replacement should succeed");
+	expectEqual(int(QFileInfo(importedModule).size()), 111, "VST3 bundle replacement must refresh the module file");
+	expectFalse(QFile::exists(importedObsolete), "VST3 bundle replacement must remove stale members");
+
+	// ImportExecutor is also safe against a manually built manifest: a caller
+	// cannot use a parent traversal to escape the selected config root.
+	EqAPO::Import::ImportManifest unsafeManifest;
+	EqAPO::Import::ImportItem unsafeItem;
+	unsafeItem.sourceAbsolute = surroundDir + "/ir.wav";
+	unsafeItem.destRelative = "../escaped.wav";
+	unsafeItem.sizeBytes = QFileInfo(unsafeItem.sourceAbsolute).size();
+	unsafeItem.fileCount = 1;
+	unsafeItem.kind = "Root";
+	unsafeManifest.items.append(unsafeItem);
+	const auto unsafeExec = EqAPO::Import::ImportExecutor::execute(unsafeManifest, tempDir.path() + "/safe-configdir");
+	expectFalse(unsafeExec.success, "unsafe manifest destination must be rejected");
+	expectFalse(QFile::exists(tempDir.path() + "/escaped.wav"), "unsafe import escaped the config root");
 }
 
 void testLegacyMigrationScanAndPolicy()

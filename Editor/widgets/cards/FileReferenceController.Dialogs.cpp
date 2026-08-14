@@ -74,6 +74,13 @@ bool FileReferenceController::importIntoConfig(
 				.arg(result.errors.join('\n')));
 		return false;
 	}
+	if (!result.warnings.isEmpty())
+	{
+		QMessageBox::warning(parent,
+			QCoreApplication::translate("FileReferenceController", "Import"),
+			QCoreApplication::translate("FileReferenceController", "Import completed with warnings:\n%1")
+				.arg(result.warnings.join('\n')));
+	}
 	written = QDir::toNativeSeparators(manifest.rootDest);
 	resolveAgainstConfig(configPath);
 	return true;
