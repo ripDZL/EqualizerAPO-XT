@@ -1,7 +1,7 @@
 # TODO
 
 - [ ] Manually verify analyzer movement with real VST2 and VST3 plug-ins before any integration-candidate install.
-- [ ] Port Theme Lab/custom-theme work against upstream UI architecture.
+- [ ] Wire saved custom themes into SkinManager and the Theme Lab UI.
 - [ ] Audit remaining fork-only behavior by feature group.
 - [ ] Run a clean integration build and upstream-compatible test suite.
 - [ ] Run CI and manually test a packaged integration candidate.

@@ -8,3 +8,4 @@
 - Ported here: Editor-side VST live analyzer preview, microphone sources, selected-endpoint selection, and row-scoped `Device:` context.
 - Ported VST2 host time/process-level safety with a deterministic host-callback regression test.
 - VST preview processing is block-paced on a dedicated worker; shutdown joins it before the plug-in is stopped or released.
+- Saved custom-theme persistence, JSON import/export, and token overrides are ported; Theme Lab UI/application wiring remains separate.

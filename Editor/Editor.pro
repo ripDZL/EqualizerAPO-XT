@@ -257,6 +257,7 @@ SOURCES += main.cpp\
 	skins/HeritageSkin.cpp \
 	skins/shared/SkinFileIcons.cpp \
 	skins/SkinThemeData.cpp \
+	skins/CustomThemeStore.cpp \
 	widgets/AddCardRow.cpp \
 	widgets/ActivatableListChrome.cpp \
 	widgets/AudioKnob.cpp \
@@ -536,6 +537,7 @@ HEADERS  += \
 	skins/shared/SkinPaint.h \
 	skins/shared/SkinSupport.h \
 	skins/SkinThemeData.h \
+	skins/CustomThemeStore.h \
 	widgets/AddCardRow.h \
 	widgets/ActivatableListChrome.h \
 	widgets/AudioKnob.h \

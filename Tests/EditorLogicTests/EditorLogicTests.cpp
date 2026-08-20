@@ -161,6 +161,7 @@ int main(int argc, char** argv)
 		testReferenceCardDerivesSharedPresentationState();
 		testVSTBusModelMigratesAndEdits();
 		testVSTPreviewEndpointSelection();
+		testCustomThemeStoreRoundTripsTokensAndJson();
 		testFilterListModel();
 		testFilterListUndo();
 		testFilterCommandCatalogRoster();

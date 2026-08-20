@@ -77,6 +77,9 @@
     <ClCompile Include="VSTPreviewEndpointTests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="CustomThemeStoreTests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="AutoInstallerLogicTests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -120,6 +123,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Editor\skins\SkinThemeData.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Editor\skins\CustomThemeStore.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Editor\widgets\EditableValueText.cpp">
@@ -185,6 +191,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Editor\skins\SkinThemeData.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Editor\skins\CustomThemeStore.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Editor\widgets\EditableValueText.h">

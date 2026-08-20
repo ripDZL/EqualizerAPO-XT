@@ -112,6 +112,7 @@ if exist "$(LIBSNDFILE_LIB)\*.dll" copy /Y "$(LIBSNDFILE_LIB)\*.dll" "$(OutDir)"
     <ClCompile Include="ReferenceCardStateTests.cpp" />
     <ClCompile Include="VSTBusModelTests.cpp" />
     <ClCompile Include="VSTPreviewEndpointTests.cpp" />
+    <ClCompile Include="CustomThemeStoreTests.cpp" />
     <ClCompile Include="InfrastructureTests.cpp" />
     <ClCompile Include="FilterCardModelTests.cpp" />
     <ClCompile Include="FilterListModelTests.cpp" />
@@ -141,6 +142,7 @@ if exist "$(LIBSNDFILE_LIB)\*.dll" copy /Y "$(LIBSNDFILE_LIB)\*.dll" "$(OutDir)"
     <ClCompile Include="..\..\services\windows\WindowsService.cpp" />
     <ClCompile Include="..\..\services\shell\StartMenuShortcuts.cpp" />
     <ClCompile Include="..\..\Editor\skins\SkinThemeData.cpp" />
+    <ClCompile Include="..\..\Editor\skins\CustomThemeStore.cpp" />
     <!-- Like EngineOrchestrationTests, AudioEngineAccess is compiled here
          directly: it is an executable-side source (Editor/DeviceSelector), not
          a Common.lib member, and the chunk-scan helper's readability filter
@@ -180,6 +182,7 @@ if exist "$(LIBSNDFILE_LIB)\*.dll" copy /Y "$(LIBSNDFILE_LIB)\*.dll" "$(OutDir)"
     <ClInclude Include="..\..\Editor\import\ImportExecutor.h" />
     <ClInclude Include="..\..\Editor\import\LegacyMigrationPolicy.h" />
     <ClInclude Include="..\..\Editor\skins\SkinThemeData.h" />
+    <ClInclude Include="..\..\Editor\skins\CustomThemeStore.h" />
     <ClInclude Include="..\..\Editor\import\ImportManifest.h" />
     <ClInclude Include="..\..\Editor\helpers\VstChunkScan.h" />
     <ClInclude Include="..\..\Installer\AutoInstallerLogic.h" />
