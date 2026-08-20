@@ -77,7 +77,7 @@ protected:
 	QToolBar* parentToolBar() const { return toolBar; }
 	bool isOwnerActive() const
 	{
-		return SkinManager::instance()->currentSkinId() == ownerSkinId;
+		return SkinManager::instance()->baseSkinId() == ownerSkinId;
 	}
 
 private:

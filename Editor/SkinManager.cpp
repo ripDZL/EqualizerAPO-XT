@@ -20,7 +20,8 @@ SkinManager::SkinManager(QObject* parent)
 	// Establishes the never-null invariant on activeSkin (see the header).
 	activeSkin = Skins::byId(skinId);
 	Q_ASSERT(activeSkin != nullptr);
-	skinId = activeSkin->id();
+	renderSkinId = activeSkin->id();
+	skinId = renderSkinId;
 	currentTokens = activeSkin->tokens(darkMode);
 }
 
@@ -38,6 +39,11 @@ const SkinTokens& SkinManager::tokens() const
 const QString& SkinManager::currentSkinId() const
 {
 	return skinId;
+}
+
+const QString& SkinManager::baseSkinId() const
+{
+	return renderSkinId;
 }
 
 bool SkinManager::isDark() const
@@ -61,7 +67,8 @@ void SkinManager::applyHeritage()
 	// native toolbar/dialog, neutral base painters - lives in HeritageSkin
 	// (audit #275 B5); this method only does the app-level work.
 	activeSkin = heritageSkin();
-	skinId = activeSkin->id();
+	renderSkinId = activeSkin->id();
+	skinId = renderSkinId;
 	darkMode = false;
 	currentTokens = activeSkin->tokens(false);
 
@@ -112,6 +119,7 @@ void SkinManager::applySkin(const QString& newSkinId, bool dark)
 	if (isCustomTheme)
 	{
 		activeSkin = Skins::byId(customTheme.baseTheme);
+		renderSkinId = activeSkin->id();
 		skinId = customTheme.skinId();
 		darkMode = customTheme.dark;
 		currentTokens = CustomThemeStore::tokensForTheme(customTheme);
@@ -121,7 +129,8 @@ void SkinManager::applySkin(const QString& newSkinId, bool dark)
 	else
 	{
 		activeSkin = Skins::byId(newSkinId);
-		skinId = activeSkin->id();
+		renderSkinId = activeSkin->id();
+		skinId = renderSkinId;
 		darkMode = dark;
 		currentTokens = activeSkin->tokens(darkMode);
 
@@ -143,7 +152,8 @@ void SkinManager::applyTokenPreview(const QString& newSkinId, bool dark, const S
 	heritageMode = false;
 	previewMode = true;
 	activeSkin = Skins::byId(newSkinId);
-	skinId = activeSkin->id();
+	renderSkinId = activeSkin->id();
+	skinId = renderSkinId;
 	darkMode = dark;
 	currentTokens = tokens;
 

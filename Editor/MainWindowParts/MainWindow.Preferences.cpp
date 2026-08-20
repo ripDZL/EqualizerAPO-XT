@@ -278,19 +278,23 @@ void MainWindow::setupRedesignActions()
 	QAction* themeEditorAction = interfaceMenu->addAction(tr("Theme editor..."));
 	connect(themeEditorAction, &QAction::triggered, this, [this]() {
 		ThemeEditorDialog dialog(skinId, skinDark, this);
+		bool previewActive = false;
 		connect(&dialog, &ThemeEditorDialog::builtInThemeRequested, this,
-			[this](const QString& id, bool dark) {
+			[this, &previewActive](const QString& id, bool dark) {
+				previewActive = false;
 				skinId = id;
 				skinDark = dark;
 				applySkinAndRebuild();
 				applyRedesignPreferences();
 			});
 		connect(&dialog, &ThemeEditorDialog::themePreviewRequested, this,
-			[this](const QString& id, bool dark, const SkinTokens& tokens) {
+			[this, &previewActive](const QString& id, bool dark, const SkinTokens& tokens) {
 				const QString resolvedId = SkinThemeData::resolveId(id);
 				const bool needsRebuild = skinId != resolvedId
 					|| skinDark != dark
 					|| SkinManager::instance()->currentSkinId() != resolvedId;
+				const QString persistedSkinId = skinId;
+				const bool persistedSkinDark = skinDark;
 				if (needsRebuild)
 				{
 					const bool wasSuppressed = skinPersistenceSuppressed;
@@ -301,14 +305,29 @@ void MainWindow::setupRedesignActions()
 					skinPersistenceSuppressed = wasSuppressed;
 				}
 				SkinManager::instance()->applyTokenPreview(resolvedId, dark, tokens);
+				// Preview must never replace the user's selected saved/built-in
+				// theme. Keep the visible renderer transient and restore this
+				// choice after the dialog closes unless Apply/Reset is chosen.
+				skinId = persistedSkinId;
+				skinDark = persistedSkinDark;
+				previewActive = true;
 			});
 		connect(&dialog, &ThemeEditorDialog::customThemeRequested, this,
-			[this](const QString& id) {
+			[this, &previewActive](const QString& id) {
+				previewActive = false;
 				skinId = id;
 				applySkinAndRebuild();
 				applyRedesignPreferences();
 			});
 		dialog.exec();
+		if (previewActive)
+		{
+			const bool wasSuppressed = skinPersistenceSuppressed;
+			skinPersistenceSuppressed = true;
+			applySkinAndRebuild();
+			skinPersistenceSuppressed = wasSuppressed;
+			applyRedesignPreferences();
+		}
 	});
 
 	if (SkinManager::instance()->isHeritage())

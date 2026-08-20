@@ -10,6 +10,7 @@
 - [x] Ported block-paced VST preview processing with join-before-stop lifecycle ordering.
 - [x] Ported saved custom-theme persistence, token derivation, and JSON round-trips.
 - [x] Ported saved-theme application, Theme Lab UI, live token preview, and current-skin display names.
+- [x] Kept temporary previews out of persisted settings and retained base-skin chrome for saved custom themes.
 - [x] Built Editor and passed offscreen `Editor.exe --selftest-vst`.
 - [x] Passed offscreen `Editor.exe --skin-switch-test`.
 - [x] Built and passed `EditorLogicTests.exe` (3098 checks).

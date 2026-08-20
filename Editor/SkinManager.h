@@ -34,6 +34,10 @@ public:
 
 	const SkinTokens& tokens() const;
 	const QString& currentSkinId() const;
+	// The built-in skin supplying card/chrome renderers. For a saved custom
+	// theme this differs from currentSkinId(), which remains custom:<id> for
+	// persistence and Interface-menu selection.
+	const QString& baseSkinId() const;
 	bool isDark() const;
 	void applySkin(const QString& skinId, bool dark);
 	void applyTokenPreview(const QString& skinId, bool dark, const SkinTokens& tokens);
@@ -128,6 +132,7 @@ private:
 	ISkin* activeSkin = nullptr;
 	SkinTokens currentTokens;
 	QString skinId = QStringLiteral("studio");
+	QString renderSkinId = QStringLiteral("studio");
 	bool darkMode = true;
 	bool heritageMode = false;
 	bool previewMode = false;

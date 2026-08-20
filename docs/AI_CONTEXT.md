@@ -9,5 +9,6 @@
 - Ported VST2 host time/process-level safety with a deterministic host-callback regression test.
 - VST preview processing is block-paced on a dedicated worker; shutdown joins it before the plug-in is stopped or released.
 - Saved custom-theme persistence, JSON import/export, token overrides, Theme Lab UI, temporary live preview, and saved-theme application are ported.
+- Review hardening keeps Theme Lab previews transient, synchronizes the menu state to a saved theme's stored dark setting, and preserves the Rack/Matrix base chrome for custom themes.
 - This slice uses the five current upstream base skins only; fork-only variant rosters, LegacyRows theming, and DeviceSelector custom-theme dressing remain separate feature groups.
 - Latest local proof: Editor Release build, offscreen VST self-test, offscreen skin-switch test, EditorLogic 3098, and HybridConv 1635 all passed. No integration artifact is installed, pushed, merged, or promoted.
