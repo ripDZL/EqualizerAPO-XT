@@ -62,6 +62,10 @@ struct ChunkBlob
 	uint32_t version;
 	float gain;
 	float bypass;
+	int32_t lastHostProcessLevel;
+	int32_t lastTimeFlags;
+	double lastTimeSamplePos;
+	double lastTimeSampleRate;
 };
 #pragma pack(pop)
 
@@ -73,6 +77,11 @@ struct PluginState
 {
 	float params[kNumParams];
 	ChunkBlob chunkScratch;
+	vst_host_callback_t host = nullptr;
+	int32_t lastHostProcessLevel = 0;
+	int32_t lastTimeFlags = 0;
+	double lastTimeSamplePos = 0.0;
+	double lastTimeSampleRate = 0.0;
 };
 
 PluginState* stateOf(vst_effect_t* effect)
@@ -102,6 +111,20 @@ template<typename Sample>
 void processGeneric(vst_effect_t* effect, const Sample* const* inputs, Sample** outputs, int32_t samples)
 {
 	const PluginState* state = stateOf(effect);
+	PluginState* mutableState = stateOf(effect);
+	if (mutableState != nullptr && mutableState->host != nullptr)
+	{
+		mutableState->lastHostProcessLevel = static_cast<int32_t>(
+			mutableState->host(effect, VST_HOST_OPCODE_GET_ACTIVE_THREAD, 0, 0, nullptr, 0.0f));
+		vst_time_info* timeInfo = reinterpret_cast<vst_time_info*>(
+			mutableState->host(effect, VST_HOST_OPCODE_GET_TIME, 0, 0, nullptr, 0.0f));
+		if (timeInfo != nullptr)
+		{
+			mutableState->lastTimeFlags = timeInfo->flags;
+			mutableState->lastTimeSamplePos = timeInfo->samplePos;
+			mutableState->lastTimeSampleRate = timeInfo->sampleRate;
+		}
+	}
 	const double gain = state != nullptr ? static_cast<double>(state->params[kParamGain]) : 1.0;
 	const bool bypass = state != nullptr && state->params[kParamBypass] >= 0.5f;
 
@@ -234,6 +257,10 @@ intptr_t VST_FUNCTION_INTERFACE dispatcher(vst_effect_t* effect, int32_t opcode,
 		state->chunkScratch.version = kChunkVersion;
 		state->chunkScratch.gain = state->params[kParamGain];
 		state->chunkScratch.bypass = state->params[kParamBypass];
+		state->chunkScratch.lastHostProcessLevel = state->lastHostProcessLevel;
+		state->chunkScratch.lastTimeFlags = state->lastTimeFlags;
+		state->chunkScratch.lastTimeSamplePos = state->lastTimeSamplePos;
+		state->chunkScratch.lastTimeSampleRate = state->lastTimeSampleRate;
 		*static_cast<void**>(ptr) = &state->chunkScratch;
 		return static_cast<intptr_t>(sizeof(ChunkBlob));
 	}
@@ -262,11 +289,12 @@ intptr_t VST_FUNCTION_INTERFACE dispatcher(vst_effect_t* effect, int32_t opcode,
 	}
 }
 
-vst_effect_t* createEffect()
+vst_effect_t* createEffect(vst_host_callback_t host)
 {
 	PluginState* state = new PluginState();
 	state->params[kParamGain] = 1.0f;
 	state->params[kParamBypass] = 0.0f;
+	state->host = host;
 	std::memset(&state->chunkScratch, 0, sizeof(state->chunkScratch));
 
 	vst_effect_t* effect = new vst_effect_t();
@@ -329,6 +357,5 @@ vst_effect_t* createEffect()
 // a DLL is needless surface area.
 extern "C" __declspec(dllexport) vst_effect_t* VST_FUNCTION_INTERFACE VSTPluginMain(vst_host_callback_t callback)
 {
-	(void)callback;
-	return createEffect();
+	return createEffect(callback);
 }

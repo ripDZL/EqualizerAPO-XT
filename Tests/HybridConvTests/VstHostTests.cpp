@@ -108,8 +108,25 @@ struct ChunkBlob
 	uint32_t version;
 	float gain;
 	float bypass;
+	int32_t lastHostProcessLevel;
+	int32_t lastTimeFlags;
+	double lastTimeSamplePos;
+	double lastTimeSampleRate;
 };
 #pragma pack(pop)
+
+constexpr int vstTimeTransportPlaying = 1 << 1;
+constexpr int vstTimeNanosValid = 1 << 8;
+constexpr int vstTimePpqPosValid = 1 << 9;
+constexpr int vstTimeTempoValid = 1 << 10;
+constexpr int vstTimeBarsValid = 1 << 11;
+constexpr int vstTimeTimeSigValid = 1 << 13;
+constexpr int expectedVstTimeFlags = vstTimeTransportPlaying
+	| vstTimeNanosValid
+	| vstTimePpqPosValid
+	| vstTimeTempoValid
+	| vstTimeBarsValid
+	| vstTimeTimeSigValid;
 
 // Directory of the running test executable. The plugin DLL is copied next to it
 // by the HybridConvTests post-build step.
@@ -333,6 +350,12 @@ void runVstHostTests()
 	instance->prepareForProcessing(48000.0f, 512);
 	instance->startProcessing();
 
+	vst_time_info* initialTime = instance->hostTimeInfo();
+	harness.expectTrue(closeEnough(initialTime->sampleRate, 48000.0), "VST2 host time reports the prepared sample rate");
+	harness.expectTrue(closeEnough(initialTime->samplePos, 0.0), "VST2 host time starts at sample 0");
+	harness.expectEqual(initialTime->flags & expectedVstTimeFlags, expectedVstTimeFlags,
+		"VST2 host time advertises playing/time-position fields");
+
 	// --- Chunk round-trip: read default state, then set a known gain and read
 	// it back. The plugin sets the programChunks flag, so the engine routes all
 	// state through the chunk path (writeToEffect/readFromEffect).
@@ -385,6 +408,26 @@ void runVstHostTests()
 	double* inArray[2] = { inLeft.data(), inRight.data() };
 	double* outArray[2] = { outLeft.data(), outRight.data() };
 	instance->processDoubleReplacing(inArray, outArray, frameCount);
+
+	vst_time_info* timeAfterFirstBlock = instance->hostTimeInfo();
+	harness.expectTrue(closeEnough(timeAfterFirstBlock->samplePos, static_cast<double>(frameCount)),
+		"VST2 host time advances by processed frame count");
+	harness.expectEqual(timeAfterFirstBlock->flags & expectedVstTimeFlags, expectedVstTimeFlags,
+		"VST2 host time keeps playing/time-position flags after processing");
+
+	wstring processedChunk;
+	unordered_map<wstring, float> processedParams;
+	instance->readFromEffect(processedChunk, processedParams);
+	ChunkBlob processedBlob = {};
+	harness.expectTrue(decodeChunk(processedChunk, processedBlob), "processed chunk decodes");
+	harness.expectEqual(processedBlob.lastHostProcessLevel, VST_HOST_ACTIVE_THREAD_AUDIO,
+		"VST2 process callback reports the audio process level");
+	harness.expectEqual(processedBlob.lastTimeFlags & expectedVstTimeFlags, expectedVstTimeFlags,
+		"plugin-observed VST2 time advertises playing/time-position fields");
+	harness.expectTrue(closeEnough(processedBlob.lastTimeSamplePos, 0.0),
+		"plugin-observed first process block starts at sample 0");
+	harness.expectTrue(closeEnough(processedBlob.lastTimeSampleRate, 48000.0),
+		"plugin-observed VST2 time reports sample rate");
 
 	bool audioMatches = true;
 	for (int i = 0; i < frameCount && audioMatches; ++i)

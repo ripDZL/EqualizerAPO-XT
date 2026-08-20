@@ -21,6 +21,7 @@
 
 #include <array>
 #include <atomic>
+#include <cstdint>
 #include <string>
 #include <memory>
 #include <functional>
@@ -126,9 +127,8 @@ public:
 
 	void setSizeWindowFunc(std::function<void(int, int)> func);
 	void onSizeWindow(int w, int h);
-	// Backing store for VST_HOST_OPCODE_GET_TIME, refreshed and returned per
-	// call. Per instance: plugins in different audio streams process
-	// concurrently, so a shared global here would let them race on one struct.
+	// VST_HOST_OPCODE_GET_TIME returns per-thread time info so editor/control
+	// callbacks cannot overwrite the audio-thread struct while it is in use.
 	vst_time_info* hostTimeInfo();
 
 private:
@@ -234,7 +234,7 @@ private:
 	double editorScaleFactor = 1.0;
 	float sampleRate = 0.0f;
 	int usedChannelCount = -1;
-	int processLevel = 0;
+	std::atomic<int64_t> vst2SamplePositionFrames{ 0 };
+	std::atomic<int> processLevel{ VST_HOST_ACTIVE_THREAD_UNKNOWN };
 	int language = 1;
-	vst_time_info vstTime{ 0,0,0,0,0,0,0,0,0,0,{0}, 0xFFFF };
 };
