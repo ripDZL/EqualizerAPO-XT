@@ -36,6 +36,7 @@ public:
 	const QString& currentSkinId() const;
 	bool isDark() const;
 	void applySkin(const QString& skinId, bool dark);
+	void applyTokenPreview(const QString& skinId, bool dark, const SkinTokens& tokens);
 
 	// The heritage presentation behind the LegacyRows mode: no stylesheet, the
 	// platform's standard palette, and classic light token values for the few
@@ -129,6 +130,7 @@ private:
 	QString skinId = QStringLiteral("studio");
 	bool darkMode = true;
 	bool heritageMode = false;
+	bool previewMode = false;
 	// True once applySkin() has dressed the application at least once. The
 	// constructor seeds skinId/tokens without applying a stylesheet, so the
 	// same-skin short-circuit in applySkin() must not fire before then.

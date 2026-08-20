@@ -67,6 +67,12 @@ void registerBundledFonts(bool includeSarasa = false);
 void applyToApplication(QApplication& app, const QString& skinId, bool dark,
 	bool setFusionStyle = true, bool includeSarasa = false);
 
+// Applies a built-in skin's QSS grammar with an explicit token table. Theme
+// Lab uses this for saved themes and temporary previews without adding a
+// second stylesheet path outside the shared skin contract.
+void applyTokensToApplication(QApplication& app, const QString& skinId, bool dark,
+	const SkinTokens& themeTokens, bool setFusionStyle = true, bool includeSarasa = false);
+
 // Canonical skin id for any stored value: applies the legacy aliases
 // (glassy -> studio, industrial -> rack) and falls back to "studio" for
 // unknown ids, mirroring Skins::byId.

@@ -9,10 +9,13 @@
 - [x] Ported VST2 transport-time/process-level safety with a red/green host test.
 - [x] Ported block-paced VST preview processing with join-before-stop lifecycle ordering.
 - [x] Ported saved custom-theme persistence, token derivation, and JSON round-trips.
+- [x] Ported saved-theme application, Theme Lab UI, live token preview, and current-skin display names.
 - [x] Built Editor and passed offscreen `Editor.exe --selftest-vst`.
-- [x] Built and passed `EditorLogicTests.exe` (3073 checks).
+- [x] Passed offscreen `Editor.exe --skin-switch-test`.
+- [x] Built and passed `EditorLogicTests.exe` (3098 checks).
 - [x] Built and passed `HybridConvTests.exe` (1635 checks).
 - [ ] Manually validate real VST2/VST3 analyzer movement before an integration-candidate install.
-- [ ] Wire saved custom themes into SkinManager and the Theme Lab UI.
+- [ ] Manually validate Theme Lab save/apply/import/delete and restart persistence.
+- [ ] Port remaining fork-only theme variants, LegacyRows theming, and DeviceSelector custom-theme dressing by feature group.
 - [ ] Port remaining fork-only features with focused tests.
 - [ ] Build, CI, and manual-host-test an integration candidate before any beta promotion.

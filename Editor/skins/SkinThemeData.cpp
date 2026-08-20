@@ -368,12 +368,18 @@ QString resolveId(const QString& id)
 void applyToApplication(QApplication& app, const QString& skinId, bool dark,
 	bool setFusionStyle, bool includeSarasa)
 {
+	const QString resolvedId = resolveId(skinId);
+	applyTokensToApplication(app, resolvedId, dark, tokens(resolvedId, dark), setFusionStyle, includeSarasa);
+}
+
+void applyTokensToApplication(QApplication& app, const QString& skinId, bool dark,
+	const SkinTokens& themeTokens, bool setFusionStyle, bool includeSarasa)
+{
 	registerBundledFonts(includeSarasa);
 	if (setFusionStyle)
 		app.setStyle(QStyleFactory::create(QStringLiteral("fusion")));
 
 	const QString resolvedId = resolveId(skinId);
-	const SkinTokens themeTokens = tokens(resolvedId, dark);
 	QString styleSheet;
 	QFile sheet(qssResource(resolvedId, dark));
 	if (!sheet.open(QFile::ReadOnly) && resolvedId != QLatin1String("studio"))

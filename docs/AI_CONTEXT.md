@@ -8,4 +8,6 @@
 - Ported here: Editor-side VST live analyzer preview, microphone sources, selected-endpoint selection, and row-scoped `Device:` context.
 - Ported VST2 host time/process-level safety with a deterministic host-callback regression test.
 - VST preview processing is block-paced on a dedicated worker; shutdown joins it before the plug-in is stopped or released.
-- Saved custom-theme persistence, JSON import/export, and token overrides are ported; Theme Lab UI/application wiring remains separate.
+- Saved custom-theme persistence, JSON import/export, token overrides, Theme Lab UI, temporary live preview, and saved-theme application are ported.
+- This slice uses the five current upstream base skins only; fork-only variant rosters, LegacyRows theming, and DeviceSelector custom-theme dressing remain separate feature groups.
+- Latest local proof: Editor Release build, offscreen VST self-test, offscreen skin-switch test, EditorLogic 3098, and HybridConv 1635 all passed. No integration artifact is installed, pushed, merged, or promoted.

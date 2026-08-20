@@ -132,6 +132,7 @@ void MainWindow::applySkinAndRebuild()
 	}
 	SkinManager::instance()->applySkin(skinId, skinDark);
 	skinId = SkinManager::instance()->currentSkinId();
+	skinDark = SkinManager::instance()->isDark();
 	// Each skin supplies its own Copy routing renderer (node graph, crosspoint
 	// matrix, step list, ...) and per-skin card chrome. Those widgets are built
 	// once when the row is created, so the rows must be rebuilt for the new

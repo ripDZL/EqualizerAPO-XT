@@ -29,9 +29,12 @@
 #include "version.h"
 #include "Editor/import/LegacyMigration.h"
 #include "Editor/widgets/TitleBar.h"
+#include "Editor/widgets/ThemeEditorDialog.h"
 #include "FilterTable.h"
 #include "MainWindow.h"
 #include "SkinManager.h"
+#include "skins/CustomThemeStore.h"
+#include "skins/SkinDisplayNames.h"
 #include "skins/SkinThemeData.h"
 #include "ui_MainWindow.h"
 
@@ -244,24 +247,26 @@ void MainWindow::setupRedesignActions()
 
 	skinActionGroup = new QActionGroup(this);
 	skinActionGroup->setExclusive(true);
-	// Which skins exist and in what order comes from SkinThemeData::roster(); this
-	// only supplies the translated names. A roster id with no name here shows as
-	// its raw id - visible and reportable, unlike the old hand-written list, where
-	// a forgotten skin was simply absent from the menu.
-	const QHash<QString, QString> skinNames = {
-		{ QStringLiteral("studio"), tr("Studio Glass") },
-		{ QStringLiteral("minimal"), tr("Precision Minimal") },
-		{ QStringLiteral("soft"), tr("Soft Lab") },
-		{ QStringLiteral("rack"), tr("Hardware Rack") },
-		{ QStringLiteral("matrix"), tr("Signal Matrix") }
-	};
 	for (const QString& skinId : SkinThemeData::ids())
 	{
-		QAction* action = interfaceMenu->addAction(skinNames.value(skinId, skinId));
+		QAction* action = interfaceMenu->addAction(SkinDisplayNames::displayName(skinId));
 		action->setCheckable(true);
 		action->setData(skinId);
 		action->setShortcut(QKeySequence(QStringLiteral("Ctrl+Alt+%1").arg(skinActionGroup->actions().size() + 1)));
 		skinActionGroup->addAction(action);
+	}
+	QSettings customThemeSettings(QString::fromWCharArray(EDITOR_REGPATH), QSettings::NativeFormat);
+	const QList<CustomThemeStore::Theme> customThemes = CustomThemeStore::themes(customThemeSettings);
+	if (!customThemes.isEmpty())
+	{
+		interfaceMenu->addSeparator();
+		for (const CustomThemeStore::Theme& theme : customThemes)
+		{
+			QAction* action = interfaceMenu->addAction(tr("Custom: %1").arg(theme.name));
+			action->setCheckable(true);
+			action->setData(theme.skinId());
+			skinActionGroup->addAction(action);
+		}
 	}
 	connect(skinActionGroup, SIGNAL(triggered(QAction*)), this, SLOT(skinSelected(QAction*)));
 
@@ -270,12 +275,49 @@ void MainWindow::setupRedesignActions()
 	darkThemeAction->setShortcut(QKeySequence(QStringLiteral("Ctrl+Alt+D")));
 	connect(darkThemeAction, SIGNAL(toggled(bool)), this, SLOT(darkThemeToggled(bool)));
 
+	QAction* themeEditorAction = interfaceMenu->addAction(tr("Theme editor..."));
+	connect(themeEditorAction, &QAction::triggered, this, [this]() {
+		ThemeEditorDialog dialog(skinId, skinDark, this);
+		connect(&dialog, &ThemeEditorDialog::builtInThemeRequested, this,
+			[this](const QString& id, bool dark) {
+				skinId = id;
+				skinDark = dark;
+				applySkinAndRebuild();
+				applyRedesignPreferences();
+			});
+		connect(&dialog, &ThemeEditorDialog::themePreviewRequested, this,
+			[this](const QString& id, bool dark, const SkinTokens& tokens) {
+				const QString resolvedId = SkinThemeData::resolveId(id);
+				const bool needsRebuild = skinId != resolvedId
+					|| skinDark != dark
+					|| SkinManager::instance()->currentSkinId() != resolvedId;
+				if (needsRebuild)
+				{
+					const bool wasSuppressed = skinPersistenceSuppressed;
+					skinPersistenceSuppressed = true;
+					skinId = resolvedId;
+					skinDark = dark;
+					applySkinAndRebuild();
+					skinPersistenceSuppressed = wasSuppressed;
+				}
+				SkinManager::instance()->applyTokenPreview(resolvedId, dark, tokens);
+			});
+		connect(&dialog, &ThemeEditorDialog::customThemeRequested, this,
+			[this](const QString& id) {
+				skinId = id;
+				applySkinAndRebuild();
+				applyRedesignPreferences();
+			});
+		dialog.exec();
+	});
+
 	if (SkinManager::instance()->isHeritage())
 	{
 		// Heritage is unskinned by definition; the choices come back with the
 		// modern presentation.
 		skinActionGroup->setEnabled(false);
 		darkThemeAction->setEnabled(false);
+		themeEditorAction->setEnabled(false);
 	}
 
 	interfaceMenu->addSeparator();
@@ -376,6 +418,7 @@ void MainWindow::applyRedesignPreferences()
 	{
 		SkinManager::instance()->applySkin(skinId, skinDark);
 		skinId = SkinManager::instance()->currentSkinId();
+		skinDark = SkinManager::instance()->isDark();
 		// The toolbar/menu dressing must not depend on applySkin actually
 		// running: a same-skin re-apply is skipped (no skinChanged signal),
 		// which used to leave the toolbar on the .ui's legacy .ico icons and
