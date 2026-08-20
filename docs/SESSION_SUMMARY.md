@@ -8,8 +8,10 @@
 - Ported block-paced VST preview processing; its worker joins before plug-in shutdown.
 - Ported saved custom-theme persistence, JSON import/export, token derivation, Theme Lab UI, temporary live preview, and saved-theme application against the five current upstream base skins.
 - Review fixes keep previews transient, keep the Dark menu synchronized to saved-theme state, and preserve Rack/Matrix toolbar chrome through a separate base-renderer identity.
+- Ported Midnight Console, Arctic Bloom, Ember Rack, Violet Pulse, and Solar Paper; each retains its own token/id identity while delegating to the matching upstream QSS and painter grammar.
+- DeviceSelector resolves those variants to the same base painter grammar; an isolated qmake build and all 60 expected offscreen shots passed.
 - Preserved upstream VST3 bus-layout path while resolving the port.
-- Validation: Editor Release build, offscreen `Editor.exe --selftest-vst`, offscreen `Editor.exe --skin-switch-test`, `EditorLogicTests.exe` (3098 checks), and `HybridConvTests.exe` (1635 checks) passed.
+- Validation: Editor Release build, offscreen `Editor.exe --selftest-vst`, offscreen `Editor.exe --skin-switch-test`, `EditorLogicTests.exe` (3194 checks), `HybridConvTests.exe` (1635 checks), and 60 DeviceSelector variant shots passed.
 - The temporary desktop self-test can stall; headless Qt mode is the validated local self-test path. No installed files were changed for that runtime setup.
 - No integration build is installed, pushed, merged, or promoted.
-- Next: manual Theme Lab persistence acceptance, then port fork-only theme variants, LegacyRows theming, and DeviceSelector custom-theme dressing as distinct slices.
+- Next: manual Theme Lab persistence acceptance, then port the later dark variants, LegacyRows theming, and DeviceSelector custom-theme dressing as distinct slices.

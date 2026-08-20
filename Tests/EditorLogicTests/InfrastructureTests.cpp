@@ -25,7 +25,14 @@
 void testTheSkinRosterIsTheOneList()
 {
 	const QVector<SkinThemeData::SkinEntry>& roster = SkinThemeData::roster();
-	requireTrue(roster.size() >= 5, "the roster carries the five built-in skins");
+	const QStringList expectedIds = {
+		QStringLiteral("studio"), QStringLiteral("minimal"), QStringLiteral("soft"),
+		QStringLiteral("rack"), QStringLiteral("matrix"), QStringLiteral("midnight"),
+		QStringLiteral("arctic"), QStringLiteral("ember"), QStringLiteral("violet"),
+		QStringLiteral("solar")
+	};
+	requireTrue(roster.size() == expectedIds.size(),
+		"the roster carries exactly the base skins and the first variant set");
 	expectTrue(roster.first().id == QStringLiteral("studio"),
 		"studio is first, which is what an unknown id falls back to and what the default is");
 
@@ -34,7 +41,12 @@ void testTheSkinRosterIsTheOneList()
 	{
 		expectFalse(skin.id.isEmpty(), "every entry has an id");
 		expectFalse(skin.qssBaseName.isEmpty(), "every entry names its style sheet");
+		expectFalse(skin.paintBaseId.isEmpty(), "every entry names its paint grammar");
 		expectTrue(skin.tokens != nullptr, "every entry carries its token table");
+		expectTrue(SkinThemeData::entry(skin.paintBaseId).id == skin.paintBaseId,
+			"every paint grammar is a registered skin id");
+		expectTrue(SkinThemeData::entry(skin.paintBaseId).paintBaseId == skin.paintBaseId,
+			"every paint grammar is a self-rooting base skin");
 		expectFalse(seen.contains(skin.id),
 			QStringLiteral("%1 appears once").arg(skin.id));
 		seen.insert(skin.id);
@@ -47,8 +59,28 @@ void testTheSkinRosterIsTheOneList()
 
 	const QStringList ids = SkinThemeData::ids();
 	requireTrue(ids.size() == roster.size(), "ids() has one entry per roster skin, in the same order");
-	for (int index = 0; index < ids.size(); index++)
-		expectTrue(ids[index] == roster[index].id, "ids() preserves the roster order, which is the display order");
+	expectTrue(ids == expectedIds,
+		"ids() preserves the exact scoped roster and its display order");
+	expectTrue(SkinThemeData::entry(QStringLiteral("midnight")).qssBaseName == QStringLiteral("studio"),
+		"Midnight Console rides the Studio QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("midnight")).paintBaseId == QStringLiteral("studio"),
+		"Midnight Console rides the Studio paint grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("arctic")).qssBaseName == QStringLiteral("soft"),
+		"Arctic Bloom rides the Soft QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("arctic")).paintBaseId == QStringLiteral("soft"),
+		"Arctic Bloom rides the Soft paint grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("ember")).qssBaseName == QStringLiteral("rack"),
+		"Ember Rack rides the Rack QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("ember")).paintBaseId == QStringLiteral("rack"),
+		"Ember Rack rides the Rack paint grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("violet")).qssBaseName == QStringLiteral("matrix"),
+		"Violet Pulse rides the Matrix QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("violet")).paintBaseId == QStringLiteral("matrix"),
+		"Violet Pulse rides the Matrix paint grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("solar")).qssBaseName == QStringLiteral("precision"),
+		"Solar Paper rides the Minimal QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("solar")).paintBaseId == QStringLiteral("minimal"),
+		"Solar Paper rides the Minimal paint grammar");
 
 	// The two stored aliases from earlier releases, which are the only ids that
 	// cannot be derived from the roster.
@@ -114,7 +146,7 @@ void testEverySkinSheetResolvesAllThemeTokens()
 			const QString resource = SkinThemeData::qssResource(skinId, dark);
 			const QString sourcePath = repoRoot.filePath(
 				QStringLiteral("Editor/skins/%1/qss/%2")
-					.arg(skinId, QFileInfo(resource).fileName()));
+					.arg(SkinThemeData::entry(skinId).paintBaseId, QFileInfo(resource).fileName()));
 			QFile file(sourcePath);
 			expectTrue(file.open(QIODevice::ReadOnly | QIODevice::Text),
 				QStringLiteral("loads %1 source sheet").arg(resource));

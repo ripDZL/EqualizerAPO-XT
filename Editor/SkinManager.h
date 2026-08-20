@@ -34,9 +34,9 @@ public:
 
 	const SkinTokens& tokens() const;
 	const QString& currentSkinId() const;
-	// The built-in skin supplying card/chrome renderers. For a saved custom
-	// theme this differs from currentSkinId(), which remains custom:<id> for
-	// persistence and Interface-menu selection.
+	// The built-in skin supplying card/chrome renderers. For a token variant
+	// and a saved custom theme this can differ from currentSkinId(), which
+	// remains the selected id for persistence and Interface-menu selection.
 	const QString& baseSkinId() const;
 	bool isDark() const;
 	void applySkin(const QString& skinId, bool dark);

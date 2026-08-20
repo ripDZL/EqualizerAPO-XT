@@ -10,5 +10,7 @@
 - VST preview processing is block-paced on a dedicated worker; shutdown joins it before the plug-in is stopped or released.
 - Saved custom-theme persistence, JSON import/export, token overrides, Theme Lab UI, temporary live preview, and saved-theme application are ported.
 - Review hardening keeps Theme Lab previews transient, synchronizes the menu state to a saved theme's stored dark setting, and preserves the Rack/Matrix base chrome for custom themes.
-- This slice uses the five current upstream base skins only; fork-only variant rosters, LegacyRows theming, and DeviceSelector custom-theme dressing remain separate feature groups.
-- Latest local proof: Editor Release build, offscreen VST self-test, offscreen skin-switch test, EditorLogic 3098, and HybridConv 1635 all passed. No integration artifact is installed, pushed, merged, or promoted.
+- Ported the first fork-only theme-variant group: Midnight Console, Arctic Bloom, Ember Rack, Violet Pulse, and Solar Paper. Each keeps its own token/id identity and reuses the appropriate upstream QSS and painter grammar.
+- DeviceSelector resolves each variant to its `paintBaseId` for painted chrome while retaining the variant's QSS and tokens; no selector-specific variant painters were added.
+- The later dark variant group, LegacyRows theming, and DeviceSelector custom-theme dressing remain separate feature groups.
+- Latest local proof: Editor Release build, offscreen VST self-test, offscreen skin-switch test, EditorLogic 3194, HybridConv 1635, and DeviceSelector qmake/60-shot coverage all passed. No integration artifact is installed, pushed, merged, or promoted.

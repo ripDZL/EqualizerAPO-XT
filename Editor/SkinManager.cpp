@@ -20,8 +20,8 @@ SkinManager::SkinManager(QObject* parent)
 	// Establishes the never-null invariant on activeSkin (see the header).
 	activeSkin = Skins::byId(skinId);
 	Q_ASSERT(activeSkin != nullptr);
-	renderSkinId = activeSkin->id();
-	skinId = renderSkinId;
+	renderSkinId = SkinThemeData::entry(activeSkin->id()).paintBaseId;
+	skinId = activeSkin->id();
 	currentTokens = activeSkin->tokens(darkMode);
 }
 
@@ -119,7 +119,7 @@ void SkinManager::applySkin(const QString& newSkinId, bool dark)
 	if (isCustomTheme)
 	{
 		activeSkin = Skins::byId(customTheme.baseTheme);
-		renderSkinId = activeSkin->id();
+		renderSkinId = SkinThemeData::entry(activeSkin->id()).paintBaseId;
 		skinId = customTheme.skinId();
 		darkMode = customTheme.dark;
 		currentTokens = CustomThemeStore::tokensForTheme(customTheme);
@@ -129,8 +129,8 @@ void SkinManager::applySkin(const QString& newSkinId, bool dark)
 	else
 	{
 		activeSkin = Skins::byId(newSkinId);
-		renderSkinId = activeSkin->id();
-		skinId = renderSkinId;
+		renderSkinId = SkinThemeData::entry(activeSkin->id()).paintBaseId;
+		skinId = activeSkin->id();
 		darkMode = dark;
 		currentTokens = activeSkin->tokens(darkMode);
 
@@ -152,8 +152,8 @@ void SkinManager::applyTokenPreview(const QString& newSkinId, bool dark, const S
 	heritageMode = false;
 	previewMode = true;
 	activeSkin = Skins::byId(newSkinId);
-	renderSkinId = activeSkin->id();
-	skinId = renderSkinId;
+	renderSkinId = SkinThemeData::entry(activeSkin->id()).paintBaseId;
+	skinId = activeSkin->id();
 	darkMode = dark;
 	currentTokens = tokens;
 
