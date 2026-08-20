@@ -39,6 +39,7 @@ public:
 
 	QPushButton* getApplyButton();
 	QCheckBox* getAutoApplyCheckBox();
+	bool hasPluginPanel() const;
 
 	void onSizeWindow(int w, int h);
 
@@ -49,4 +50,5 @@ private:
 	std::unique_ptr<Ui::VSTPluginFilterGUIDialog> ui;
 	// Non-owning: the dialog is stack-bound inside the effect owner's method.
 	VSTPluginInstance* effect;
+	bool panelOpened = false;
 };

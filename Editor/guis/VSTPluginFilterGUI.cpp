@@ -24,6 +24,7 @@
 #include <QAbstractEventDispatcher>
 #include <QAction>
 #include <QMenu>
+#include <QMessageBox>
 #include <QStringList>
 
 #define WIN32_LEAN_AND_MEAN
@@ -182,6 +183,12 @@ void VSTPluginFilterGUI::on_openPanelButton_clicked()
 		effect->writeToEffect(chunkData, paramMap);
 
 		VSTPluginFilterGUIDialog dialog(this, effect.get(), autoApplyDialog);
+		if (!dialog.hasPluginPanel())
+		{
+			QMessageBox::information(this, tr("VST plug-in"),
+				tr("This plug-in does not provide a native editor panel."));
+			return;
+		}
 		connect(dialog.getApplyButton(), SIGNAL(pressed()), SLOT(applyDialog()));
 		connect(dialog.getAutoApplyCheckBox(), SIGNAL(toggled(bool)), SLOT(autoApplyToggled(bool)));
 		connect(QAbstractEventDispatcher::instance(), SIGNAL(aboutToBlock()), SLOT(on_idle()));
@@ -379,7 +386,7 @@ void VSTPluginFilterGUI::on_embedAction_toggled(bool checked)
 				palette.setColor(QPalette::Active, QPalette::WindowText, Qt::red);
 				palette.setColor(QPalette::Inactive, QPalette::WindowText, Qt::red);
 				ui->statusLabel->setPalette(palette);
-				ui->statusLabel->setText(tr("Plugin crashed when opening panel."));
+				ui->statusLabel->setText(tr("Plugin could not open a native editor panel."));
 			}
 		}
 		else
@@ -459,11 +466,12 @@ bool VSTPluginFilterGUI::embedPlugin()
 		effect->writeToEffect(chunkData, paramMap);
 
 		HWND hwnd = (HWND)ui->frame->winId();
-		short width, height;
+		short width = 0;
+		short height = 0;
 
-		effect->startEditing(hwnd, &width, &height, ui->frame->devicePixelRatioF());
-
-		ui->frame->setFixedSize(width, height);
+		result = effect->startEditing(hwnd, &width, &height, ui->frame->devicePixelRatioF());
+		if (result)
+			ui->frame->setFixedSize(width, height);
 	}
 	__except (EXCEPTION_EXECUTE_HANDLER)
 	{
