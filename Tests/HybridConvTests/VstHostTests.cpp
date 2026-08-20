@@ -223,6 +223,25 @@ void expectRejectedMetadataPassesThrough(const shared_ptr<VSTPluginLibrary>& lib
 	SetEnvironmentVariableW(L"EAPO_TEST_VST_METADATA", nullptr);
 }
 
+// TestVst2Plugin deliberately has no native editor. Keep the pre-fix access
+// violation inside this probe so the harness can report the expected safe
+// failure instead of aborting the complete VST host suite.
+bool tryStartEditingWithoutNativeEditor(VSTPluginInstance* instance, HWND parent, bool& raisedException)
+{
+	raisedException = false;
+	short width = 0;
+	short height = 0;
+	__try
+	{
+		return instance != nullptr && instance->startEditing(parent, &width, &height);
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER)
+	{
+		raisedException = true;
+		return false;
+	}
+}
+
 void testVolumeControllerBalancesComInitialization()
 {
 	bool threadStartedUninitialized = false;
@@ -346,6 +365,19 @@ void runVstHostTests()
 	harness.expectTrue(instance->canReplacing(), "plugin advertises float replacing");
 	harness.expectTrue(instance->canDoubleReplacing(), "plugin advertises double replacing");
 	harness.expectTrue(instance->getName() == L"TestVst2Plugin", "plugin reports its name");
+
+	HWND noEditorParent = CreateWindowExW(0, L"STATIC", L"VST2 no-editor test parent", WS_OVERLAPPED,
+		0, 0, 640, 480, nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
+	harness.expectTrue(noEditorParent != nullptr, "VST2 no-editor test parent is created");
+	bool noEditorRaisedException = false;
+	const bool noEditorOpened = noEditorParent != nullptr
+		&& tryStartEditingWithoutNativeEditor(instance.get(), noEditorParent, noEditorRaisedException);
+	harness.expectFalse(noEditorRaisedException,
+		"VST2 without a native editor does not fault when opening its panel");
+	harness.expectFalse(noEditorOpened,
+		"VST2 without a native editor reports that no panel can be opened");
+	if (noEditorParent != nullptr)
+		DestroyWindow(noEditorParent);
 
 	instance->prepareForProcessing(48000.0f, 512);
 	instance->startProcessing();

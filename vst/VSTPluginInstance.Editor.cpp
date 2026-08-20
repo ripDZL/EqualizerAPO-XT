@@ -24,6 +24,8 @@
 #include "pluginterfaces/base/smartpointer.h"
 #include "pluginterfaces/gui/iplugviewcontentscalesupport.h"
 
+#include <limits>
+
 using namespace std;
 using namespace Steinberg;
 using namespace Steinberg::Vst;
@@ -158,18 +160,36 @@ bool VSTPluginInstance::startEditing(HWND hWnd, short* width, short* height, dou
 		return true;
 	}
 
-	if (effect == NULL)
+	if (effect == NULL || (effect->flags & VST_EFFECT_FLAG_EDITOR) == 0)
 		return false;
 
-	vst_rect_t* rect;
+	// VST2 plug-ins with no native editor are allowed to ignore these opcodes.
+	// Keep the pointer initialized and require a usable rectangle before the
+	// caller sizes its Qt frame from it.
+	vst_rect_t* rect = NULL;
 	effect->control(effect.get(), VST_EFFECT_OPCODE_EDITOR_GET_RECT, 0, 0, &rect, 0.0f);
 	effect->control(effect.get(), VST_EFFECT_OPCODE_EDITOR_OPEN, 0, 0, hWnd, 0.0f);
 	effect->control(effect.get(), VST_EFFECT_OPCODE_EDITOR_GET_RECT, 0, 0, &rect, 0.0f);
+	if (rect == NULL)
+	{
+		effect->control(effect.get(), VST_EFFECT_OPCODE_EDITOR_CLOSE, 0, 0, NULL, 0.0f);
+		return false;
+	}
+
+	const int editorWidth = (int)rect->right - (int)rect->left;
+	const int editorHeight = (int)rect->bottom - (int)rect->top;
+	if (editorWidth <= 0 || editorHeight <= 0
+		|| editorWidth > numeric_limits<short>::max()
+		|| editorHeight > numeric_limits<short>::max())
+	{
+		effect->control(effect.get(), VST_EFFECT_OPCODE_EDITOR_CLOSE, 0, 0, NULL, 0.0f);
+		return false;
+	}
 
 	if (width != NULL)
-		*width = rect->right - rect->left;
+		*width = (short)editorWidth;
 	if (height != NULL)
-		*height = rect->bottom - rect->top;
+		*height = (short)editorHeight;
 	return true;
 }
 

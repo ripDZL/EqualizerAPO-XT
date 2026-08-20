@@ -286,6 +286,12 @@ void VSTCardEditor::openPanel()
 		effect->writeToEffect(chunkData, paramMap);
 
 		VSTPluginFilterGUIDialog dialog(this, effect.get(), autoApplyDialog);
+		if (!dialog.hasPluginPanel())
+		{
+			QMessageBox::information(this, tr("VST plug-in"),
+				tr("This plug-in does not provide a native editor panel."));
+			return;
+		}
 		connect(dialog.getApplyButton(), SIGNAL(pressed()), SLOT(applyDialog()));
 		connect(dialog.getAutoApplyCheckBox(), SIGNAL(toggled(bool)), SLOT(autoApplyToggled(bool)));
 		connect(QAbstractEventDispatcher::instance(), SIGNAL(aboutToBlock()), SLOT(onIdle()));
@@ -724,7 +730,7 @@ void VSTCardEditor::embedToggled(bool checked)
 				frame->setVisible(false);
 				livePreview.stop();
 
-				initErrorText = tr("Plugin crashed when opening panel.");
+				initErrorText = tr("Plugin could not open a native editor panel.");
 				updateReferenceState();
 			}
 		}
@@ -807,9 +813,11 @@ bool VSTCardEditor::embedPlugin()
 		effect->writeToEffect(chunkData, paramMap);
 
 		HWND hwnd = (HWND)frame->winId();
-		short width, height;
-		effect->startEditing(hwnd, &width, &height, frame->devicePixelRatioF());
-		frame->setFixedSize(width, height);
+		short width = 0;
+		short height = 0;
+		result = effect->startEditing(hwnd, &width, &height, frame->devicePixelRatioF());
+		if (result)
+			frame->setFixedSize(width, height);
 	}
 	__except (EXCEPTION_EXECUTE_HANDLER)
 	{
