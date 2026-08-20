@@ -87,11 +87,10 @@ void MainWindow::interfaceModeSelected(QAction* action)
 	if (mode == currentRenderMode)
 		return;
 
-	// The two modes are whole presentations, not just row widgets: heritage
-	// (legacy rows) runs unskinned on the native style, frame, font engine and
-	// system fonts. None of that can swap cleanly inside a live process, and a
-	// partial swap mixes modern chrome around legacy rows. Restart into the
-	// chosen presentation instead.
+	// The two modes are whole presentations, not just row widgets: legacy rows
+	// keep the native font engine and the old factory chain, while modern cards
+	// use the FreeType/skinned stack. Restart into the chosen presentation so
+	// the platform integration follows the mode.
 	if (QMessageBox::question(this, tr("Restart required"), tr("Configuration Editor will be restarted to apply the changed settings. Proceed?")) == QMessageBox::Yes)
 	{
 		// savePreferences() persists interface/legacyRows from this member on
@@ -130,7 +129,10 @@ void MainWindow::applySkinAndRebuild()
 		if (filterTable != nullptr)
 			filterTable->clearRows();
 	}
-	SkinManager::instance()->applySkin(skinId, skinDark);
+	if (currentRenderMode == FilterTable::LegacyRows)
+		SkinManager::instance()->applyHeritage(skinId, skinDark);
+	else
+		SkinManager::instance()->applySkin(skinId, skinDark);
 	skinId = SkinManager::instance()->currentSkinId();
 	skinDark = SkinManager::instance()->isDark();
 	if (skinActionGroup != nullptr)
@@ -144,11 +146,9 @@ void MainWindow::applySkinAndRebuild()
 		darkThemeAction->setChecked(skinDark);
 		darkThemeAction->blockSignals(signalsBlocked);
 	}
-	// Each skin supplies its own Copy routing renderer (node graph, crosspoint
-	// matrix, step list, ...) and per-skin card chrome. Those widgets are built
-	// once when the row is created, so the rows must be rebuilt for the new
-	// skin to take effect — a plain repaint only re-colours the old widgets and
-	// left every skin showing the studio node graph for Copy.
+	// Modern cards rebuild because routing renderers and card chrome are chosen
+	// at construction time. Legacy rows rebuild to re-polish the old widgets
+	// under the heritage palette without changing their factory behavior.
 	for (int i = 0; i < ui->tabWidget->count(); i++)
 	{
 		FilterTable* filterTable = filterTableForTab(i);

@@ -151,7 +151,24 @@ compiles this unit and `CustomThemeStore` plus the aliased `.qss`/font resources
 (`DeviceSelector/DeviceSelectorSkins.qrc`), and wears the Editor's stored
 built-in or saved custom skin (`interface/skin`, default studio). A saved theme
 supplies its own token table while its `baseTheme` selects the shared QSS and
-painter grammar; heritage mode keeps the native look.
+painter grammar; LegacyRows applies its own compact token layer around the
+original row widgets.
+
+## LegacyRows heritage themes
+
+`SkinManager::applyHeritage(id, dark)` keeps the legacy row factories,
+promoted controls, plugin/graph behavior, and stock font engine. It applies
+the selected built-in or saved custom token table only to shared chrome,
+dialogs, row paint, and token-consuming painters.
+
+The custom title bar remains active unless `interface/nativeTitleBar` is set;
+Qt cannot colour the native Windows caption. `legacy-slate`, `legacy-blue`,
+`legacy-forest`, `legacy-bronze`, and `legacy-plum` use the Minimal/Precision
+grammar outside LegacyRows and supply their own heritage palette inside it.
+
+`Editor --skin-switch-test` verifies the dark Bronze palette and QMessageBox
+contrast. `EAPO_GALLERY_LEGACY=1` produces normal, disabled, and dialog shots
+for each selected legacy theme.
 
 ## Reference-card view hook
 
@@ -300,7 +317,7 @@ each for the toolbar, title bar, menu bar and an open menu, two for the
 add-card row (`addrow` normal/hover), one for the insertion seam's hover
 reveal (`seam`) and one for the update toast (`toast`). Output names are
 stable: `<skin>_<dark|light>_<row>_<state>.png`,
-15 × 2 × (21 × 3 + 12) = 2,250 PNGs
+20 × 2 × (21 × 3 + 12) = 3,000 PNGs
 for the current full run; the run self-checks the count, so adding a gallery row needs
 no external count update. A row shot fails the render (non-zero exit) if a
 visible horizontal scrollbar is found inside the row — rows must fit the

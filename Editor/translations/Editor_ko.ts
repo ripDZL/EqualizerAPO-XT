@@ -4899,4 +4899,32 @@ Change the file permissions or copy the files to the config directory.</source>
         <translation>다음 결정적 변형을 선택합니다</translation>
     </message>
 </context>
+<context>
+    <name>SkinDisplayNames</name>
+    <message>
+        <location filename="../skins/SkinDisplayNames.cpp" line="30"/>
+        <source>Legacy Slate</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../skins/SkinDisplayNames.cpp" line="31"/>
+        <source>Legacy Blue</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../skins/SkinDisplayNames.cpp" line="32"/>
+        <source>Legacy Forest</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../skins/SkinDisplayNames.cpp" line="33"/>
+        <source>Legacy Bronze</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../skins/SkinDisplayNames.cpp" line="34"/>
+        <source>Legacy Plum</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
 </TS>

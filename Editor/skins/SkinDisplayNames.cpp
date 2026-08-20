@@ -26,7 +26,12 @@ QString displayName(const QString& id)
 		{ QStringLiteral("aurora"), QT_TRANSLATE_NOOP("SkinDisplayNames", "Aurora Veil") },
 		{ QStringLiteral("forge"), QT_TRANSLATE_NOOP("SkinDisplayNames", "Copper Forge") },
 		{ QStringLiteral("nebula"), QT_TRANSLATE_NOOP("SkinDisplayNames", "Neon Nebula") },
-		{ QStringLiteral("noir"), QT_TRANSLATE_NOOP("SkinDisplayNames", "Noir Chrome") }
+		{ QStringLiteral("noir"), QT_TRANSLATE_NOOP("SkinDisplayNames", "Noir Chrome") },
+		{ QStringLiteral("legacy-slate"), QT_TRANSLATE_NOOP("SkinDisplayNames", "Legacy Slate") },
+		{ QStringLiteral("legacy-blue"), QT_TRANSLATE_NOOP("SkinDisplayNames", "Legacy Blue") },
+		{ QStringLiteral("legacy-forest"), QT_TRANSLATE_NOOP("SkinDisplayNames", "Legacy Forest") },
+		{ QStringLiteral("legacy-bronze"), QT_TRANSLATE_NOOP("SkinDisplayNames", "Legacy Bronze") },
+		{ QStringLiteral("legacy-plum"), QT_TRANSLATE_NOOP("SkinDisplayNames", "Legacy Plum") }
 	};
 	const auto it = names.constFind(id);
 	if (it == names.constEnd())

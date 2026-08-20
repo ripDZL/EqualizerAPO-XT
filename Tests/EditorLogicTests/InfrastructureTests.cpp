@@ -30,10 +30,13 @@ void testTheSkinRosterIsTheOneList()
 		QStringLiteral("rack"), QStringLiteral("matrix"), QStringLiteral("midnight"),
 		QStringLiteral("arctic"), QStringLiteral("ember"), QStringLiteral("violet"),
 		QStringLiteral("solar"), QStringLiteral("obsidian"), QStringLiteral("aurora"),
-		QStringLiteral("forge"), QStringLiteral("nebula"), QStringLiteral("noir")
+		QStringLiteral("forge"), QStringLiteral("nebula"), QStringLiteral("noir"),
+		QStringLiteral("legacy-slate"), QStringLiteral("legacy-blue"),
+		QStringLiteral("legacy-forest"), QStringLiteral("legacy-bronze"),
+		QStringLiteral("legacy-plum")
 	};
 	requireTrue(roster.size() == expectedIds.size(),
-		"the roster carries exactly the base skins and the two scoped variant sets");
+		"the roster carries exactly the base skins and the three scoped variant sets");
 	expectTrue(roster.first().id == QStringLiteral("studio"),
 		"studio is first, which is what an unknown id falls back to and what the default is");
 
@@ -102,6 +105,14 @@ void testTheSkinRosterIsTheOneList()
 		"Noir Chrome rides the Minimal QSS grammar");
 	expectTrue(SkinThemeData::entry(QStringLiteral("noir")).paintBaseId == QStringLiteral("minimal"),
 		"Noir Chrome rides the Minimal paint grammar");
+	for (const QString& variant : { QStringLiteral("legacy-slate"), QStringLiteral("legacy-blue"),
+		QStringLiteral("legacy-forest"), QStringLiteral("legacy-bronze"), QStringLiteral("legacy-plum") })
+	{
+		expectTrue(SkinThemeData::entry(variant).qssBaseName == QStringLiteral("precision"),
+			QStringLiteral("%1 rides the Precision QSS grammar").arg(variant));
+		expectTrue(SkinThemeData::entry(variant).paintBaseId == QStringLiteral("minimal"),
+			QStringLiteral("%1 rides the Minimal paint grammar").arg(variant));
+	}
 	expectTrue(SkinThemeData::tokens(QStringLiteral("obsidian"), true).graphRadius == 12,
 		"Obsidian Glass keeps its larger graph radius");
 	expectTrue(SkinThemeData::tokens(QStringLiteral("aurora"), true).borderRadius == 18,
@@ -112,6 +123,10 @@ void testTheSkinRosterIsTheOneList()
 		"Neon Nebula keeps its matrix card rail");
 	expectTrue(SkinThemeData::tokens(QStringLiteral("noir"), true).zebraStripe,
 		"Noir Chrome keeps its minimal zebra stripes");
+	expectTrue(SkinThemeData::tokens(QStringLiteral("legacy-bronze"), true).fontFamily == QStringLiteral("Segoe UI"),
+		"Legacy Bronze keeps the native legacy-row font");
+	expectTrue(SkinThemeData::tokens(QStringLiteral("legacy-bronze"), true).accent == QStringLiteral("#C58B48"),
+		"Legacy Bronze carries the requested bronze accent");
 
 	// The two stored aliases from earlier releases, which are the only ids that
 	// cannot be derived from the roster.

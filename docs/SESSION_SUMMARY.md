@@ -11,8 +11,10 @@
 - Ported Midnight Console, Arctic Bloom, Ember Rack, Violet Pulse, and Solar Paper; each retains its own token/id identity while delegating to the matching upstream QSS and painter grammar.
 - Ported Obsidian Glass, Aurora Veil, Copper Forge, Neon Nebula, and Noir Chrome with the same token-variant contract; no new skin grammar or DeviceSelector-specific painter was added.
 - DeviceSelector resolves all token variants to the same base painter grammar and now restores saved custom-theme tokens/QSS through a shared application path; an isolated qmake build and all 93 expected offscreen shots passed.
+- Ported LegacyRows theming without changing legacy row factories, filters, or the stock font engine: shared chrome, dialogs, row paint, and token consumers now follow the selected palette.
+- Added Legacy Slate, Blue, Forest, Bronze, and Plum; all use Minimal/Precision grammar for modern/DeviceSelector presentation and a compact heritage QSS/palette layer for legacy rows.
 - Preserved upstream VST3 bus-layout path while resolving the port.
-- Validation: Editor Release build, offscreen `Editor.exe --selftest-vst`, offscreen 90-cycle `Editor.exe --skin-switch-test`, `EditorLogicTests.exe` (3284 checks), `HybridConvTests.exe` (1635 checks), and 93 DeviceSelector shots (including a temporary saved-theme probe) passed. Representative dark and saved-theme DeviceSelector captures were visually checked.
+- Validation: Editor Release build, offscreen `Editor.exe --selftest-vst`, offscreen 120-cycle `Editor.exe --skin-switch-test`, `EditorLogicTests.exe` (3371 checks), `HybridConvTests.exe` (1635 checks), a 30-shot LegacyRows gallery, and 123 DeviceSelector shots (including a temporary saved-theme probe) passed. Representative LegacyRows and DeviceSelector captures were visually checked.
 - The temporary desktop self-test can stall; headless Qt mode is the validated local self-test path. No installed files were changed for that runtime setup.
 - No integration build is installed, pushed, merged, or promoted.
-- Next: manual Theme Lab persistence acceptance, then port LegacyRows theming as its own slice.
+- Next: manually validate Theme Lab and LegacyRows persistence in an integration candidate, then audit the remaining fork-only feature groups.

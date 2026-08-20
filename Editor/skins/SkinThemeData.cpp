@@ -722,6 +722,131 @@ SkinTokens noirTokens(bool dark)
 	finishTokens(t);
 	return t;
 }
+
+struct LegacyPalette
+{
+	const char* background;
+	const char* surface;
+	const char* card;
+	const char* cardHover;
+	const char* cardSelected;
+	const char* text;
+	const char* mutedText;
+	const char* border;
+	const char* graph;
+	const char* graphGridMinor;
+	const char* accent;
+	const char* accent2;
+	const char* success;
+	const char* warning;
+	const char* danger;
+};
+
+SkinTokens legacyVariantTokens(bool dark, const LegacyPalette& darkPalette, const LegacyPalette& lightPalette)
+{
+	const LegacyPalette& p = dark ? darkPalette : lightPalette;
+	SkinTokens t = minimalTokens(dark);
+	t.fontFamily = QStringLiteral("Segoe UI");
+	t.monoFontFamily = QStringLiteral("Consolas");
+	t.borderRadius = 5;
+	t.rowHeight = 36;
+	t.channelGroupIndent = 16;
+	t.channelGroupStyle = SkinTokens::TreeLines;
+	t.badgeStyle = SkinTokens::OutlineOnly;
+	t.zebraStripe = false;
+	t.background = QLatin1String(p.background);
+	t.surface = QLatin1String(p.surface);
+	t.card = QLatin1String(p.card);
+	t.cardHover = QLatin1String(p.cardHover);
+	t.cardSelected = QLatin1String(p.cardSelected);
+	t.text = QLatin1String(p.text);
+	t.mutedText = QLatin1String(p.mutedText);
+	t.border = QLatin1String(p.border);
+	t.graph = QLatin1String(p.graph);
+	t.graphGridMinor = QLatin1String(p.graphGridMinor);
+	t.accent = QLatin1String(p.accent);
+	t.accent2 = QLatin1String(p.accent2);
+	t.success = QLatin1String(p.success);
+	t.warning = QLatin1String(p.warning);
+	t.danger = QLatin1String(p.danger);
+	finishTokens(t);
+	return t;
+}
+
+SkinTokens legacySlateTokens(bool dark)
+{
+	static constexpr LegacyPalette darkPalette{
+		"#111418", "#1A1E24", "#242930", "#2C333B", "#354154",
+		"#ECEFF4", "#A7B0BD", "#48515D", "#0B0D10", "#303841",
+		"#6EA8FE", "#9AA7B8", "#6BCB8F", "#E5B567", "#E06C75"
+	};
+	static constexpr LegacyPalette lightPalette{
+		"#ECEFF3", "#F7F8FA", "#FFFFFF", "#EEF2F6", "#DDE8F8",
+		"#1C232D", "#667080", "#C2CAD5", "#FFFFFF", "#D8DEE8",
+		"#2F6FD6", "#5E6A7A", "#2E8A57", "#9B6500", "#B33A42"
+	};
+	return legacyVariantTokens(dark, darkPalette, lightPalette);
+}
+
+SkinTokens legacyBlueTokens(bool dark)
+{
+	static constexpr LegacyPalette darkPalette{
+		"#08111C", "#101C2B", "#18283B", "#20344C", "#143B66",
+		"#EAF4FF", "#9DB4CC", "#2F4A66", "#050B12", "#1C3348",
+		"#48A6FF", "#7CC7FF", "#61D394", "#F1C45F", "#FF6B7A"
+	};
+	static constexpr LegacyPalette lightPalette{
+		"#EAF3FC", "#F7FBFF", "#FFFFFF", "#ECF6FF", "#D7EAFF",
+		"#162B40", "#60788E", "#BCD3E8", "#FFFFFF", "#D8E8F6",
+		"#1D75C9", "#268FAE", "#218A54", "#A66F00", "#BD3B48"
+	};
+	return legacyVariantTokens(dark, darkPalette, lightPalette);
+}
+
+SkinTokens legacyForestTokens(bool dark)
+{
+	static constexpr LegacyPalette darkPalette{
+		"#0B130E", "#121F17", "#1B2A21", "#25382C", "#1F4A35",
+		"#EEF8EF", "#A8B9A9", "#3D5845", "#050B07", "#223A2B",
+		"#6BCB8F", "#A1D47A", "#78D88A", "#E3C566", "#E36B66"
+	};
+	static constexpr LegacyPalette lightPalette{
+		"#EEF5EE", "#FAFCF8", "#FFFFFF", "#EFF7EE", "#DDEFDD",
+		"#1F3023", "#687A68", "#C3D5C1", "#FFFFFF", "#DCEADB",
+		"#2F8A57", "#5B8E36", "#238044", "#9A7600", "#B5443F"
+	};
+	return legacyVariantTokens(dark, darkPalette, lightPalette);
+}
+
+SkinTokens legacyBronzeTokens(bool dark)
+{
+	static constexpr LegacyPalette darkPalette{
+		"#17100A", "#241910", "#322318", "#402E20", "#5A351B",
+		"#F8EDE0", "#C2A78A", "#65462F", "#0E0905", "#3F2D20",
+		"#C58B48", "#E0B15E", "#87C56F", "#E6BC55", "#E06A4D"
+	};
+	static constexpr LegacyPalette lightPalette{
+		"#F3ECE3", "#FFF9F1", "#FFFFFF", "#F8ECDC", "#F1D8B8",
+		"#332317", "#806850", "#D7C0A6", "#FFFFFF", "#E7D2B8",
+		"#A86420", "#8B6A2A", "#3F874A", "#9F6F00", "#B84830"
+	};
+	return legacyVariantTokens(dark, darkPalette, lightPalette);
+}
+
+SkinTokens legacyPlumTokens(bool dark)
+{
+	static constexpr LegacyPalette darkPalette{
+		"#140D19", "#201428", "#2B1D36", "#362545", "#442566",
+		"#F8ECFF", "#B8A0C6", "#523A61", "#0B0610", "#33243F",
+		"#B06BFF", "#E06BB4", "#73DCA0", "#FFD06A", "#FF6F91"
+	};
+	static constexpr LegacyPalette lightPalette{
+		"#F4ECF8", "#FFFAFF", "#FFFFFF", "#F5ECFB", "#E9D9F8",
+		"#2D1D38", "#776284", "#D8C5E3", "#FFFFFF", "#E9D8F0",
+		"#8046B8", "#B84C88", "#248A57", "#A67000", "#BE3D62"
+	};
+	return legacyVariantTokens(dark, darkPalette, lightPalette);
+}
 }
 
 namespace SkinThemeData
@@ -789,6 +914,11 @@ const QVector<SkinEntry>& roster()
 		{ QStringLiteral("forge"), QStringLiteral("rack"), QStringLiteral("rack"), &forgeTokens },
 		{ QStringLiteral("nebula"), QStringLiteral("matrix"), QStringLiteral("matrix"), &nebulaTokens },
 		{ QStringLiteral("noir"), QStringLiteral("precision"), QStringLiteral("minimal"), &noirTokens },
+		{ QStringLiteral("legacy-slate"), QStringLiteral("precision"), QStringLiteral("minimal"), &legacySlateTokens },
+		{ QStringLiteral("legacy-blue"), QStringLiteral("precision"), QStringLiteral("minimal"), &legacyBlueTokens },
+		{ QStringLiteral("legacy-forest"), QStringLiteral("precision"), QStringLiteral("minimal"), &legacyForestTokens },
+		{ QStringLiteral("legacy-bronze"), QStringLiteral("precision"), QStringLiteral("minimal"), &legacyBronzeTokens },
+		{ QStringLiteral("legacy-plum"), QStringLiteral("precision"), QStringLiteral("minimal"), &legacyPlumTokens },
 	};
 	return entries;
 }

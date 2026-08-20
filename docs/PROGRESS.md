@@ -15,12 +15,14 @@
 - [x] Ported Obsidian Glass, Aurora Veil, Copper Forge, Neon Nebula, and Noir Chrome with the same scoped painter/QSS mapping.
 - [x] Kept all token variants on their matching DeviceSelector base painters; 90 headless shots passed.
 - [x] Ported DeviceSelector saved custom-theme application and a temporary-settings probe; 93 headless shots passed.
+- [x] Ported LegacyRows token chrome and five legacy palettes while retaining the legacy row factory chain; 30 headless gallery shots passed.
+- [x] Kept the expanded 20-theme shared roster on the Minimal DeviceSelector painter where appropriate; 123 headless shots passed.
 - [x] Built Editor and passed offscreen `Editor.exe --selftest-vst`.
-- [x] Passed offscreen `Editor.exe --skin-switch-test`.
-- [x] Built and passed `EditorLogicTests.exe` (3284 checks).
+- [x] Passed offscreen `Editor.exe --skin-switch-test` (120 switches).
+- [x] Built and passed `EditorLogicTests.exe` (3371 checks).
 - [x] Built and passed `HybridConvTests.exe` (1635 checks).
 - [ ] Manually validate real VST2/VST3 analyzer movement before an integration-candidate install.
 - [ ] Manually validate Theme Lab save/apply/import/delete and restart persistence.
-- [ ] Port LegacyRows theming by feature group.
+- [ ] Manually validate LegacyRows palette selection and restart persistence in an integration candidate.
 - [ ] Port remaining fork-only features with focused tests.
 - [ ] Build, CI, and manual-host-test an integration candidate before any beta promotion.
