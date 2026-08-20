@@ -147,10 +147,11 @@ token variants, QSS resource
 paths, the `@TOKEN@` substitution, the token → `QPalette` mapping and the
 Qt 6.10 combo-arrow override. The `ISkin` classes delegate their
 `tokens()`/`qssResource()` here, so the tables cannot drift. DeviceSelector
-compiles this one unit plus the aliased `.qss`/font resources
-(`DeviceSelector/DeviceSelectorSkins.qrc`) and wears the Editor's stored
-skin (`interface/skin`, default studio; heritage mode keeps the native
-look).
+compiles this unit and `CustomThemeStore` plus the aliased `.qss`/font resources
+(`DeviceSelector/DeviceSelectorSkins.qrc`), and wears the Editor's stored
+built-in or saved custom skin (`interface/skin`, default studio). A saved theme
+supplies its own token table while its `baseTheme` selects the shared QSS and
+painter grammar; heritage mode keeps the native look.
 
 ## Reference-card view hook
 

@@ -13,5 +13,6 @@
 - Ported the first fork-only theme-variant group: Midnight Console, Arctic Bloom, Ember Rack, Violet Pulse, and Solar Paper. Each keeps its own token/id identity and reuses the appropriate upstream QSS and painter grammar.
 - Ported the later dark group: Obsidian Glass, Aurora Veil, Copper Forge, Neon Nebula, and Noir Chrome. It reuses the same scoped QSS/painter grammar mapping without adding a new skin form.
 - DeviceSelector resolves each variant to its `paintBaseId` for painted chrome while retaining the variant's QSS and tokens; no selector-specific variant painters were added.
-- LegacyRows theming and DeviceSelector custom-theme dressing remain separate feature groups.
-- Latest local proof: Editor Release build, offscreen VST self-test, offscreen 90-cycle skin-switch test, EditorLogic 3284, HybridConv 1635, and DeviceSelector qmake/90-shot coverage all passed. Representative dark DeviceSelector captures were visually checked. No integration artifact is installed, pushed, merged, or promoted.
+- DeviceSelector now restores saved custom themes with their saved base grammar and token table; its temporary-settings coverage adds three custom-theme shots.
+- LegacyRows theming remains a separate feature group.
+- Latest local proof: Editor Release build, offscreen VST self-test, offscreen 90-cycle skin-switch test, EditorLogic 3284, HybridConv 1635, and DeviceSelector qmake/93-shot coverage all passed. Representative dark and saved-theme DeviceSelector captures were visually checked. No integration artifact is installed, pushed, merged, or promoted.

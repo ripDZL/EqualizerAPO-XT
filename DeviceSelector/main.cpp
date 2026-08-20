@@ -28,6 +28,7 @@
 #include <QFontDatabase>
 #include <QSettings>
 #include <QStyleFactory>
+#include <QTemporaryDir>
 #include <QtWidgets/QApplication>
 #include <devices/VoicemeeterAPOInfo.h>
 #include <winsock2.h>
@@ -37,6 +38,7 @@
 #include "skins/DeviceSkinPainter.h"
 #include "Editor/helpers/QtAppBootstrap.h"
 #include "Editor/helpers/EditorSettings.h"
+#include "Editor/skins/CustomThemeStore.h"
 #include "Editor/skins/SkinThemeData.h"
 #include "services/install/ApoRegistration.h"
 #include "services/diagnostics/InstallDiagnostics.h"
@@ -48,9 +50,8 @@ namespace
 // interface/dark; both default to the Editor's own defaults, so a machine
 // that never chose gets Studio). In the Editor's heritage mode (legacyRows)
 // the dialog keeps its classic native look, matching the Editor's choice.
-void applyEditorTheme(QApplication& app)
+void applyEditorTheme(QApplication& app, QSettings& settings)
 {
-	QSettings settings(QString::fromWCharArray(EDITOR_REGPATH), QSettings::NativeFormat);
 	if (settings.value(QLatin1String(EditorSettings::Keys::LegacyRows), false).toBool())
 	{
 		// Neutral base forms in classic light colours for the painted chrome;
@@ -63,16 +64,31 @@ void applyEditorTheme(QApplication& app)
 
 	const bool systemDark = QGuiApplication::styleHints()->colorScheme() == Qt::ColorScheme::Dark;
 	const EditorSettings::SkinChoice choice = EditorSettings::readSkinChoice(settings, systemDark);
+	CustomThemeStore::Theme customTheme;
+	if (CustomThemeStore::findTheme(settings, choice.id, &customTheme))
+	{
+		const SkinTokens tokens = CustomThemeStore::tokensForTheme(customTheme);
+		SkinThemeData::applyTokensToApplication(app, customTheme.baseTheme, customTheme.dark, tokens);
+		DeviceSkinPainter::setActiveThemeTokens(customTheme.baseTheme, tokens);
+		return;
+	}
 	SkinThemeData::applyToApplication(app, choice.id, choice.dark);
 	DeviceSkinPainter::setActiveTheme(choice.id, choice.dark);
 }
 
+void applyEditorTheme(QApplication& app)
+{
+	QSettings settings(QString::fromWCharArray(EDITOR_REGPATH), QSettings::NativeFormat);
+	applyEditorTheme(app, settings);
+}
+
 // --skin-shots <outDir>: renders the dialog with canned devices for every
 // skin x dark/light in three states (rest, hovered row, troubleshooting
-// open) on the offscreen platform. The review gate's capture source and the
-// skin work's regression harness - no registry writes, no COM. Renders in
-// the user's language (translators install before the harness runs), so
-// byte-comparison only holds for a fixed language setting.
+// open), then one saved custom-theme probe from temporary settings. The
+// review gate's capture source and the skin work's regression harness - no
+// registry writes, no COM. Renders in the user's language (translators install
+// before the harness runs), so byte-comparison only holds for a fixed language
+// setting.
 int runSkinShots(QApplication& app)
 {
 	const QStringList args = app.arguments();
@@ -90,6 +106,35 @@ int runSkinShots(QApplication& app)
 	}
 
 	int failures = 0;
+	auto captureStates = [&outDir, &failures](const QString& outputId, bool dark) {
+		DeviceSelector dialog(PreviewDevices::playback(), PreviewDevices::capture());
+		dialog.resize(760, 700);
+		dialog.show();
+		QApplication::processEvents();
+		// One pending install so the will-install state shows.
+		dialog.previewCheckDevice(0, 1);
+		QApplication::processEvents();
+
+		const QString mode = dark ? QStringLiteral("dark") : QStringLiteral("light");
+		auto save = [&](const QString& state) {
+			const QString file = outDir.filePath(
+				QStringLiteral("devsel_%1_%2_%3.png").arg(outputId, mode, state));
+			if (!dialog.grab().save(file))
+			{
+				fprintf(stderr, "DeviceSelector shots: failed to save %s\n", qPrintable(file));
+				failures++;
+			}
+		};
+
+		save(QStringLiteral("normal"));
+		dialog.previewHoverDevice(0, 2);
+		QApplication::processEvents();
+		save(QStringLiteral("hover"));
+		dialog.previewSelectDevice(0, 0);
+		dialog.previewOpenTroubleshooting();
+		QApplication::processEvents();
+		save(QStringLiteral("options"));
+	};
 	// From the roster, so a new skin appears in the review captures without
 	// anybody remembering this list.
 	const QStringList skins = SkinThemeData::ids();
@@ -100,34 +145,45 @@ int runSkinShots(QApplication& app)
 			const bool dark = darkIndex == 0;
 			SkinThemeData::applyToApplication(app, skinId, dark);
 			DeviceSkinPainter::setActiveTheme(skinId, dark);
+			captureStates(skinId, dark);
+		}
+	}
 
-			DeviceSelector dialog(PreviewDevices::playback(), PreviewDevices::capture());
-			dialog.resize(760, 700);
-			dialog.show();
-			QApplication::processEvents();
-			// One pending install so the will-install state shows.
-			dialog.previewCheckDevice(0, 1);
-			QApplication::processEvents();
-
-			const QString mode = dark ? QStringLiteral("dark") : QStringLiteral("light");
-			auto save = [&](const QString& state) {
-				const QString file = outDir.filePath(
-					QStringLiteral("devsel_%1_%2_%3.png").arg(skinId, mode, state));
-				if (!dialog.grab().save(file))
-				{
-					fprintf(stderr, "DeviceSelector shots: failed to save %s\n", qPrintable(file));
-					failures++;
-				}
-			};
-
-			save(QStringLiteral("normal"));
-			dialog.previewHoverDevice(0, 2);
-			QApplication::processEvents();
-			save(QStringLiteral("hover"));
-			dialog.previewSelectDevice(0, 0);
-			dialog.previewOpenTroubleshooting();
-			QApplication::processEvents();
-			save(QStringLiteral("options"));
+	QTemporaryDir customSettingsDirectory;
+	if (!customSettingsDirectory.isValid())
+	{
+		fprintf(stderr, "DeviceSelector shots: cannot create custom-theme settings\n");
+		failures++;
+	}
+	else
+	{
+		QSettings customSettings(customSettingsDirectory.filePath(QStringLiteral("selector-theme.ini")),
+			QSettings::IniFormat);
+		CustomThemeStore::Theme customTheme;
+		customTheme.id = QStringLiteral("selector-probe");
+		customTheme.name = QStringLiteral("Selector probe");
+		customTheme.baseTheme = QStringLiteral("nebula");
+		customTheme.dark = true;
+		customTheme.colors.insert(QStringLiteral("background"), QStringLiteral("#06111D"));
+		customTheme.colors.insert(QStringLiteral("accent"), QStringLiteral("#EE46D4"));
+		if (!CustomThemeStore::saveTheme(customSettings, customTheme))
+		{
+			fprintf(stderr, "DeviceSelector shots: cannot save custom theme\n");
+			failures++;
+		}
+		else
+		{
+			EditorSettings::writeSkinChoice(customSettings, { customTheme.skinId(), false });
+			customSettings.sync();
+			applyEditorTheme(app, customSettings);
+			const SkinTokens expectedTokens = CustomThemeStore::tokensForTheme(customTheme);
+			if (DeviceSkinPainter::activeTokens().background != expectedTokens.background
+				|| DeviceSkinPainter::activeTokens().accent != expectedTokens.accent)
+			{
+				fprintf(stderr, "DeviceSelector shots: custom theme tokens were not applied\n");
+				failures++;
+			}
+			captureStates(QStringLiteral("custom-nebula"), customTheme.dark);
 		}
 	}
 
