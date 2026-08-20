@@ -1,6 +1,6 @@
 # TODO
 
-- [ ] Review block-paced VST preview processing separately from the VST2 host safety port.
+- [ ] Manually verify analyzer movement with real VST2 and VST3 plug-ins before any integration-candidate install.
 - [ ] Port Theme Lab/custom-theme work against upstream UI architecture.
 - [ ] Audit remaining fork-only behavior by feature group.
 - [ ] Run a clean integration build and upstream-compatible test suite.

@@ -7,9 +7,10 @@
 - [x] Ported selected EAPO-endpoint preview selection and regression coverage.
 - [x] Ported row-scoped `Device:` resolution for VST preview capture.
 - [x] Ported VST2 transport-time/process-level safety with a red/green host test.
-- [x] Built Editor and passed `Editor.exe --selftest-vst`.
-- [x] Built and passed `EditorLogicTests.exe` (3069 checks).
+- [x] Ported block-paced VST preview processing with join-before-stop lifecycle ordering.
+- [x] Built Editor and passed offscreen `Editor.exe --selftest-vst`.
+- [x] Built and passed `EditorLogicTests.exe` (3073 checks).
 - [x] Built and passed `HybridConvTests.exe` (1635 checks).
-- [ ] Audit remaining VST preview hardening separately from unrelated legacy skin changes.
+- [ ] Manually validate real VST2/VST3 analyzer movement before an integration-candidate install.
 - [ ] Port remaining fork-only features with focused tests.
 - [ ] Build, CI, and manual-host-test an integration candidate before any beta promotion.
