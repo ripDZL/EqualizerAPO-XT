@@ -12,13 +12,14 @@
 - [x] Ported saved-theme application, Theme Lab UI, live token preview, and current-skin display names.
 - [x] Kept temporary previews out of persisted settings and retained base-skin chrome for saved custom themes.
 - [x] Ported Midnight Console, Arctic Bloom, Ember Rack, Violet Pulse, and Solar Paper with their upstream painter/QSS bases.
-- [x] Kept DeviceSelector token variants on their matching base painters; 60 headless shots passed.
+- [x] Ported Obsidian Glass, Aurora Veil, Copper Forge, Neon Nebula, and Noir Chrome with the same scoped painter/QSS mapping.
+- [x] Kept all token variants on their matching DeviceSelector base painters; 90 headless shots passed.
 - [x] Built Editor and passed offscreen `Editor.exe --selftest-vst`.
 - [x] Passed offscreen `Editor.exe --skin-switch-test`.
-- [x] Built and passed `EditorLogicTests.exe` (3194 checks).
+- [x] Built and passed `EditorLogicTests.exe` (3284 checks).
 - [x] Built and passed `HybridConvTests.exe` (1635 checks).
 - [ ] Manually validate real VST2/VST3 analyzer movement before an integration-candidate install.
 - [ ] Manually validate Theme Lab save/apply/import/delete and restart persistence.
-- [ ] Port later dark theme variants, LegacyRows theming, and DeviceSelector custom-theme dressing by feature group.
+- [ ] Port LegacyRows theming and DeviceSelector custom-theme dressing by feature group.
 - [ ] Port remaining fork-only features with focused tests.
 - [ ] Build, CI, and manual-host-test an integration candidate before any beta promotion.

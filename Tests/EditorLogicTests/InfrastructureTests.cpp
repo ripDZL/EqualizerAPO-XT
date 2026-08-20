@@ -29,10 +29,11 @@ void testTheSkinRosterIsTheOneList()
 		QStringLiteral("studio"), QStringLiteral("minimal"), QStringLiteral("soft"),
 		QStringLiteral("rack"), QStringLiteral("matrix"), QStringLiteral("midnight"),
 		QStringLiteral("arctic"), QStringLiteral("ember"), QStringLiteral("violet"),
-		QStringLiteral("solar")
+		QStringLiteral("solar"), QStringLiteral("obsidian"), QStringLiteral("aurora"),
+		QStringLiteral("forge"), QStringLiteral("nebula"), QStringLiteral("noir")
 	};
 	requireTrue(roster.size() == expectedIds.size(),
-		"the roster carries exactly the base skins and the first variant set");
+		"the roster carries exactly the base skins and the two scoped variant sets");
 	expectTrue(roster.first().id == QStringLiteral("studio"),
 		"studio is first, which is what an unknown id falls back to and what the default is");
 
@@ -81,6 +82,36 @@ void testTheSkinRosterIsTheOneList()
 		"Solar Paper rides the Minimal QSS grammar");
 	expectTrue(SkinThemeData::entry(QStringLiteral("solar")).paintBaseId == QStringLiteral("minimal"),
 		"Solar Paper rides the Minimal paint grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("obsidian")).qssBaseName == QStringLiteral("studio"),
+		"Obsidian Glass rides the Studio QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("obsidian")).paintBaseId == QStringLiteral("studio"),
+		"Obsidian Glass rides the Studio paint grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("aurora")).qssBaseName == QStringLiteral("soft"),
+		"Aurora Veil rides the Soft QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("aurora")).paintBaseId == QStringLiteral("soft"),
+		"Aurora Veil rides the Soft paint grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("forge")).qssBaseName == QStringLiteral("rack"),
+		"Copper Forge rides the Rack QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("forge")).paintBaseId == QStringLiteral("rack"),
+		"Copper Forge rides the Rack paint grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("nebula")).qssBaseName == QStringLiteral("matrix"),
+		"Neon Nebula rides the Matrix QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("nebula")).paintBaseId == QStringLiteral("matrix"),
+		"Neon Nebula rides the Matrix paint grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("noir")).qssBaseName == QStringLiteral("precision"),
+		"Noir Chrome rides the Minimal QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("noir")).paintBaseId == QStringLiteral("minimal"),
+		"Noir Chrome rides the Minimal paint grammar");
+	expectTrue(SkinThemeData::tokens(QStringLiteral("obsidian"), true).graphRadius == 12,
+		"Obsidian Glass keeps its larger graph radius");
+	expectTrue(SkinThemeData::tokens(QStringLiteral("aurora"), true).borderRadius == 18,
+		"Aurora Veil keeps its softer radius");
+	expectTrue(SkinThemeData::tokens(QStringLiteral("forge"), true).graphRadius == 6,
+		"Copper Forge keeps its compact graph radius");
+	expectTrue(SkinThemeData::tokens(QStringLiteral("nebula"), true).cardRailWidth == 5,
+		"Neon Nebula keeps its matrix card rail");
+	expectTrue(SkinThemeData::tokens(QStringLiteral("noir"), true).zebraStripe,
+		"Noir Chrome keeps its minimal zebra stripes");
 
 	// The two stored aliases from earlier releases, which are the only ids that
 	// cannot be derived from the roster.

@@ -11,6 +11,7 @@
 - Saved custom-theme persistence, JSON import/export, token overrides, Theme Lab UI, temporary live preview, and saved-theme application are ported.
 - Review hardening keeps Theme Lab previews transient, synchronizes the menu state to a saved theme's stored dark setting, and preserves the Rack/Matrix base chrome for custom themes.
 - Ported the first fork-only theme-variant group: Midnight Console, Arctic Bloom, Ember Rack, Violet Pulse, and Solar Paper. Each keeps its own token/id identity and reuses the appropriate upstream QSS and painter grammar.
+- Ported the later dark group: Obsidian Glass, Aurora Veil, Copper Forge, Neon Nebula, and Noir Chrome. It reuses the same scoped QSS/painter grammar mapping without adding a new skin form.
 - DeviceSelector resolves each variant to its `paintBaseId` for painted chrome while retaining the variant's QSS and tokens; no selector-specific variant painters were added.
-- The later dark variant group, LegacyRows theming, and DeviceSelector custom-theme dressing remain separate feature groups.
-- Latest local proof: Editor Release build, offscreen VST self-test, offscreen skin-switch test, EditorLogic 3194, HybridConv 1635, and DeviceSelector qmake/60-shot coverage all passed. No integration artifact is installed, pushed, merged, or promoted.
+- LegacyRows theming and DeviceSelector custom-theme dressing remain separate feature groups.
+- Latest local proof: Editor Release build, offscreen VST self-test, offscreen 90-cycle skin-switch test, EditorLogic 3284, HybridConv 1635, and DeviceSelector qmake/90-shot coverage all passed. Representative dark DeviceSelector captures were visually checked. No integration artifact is installed, pushed, merged, or promoted.

@@ -480,6 +480,248 @@ SkinTokens solarTokens(bool dark)
 	finishTokens(t);
 	return t;
 }
+
+SkinTokens obsidianTokens(bool dark)
+{
+	SkinTokens t = studioTokens(dark);
+	t.borderRadius = 12;
+	t.rowHeight = 42;
+	t.cardPadding = 14;
+	t.cardGap = 10;
+	t.graphRadius = 12;
+	if (dark)
+	{
+		t.background = QStringLiteral("#02040A");
+		t.surface = QStringLiteral("#070B14");
+		t.card = QStringLiteral("#0D1322");
+		t.cardHover = QStringLiteral("#141D31");
+		t.cardSelected = QStringLiteral("#11284E");
+		t.text = QStringLiteral("#F4F8FF");
+		t.mutedText = QStringLiteral("#8997B2");
+		t.border = QStringLiteral("#202C45");
+		t.graph = QStringLiteral("#01030A");
+		t.graphGridMinor = QStringLiteral("#17243A");
+		t.accent = QStringLiteral("#34D6FF");
+		t.accent2 = QStringLiteral("#B66CFF");
+		t.success = QStringLiteral("#43F0B0");
+		t.warning = QStringLiteral("#FFCF70");
+		t.danger = QStringLiteral("#FF5F8C");
+	}
+	else
+	{
+		t.background = QStringLiteral("#E9EEF7");
+		t.surface = QStringLiteral("#F7FAFF");
+		t.card = QStringLiteral("#FFFFFF");
+		t.cardHover = QStringLiteral("#EEF4FC");
+		t.cardSelected = QStringLiteral("#D9E7FF");
+		t.text = QStringLiteral("#111927");
+		t.mutedText = QStringLiteral("#61708A");
+		t.border = QStringLiteral("#C0CDDF");
+		t.graph = QStringLiteral("#F5F8FD");
+		t.graphGridMinor = QStringLiteral("#D9E2F0");
+		t.accent = QStringLiteral("#0077B6");
+		t.accent2 = QStringLiteral("#7C3BC8");
+		t.success = QStringLiteral("#138A67");
+		t.warning = QStringLiteral("#A66F00");
+		t.danger = QStringLiteral("#C93462");
+	}
+	finishTokens(t);
+	return t;
+}
+
+SkinTokens auroraTokens(bool dark)
+{
+	SkinTokens t = softTokens(dark);
+	t.borderRadius = 18;
+	t.rowHeight = 50;
+	t.cardPadding = 16;
+	t.cardGap = 12;
+	t.graphRadius = 18;
+	if (dark)
+	{
+		t.background = QStringLiteral("#03110F");
+		t.surface = QStringLiteral("#0A1D1B");
+		t.card = QStringLiteral("#102B29");
+		t.cardHover = QStringLiteral("#173B38");
+		t.cardSelected = QStringLiteral("#154E49");
+		t.text = QStringLiteral("#ECFFF8");
+		t.mutedText = QStringLiteral("#9BBDB4");
+		t.border = QStringLiteral("#28514C");
+		t.graph = QStringLiteral("#020B0B");
+		t.graphGridMinor = QStringLiteral("#163933");
+		t.accent = QStringLiteral("#66F0C2");
+		t.accent2 = QStringLiteral("#7D8CFF");
+		t.success = QStringLiteral("#86F6A8");
+		t.warning = QStringLiteral("#FFE08A");
+		t.danger = QStringLiteral("#FF8AA6");
+	}
+	else
+	{
+		t.background = QStringLiteral("#EFFAF5");
+		t.surface = QStringLiteral("#FCFFFD");
+		t.card = QStringLiteral("#FFFFFF");
+		t.cardHover = QStringLiteral("#EAF8F2");
+		t.cardSelected = QStringLiteral("#D7F4EA");
+		t.text = QStringLiteral("#17302C");
+		t.mutedText = QStringLiteral("#67837B");
+		t.border = QStringLiteral("#CBE2DA");
+		t.graph = QStringLiteral("#F8FFFB");
+		t.graphGridMinor = QStringLiteral("#DAEEE8");
+		t.accent = QStringLiteral("#159873");
+		t.accent2 = QStringLiteral("#4F5ECF");
+		t.success = QStringLiteral("#178A4D");
+		t.warning = QStringLiteral("#B18100");
+		t.danger = QStringLiteral("#C94B72");
+	}
+	finishTokens(t);
+	return t;
+}
+
+SkinTokens forgeTokens(bool dark)
+{
+	SkinTokens t = rackTokens(dark);
+	t.borderRadius = 5;
+	t.rowHeight = 38;
+	t.cardPadding = 10;
+	t.cardGap = 7;
+	t.graphRadius = 6;
+	if (dark)
+	{
+		t.background = QStringLiteral("#090706");
+		t.surface = QStringLiteral("#14110E");
+		t.card = QStringLiteral("#211A14");
+		t.cardHover = QStringLiteral("#2D231A");
+		t.cardSelected = QStringLiteral("#4A2B13");
+		t.text = QStringLiteral("#F5E7D6");
+		t.mutedText = QStringLiteral("#B49D83");
+		t.border = QStringLiteral("#51402E");
+		t.graph = QStringLiteral("#050403");
+		t.graphGridMinor = QStringLiteral("#342B22");
+		t.accent = QStringLiteral("#E19A4B");
+		t.accent2 = QStringLiteral("#55D6B0");
+		t.success = QStringLiteral("#87D66A");
+		t.warning = QStringLiteral("#FFC560");
+		t.danger = QStringLiteral("#F05F45");
+	}
+	else
+	{
+		t.background = QStringLiteral("#F4EEE6");
+		t.surface = QStringLiteral("#FFFBF4");
+		t.card = QStringLiteral("#FFFFFF");
+		t.cardHover = QStringLiteral("#F7EBDC");
+		t.cardSelected = QStringLiteral("#F5D9B4");
+		t.text = QStringLiteral("#2B2119");
+		t.mutedText = QStringLiteral("#746758");
+		t.border = QStringLiteral("#D5C1A9");
+		t.graph = QStringLiteral("#FFF8EE");
+		t.graphGridMinor = QStringLiteral("#E9D3B8");
+		t.accent = QStringLiteral("#A85F16");
+		t.accent2 = QStringLiteral("#147A61");
+		t.success = QStringLiteral("#2E8044");
+		t.warning = QStringLiteral("#9C6500");
+		t.danger = QStringLiteral("#B83D2A");
+	}
+	finishTokens(t);
+	return t;
+}
+
+SkinTokens nebulaTokens(bool dark)
+{
+	SkinTokens t = matrixTokens(dark);
+	t.rowHeight = 38;
+	t.channelGroupIndent = 26;
+	t.cardPadding = 13;
+	t.cardGap = 10;
+	t.cardRailWidth = 5;
+	t.graphRadius = 0;
+	if (dark)
+	{
+		t.background = QStringLiteral("#07030F");
+		t.surface = QStringLiteral("#100820");
+		t.card = QStringLiteral("#1B1032");
+		t.cardHover = QStringLiteral("#261848");
+		t.cardSelected = QStringLiteral("#351D67");
+		t.text = QStringLiteral("#F7EDFF");
+		t.mutedText = QStringLiteral("#AA96C8");
+		t.border = QStringLiteral("#3C2B62");
+		t.graph = QStringLiteral("#05020C");
+		t.graphGridMinor = QStringLiteral("#2B2148");
+		t.accent = QStringLiteral("#FF5DD8");
+		t.accent2 = QStringLiteral("#4EE8FF");
+		t.success = QStringLiteral("#67F7B4");
+		t.warning = QStringLiteral("#FFD36D");
+		t.danger = QStringLiteral("#FF618A");
+	}
+	else
+	{
+		t.background = QStringLiteral("#F8F1FF");
+		t.surface = QStringLiteral("#FFFFFF");
+		t.card = QStringLiteral("#FEFBFF");
+		t.cardHover = QStringLiteral("#F2E9FF");
+		t.cardSelected = QStringLiteral("#E8D8FF");
+		t.text = QStringLiteral("#27153D");
+		t.mutedText = QStringLiteral("#76628E");
+		t.border = QStringLiteral("#DAC7EE");
+		t.graph = QStringLiteral("#FFFBFF");
+		t.graphGridMinor = QStringLiteral("#E8D8F6");
+		t.accent = QStringLiteral("#C02CA2");
+		t.accent2 = QStringLiteral("#008CA6");
+		t.success = QStringLiteral("#198754");
+		t.warning = QStringLiteral("#A26A00");
+		t.danger = QStringLiteral("#C93462");
+	}
+	finishTokens(t);
+	return t;
+}
+
+SkinTokens noirTokens(bool dark)
+{
+	SkinTokens t = minimalTokens(dark);
+	t.rowHeight = 34;
+	t.cardPadding = 9;
+	t.cardGap = 6;
+	t.channelGroupIndent = 18;
+	t.graphRadius = 0;
+	t.zebraStripe = true;
+	if (dark)
+	{
+		t.background = QStringLiteral("#050505");
+		t.surface = QStringLiteral("#0C0C0D");
+		t.card = QStringLiteral("#151516");
+		t.cardHover = QStringLiteral("#202023");
+		t.cardSelected = QStringLiteral("#2E3038");
+		t.text = QStringLiteral("#F0F0EE");
+		t.mutedText = QStringLiteral("#9A9A96");
+		t.border = QStringLiteral("#343438");
+		t.graph = QStringLiteral("#020202");
+		t.graphGridMinor = QStringLiteral("#242428");
+		t.accent = QStringLiteral("#D7DEE8");
+		t.accent2 = QStringLiteral("#C8A96A");
+		t.success = QStringLiteral("#72C27D");
+		t.warning = QStringLiteral("#D7A84F");
+		t.danger = QStringLiteral("#D86464");
+	}
+	else
+	{
+		t.background = QStringLiteral("#EDEDE8");
+		t.surface = QStringLiteral("#FAFAF7");
+		t.card = QStringLiteral("#FFFFFF");
+		t.cardHover = QStringLiteral("#F2F2ED");
+		t.cardSelected = QStringLiteral("#E4E8EF");
+		t.text = QStringLiteral("#1A1A1A");
+		t.mutedText = QStringLiteral("#666663");
+		t.border = QStringLiteral("#C9C9C4");
+		t.graph = QStringLiteral("#FFFFFF");
+		t.graphGridMinor = QStringLiteral("#E2E2DC");
+		t.accent = QStringLiteral("#4E5968");
+		t.accent2 = QStringLiteral("#8A6A27");
+		t.success = QStringLiteral("#2F8048");
+		t.warning = QStringLiteral("#8A6500");
+		t.danger = QStringLiteral("#A83A3A");
+	}
+	finishTokens(t);
+	return t;
+}
 }
 
 namespace SkinThemeData
@@ -542,6 +784,11 @@ const QVector<SkinEntry>& roster()
 		{ QStringLiteral("ember"), QStringLiteral("rack"), QStringLiteral("rack"), &emberTokens },
 		{ QStringLiteral("violet"), QStringLiteral("matrix"), QStringLiteral("matrix"), &violetTokens },
 		{ QStringLiteral("solar"), QStringLiteral("precision"), QStringLiteral("minimal"), &solarTokens },
+		{ QStringLiteral("obsidian"), QStringLiteral("studio"), QStringLiteral("studio"), &obsidianTokens },
+		{ QStringLiteral("aurora"), QStringLiteral("soft"), QStringLiteral("soft"), &auroraTokens },
+		{ QStringLiteral("forge"), QStringLiteral("rack"), QStringLiteral("rack"), &forgeTokens },
+		{ QStringLiteral("nebula"), QStringLiteral("matrix"), QStringLiteral("matrix"), &nebulaTokens },
+		{ QStringLiteral("noir"), QStringLiteral("precision"), QStringLiteral("minimal"), &noirTokens },
 	};
 	return entries;
 }

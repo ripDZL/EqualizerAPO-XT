@@ -9,9 +9,10 @@
 - Ported saved custom-theme persistence, JSON import/export, token derivation, Theme Lab UI, temporary live preview, and saved-theme application against the five current upstream base skins.
 - Review fixes keep previews transient, keep the Dark menu synchronized to saved-theme state, and preserve Rack/Matrix toolbar chrome through a separate base-renderer identity.
 - Ported Midnight Console, Arctic Bloom, Ember Rack, Violet Pulse, and Solar Paper; each retains its own token/id identity while delegating to the matching upstream QSS and painter grammar.
-- DeviceSelector resolves those variants to the same base painter grammar; an isolated qmake build and all 60 expected offscreen shots passed.
+- Ported Obsidian Glass, Aurora Veil, Copper Forge, Neon Nebula, and Noir Chrome with the same token-variant contract; no new skin grammar or DeviceSelector-specific painter was added.
+- DeviceSelector resolves all token variants to the same base painter grammar; an isolated qmake build and all 90 expected offscreen shots passed.
 - Preserved upstream VST3 bus-layout path while resolving the port.
-- Validation: Editor Release build, offscreen `Editor.exe --selftest-vst`, offscreen `Editor.exe --skin-switch-test`, `EditorLogicTests.exe` (3194 checks), `HybridConvTests.exe` (1635 checks), and 60 DeviceSelector variant shots passed.
+- Validation: Editor Release build, offscreen `Editor.exe --selftest-vst`, offscreen 90-cycle `Editor.exe --skin-switch-test`, `EditorLogicTests.exe` (3284 checks), `HybridConvTests.exe` (1635 checks), and 90 DeviceSelector variant shots passed. Representative dark DeviceSelector captures were visually checked.
 - The temporary desktop self-test can stall; headless Qt mode is the validated local self-test path. No installed files were changed for that runtime setup.
 - No integration build is installed, pushed, merged, or promoted.
-- Next: manual Theme Lab persistence acceptance, then port the later dark variants, LegacyRows theming, and DeviceSelector custom-theme dressing as distinct slices.
+- Next: manual Theme Lab persistence acceptance, then port LegacyRows theming and DeviceSelector custom-theme dressing as distinct slices.
