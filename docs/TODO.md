@@ -1,7 +1,6 @@
 # TODO
 
 - [ ] Review block-paced VST preview processing separately from the VST2 host safety port.
-- [ ] Review row-scoped `Device:` resolution for VST preview capture.
 - [ ] Port Theme Lab/custom-theme work against upstream UI architecture.
 - [ ] Audit remaining fork-only behavior by feature group.
 - [ ] Run a clean integration build and upstream-compatible test suite.

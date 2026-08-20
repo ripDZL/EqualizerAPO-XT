@@ -51,7 +51,7 @@ IFilterGUI* VSTPluginFilterGUIFactory::createFilterGUI(QString& command, QString
 	if (command == "VSTPlugin")
 	{
 		const VSTPreviewEndpoint previewEndpoint = vstPreviewEndpointForSelectedDevice(
-			filterTable != nullptr ? filterTable->getSelectedDevice() : nullptr);
+			filterTable != nullptr ? filterTable->getPreviewDeviceContext() : nullptr);
 		// Parse straight into the shared command struct. This reuses the engine's
 		// exact parameter grammar without building (and immediately destroying) a
 		// real VSTPluginFilter, and never loads a plugin binary: getInstance only
