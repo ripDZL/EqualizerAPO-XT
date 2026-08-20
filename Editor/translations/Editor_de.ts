@@ -1114,8 +1114,8 @@ Wählen Sie eine andere Datei oder ändern Sie die Konfiguration des Geräts.</t
     </message>
     <message>
         <location filename="../import/ImportDialog.cpp" line="53"/>
-        <source>%1 file(s), %2 will be copied into %3.</source>
-        <translation>%1 Datei(en), %2 werden nach %3 kopiert.</translation>
+        <source>%1 item(s), %2 file(s), %3 will be copied into %4.</source>
+        <translation>%1 Element(e), %2 Datei(en), %3 werden nach %4 kopiert.</translation>
     </message>
     <message>
         <location filename="../import/ImportDialog.cpp" line="61"/>
@@ -1217,6 +1217,12 @@ Wählen Sie eine andere Datei oder ändern Sie die Konfiguration des Geräts.</t
         <source>Some files could not be copied:
 %1</source>
         <translation type="unfinished">Einige Dateien konnten nicht kopiert werden:
+%1</translation>
+    </message>
+    <message>
+        <source>Import completed with warnings:
+%1</source>
+        <translation>Import mit Warnungen abgeschlossen:
 %1</translation>
     </message>
 </context>
@@ -3397,6 +3403,102 @@ This folder is now the one the audio pipeline reads. The previous folder is no l
 %2</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Missing VST3 bundle: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>VST3 bundle uses a reparse-point root and will not be imported: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>VST3 bundle contains a reparse point and will not be imported: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>VST3 bundle contains an unsupported entry and will not be imported: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Only VST3 bundle directories can be imported: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unsafe import destination rejected: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Import target is not a safe directory: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Import destination crosses an unsafe path: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Source is not a safe regular file: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not overwrite directory with file: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Source is not a safe VST3 bundle: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not create staging directory %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>VST3 bundle contains a reparse point and was not imported: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unsafe VST3 bundle entry rejected: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unsupported VST3 bundle entry: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Failed to stage %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not replace unsafe bundle destination: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not create a staging directory in %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not preserve existing bundle %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not install staged VST3 bundle at %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not restore previous bundle from %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Imported bundle successfully, but the previous copy remains at %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>VST3 bundle has no %1 module and will not be imported: %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>VST3 bundle has no %1 module: %2</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>RackCrossoverReadout</name>
@@ -4676,8 +4778,8 @@ This folder is now the one the audio pipeline reads. The previous folder is no l
     </message>
     <message>
         <location filename="../widgets/cards/VSTCardEditor.cpp" line="599"/>
-        <source>VST plugins (*.dll *.vst3)</source>
-        <translation>VST-Plugins (*.dll *.vst3)</translation>
+        <source>VST2 plugins (*.dll)</source>
+        <translation>VST2-Plugins (*.dll)</translation>
     </message>
     <message>
         <location filename="../widgets/cards/VSTCardEditor.cpp" line="661"/>
@@ -4697,6 +4799,18 @@ Change the file permissions or copy the files to the config directory.</source>
         <translation>Das Plugin greift offenbar auf diese für den Audiodienst nicht lesbaren Dateien zu:
 %0
 Ändern Sie die Dateiberechtigungen oder kopieren Sie die Dateien in das Konfigurationsverzeichnis.</translation>
+    </message>
+    <message>
+        <source>Select VST3 bundle folder...</source>
+        <translation>VST3-Bundle-Ordner auswählen...</translation>
+    </message>
+    <message>
+        <source>Select VST3 bundle</source>
+        <translation>VST3-Bundle auswählen</translation>
+    </message>
+    <message>
+        <source>Select a VST3 bundle folder ending in .vst3.</source>
+        <translation>Wählen Sie einen VST3-Bundle-Ordner mit der Endung .vst3 aus.</translation>
     </message>
 </context>
 <context>

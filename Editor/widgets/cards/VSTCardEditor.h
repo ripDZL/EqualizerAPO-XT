@@ -66,6 +66,7 @@ private slots:
 	void autoApplyToggled(bool checked);
 	void pathCommitted(const QString& text);
 	void selectFile();
+	void selectVST3Bundle();
 	void importToConfig();
 	void embedToggled(bool checked);
 	void busLayoutsPicked(VST3BusLayout input, VST3BusLayout output);

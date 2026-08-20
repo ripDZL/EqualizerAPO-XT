@@ -1111,8 +1111,8 @@ Select a different file or change the device configuration.</source>
     </message>
     <message>
         <location filename="../import/ImportDialog.cpp" line="53"/>
-        <source>%1 file(s), %2 will be copied into %3.</source>
-        <translation>%1개 파일 중 %2개를 %3(으)로 복사합니다.</translation>
+        <source>%1 item(s), %2 file(s), %3 will be copied into %4.</source>
+        <translation>%1개 항목, %2개 파일, %3이(가) %4에 복사됩니다.</translation>
     </message>
     <message>
         <location filename="../import/ImportDialog.cpp" line="61"/>
@@ -1214,6 +1214,12 @@ Select a different file or change the device configuration.</source>
         <source>Some files could not be copied:
 %1</source>
         <translation type="unfinished">일부 파일을 복사하지 못했습니다:
+%1</translation>
+    </message>
+    <message>
+        <source>Import completed with warnings:
+%1</source>
+        <translation>경고와 함께 가져오기를 완료했습니다:
 %1</translation>
     </message>
 </context>
@@ -3401,6 +3407,102 @@ This folder is now the one the audio pipeline reads. The previous folder is no l
         <source>Failed to copy %1 to %2.</source>
         <translation>%1을(를) %2(으)로 복사하지 못했습니다.</translation>
     </message>
+    <message>
+        <source>Missing VST3 bundle: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>VST3 bundle uses a reparse-point root and will not be imported: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>VST3 bundle contains a reparse point and will not be imported: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>VST3 bundle contains an unsupported entry and will not be imported: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Only VST3 bundle directories can be imported: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unsafe import destination rejected: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Import target is not a safe directory: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Import destination crosses an unsafe path: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Source is not a safe regular file: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not overwrite directory with file: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Source is not a safe VST3 bundle: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not create staging directory %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>VST3 bundle contains a reparse point and was not imported: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unsafe VST3 bundle entry rejected: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unsupported VST3 bundle entry: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Failed to stage %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not replace unsafe bundle destination: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not create a staging directory in %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not preserve existing bundle %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not install staged VST3 bundle at %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not restore previous bundle from %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Imported bundle successfully, but the previous copy remains at %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>VST3 bundle has no %1 module and will not be imported: %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>VST3 bundle has no %1 module: %2</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>RackCrossoverReadout</name>
@@ -4680,8 +4782,8 @@ This folder is now the one the audio pipeline reads. The previous folder is no l
     </message>
     <message>
         <location filename="../widgets/cards/VSTCardEditor.cpp" line="599"/>
-        <source>VST plugins (*.dll *.vst3)</source>
-        <translation>VST 플러그인 (*.dll *.vst3)</translation>
+        <source>VST2 plugins (*.dll)</source>
+        <translation>VST2 플러그인 (*.dll)</translation>
     </message>
     <message>
         <location filename="../widgets/cards/VSTCardEditor.cpp" line="661"/>
@@ -4701,6 +4803,18 @@ Change the file permissions or copy the files to the config directory.</source>
         <translation>플러그인이 오디오 서비스가 읽을 수 없는 다음 파일에 접근하는 것으로 보입니다:
 %0
 파일 권한을 바꾸거나 구성 디렉터리로 파일을 복사하세요.</translation>
+    </message>
+    <message>
+        <source>Select VST3 bundle folder...</source>
+        <translation>VST3 번들 폴더 선택...</translation>
+    </message>
+    <message>
+        <source>Select VST3 bundle</source>
+        <translation>VST3 번들 선택</translation>
+    </message>
+    <message>
+        <source>Select a VST3 bundle folder ending in .vst3.</source>
+        <translation>.vst3로 끝나는 VST3 번들 폴더를 선택하세요.</translation>
     </message>
 </context>
 <context>

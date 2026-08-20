@@ -17,6 +17,8 @@
 - [x] Ported DeviceSelector saved custom-theme application and a temporary-settings probe; 93 headless shots passed.
 - [x] Ported LegacyRows token chrome and five legacy palettes while retaining the legacy row factory chain; 30 headless gallery shots passed.
 - [x] Kept the expanded 20-theme shared roster on the Minimal DeviceSelector painter where appropriate; 123 headless shots passed.
+- [x] Audited the remaining fork-only feature groups against current upstream; only direct VST3 bundle import remained substantive.
+- [x] Ported direct VST3 bundle import with a dedicated folder picker, rejection that preserves the active reference, staged replacement, host-module/reparse/traversal rejection, UI warnings, and 3415 EditorLogic checks.
 - [x] Built Editor and passed offscreen `Editor.exe --selftest-vst`.
 - [x] Passed offscreen `Editor.exe --skin-switch-test` (120 switches).
 - [x] Built and passed `EditorLogicTests.exe` (3371 checks).
@@ -24,5 +26,5 @@
 - [ ] Manually validate real VST2/VST3 analyzer movement before an integration-candidate install.
 - [ ] Manually validate Theme Lab save/apply/import/delete and restart persistence.
 - [ ] Manually validate LegacyRows palette selection and restart persistence in an integration candidate.
-- [ ] Port remaining fork-only features with focused tests.
+- [ ] Manually validate a VST3 bundle import and plug-in load in an integration candidate.
 - [ ] Build, CI, and manual-host-test an integration candidate before any beta promotion.

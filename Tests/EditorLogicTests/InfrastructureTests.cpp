@@ -270,6 +270,37 @@ void testFileReferenceControllerOwnsPathState()
 	const QString farSelection = root.filePath(QStringLiteral("outside/plugin.dll"));
 	expectPath(FileReferenceController::displayPathForBaseDirectory(
 		baseDirectory, farSelection), farSelection);
+
+	const QString vst3Bundle = root.filePath(QStringLiteral("outside/Portable.vst3"));
+	const QString vst3Module = vst3Bundle + QStringLiteral("/Contents/x86_64-win/Portable.vst3");
+	requireTrue(root.mkpath(QFileInfo(vst3Module).absolutePath()),
+		"file-reference test creates the VST3 bundle fixture");
+	QFile module(vst3Module);
+	requireTrue(module.open(QIODevice::WriteOnly),
+		"file-reference test creates the VST3 module fixture");
+	module.close();
+	expectTrue(FileReferenceController::isVST3BundleDirectory(vst3Bundle),
+		"VST3 bundle directory is an eligible direct VST selection");
+	expectFalse(FileReferenceController::isVST3BundleDirectory(vst3Module),
+		"VST3 module file must not masquerade as a bundle selection");
+	expectFalse(FileReferenceController::isVST3BundleDirectory(root.filePath(QStringLiteral("outside"))),
+		"ordinary directories are not VST3 bundle selections");
+
+	FileReferenceController vstReference(
+		QStringLiteral("vst"), QStringLiteral("kept-plugin.dll"));
+	vstReference.setResolvedPath(farSelection);
+	expectFalse(vstReference.setVST3BundleSelection(
+		root.filePath(QStringLiteral("outside")), root.filePath(QStringLiteral("outside"))),
+		"invalid VST3 selection must be rejected before controller state changes");
+	expectEqual(vstReference.writtenPath(), QStringLiteral("kept-plugin.dll"),
+		"rejected VST3 selection preserves the saved library path");
+	expectPath(vstReference.resolvedPath(), farSelection);
+	expectTrue(vstReference.setVST3BundleSelection(
+		vst3Bundle, root.filePath(QStringLiteral("outside"))),
+		"valid VST3 selection updates the controller");
+	expectEqual(vstReference.writtenPath(), QStringLiteral("Portable.vst3"),
+		"valid VST3 selection uses the configured base directory");
+	expectPath(vstReference.resolvedPath(), vst3Bundle);
 }
 
 void testAnalysisWorkerRecovery()

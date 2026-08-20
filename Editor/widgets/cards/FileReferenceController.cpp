@@ -57,6 +57,26 @@ QString FileReferenceController::displayPathForBaseDirectory(
 	return QDir::toNativeSeparators(relative);
 }
 
+bool FileReferenceController::isVST3BundleDirectory(const QString& absolutePath)
+{
+	const QFileInfo info(QDir::fromNativeSeparators(absolutePath));
+	return info.exists() && info.isDir()
+		&& info.suffix().compare(QStringLiteral("vst3"), Qt::CaseInsensitive) == 0;
+}
+
+bool FileReferenceController::setVST3BundleSelection(const QString& selectedPath,
+	const QString& referenceBaseDirectory)
+{
+	if (!isVST3BundleDirectory(selectedPath))
+		return false;
+
+	written = referenceBaseDirectory.isEmpty()
+		? QDir::toNativeSeparators(selectedPath)
+		: displayPathForBaseDirectory(referenceBaseDirectory, selectedPath);
+	resolved = QDir::toNativeSeparators(selectedPath);
+	return true;
+}
+
 ReferenceCardState FileReferenceController::describe(const QString& emptyName) const
 {
 	ReferenceCardState state;

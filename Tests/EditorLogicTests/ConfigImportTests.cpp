@@ -260,6 +260,105 @@ void testConfigImport()
 	EqAPO::Import::ExecutionResult pluginExec = EqAPO::Import::ImportExecutor::execute(pluginSingle, vstConfigDest);
 	expectTrue(pluginExec.success, "single dll import should succeed");
 	expectTrue(QFile::exists(vstConfigDest + "/Surround/TestPlugin.dll"), "dll missing after single-file import");
+
+	// A Windows VST3 library is a directory bundle. Import it as one atomic
+	// tree, rather than treating its module file as a standalone plug-in.
+	#if defined(_M_ARM64)
+	const QString bundlePlatform = QStringLiteral("arm64-win");
+	#elif defined(_WIN64)
+	const QString bundlePlatform = QStringLiteral("x86_64-win");
+	#else
+	const QString bundlePlatform = QStringLiteral("x86-win");
+	#endif
+	const QString bundleRoot = tempDir.path() + "/plugins/Portable.vst3";
+	const QString bundleModule = bundleRoot + "/Contents/" + bundlePlatform + "/Portable.vst3";
+	const QString bundleMetadata = bundleRoot + "/Contents/Resources/moduleinfo.json";
+	const QString bundleObsolete = bundleRoot + "/Contents/Resources/obsolete.dat";
+	expectTrue(QDir().mkpath(QFileInfo(bundleModule).absolutePath()), "failed to create VST3 module directory");
+	expectTrue(QDir().mkpath(QFileInfo(bundleMetadata).absolutePath()), "failed to create VST3 resource directory");
+	writeBlob(bundleModule, 96);
+	writeBlob(bundleMetadata, 23);
+	writeBlob(bundleObsolete, 7);
+
+	const QString bundleConfigDest = tempDir.path() + "/bundle-configdir";
+	auto bundleManifest = EqAPO::Import::ConfigDependencyScanner::scan(bundleRoot, bundleConfigDest);
+	expectFalse(bundleManifest.hasErrors, "VST3 bundle scan should not flag errors");
+	requireEqual(int(bundleManifest.items.size()), 1, "VST3 bundle should be one manifest item");
+	expectTrue(bundleManifest.items[0].payloadKind
+		== EqAPO::Import::ImportPayloadKind::DirectoryTree,
+		"VST3 bundle must use the directory-tree import payload");
+	expectEqual(bundleManifest.items[0].fileCount, 3, "VST3 bundle should count every regular file");
+	expectEqual(bundleManifest.totalFiles, 3, "manifest should expose the total VST3 bundle file count");
+	expectEqual(bundleManifest.rootDest, "plugins/Portable.vst3", "VST3 bundle destination should keep its folder name");
+
+	const auto bundleExec = EqAPO::Import::ImportExecutor::execute(bundleManifest, bundleConfigDest);
+	expectTrue(bundleExec.success, "VST3 bundle import should succeed");
+	expectEqual(bundleExec.filesCopied, 3, "VST3 bundle import should copy its regular files");
+	const QString importedModule = bundleConfigDest + "/plugins/Portable.vst3/Contents/"
+		+ bundlePlatform + "/Portable.vst3";
+	const QString importedMetadata = bundleConfigDest + "/plugins/Portable.vst3/Contents/Resources/moduleinfo.json";
+	const QString importedObsolete = bundleConfigDest + "/plugins/Portable.vst3/Contents/Resources/obsolete.dat";
+	expectTrue(QFile::exists(importedModule), "VST3 module missing after bundle import");
+	expectTrue(QFile::exists(importedMetadata), "VST3 metadata missing after bundle import");
+	expectTrue(QFile::exists(importedObsolete), "VST3 bundle file missing after bundle import");
+
+	// Re-importing replaces the whole tree through staging, rather than merging
+	// stale files left behind by an earlier bundle version.
+	writeBlob(bundleModule, 111);
+	expectTrue(QFile::remove(bundleObsolete), "failed to remove stale VST3 source member");
+	const auto bundleExec2 = EqAPO::Import::ImportExecutor::execute(bundleManifest, bundleConfigDest);
+	expectTrue(bundleExec2.success, "VST3 bundle replacement should succeed");
+	expectEqual(int(QFileInfo(importedModule).size()), 111, "VST3 bundle replacement must refresh the module file");
+	expectFalse(QFile::exists(importedObsolete), "VST3 bundle replacement must remove stale members");
+
+	// A caller cannot escape the selected config root through a hand-built
+	// manifest; the executor owns that boundary, not merely the scanner.
+	EqAPO::Import::ImportManifest unsafeManifest;
+	EqAPO::Import::ImportItem unsafeItem;
+	unsafeItem.sourceAbsolute = surroundDir + "/ir.wav";
+	unsafeItem.destRelative = "../escaped.wav";
+	unsafeItem.sizeBytes = QFileInfo(unsafeItem.sourceAbsolute).size();
+	unsafeItem.fileCount = 1;
+	unsafeItem.kind = "Root";
+	unsafeManifest.items.append(unsafeItem);
+	const auto unsafeExec = EqAPO::Import::ImportExecutor::execute(unsafeManifest, tempDir.path() + "/safe-configdir");
+	expectFalse(unsafeExec.success, "unsafe manifest destination must be rejected");
+	expectFalse(QFile::exists(tempDir.path() + "/escaped.wav"), "unsafe import escaped the config root");
+
+	const QString plainDirectory = tempDir.path() + "/plugins/not-a-vst3-bundle";
+	expectTrue(QDir().mkpath(plainDirectory), "failed to create non-VST3 directory fixture");
+	const auto plainDirectoryManifest = EqAPO::Import::ConfigDependencyScanner::scan(
+		plainDirectory, tempDir.path() + "/plain-directory-configdir");
+	expectTrue(plainDirectoryManifest.hasErrors, "non-VST3 directories must be rejected by the scanner");
+	expectTrue(plainDirectoryManifest.items.isEmpty(), "non-VST3 directories must not become import items");
+
+	// A folder ending in .vst3 still is not a usable bundle without the
+	// platform module. Reject it before it can replace an existing good copy.
+	const QString invalidBundle = tempDir.path() + "/plugins/Invalid.vst3";
+	expectTrue(QDir().mkpath(invalidBundle), "failed to create invalid VST3 bundle fixture");
+	const auto invalidBundleManifest = EqAPO::Import::ConfigDependencyScanner::scan(
+		invalidBundle, tempDir.path() + "/invalid-bundle-configdir");
+	expectTrue(invalidBundleManifest.hasErrors, "invalid VST3 bundle must be rejected by the scanner");
+	expectTrue(invalidBundleManifest.items.isEmpty(), "invalid VST3 bundle must not become an import item");
+
+	const QString retainedBundle = tempDir.path()
+		+ "/invalid-bundle-configdir/plugins/Existing.vst3";
+	const QString retainedMember = retainedBundle + "/Contents/Resources/keep.dat";
+	expectTrue(QDir().mkpath(QFileInfo(retainedMember).absolutePath()),
+		"failed to create existing VST3 bundle fixture");
+	writeBlob(retainedMember, 31);
+	EqAPO::Import::ImportManifest invalidExecuteManifest;
+	EqAPO::Import::ImportItem invalidExecuteItem;
+	invalidExecuteItem.sourceAbsolute = invalidBundle;
+	invalidExecuteItem.destRelative = "plugins/Existing.vst3";
+	invalidExecuteItem.payloadKind = EqAPO::Import::ImportPayloadKind::DirectoryTree;
+	invalidExecuteItem.exists = true;
+	invalidExecuteManifest.items.append(invalidExecuteItem);
+	const auto invalidExecute = EqAPO::Import::ImportExecutor::execute(
+		invalidExecuteManifest, tempDir.path() + "/invalid-bundle-configdir");
+	expectFalse(invalidExecute.success, "executor must reject an invalid VST3 bundle");
+	expectTrue(QFile::exists(retainedMember),
+		"invalid VST3 bundle must not replace an existing working bundle");
 }
 
 void testLegacyMigrationScanAndPolicy()

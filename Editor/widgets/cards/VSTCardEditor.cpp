@@ -19,6 +19,7 @@
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QMenu>
+#include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QRegularExpression>
@@ -96,6 +97,11 @@ VSTCardEditor::VSTCardEditor(shared_ptr<VSTPluginLibrary> library, const wstring
 	selectButton->setObjectName(QStringLiteral("FilterCardIconButton"));
 	selectButton->setIcon(GUIHelper::tintedIcon(QStringLiteral(":/icons/modern/folder-open.svg"), actionColor, 18));
 	connect(selectButton, SIGNAL(clicked()), this, SLOT(selectFile()));
+	selectButton->setPopupMode(QToolButton::MenuButtonPopup);
+	auto* selectMenu = new QMenu(selectButton);
+	QAction* selectVst3Action = selectMenu->addAction(tr("Select VST3 bundle folder..."));
+	connect(selectVst3Action, SIGNAL(triggered()), this, SLOT(selectVST3Bundle()));
+	selectButton->setMenu(selectMenu);
 	view->addActionButton(ReferenceCardView::ActionRole::Browse, selectButton);
 
 	// The remedy for a library the audio service cannot read: copy it into
@@ -618,13 +624,49 @@ void VSTCardEditor::selectFile()
 
 	const QString absolutePath = reference->chooseExistingFile(
 		this, tr("Select VST plugin"), fileInfo.absoluteFilePath(),
-		tr("VST plugins (*.dll *.vst3)"), pluginsDir.absolutePath(),
+		tr("VST2 plugins (*.dll)"), pluginsDir.absolutePath(),
 		reference->writtenPath().isEmpty() ? QString() : fileInfo.fileName());
 	if (!absolutePath.isEmpty())
 	{
 		settings.setValue("vst/lastDir", QDir::toNativeSeparators(QFileInfo(absolutePath).absolutePath()));
 		pathCommitted(reference->writtenPath());
 	}
+}
+
+void VSTCardEditor::selectVST3Bundle()
+{
+	QDir pluginsDir(QString::fromStdWString(VSTPluginLibrary::getDefaultPluginPath()));
+
+	QSettings settings(QString::fromWCharArray(EDITOR_REGPATH), QSettings::NativeFormat);
+	QString lastDir = settings.value("vst/lastDir", "").toString();
+	if (lastDir == "")
+		lastDir = pluginsDir.absolutePath();
+
+	QFileInfo fileInfo(lastDir);
+	if (!reference->writtenPath().isEmpty())
+		fileInfo.setFile(pluginsDir, reference->writtenPath());
+	const QString initialPath = reference->writtenPath().isEmpty()
+		? lastDir
+		: fileInfo.absolutePath();
+
+	bool invalidBundleSelection = false;
+	const QString absolutePath = reference->chooseExistingVST3Bundle(
+		this, tr("Select VST3 bundle"), initialPath,
+		pluginsDir.absolutePath(),
+		reference->writtenPath().isEmpty() ? QString() : fileInfo.fileName(),
+		&invalidBundleSelection);
+	if (absolutePath.isEmpty())
+	{
+		if (invalidBundleSelection)
+		{
+			QMessageBox::warning(this, tr("Select VST3 bundle"),
+				tr("Select a VST3 bundle folder ending in .vst3."));
+		}
+		return;
+	}
+
+	settings.setValue("vst/lastDir", QDir::toNativeSeparators(QFileInfo(absolutePath).absolutePath()));
+	pathCommitted(reference->writtenPath());
 }
 
 void VSTCardEditor::importToConfig()

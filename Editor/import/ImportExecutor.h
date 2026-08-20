@@ -25,6 +25,7 @@ struct ExecutionResult
     int filesCopied = 0;
     qint64 bytesCopied = 0;
     QStringList errors;
+    QStringList warnings;
 };
 
 class ImportExecutor

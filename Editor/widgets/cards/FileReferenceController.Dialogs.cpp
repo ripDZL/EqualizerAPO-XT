@@ -37,6 +37,33 @@ QString FileReferenceController::chooseExistingFile(QWidget* parent,
 	return selected;
 }
 
+QString FileReferenceController::chooseExistingVST3Bundle(QWidget* parent,
+	const QString& title, const QString& initialPath,
+	const QString& referenceBaseDirectory, const QString& selectedDirectory,
+	bool* invalidSelection)
+{
+	if (invalidSelection != nullptr)
+		*invalidSelection = false;
+
+	QFileDialog dialog(parent, title, initialPath);
+	dialog.setFileMode(QFileDialog::Directory);
+	dialog.setOption(QFileDialog::ShowDirsOnly);
+	GUIHelper::prepareFileDialog(dialog);
+	if (!selectedDirectory.isEmpty())
+		dialog.selectFile(selectedDirectory);
+	if (dialog.exec() != QDialog::Accepted || dialog.selectedFiles().isEmpty())
+		return {};
+
+	const QString selected = dialog.selectedFiles().first();
+	if (!setVST3BundleSelection(selected, referenceBaseDirectory))
+	{
+		if (invalidSelection != nullptr)
+			*invalidSelection = true;
+		return {};
+	}
+	return selected;
+}
+
 bool FileReferenceController::isReadableByAudioService(const QString& absolutePath)
 {
 	if (absolutePath.isEmpty() || qEnvironmentVariableIsSet("EAPO_SKIN_GALLERY"))
@@ -73,6 +100,13 @@ bool FileReferenceController::importIntoConfig(
 			QCoreApplication::translate("FileReferenceController", "Some files could not be copied:\n%1")
 				.arg(result.errors.join('\n')));
 		return false;
+	}
+	if (!result.warnings.isEmpty())
+	{
+		QMessageBox::warning(parent,
+			QCoreApplication::translate("FileReferenceController", "Import"),
+			QCoreApplication::translate("FileReferenceController", "Import completed with warnings:\n%1")
+				.arg(result.warnings.join('\n')));
 	}
 	written = QDir::toNativeSeparators(manifest.rootDest);
 	resolveAgainstConfig(configPath);
