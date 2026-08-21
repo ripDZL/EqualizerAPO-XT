@@ -24,6 +24,7 @@ Describe "Invoke-EditorOffscreenTest.ps1 planning" {
             Should -Be "C:\ws\Tests\TestVst3Plugin\x64\Release\TestVst3Plugin.vst3"
         $plan.ExtraEnv["EAPO_GALLERY_VST2_PLUGIN"] |
             Should -Be "C:\ws\Tests\TestVst2Plugin\x64\Release\TestVst2Plugin.dll"
+        $plan.LogPath | Should -Be "C:\ws\skin-gallery\skin-gallery.log"
         $plan.PostChecks | Should -Contain "gallery-not-empty"
     }
 
@@ -44,7 +45,7 @@ Describe "Invoke-EditorOffscreenTest.ps1 planning" {
     }
 
     It "captures stderr for the GUI-subsystem gates that log through qWarning" {
-        foreach ($gate in @("skin-switch", "analysis-layout", "card-move", "card-selection")) {
+        foreach ($gate in @("skin-gallery", "skin-switch", "analysis-layout", "card-move", "card-selection")) {
             $plan = PlanFor $gate
             $plan.LogPath | Should -Not -BeNullOrEmpty
             $plan.ExtraEnv["QT_FORCE_STDERR_LOGGING"] | Should -Be "1"

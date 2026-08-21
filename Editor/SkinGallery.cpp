@@ -1038,8 +1038,11 @@ int renderSkin(const QDir& outDir, const QString& skinId, const QString& configP
 					QStringLiteral("SubwooferRoutingContentScroll"));
 				QWidget* buttons = dialog.findChild<QWidget*>(
 					QStringLiteral("SubwooferRoutingButtonBox"));
+				// Token variants retain their own selected id but reuse a concrete
+				// painter's layout contract. Studio-derived variants therefore share
+				// Studio's intentionally non-scrolling expanded dialog.
 				const bool needsVerticalScroll =
-					skinId != QStringLiteral("studio");
+					SkinManager::instance()->baseSkinId() != QStringLiteral("studio");
 				if (contentScroll == nullptr
 					|| (needsVerticalScroll
 						&& contentScroll->verticalScrollBar()->maximum() <= 0)

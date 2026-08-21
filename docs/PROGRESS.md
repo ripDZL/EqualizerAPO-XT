@@ -25,6 +25,7 @@
 - [x] Repaired upstream's duplicate `AudioEngineAccess.cpp` entry in `EditorLogicTests.vcxproj`; configured local build and 3415 checks passed.
 - [x] Pushed validated integration branch to `origin/codex/upstream-289-port`; no upstream merge or installation is included.
 - [x] Corrected the skin-module CI gate to distinguish token variants from concrete `paintBaseId` modules; the local gate passes for 5 modules across 20 themes.
+- [x] Corrected the skin-gallery expanded-dialog assertion to use the active painter base; a rebuilt full gallery passes 5,840 shots across 20 themes and its CI harness now captures diagnostics.
 - [x] Built Editor and passed offscreen `Editor.exe --selftest-vst`.
 - [x] Passed offscreen `Editor.exe --skin-switch-test` (120 switches).
 - [x] Built and passed `EditorLogicTests.exe` (3371 checks).

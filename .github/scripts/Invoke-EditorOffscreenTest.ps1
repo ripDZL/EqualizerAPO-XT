@@ -48,10 +48,11 @@ $gates = @{
         # states and the VST2 stale-keys warning. A copy named Upmixer.vst3
         # flips TestVst3Plugin into its Stereo -> 7.1 mode (filename-driven).
         ExtraEnv   = @{
+            QT_FORCE_STDERR_LOGGING = "1"
             EAPO_GALLERY_VST3_PLUGIN  = Join-Path $WorkspaceRoot "Tests\TestVst3Plugin\$Platform\Release\TestVst3Plugin.vst3"
             EAPO_GALLERY_VST2_PLUGIN  = Join-Path $WorkspaceRoot "Tests\TestVst2Plugin\$Platform\Release\TestVst2Plugin.dll"
         }
-        LogPath    = $null
+        LogPath    = Join-Path $WorkspaceRoot "skin-gallery\skin-gallery.log"
         PostChecks = @("gallery-not-empty")
     }
     "skin-switch" = [pscustomobject]@{
