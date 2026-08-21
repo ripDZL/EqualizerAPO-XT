@@ -1,6 +1,7 @@
 # AI Context
 
 - Local integration branch: `codex/upstream-289-port`.
+- Approved remote target: `origin/codex/upstream-289-port`; do not merge upstream or install from it without separate approval.
 - Base: upstream `main` at `ff9c1747614546b68418a5376d0e5f893babd130` (v2.39.0).
 - A direct merge from `beta` produced 149 conflicts; port fork-only features onto current upstream instead.
 - Preserve upstream VST3 `Input`/`Output` bus-layout controls while porting VST preview work.

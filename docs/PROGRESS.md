@@ -23,6 +23,7 @@
 - [x] Restored signed/leading-decimal legacy VST parameter parsing with a regression test.
 - [x] Restored Visual Studio environment casing and clean-artifact packaging safeguards with Pester 5 coverage.
 - [x] Repaired upstream's duplicate `AudioEngineAccess.cpp` entry in `EditorLogicTests.vcxproj`; configured local build and 3415 checks passed.
+- [x] Prepared validated integration branch for push to `origin/codex/upstream-289-port`; no upstream merge or installation is included.
 - [x] Built Editor and passed offscreen `Editor.exe --selftest-vst`.
 - [x] Passed offscreen `Editor.exe --skin-switch-test` (120 switches).
 - [x] Built and passed `EditorLogicTests.exe` (3371 checks).
