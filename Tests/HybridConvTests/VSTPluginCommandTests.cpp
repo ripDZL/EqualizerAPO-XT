@@ -79,9 +79,8 @@ void testChunkData()
 
 void testNamedParams()
 {
-	// Named parameters: each pair is "<name> <numeric value>". The value's first
-	// character is a digit, so the parser takes the isdigit branch that maps the
-	// name (the key) to the value.
+	// Named parameters: each pair is "<name> <numeric value>". Full numeric-token
+	// parsing maps the name (the key) to the value.
 	VSTPluginCommand cmd = VSTPluginCommand::parse(L"", L"Library C:\\plugins\\reverb.dll Gain 0.5 Mix 0.25");
 	harness.expectTrue(!cmd.libraryPath.empty(), "named-params: library resolved");
 	harness.expectTrue(cmd.chunkData == L"", "named-params: no chunk data");
@@ -100,7 +99,7 @@ void testNamedParams()
 void testQuotedName()
 {
 	// A parameter name containing a space is quoted; splitQuoted reassembles it as
-	// a single key, and the numeric value still takes the isdigit branch.
+	// a single key, and the numeric value remains a full numeric token.
 	VSTPluginCommand cmd = VSTPluginCommand::parse(L"", L"Library C:\\plugins\\reverb.dll \"Dry Wet\" 0.75");
 	harness.expectEqual(cmd.paramMap.size(), (size_t)1, "quoted-name: one param");
 	harness.expectEqual(paramValue(cmd.paramMap, L"Dry Wet", "quoted-name value"), 0.75f, "quoted-name: value");
@@ -116,13 +115,29 @@ void testIdParams()
 	harness.expectEqual(paramValue(cmd.paramMap, L"12", "id-params 12"), 0.9f, "id-params: id 12 value");
 }
 
+void testSignedAndLeadingDecimalParams()
+{
+	// A full numeric token may begin with a sign or decimal point. These values
+	// must remain ordinary parameter values, not be misclassified as legacy
+	// parameter names.
+	VSTPluginCommand cmd = VSTPluginCommand::parse(
+		L"", L"Library C:\\plugins\\reverb.dll Gain -0.5 Mix +.25 Depth .75");
+	harness.expectEqual(cmd.paramMap.size(), (size_t)3, "signed-decimal: three params");
+	harness.expectEqual(paramValue(cmd.paramMap, L"Gain", "signed-decimal Gain"), -0.5f,
+		"signed-decimal: negative value");
+	harness.expectEqual(paramValue(cmd.paramMap, L"Mix", "signed-decimal Mix"), 0.25f,
+		"signed-decimal: signed leading decimal");
+	harness.expectEqual(paramValue(cmd.paramMap, L"Depth", "signed-decimal Depth"), 0.75f,
+		"signed-decimal: leading decimal");
+}
+
 void testNonNumericValueBranch()
 {
-	// Covers the other side of the isdigit branch verbatim: when a value token is
-	// not numeric, the parser treats that token as the parameter name and reads the
-	// token two slots further on as its value. This is an edge of the original
-	// grammar, asserted here only to lock the verbatim behaviour (store() never
-	// emits such a line, so it is not part of the round-trip set).
+	// Covers the legacy fallback: when a value token is not numeric, the parser
+	// treats that token as the parameter name and reads the token two slots further
+	// on as its value. This is an edge of the original grammar, asserted here only
+	// to lock the verbatim behaviour (store() never emits such a line, so it is
+	// not part of the round-trip set).
 	VSTPluginCommand cmd = VSTPluginCommand::parse(L"", L"Library C:\\plugins\\reverb.dll ParamName SomeText 0.5");
 	harness.expectEqual(cmd.paramMap.size(), (size_t)1, "non-numeric: one param");
 	harness.expectEqual(paramValue(cmd.paramMap, L"SomeText", "non-numeric value"), 0.5f, "non-numeric: mapped value");
@@ -292,6 +307,7 @@ void runVSTPluginCommandTests()
 	testNamedParams();
 	testQuotedName();
 	testIdParams();
+	testSignedAndLeadingDecimalParams();
 	testNonNumericValueBranch();
 	testSerializeRoundTrip();
 	testStereoInput();

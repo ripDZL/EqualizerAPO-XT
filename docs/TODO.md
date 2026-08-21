@@ -5,6 +5,6 @@
 - [ ] Manually test LegacyRows palette selection and restart persistence in an integration candidate.
 - [x] Audited remaining fork-only behavior by feature group; VST3 layouts, card focus, and VST readability were already upstream, and VST3 bundle import is now ported.
 - [ ] Manually import a representative VST3 bundle in an integration candidate and verify it loads after restart.
-- [ ] Run CI and manually test a packaged integration candidate.
-- [ ] Keep the installed VST2 safety candidate isolated until its manual panel test is explicitly accepted.
+- [ ] Run CI's Pester 5 build-script tests and manually test a packaged integration candidate.
+- [ ] Manually open the VST2 no-editor test plug-in's panel in an integration candidate; it must reject safely without crashing.
 - [ ] Do not merge, push, install, or promote this port without user approval.

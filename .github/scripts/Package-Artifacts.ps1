@@ -18,7 +18,11 @@ $requiredFiles = @(
 $vst3PluginModule = "VST3\SubwooferRouting\$Platform\Release\EapoXtSubwooferRouting.vst3"
 $vst3PluginLicense = "VST3\SubwooferRouting\LICENSE"
 $vst3BundleArch = if ($Platform -eq "ARM64") { "arm64-win" } else { "x86_64-win" }
-$excludeExtensions = @(".obj", ".res", ".log", ".tlog", ".iobj", ".ipdb", ".ilk", ".pdb")
+$excludeExtensions = @(
+    ".obj", ".res", ".log", ".tlog", ".iobj", ".ipdb", ".ilk", ".pdb",
+    ".pch", ".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx",
+    ".qrc", ".lib", ".exp", ".idb", ".lastbuildstate"
+)
 # The Qt plugin folder list lives in the manifest (Shared.QtPluginFolders) so
 # the packaging assertion below and New-VelopackRelease.ps1's qt\ relocation
 # cannot drift apart (audit #275 TD-11: generic/ and networkinformation/ were
@@ -34,6 +38,9 @@ if ($PlanOnly) { return $plan }
 
 $ErrorActionPreference = "Stop"
 $artifactPath = Join-Path $WorkspaceRoot "artifacts\$artifactName"
+if (Test-Path -LiteralPath $artifactPath) {
+    Remove-Item -LiteralPath $artifactPath -Recurse -Force
+}
 New-Item -ItemType Directory -Force -Path $artifactPath | Out-Null
 foreach ($relative in $requiredFiles) {
     $source = Join-Path $WorkspaceRoot $relative

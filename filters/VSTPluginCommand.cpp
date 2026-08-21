@@ -259,20 +259,15 @@ VSTPluginCommand VSTPluginCommand::parse(const wstring& /*configPath*/, const ws
 		}
 		else
 		{
-			if (value.empty() || !std::iswdigit(value[0]))
+			float parameterValue = 0.0f;
+			if (!parseFloatToken(value, parameterValue))
 			{
 				size_t x = (size_t)i + 2;
-				if (x < parts.size())
-				{
-					float f = wcstof(parts[x].c_str(), nullptr);
-					cmd.paramMap[value.c_str()] = f;
-				}
+				if (x < parts.size() && parseFloatToken(parts[x], parameterValue))
+					cmd.paramMap[value.c_str()] = parameterValue;
 			}
 			else
-			{
-				float f = wcstof(value.c_str(), nullptr);
-				cmd.paramMap[key] = f;
-			}
+				cmd.paramMap[key] = parameterValue;
 		}
 	}
 

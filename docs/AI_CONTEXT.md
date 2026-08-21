@@ -4,7 +4,9 @@
 - Base: upstream `main` at `ff9c1747614546b68418a5376d0e5f893babd130` (v2.39.0).
 - A direct merge from `beta` produced 149 conflicts; port fork-only features onto current upstream instead.
 - Preserve upstream VST3 `Input`/`Output` bus-layout controls while porting VST preview work.
-- The separately built VST2 no-native-editor safety fix (`9c9e95d6`) is not part of this branch and is not promoted.
+- VST2 no-native-editor safety is included as `767f3fdf`: an editor-less VST2 plug-in is rejected before any panel opcode is sent.
+- Retained the legacy VST parameter parser for signed and leading-decimal values, plus the Visual Studio environment casing and clean-artifact packaging safeguards.
+- Repaired the upstream `EditorLogicTests` project listing `AudioEngineAccess.cpp` twice; parallel compilation now has one object producer.
 - Ported here: Editor-side VST live analyzer preview, microphone sources, selected-endpoint selection, and row-scoped `Device:` context.
 - Ported VST2 host time/process-level safety with a deterministic host-callback regression test.
 - VST preview processing is block-paced on a dedicated worker; shutdown joins it before the plug-in is stopped or released.
@@ -18,3 +20,4 @@
 - Added Legacy Slate, Blue, Forest, Bronze, and Plum as Minimal/Precision token variants for both LegacyRows and DeviceSelector.
 - Ported direct VST3 bundle import: a dedicated VST3-folder picker reaches the bundle path without mutating the active reference on rejection; it stages the complete regular-file tree, requires the host-platform module, rejects reparse/traversal paths, and replaces prior bundles without stale members.
 - Latest local proof: Editor Release build, offscreen VST self-test, 120-cycle skin-switch test, EditorLogic 3415, HybridConv 1635, a 30-shot LegacyRows gallery, and DeviceSelector qmake/123-shot coverage all passed. The VST3 importer test covers tree copy, staged replacement, traversal rejection, non-VST3 directory rejection, platform-module validation, preservation of an existing bundle on invalid input, and VST picker reference preservation on an invalid folder. Representative LegacyRows and DeviceSelector captures were visually checked. No integration artifact is installed, pushed, merged, or promoted.
+- The local host has Pester 3.4 only; the repository's build-script tests require Pester 5 and remain a CI gate.

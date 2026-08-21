@@ -19,6 +19,10 @@
 - [x] Kept the expanded 20-theme shared roster on the Minimal DeviceSelector painter where appropriate; 123 headless shots passed.
 - [x] Audited the remaining fork-only feature groups against current upstream; only direct VST3 bundle import remained substantive.
 - [x] Ported direct VST3 bundle import with a dedicated folder picker, rejection that preserves the active reference, staged replacement, host-module/reparse/traversal rejection, UI warnings, and 3415 EditorLogic checks.
+- [x] Included VST2 no-native-editor panel safety; the forced native rebuild passed VST2/VST3 host coverage.
+- [x] Restored signed/leading-decimal legacy VST parameter parsing with a regression test.
+- [x] Restored Visual Studio environment casing and clean-artifact packaging safeguards with Pester 5 coverage.
+- [x] Repaired upstream's duplicate `AudioEngineAccess.cpp` entry in `EditorLogicTests.vcxproj`; configured local build and 3415 checks passed.
 - [x] Built Editor and passed offscreen `Editor.exe --selftest-vst`.
 - [x] Passed offscreen `Editor.exe --skin-switch-test` (120 switches).
 - [x] Built and passed `EditorLogicTests.exe` (3371 checks).
