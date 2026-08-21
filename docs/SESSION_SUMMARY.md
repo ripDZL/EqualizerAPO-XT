@@ -19,7 +19,7 @@
 - Included VST2 no-native-editor panel safety (`767f3fdf`), so an editor-less VST2 plug-in is rejected before panel opcodes.
 - Restored signed/leading-decimal legacy VST parameter parsing and the Visual Studio environment casing/clean-artifact packaging safeguards. The focused VST parser suite now passes 123 checks inside the 1635-check native suite.
 - Repaired upstream's duplicate `AudioEngineAccess.cpp` compile entry in `EditorLogicTests.vcxproj`; it caused a parallel-object race. The configured suite now builds and passes 3415 checks.
-- Approved remote handoff: push the validated candidate to `origin/codex/upstream-289-port`; this is not an upstream merge or an installed build.
+- Pushed the validated candidate to `origin/codex/upstream-289-port`; this is not an upstream merge or an installed build.
 - Validation: Editor Release build, offscreen `Editor.exe --selftest-vst`, offscreen 120-cycle `Editor.exe --skin-switch-test`, `EditorLogicTests.exe` (3415 checks, including VST3 picker classification/state preservation, tree copy/replacement/traversal, non-VST3-directory rejection, and preservation of an existing bundle from invalid input), `HybridConvTests.exe` (1635 checks), a 30-shot LegacyRows gallery, and 123 DeviceSelector shots (including a temporary saved-theme probe) passed. Translation catalogs compiled. Representative LegacyRows and DeviceSelector captures were visually checked.
 - The temporary desktop self-test can stall; headless Qt mode is the validated local self-test path. No installed files were changed for that runtime setup.
 - No integration build is installed, pushed, merged, or promoted.
