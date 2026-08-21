@@ -24,6 +24,7 @@
 - [x] Restored Visual Studio environment casing and clean-artifact packaging safeguards with Pester 5 coverage.
 - [x] Repaired upstream's duplicate `AudioEngineAccess.cpp` entry in `EditorLogicTests.vcxproj`; configured local build and 3415 checks passed.
 - [x] Pushed validated integration branch to `origin/codex/upstream-289-port`; no upstream merge or installation is included.
+- [x] Corrected the skin-module CI gate to distinguish token variants from concrete `paintBaseId` modules; the local gate passes for 5 modules across 20 themes.
 - [x] Built Editor and passed offscreen `Editor.exe --selftest-vst`.
 - [x] Passed offscreen `Editor.exe --skin-switch-test` (120 switches).
 - [x] Built and passed `EditorLogicTests.exe` (3371 checks).
@@ -32,4 +33,4 @@
 - [ ] Manually validate Theme Lab save/apply/import/delete and restart persistence.
 - [ ] Manually validate LegacyRows palette selection and restart persistence in an integration candidate.
 - [ ] Manually validate a VST3 bundle import and plug-in load in an integration candidate.
-- [ ] Build, CI, and manual-host-test an integration candidate before any beta promotion.
+- [ ] Complete the manually dispatched CI test build and manual-host-test its integration candidate before any beta promotion.
