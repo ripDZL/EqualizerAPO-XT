@@ -41,6 +41,7 @@
 - [ ] Manually validate Theme Lab save/apply/import/delete and restart persistence.
 - [x] Audited 20 themes × two modes: 4.5:1 text/muted/selection, distinct light/dark grounds, modern + LegacyRows tooltips; EditorLogic 4043 and `--theme-lab-test` passed.
 - [x] Rebuilt Theme Lab with picker/reset/repair, neutral control preview, audit, and safe custom-theme fallback.
+- [x] Installed hash-verified `9f12df1c` Editor-only Theme Lab overlay in the registered AVX-512 test runtime; VST DLL + Program Files untouched.
 - [ ] Manually validate the new Theme Lab readability workflow and tooltip treatment in both a LegacyRows palette and a modern theme.
 - [ ] Manually validate LegacyRows palette selection and restart persistence in an integration candidate.
 - [ ] Manually validate a VST3 bundle import and plug-in load in an integration candidate.

@@ -31,4 +31,5 @@
 - Next: use the repaired `EQ APO XT AVX-512` shortcut to verify Pro-Q 4 loads and a disposable LegacyRows row can be removed. Then complete the manually dispatched CI build (Pester 5) and remaining VST2/Theme/VST3-bundle/LegacyRows acceptance before beta promotion.
 - Theme pass: 20 themes × two modes pass 4.5:1 text/muted/selection; shared token tooltip covers modern + LegacyRows.
 - Theme Lab: picker/reset/repair, neutral control preview/audit, and safe saved-theme fallback. Editor Release, EditorLogic 4043, and `--theme-lab-test` passed.
+- Installed commit `9f12df1c` Editor-only overlay in the AVX-512 test runtime; backup `artifacts/install-backups/pre-theme-lab-9f12df1c-20260824-135508`; VST DLL + Program Files unchanged.
 - Next: with approval, install and compare LegacyRows + a modern theme in both modes; test tooltip and custom save/apply/import/export.
