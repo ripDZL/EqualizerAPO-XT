@@ -1,7 +1,7 @@
 # TODO
 
 - [x] FabFilter Pro-Q manual test works; removed temporary debug/probe instrumentation.
-- [ ] Manually confirm the installed clean AVX-512 Editor `6B24EFD87C122F405F37DD31312D5681A4FB8FE7F0ADE89E869B21510C095210` shows only a small arrow/separator—not a filled second button—beside Browse/Options in Copper Forge and Legacy Bronze light/dark.
+- [x] User confirmed the installed clean AVX-512 Editor `6B24EFD87C122F405F37DD31312D5681A4FB8FE7F0ADE89E869B21510C095210` shows an acceptable small arrow/separator beside Browse/Options.
 - [ ] Manually verify analyzer movement with real VST2 and VST3 plug-ins before any integration-candidate install.
 - [ ] Manually test Theme Lab save/apply/import/delete and persistence across an Editor restart.
 - [ ] Manually test LegacyRows palette selection and restart persistence in an integration candidate.
