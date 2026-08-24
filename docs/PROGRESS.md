@@ -54,3 +54,6 @@
 - [ ] Manually validate LegacyRows palette selection and restart persistence in an integration candidate.
 - [ ] Manually validate a VST3 bundle import and plug-in load in an integration candidate.
 - [ ] Complete the manually dispatched CI test build and manual-host-test its integration candidate before any beta promotion.
+- [x] Integrated exact upstream v2.42.2 locally, retaining fork VST preview/safety and theme changes alongside upstream VST3 slot-fill controls; corrected the resulting SkinGallery VST constructor call.
+- [x] v2.42.2 validation: Release Editor build, EditorLogicTests (4306), HybridConvTests (1635), and EngineOrchestrationTests (1259) pass.
+- [ ] Await user approval for a v2.42.2 runtime test install; no v2.42.2 files are installed or pushed.

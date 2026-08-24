@@ -12,6 +12,7 @@
 #include "filters/VSTPluginFilter.h"
 #include "filters/VSTPluginFilterFactory.h"
 #include "guis/VSTPluginFilterGUI.h"
+#include "widgets/cards/VSTSlotFillRail.h"
 #include "MainWindow.h"
 #include "diagnostics/ToolbarPixelProbe.h"
 #include "widgets/MainToolbarKit.h"
@@ -189,6 +190,13 @@ QList<GalleryRow> galleryRows()
 		{ QStringLiteral("include_nested"), QStringLiteral("Include: Surround\\example.txt") },
 		{ QStringLiteral("include_missing"), QStringLiteral("Include: missing.txt") },
 		{ QStringLiteral("vst"), QStringLiteral("VSTPlugin: Library example.dll") },
+		// The channel-fill rails on a forced contract: input rail under the
+		// header, output rail under the body, expanded because both lists
+		// are explicit. Deviceless, so the values render without a missing
+		// verdict (no selection context to judge against).
+		{ QStringLiteral("vst_slotfill"), QStringLiteral(
+			  "VSTPlugin: Library example.vst3 Input 5.1 InputChannels L,R,C,-,SL,SR"
+			  " Output 5.1 OutputChannels L,R,C,LFE,RL,RR") },
 		{ QStringLiteral("device"), QStringLiteral("Device: Speakers Example Audio; Microphone Example Audio") },
 		{ QStringLiteral("device_all"), QStringLiteral("Device: all") },
 		{ QStringLiteral("channel"), QStringLiteral("Channel: L R") },
@@ -2322,6 +2330,69 @@ int runCardMoveTest(const QStringList& arguments)
 		moves, static_cast<long long>(lines.size()), static_cast<long long>(worstMs),
 		qPrintable(worstName), warningMs, limitMs, failures);
 
+	// Scroll-position contract for the row edits a user makes from a card's
+	// own header (+ / - / text edit) and for the full rebuild behind every
+	// other structural change. Field report: adding or removing one line
+	// flashed the whole list and threw the view back to the top, so on a
+	// long document every edit cost a scroll back down. The scrolled view
+	// must stay where it was, within the height of the row that changed.
+	{
+		scrollArea.show();
+		QApplication::processEvents();
+		QScrollBar* bar = scrollArea.verticalScrollBar();
+		const int rowCount = int(table->documentItems().count());
+		const int middle = rowCount / 2;
+		const int target = bar->maximum() / 2;
+		const auto settle = [&bar]() {
+			QApplication::processEvents();
+			QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+			QApplication::processEvents();
+			return bar->value();
+		};
+		const auto check = [&](const char* what, int before, int after) {
+			// One card's height is the most a splice above the viewport may
+			// legitimately shift the content by.
+			const int tolerance = 160;
+			if (std::abs(after - before) > tolerance)
+			{
+				qWarning("CardMoveTest: scroll after %s jumped %d -> %d (max %d)", what, before, after, bar->maximum());
+				failures++;
+			}
+			else
+			{
+				qWarning("CardMoveTest: scroll after %s held %d -> %d (max %d)", what, before, after, bar->maximum());
+			}
+		};
+
+		bar->setValue(target);
+		int before = settle();
+		if (before <= 0)
+		{
+			qWarning("CardMoveTest: the document does not scroll (max %d); scroll contract not exercised", bar->maximum());
+			failures++;
+		}
+		else
+		{
+			FilterTable::Item* anchor = table->documentItems().at(middle);
+			FilterTable::Item* inserted = table->insertLine(QStringLiteral("Preamp: -1 dB"), anchor);
+			check("header insert", before, settle());
+			before = bar->value();
+			table->removeLine(inserted);
+			check("header remove", before, settle());
+			before = bar->value();
+			table->updateGuis();
+			check("full rebuild", before, settle());
+			// The live skin switch tears down first and rebuilds after the
+			// stylesheet swap (MainWindow::skinSelected); the position must
+			// survive that gap too.
+			before = bar->value();
+			table->clearRows();
+			SkinManager::instance()->applySkin(Skins::all().first()->id(), false);
+			table->updateGuis();
+			check("skin switch", before, settle());
+		}
+	}
+
 	// Same no-teardown exit as run().
 	const int status = failures == 0 ? 0 : 1;
 	std::fflush(nullptr);
@@ -2634,7 +2705,9 @@ int SkinGallery::runVstRoundTripSelfTest()
 		{ L"paramMap-quoted-name", L"Library fake.dll \"Dry/Wet\" 0.75 Output 0.5" },
 		{ L"stereoInput-chunk", L"Library fake.dll StereoInput 1 ChunkData \"QUJDREVGR0g=\"" },
 		{ L"stereoInput-params", L"Library fake.dll StereoInput 1 Gain 0.5" },
-		{ L"busContract", L"Library fake.vst3 Input Stereo Output 7.1 Gain 0.5" }
+		{ L"busContract", L"Library fake.vst3 Input Stereo Output 7.1 Gain 0.5" },
+		{ L"busContract-slotFill",
+		  L"Library fake.vst3 Input 5.1 InputChannels L,R,C,-,SL,SR Output 5.1 OutputChannels L,R,C,LFE,RL,RR Gain 0.5" }
 	};
 
 	int failures = 0;
@@ -2655,8 +2728,10 @@ int SkinGallery::runVstRoundTripSelfTest()
 		std::unordered_map<std::wstring, float> map0 = f0->getParamMap();
 		const bool stereo0 = f0->getStereoInput();
 		const std::optional<VST3BusContract> bus0 = f0->getBusContract();
+		const std::vector<std::wstring> fillIn0 = f0->getInputChannels();
+		const std::vector<std::wstring> fillOut0 = f0->getOutputChannels();
 
-		VSTPluginFilterGUI gui(f0->getLibrary(), chunk0, map0, stereo0, bus0);
+		VSTPluginFilterGUI gui(f0->getLibrary(), chunk0, map0, stereo0, bus0, {}, fillIn0, fillOut0);
 		QString outCommand, outParams;
 		gui.store(outCommand, outParams);
 
@@ -2676,13 +2751,15 @@ int SkinGallery::runVstRoundTripSelfTest()
 		const std::optional<VST3BusContract> bus1 = f1->getBusContract();
 		const bool sameBusContract = bus0.has_value() == bus1.has_value()
 			&& (!bus0 || (bus0->input == bus1->input && bus0->output == bus1->output));
-		bool ok = (chunk0 == chunk1) && (map0 == map1) && (stereo0 == stereo1) && sameBusContract;
+		const bool sameSlotFill = fillIn0 == f1->getInputChannels() && fillOut0 == f1->getOutputChannels();
+		bool ok = (chunk0 == chunk1) && (map0 == map1) && (stereo0 == stereo1) && sameBusContract && sameSlotFill;
 		if (!ok)
 		{
 			failures++;
-			fprintf(stderr, "[VST selftest] %ls: LOSS. chunk %ls->%ls, params %zu->%zu, stereoInput %d->%d, bus %d->%d\n",
+			fprintf(stderr, "[VST selftest] %ls: LOSS. chunk %ls->%ls, params %zu->%zu, stereoInput %d->%d, bus %d->%d, fill %zu/%zu->%zu/%zu\n",
 				c.name, chunk0.c_str(), chunk1.c_str(), map0.size(), map1.size(), stereo0 ? 1 : 0,
-				stereo1 ? 1 : 0, bus0 ? 1 : 0, bus1 ? 1 : 0);
+				stereo1 ? 1 : 0, bus0 ? 1 : 0, bus1 ? 1 : 0,
+				fillIn0.size(), fillOut0.size(), f1->getInputChannels().size(), f1->getOutputChannels().size());
 			for (auto& kv : map0)
 			{
 				auto it = map1.find(kv.first);
@@ -2701,6 +2778,303 @@ int SkinGallery::runVstRoundTripSelfTest()
 
 	fprintf(stderr, "[VST selftest] %s (%d failure(s))\n", failures == 0 ? "PASS" : "FAIL", failures);
 	return failures == 0 ? 0 : 1;
+}
+
+int SkinGallery::runVstFillSelfTest()
+{
+	// A 7.1 endpoint (the layout Windows offers for the field setup); the
+	// row itself negotiates Stereo in / 5.1 out like a stereo upmixer. Each
+	// case lists the rows above the VST row and the channels its fill menus
+	// must offer: the device set, a Channel row's narrowed selection, and
+	// the device set again when that Channel row is powered off (the engine
+	// skips commented lines).
+	struct Case { const char* name = nullptr; QList<QString> rowsAbove; QStringList expected; };
+	const QStringList deviceChannels = {
+		QStringLiteral("L"), QStringLiteral("R"), QStringLiteral("C"), QStringLiteral("LFE"),
+		QStringLiteral("RL"), QStringLiteral("RR"), QStringLiteral("SL"), QStringLiteral("SR")};
+	const Case cases[] = {
+		{ "device", {}, deviceChannels },
+		{ "channel-narrowed", { QStringLiteral("Channel: L R") },
+		  { QStringLiteral("L"), QStringLiteral("R") } },
+		{ "channel-commented", { QStringLiteral("# Channel: L R") }, deviceChannels }
+	};
+	const QString vstLine = QStringLiteral("VSTPlugin: Library example.vst3 Input Stereo Output 5.1");
+
+	int failures = 0;
+	for (const Case& c : cases)
+	{
+		for (int modeIndex = 0; modeIndex < 2; modeIndex++)
+		{
+			const bool legacy = modeIndex == 1;
+			const QByteArray label = QByteArray(c.name) + (legacy ? "/legacy" : "/cards");
+			QScrollArea scrollArea;
+			scrollArea.setWidgetResizable(true);
+			scrollArea.resize(960, 720);
+			FilterTable* table = new FilterTable();
+			table->setRenderMode(legacy ? FilterTable::LegacyRows : FilterTable::ModernCards);
+			scrollArea.setWidget(table);
+			QList<std::shared_ptr<AbstractAPOInfo>> outputDevices, inputDevices;
+			galleryDevices(outputDevices, inputDevices);
+			std::shared_ptr<AbstractAPOInfo> device =
+				std::make_shared<GalleryAPOInfo>(L"Speakers", L"Example Audio", false, true, 8, 0x63F);
+			table->updateDeviceAndChannelMask(device, 0x63F);
+			table->initialize(&scrollArea, outputDevices, inputDevices);
+			QList<QString> lines = c.rowsAbove;
+			lines.append(vstLine);
+			table->setLines(QString(), lines);
+			table->updateGuis();
+			scrollArea.show();
+			QApplication::processEvents();
+
+			// Both presentations report the menu of every slot; the cards
+			// path through the rail cells, the legacy row through its combos
+			// after the fold latch is opened (a defaulted fill starts folded,
+			// exactly as the field report found it).
+			QList<QStringList> menus;
+			if (legacy)
+			{
+				VSTPluginFilterGUI* gui = table->findChild<VSTPluginFilterGUI*>();
+				if (gui == nullptr)
+				{
+					fprintf(stderr, "[VST fill selftest] %s: no VSTPluginFilterGUI row\n", label.constData());
+					failures++;
+					continue;
+				}
+				QCheckBox* latch = gui->findChild<QCheckBox*>();
+				if (latch != nullptr && !latch->isChecked())
+					latch->setChecked(true);
+				QApplication::processEvents();
+				for (QComboBox* combo : gui->findChildren<QComboBox*>())
+				{
+					if (!combo->objectName().isEmpty())
+						continue;
+					QStringList items;
+					for (int i = 0; i < combo->count(); i++)
+						items.append(combo->itemData(i).toString());
+					menus.append(items);
+				}
+			}
+			else
+			{
+				for (const VSTSlotFillCell* cell : table->findChildren<VSTSlotFillCell*>())
+					menus.append(cell->channelChoices());
+			}
+
+			// Stereo in + 5.1 out: two input slots and six output slots.
+			if (menus.size() != 8)
+			{
+				fprintf(stderr, "[VST fill selftest] %s: expected 8 slot menus, found %d\n",
+					label.constData(), int(menus.size()));
+				failures++;
+				continue;
+			}
+			bool ok = true;
+			for (const QStringList& menu : menus)
+			{
+				QStringList channels = menu;
+				channels.removeAll(QStringLiteral("-"));
+				if (channels != c.expected)
+					ok = false;
+			}
+			if (!ok)
+			{
+				failures++;
+				fprintf(stderr, "[VST fill selftest] %s: expected %s, menus offer:\n", label.constData(),
+					c.expected.join(QLatin1Char(',')).toUtf8().constData());
+				for (const QStringList& menu : menus)
+					fprintf(stderr, "    %s\n", menu.join(QLatin1Char(',')).toUtf8().constData());
+			}
+			else
+			{
+				fprintf(stderr, "[VST fill selftest] %s: OK (%s)\n", label.constData(),
+					c.expected.join(QLatin1Char(',')).toUtf8().constData());
+			}
+		}
+	}
+	fprintf(stderr, "[VST fill selftest] %s (%d failure(s))\n", failures == 0 ? "PASS" : "FAIL", failures);
+	return failures == 0 ? 0 : 1;
+}
+
+int SkinGallery::runScrollBench()
+{
+	qWarning("ScrollBench: starting");
+	QTemporaryDir scratch;
+	if (!scratch.isValid())
+		return 2;
+	qputenv("EAPO_SKIN_GALLERY", "1");
+	const QString configPath = buildReferenceFiles(QDir(scratch.path()));
+	if (configPath.isEmpty())
+		return 2;
+
+	QList<QString> lines;
+	for (int repeat = 0; repeat < 6; repeat++)
+		for (const GalleryRow& row : galleryRows())
+			lines.append(row.line);
+
+	for (ISkin* skin : Skins::all())
+	{
+		QScrollArea scrollArea;
+		// A maximized QHD editor: the card column is ~2500 px wide.
+		scrollArea.resize(2560, 1300);
+		SkinManager::instance()->applySkin(skin->id(), true);
+		buildRows(scrollArea, configPath, lines);
+		FilterTable* table = qobject_cast<FilterTable*>(scrollArea.widget());
+		if (table == nullptr)
+			continue;
+		table->openConfig(QString());
+		QApplication::processEvents();
+
+		QScrollBar* bar = scrollArea.verticalScrollBar();
+		bar->setValue(0);
+		QApplication::processEvents();
+		// Force real rasterization per step: grab() renders the viewport
+		// through the same paint path the screen would use.
+		QElapsedTimer timer;
+		timer.start();
+		int steps = 0;
+		for (int value = 0; value <= bar->maximum() && steps < 40; value += 120, steps++)
+		{
+			bar->setValue(value);
+			QApplication::processEvents();
+			scrollArea.viewport()->grab();
+		}
+		const qint64 elapsed = timer.elapsed();
+		qWarning("ScrollBench: %s %d steps in %lld ms (%.1f ms/step)",
+			qPrintable(skin->id()), steps, static_cast<long long>(elapsed),
+			steps > 0 ? double(elapsed) / steps : 0.0);
+	}
+	std::fflush(nullptr);
+	std::_Exit(0);
+}
+
+int SkinGallery::runPowerToggleTest()
+{
+	qWarning("PowerToggleTest: starting");
+	QTemporaryDir scratch;
+	if (!scratch.isValid())
+	{
+		qWarning("PowerToggleTest: cannot create a scratch directory");
+		return 2;
+	}
+	qputenv("EAPO_SKIN_GALLERY", "1");
+	const QString configPath = buildReferenceFiles(QDir(scratch.path()));
+	if (configPath.isEmpty())
+	{
+		qWarning("PowerToggleTest: cannot write reference target files");
+		return 2;
+	}
+
+	// Gain-less biquads (the field report) and full-grammar controls must
+	// keep a real editor through load and an off/on round trip; a peaking
+	// line missing its gain is one the ENGINE rejects ("no gain given"),
+	// so its raw presentation is correct and only the text round trip is
+	// held. Every line must survive the toggle byte-identically.
+	struct Case { QString line; bool editor = true; };
+	const QList<Case> cases = {
+		{ QStringLiteral("Filter: ON NO Fc 800 Hz"), true },
+		{ QStringLiteral("Filter: ON AP Fc 900 Hz BW Oct 1"), true },
+		{ QStringLiteral("Filter: ON LP Fc 5000 Hz"), true },
+		{ QStringLiteral("Filter: ON HPQ Fc 80 Hz Q 0.5"), true },
+		{ QStringLiteral("Filter: ON BP Fc 1000 Hz Q 2"), true },
+		{ QStringLiteral("Filter 1: ON PK Fc 1000 Hz Gain 6 dB Q 0.71"), true },
+		{ QStringLiteral("Filter: ON PK Fc 1000 Hz Q 1"), false },
+		{ QStringLiteral("Preamp: -3 dB"), true }
+	};
+	QList<QString> lines;
+	for (const Case& c : cases)
+		lines.append(c.line);
+
+	int failures = 0;
+	for (ISkin* skin : Skins::all())
+	{
+		const QString name = skin->id();
+		QScrollArea scrollArea;
+		scrollArea.resize(960, 720);
+		SkinManager::instance()->applySkin(skin->id(), true);
+		buildRows(scrollArea, configPath, lines);
+		FilterTable* table = qobject_cast<FilterTable*>(scrollArea.widget());
+		if (table == nullptr)
+		{
+			qWarning("PowerToggleTest: %s table construction failed", qPrintable(name));
+			failures++;
+			continue;
+		}
+		table->openConfig(QString());
+
+		const auto rowWidget = [table](int index) -> FilterCardRow* {
+			QList<FilterCardRow*> rows = table->findChildren<FilterCardRow*>(
+				QString(), Qt::FindDirectChildrenOnly);
+			std::sort(rows.begin(), rows.end(), [](FilterCardRow* a, FilterCardRow* b) {
+				return a->y() < b->y();
+			});
+			return index < rows.size() ? rows[index] : nullptr;
+		};
+		const auto powerButton = [](FilterCardRow* row) -> QToolButton* {
+			for (QToolButton* button : row->findChildren<QToolButton*>())
+			{
+				if (button->toolTip() == QStringLiteral("Enable or comment out this command"))
+					return button;
+			}
+			return nullptr;
+		};
+		const auto settle = []() {
+			QApplication::processEvents();
+			QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+			QApplication::processEvents();
+		};
+
+		for (int i = 0; i < lines.size(); i++)
+		{
+			const QString original = table->documentItems().at(i)->text;
+			if ((table->documentItems().at(i)->gui != nullptr) != cases[i].editor)
+			{
+				// The load-time half of the regression this gate pins: the
+				// audit #275 B4 policy extraction dropped the card-to-chain
+				// fallthrough and every plain biquad loaded as a raw row.
+				qWarning("PowerToggleTest: %s row %d editor presence %d at load (expected %d)",
+					qPrintable(name), i + 1,
+					table->documentItems().at(i)->gui != nullptr ? 1 : 0, cases[i].editor ? 1 : 0);
+				failures++;
+			}
+			for (int phase = 0; phase < 2; phase++)
+			{
+				FilterCardRow* row = rowWidget(i);
+				QToolButton* button = row != nullptr ? powerButton(row) : nullptr;
+				if (button == nullptr)
+				{
+					qWarning("PowerToggleTest: %s row %d lost its power button in phase %d",
+						qPrintable(name), i + 1, phase);
+					failures++;
+					break;
+				}
+				button->setChecked(phase == 1);
+				settle();
+				const QString text = table->documentItems().at(i)->text;
+				const QString expected = phase == 0
+					? QStringLiteral("# ") + original : original;
+				if (text != expected)
+				{
+					qWarning("PowerToggleTest: %s row %d phase %d text '%s' (expected '%s')",
+						qPrintable(name), i + 1, phase,
+						qPrintable(text), qPrintable(expected));
+					failures++;
+				}
+			}
+			FilterCardRow* row = rowWidget(i);
+			const bool hasGui = table->documentItems().at(i)->gui != nullptr;
+			if (hasGui != cases[i].editor)
+			{
+				qWarning("PowerToggleTest: %s row %d editor presence %d after the toggle (expected %d)",
+					qPrintable(name), i + 1, hasGui ? 1 : 0, cases[i].editor ? 1 : 0);
+				failures++;
+			}
+			Q_UNUSED(row);
+		}
+	}
+	qWarning("PowerToggleTest: %s (%d failure(s))", failures == 0 ? "PASS" : "FAIL", failures);
+	const int status = failures == 0 ? 0 : 1;
+	std::fflush(nullptr);
+	std::_Exit(status);
 }
 
 bool SkinGallery::armAnalysisLayoutProbe(MainWindow& window, const QString& screenshotPath)

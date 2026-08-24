@@ -14,6 +14,128 @@ tags are clean `vX.Y.Z` names. Installers for every version are on the
 
 ## Unreleased
 
+- **Scrolling a maximized window is smooth in the Rack skin again.** The
+  brushed-metal grain was drawn as hundreds of full-width translucent
+  hairlines on every repaint, which made a wheel step on a maximized QHD
+  window cost ~195 ms; it is now a cached one-pixel tile stretched in a
+  single blit (~39 ms, in line with the other skins)
+  ([#305](https://github.com/115dkk/EqualizerAPO-XT/pull/305)).
+## v2.42.1 — 2026-08-24
+
+- **Parametric filter rows have their knob editor back.** Since v2.37.3 every
+  plain "Filter:" line (peaking, low/high-pass, band-pass, notch - everything
+  except the IIR and all-pass cards) loaded as a collapsed card whose body was
+  the raw text instead of the knobs, and toggling the power made it obvious.
+  A new CI gate now holds every valid line to a real editor through load and
+  a power round trip ([#304](https://github.com/115dkk/EqualizerAPO-XT/pull/304)).
+- **Fonts survive switching to the legacy rows and back.** The in-process
+  restart behind the interface-mode and language switches dropped the bundled
+  fonts (DM Sans, DM Mono, Pretendard) and the editor fell back to the system
+  font until a full relaunch
+  ([#304](https://github.com/115dkk/EqualizerAPO-XT/pull/304)).
+
+## v2.42.0 — 2026-08-24
+
+- **The card header's controls sit in a fixed column at the left.** Power,
+  `+`, `-` and the raw-line editor used to be pushed to the far right edge of
+  the window, a long glance away from the content on a wide screen. They now
+  follow the row number, the way the original rows laid them out, and the
+  type badge, title and summary come after them. The skins' right-edge
+  readouts (minimal's watch column, matrix's readout cell, studio's `= value`)
+  use the freed edge ([#299](https://github.com/115dkk/EqualizerAPO-XT/pull/299)).
+
+## v2.41.5 — 2026-08-23
+
+- **Adding or removing a card no longer flashes the list or jumps to the
+  top.** The + and - in a card's header, and the inline text edit, used to
+  rebuild every card in the document, which threw the view back to the top
+  on every edit of a long configuration. They now build or remove only the
+  affected card. The full rebuild behind multi-row edits, undo and skin
+  switches keeps the scroll position too
+  ([#298](https://github.com/115dkk/EqualizerAPO-XT/pull/298)).
+
+## v2.41.4 — 2026-08-23
+
+- **The legacy rows offer real channels in a VST row's channel fill again.**
+  Under the heritage (legacy rows) presentation, every fill dropdown of a VST
+  row listed only "Silence (-)" / "Discard (-)", while the card presentation
+  offered every device channel; a stereo-to-5.1 upmixer could not be fed from
+  the legacy rows at all. The legacy power-toggle wrapper around each row
+  never passed the selected channels on to the row's editor. It does now, so
+  the fill dropdowns list the device channels, and a `Channel:` row above the
+  VST row narrows them as it should. A powered-off (`#`) `Channel:` row no
+  longer narrows the rows below it in either presentation; the card
+  presentation used to do that. The VST self-test gate now checks all three
+  cases in both presentations
+  ([#297](https://github.com/115dkk/EqualizerAPO-XT/pull/297)).
+
+## v2.41.3 — 2026-08-23
+
+- **The APO now ignores a device-test pipe name that could point outside the
+  pipe namespace.** The DeviceSelector device test hands the APO a named-pipe
+  name through the registry; the APO used to append it to `\\.\pipe\` as
+  is. It now accepts only letters, digits, `_` and `-` (up to 128 characters)
+  and otherwise behaves as if no test were running. The name DeviceSelector
+  writes is unchanged, so the device test works as before. This closes CodeQL
+  alerts #9 and #10; the two remaining registry-path alerts (#11 configuration
+  directory, #12 Voicemeeter DLL location) are dismissed as false positives,
+  because both values live under HKLM, which only administrators can write,
+  and every reader runs with less privilege than that.
+- **The weekly CodeQL scan sees registry-derived paths again.** Since v2.37.3
+  every registry read goes through the `IRegistry` port, which CodeQL's
+  built-in Windows models do not follow; a control scan of unchanged code
+  reported all four registry alerts as gone. An in-repository model pack now
+  declares the port's read methods as registry sources, and a scan with it
+  re-detects #11/#12 (still dismissed) while confirming the pipe-name fix
+  ([#296](https://github.com/115dkk/EqualizerAPO-XT/pull/296)).
+
+## v2.41.2 — 2026-08-22
+
+- **The rack fill rail speaks one relief language.** v2.41.1's mix of a
+  recessed readout, a raised select cap and a machined fold key read as
+  three different depths in one row; every cell and the fold now wear the
+  same modest latch-down cap as the card's IN/OUT selectors, with the fold
+  keeping only its pilot LED and engraved FILL
+  ([#295](https://github.com/115dkk/EqualizerAPO-XT/pull/295)).
+
+## v2.41.1 — 2026-08-22
+
+- **The rack skin's channel-fill rails got hardware styling.** The fold
+  became a machined key with a pilot LED, the channel dropdowns became
+  readout windows with a milled select cap, and the window floors took a
+  warm-glass tint instead of a near-black pit, in both light and dark
+  ([#294](https://github.com/115dkk/EqualizerAPO-XT/pull/294)). (This
+  entry was recorded after the release; the styling was reworked again in
+  the next version above.)
+
+## v2.41.0 — 2026-08-22
+
+- **The channel fill got its editor, in every skin.** The per-slot lists
+  from v2.40.0 no longer require hand-editing the line: the VST card grows
+  two rails inside the card (input under the header, output under the
+  body) with one channel dropdown per negotiated slot, dressed in each
+  skin's own language, and the legacy row gets plain combo rows. Rails
+  exist only for explicitly negotiated sides; when both exist, a fill
+  switch folds them away to save space. The dropdowns offer exactly the
+  channels selected at that line - `Channel:` restrictions and
+  `Copy:`-created channels included - and a saved channel outside the
+  selection shows in the danger color
+  ([#292](https://github.com/115dkk/EqualizerAPO-XT/pull/292)).
+
+## v2.40.0 — 2026-08-22
+
+- **A forced VST3 bus can now take its channels from anywhere.** `Input`/
+  `Output` used to consume the first channels in device order. New
+  `InputChannels`/`OutputChannels` lists name the config channel for each
+  negotiated slot (`Copy`-style names or numbers, `-` for a silent input
+  slot or a discarded output slot), so a stereo-only plug-in can process the
+  side pair, or an upmixer can feed a height bed, while every untouched
+  channel passes through unchanged
+  ([#290](https://github.com/115dkk/EqualizerAPO-XT/pull/290)).
+- **The legacy VST row can edit the bus contract.** Plain Input/Output
+  dropdowns set or remove the VST3 layout pair without switching to the
+  card view ([#290](https://github.com/115dkk/EqualizerAPO-XT/pull/290)).
+
 ## v2.39.0 — 2026-08-20
 
 - **The installed app has a readable name now.** It used to appear as

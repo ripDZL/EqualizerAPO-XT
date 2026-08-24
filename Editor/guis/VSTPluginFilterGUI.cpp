@@ -23,6 +23,11 @@
 #include <QSettings>
 #include <QAbstractEventDispatcher>
 #include <QAction>
+#include <QBrush>
+#include <QCheckBox>
+#include <QGridLayout>
+#include <QHBoxLayout>
+#include <QLabel>
 #include <QMenu>
 #include <QMessageBox>
 #include <QStringList>
@@ -50,9 +55,11 @@ using std::placeholders::_2;
 
 VSTPluginFilterGUI::VSTPluginFilterGUI(std::shared_ptr<VSTPluginLibrary> library, const std::wstring& chunkData, const std::unordered_map<std::wstring, float>& paramMap,
 	bool stereoInput, const std::optional<VST3BusContract>& busContract,
-	const VSTPreviewEndpoint& previewEndpoint)
+	const VSTPreviewEndpoint& previewEndpoint,
+	std::vector<std::wstring> inputChannels, std::vector<std::wstring> outputChannels)
 	: ui(std::make_unique<Ui::VSTPluginFilterGUI>()), library(library), chunkData(chunkData), paramMap(paramMap),
-	stereoInput(stereoInput), busContract(busContract), previewEndpoint(previewEndpoint)
+	stereoInput(stereoInput), busContract(busContract), previewEndpoint(previewEndpoint),
+	inputChannels(std::move(inputChannels)), outputChannels(std::move(outputChannels))
 {
 	ui->setupUi(this);
 	ui->frame->setVisible(false);
@@ -84,6 +91,40 @@ VSTPluginFilterGUI::VSTPluginFilterGUI(std::shared_ptr<VSTPluginLibrary> library
 	connect(livePreviewAction, &QAction::toggled, this, &VSTPluginFilterGUI::livePreviewToggled);
 	menu->addAction(livePreviewAction);
 	ui->optionsButton->setMenu(menu);
+
+	// The VST3 main-bus contract as two plain dropdowns. The layout names are
+	// config tokens, not prose, so they stay untranslated.
+	static const VST3BusLayout busLayoutChoices[] = {
+		VST3BusLayout::Auto, VST3BusLayout::Mono, VST3BusLayout::Stereo,
+		VST3BusLayout::Surround40, VST3BusLayout::Surround41, VST3BusLayout::Surround50,
+		VST3BusLayout::Surround51, VST3BusLayout::Surround61, VST3BusLayout::Surround71,
+		VST3BusLayout::Surround712, VST3BusLayout::Surround714};
+	for (VST3BusLayout layout : busLayoutChoices)
+	{
+		const QString name = QString::fromWCharArray(vst3BusLayoutName(layout));
+		ui->busInputComboBox->addItem(name, static_cast<int>(layout));
+		ui->busOutputComboBox->addItem(name, static_cast<int>(layout));
+	}
+	connect(ui->busInputComboBox, &QComboBox::activated, this, &VSTPluginFilterGUI::busLayoutPicked);
+	connect(ui->busOutputComboBox, &QComboBox::activated, this, &VSTPluginFilterGUI::busLayoutPicked);
+
+	// The channel-fill rows sit between the bus dropdowns and the embed
+	// frame, inside the row (never below the table's add button). Their
+	// combos are rebuilt from VSTSlotFillModel whenever the contract, the
+	// lists or the selected channels change.
+	QGridLayout* grid = static_cast<QGridLayout*>(layout());
+	inputFillRow = new QWidget(this);
+	new QHBoxLayout(inputFillRow);
+	static_cast<QHBoxLayout*>(inputFillRow->layout())->setContentsMargins(0, 0, 0, 0);
+	grid->addWidget(inputFillRow, 3, 0, 1, 4);
+	outputFillRow = new QWidget(this);
+	new QHBoxLayout(outputFillRow);
+	static_cast<QHBoxLayout*>(outputFillRow->layout())->setContentsMargins(0, 0, 0, 0);
+	grid->addWidget(outputFillRow, 4, 0, 1, 4);
+	fillCollapsed = this->inputChannels.empty() && this->outputChannels.empty();
+
+	updateBusControls();
+	updateFillRows();
 
 	// Frozen legacy row: it stays functional under every skin, so it consults
 	// the same chrome hook as the card editors (legacyRow marks it for skins
@@ -130,6 +171,8 @@ void VSTPluginFilterGUI::store(QString& command, QString& parameters)
 	{
 		cmd.busContract = *busContract;
 		cmd.hasBusContract = true;
+		cmd.inputChannels = inputChannels;
+		cmd.outputChannels = outputChannels;
 	}
 	parameters += QString::fromStdWString(cmd.serialize());
 }
@@ -148,10 +191,160 @@ void VSTPluginFilterGUI::livePreviewToggled(bool checked)
 	updateLivePreview();
 }
 
+void VSTPluginFilterGUI::busLayoutPicked()
+{
+	const VST3BusLayout input = static_cast<VST3BusLayout>(ui->busInputComboBox->currentData().toInt());
+	const VST3BusLayout output = static_cast<VST3BusLayout>(ui->busOutputComboBox->currentData().toInt());
+	// A full Auto pair is the absence of a contract, so returning both
+	// dropdowns to Auto removes the Input/Output keys from the line entirely.
+	std::optional<VST3BusContract> picked;
+	if (input != VST3BusLayout::Auto || output != VST3BusLayout::Auto)
+		picked = VST3BusContract{input, output};
+	const bool same = busContract.has_value() == picked.has_value()
+		&& (!picked || (busContract->input == picked->input && busContract->output == picked->output));
+	if (same)
+		return;
+	// A changed layout invalidates that side's per-slot channel fill: the
+	// slot count no longer matches, so the stale list would fail to parse.
+	if (input != (busContract ? busContract->input : VST3BusLayout::Auto))
+		inputChannels.clear();
+	if (output != (busContract ? busContract->output : VST3BusLayout::Auto))
+		outputChannels.clear();
+	busContract = picked;
+	if (busContract && stereoInput)
+	{
+		// The parser rejects StereoInput combined with Input/Output, so the
+		// explicit contract silently retires the legacy flag.
+		stereoInput = false;
+		stereoInputAction->setChecked(false);
+	}
+	updateBusControls();
+	updateFillRows();
+	updateModel();
+}
+
+void VSTPluginFilterGUI::fillToggleClicked(bool checked)
+{
+	fillCollapsed = !checked;
+	fillCollapsedFromPrefs = true;
+	updateFillRows();
+}
+
+void VSTPluginFilterGUI::configureSelectedChannels(std::vector<std::wstring>& selectedChannels)
+{
+	fillModel.setSelectedChannels(selectedChannels);
+	updateFillRows();
+}
+
+void VSTPluginFilterGUI::updateFillRows()
+{
+	fillModel.setContract(busContract);
+	fillModel.setFill(inputChannels, outputChannels);
+	// A single rail never folds; the toggle quietly disappears with it.
+	if (!fillModel.latchPresent())
+		fillCollapsed = false;
+	rebuildFillRow(false);
+	rebuildFillRow(true);
+	inputFillRow->setVisible(fillModel.railPresent(false));
+	outputFillRow->setVisible(fillModel.railPresent(true) && !fillCollapsed);
+}
+
+void VSTPluginFilterGUI::rebuildFillRow(bool output)
+{
+	QWidget* row = output ? outputFillRow : inputFillRow;
+	QHBoxLayout* box = static_cast<QHBoxLayout*>(row->layout());
+	while (QLayoutItem* item = box->takeAt(0))
+	{
+		if (item->widget() != nullptr)
+			item->widget()->deleteLater();
+		delete item;
+	}
+	if (!output)
+		fillToggle = nullptr;
+
+	if (!output && fillModel.latchPresent())
+	{
+		fillToggle = new QCheckBox(tr("Channel fill"), row);
+		fillToggle->setChecked(!fillCollapsed);
+		fillToggle->setToolTip(tr("Choose which channels occupy the negotiated bus slots."));
+		connect(fillToggle, &QCheckBox::toggled, this, &VSTPluginFilterGUI::fillToggleClicked);
+		box->addWidget(fillToggle);
+	}
+	else
+	{
+		box->addWidget(new QLabel(output ? tr("Output fill") : tr("Input fill"), row));
+	}
+
+	if (!fillCollapsed)
+	{
+		const int count = fillModel.slotCount(output);
+		for (int slot = 0; slot < count; slot++)
+		{
+			box->addWidget(new QLabel(QString::fromStdWString(fillModel.slotRole(output, slot)), row));
+			QComboBox* combo = new QComboBox(row);
+			combo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+			for (const std::wstring& name : fillModel.selectedChannels())
+				combo->addItem(QString::fromStdWString(name), QString::fromStdWString(name));
+			combo->addItem(output ? tr("Discard (-)") : tr("Silence (-)"), QStringLiteral("-"));
+			const QString value = QString::fromStdWString(fillModel.slotValue(output, slot));
+			int index = combo->findData(value);
+			if (index < 0)
+			{
+				// A committed channel outside the current selection stays
+				// visible (the engine would refuse it), marked in red.
+				combo->insertItem(0, value, value);
+				combo->setItemData(0, QBrush(Qt::red), Qt::ForegroundRole);
+				index = 0;
+			}
+			combo->setCurrentIndex(index);
+			connect(combo, &QComboBox::activated, this, [this, combo, output, slot](int picked)
+			{
+				fillModel.setContract(busContract);
+				fillModel.setFill(inputChannels, outputChannels);
+				fillModel.pickSlot(output, slot, combo->itemData(picked).toString().toStdWString());
+				inputChannels = fillModel.inputFill();
+				outputChannels = fillModel.outputFill();
+				updateFillRows();
+				updateModel();
+			});
+			box->addWidget(combo);
+		}
+	}
+	box->addStretch(1);
+}
+
+void VSTPluginFilterGUI::updateBusControls()
+{
+	ui->busInputComboBox->setCurrentIndex(ui->busInputComboBox->findData(
+		static_cast<int>(busContract ? busContract->input : VST3BusLayout::Auto)));
+	ui->busOutputComboBox->setCurrentIndex(ui->busOutputComboBox->findData(
+		static_cast<int>(busContract ? busContract->output : VST3BusLayout::Auto)));
+
+	// The row has no separate repair affordance, so the dropdowns stay enabled
+	// even for a loaded VST2 module; the tooltip carries the caveat instead.
+	const bool loadedVst2 = effect != nullptr && !library->isVST3();
+	const QString busToolTip = loadedVst2
+		? tr("A VST2 plugin ignores the Input and Output layouts.") : QString();
+	ui->busInputComboBox->setToolTip(busToolTip);
+	ui->busOutputComboBox->setToolTip(busToolTip);
+
+	stereoInputAction->setEnabled(!busContract);
+	stereoInputAction->setToolTip(busContract
+		? tr("Not available while Input and Output layouts are set.")
+		: tr("Use for upmixers that expand a stereo signal to multichannel."));
+}
+
 void VSTPluginFilterGUI::loadPreferences(const QVariantMap& prefs)
 {
 	autoApplyDialog = prefs.value("autoApplyDialog").toBool();
 	livePreviewAction->setChecked(prefs.value("liveAnalyzerFeed", true).toBool());
+
+	if (prefs.contains("slotFillCollapsed"))
+	{
+		fillCollapsed = prefs.value("slotFillCollapsed").toBool();
+		fillCollapsedFromPrefs = true;
+		updateFillRows();
+	}
 
 	if (prefs.value("embed").toBool())
 		// will also call initPlugin
@@ -165,6 +358,8 @@ void VSTPluginFilterGUI::storePreferences(QVariantMap& prefs)
 	prefs.insert("embed", ui->embedAction->isChecked());
 	prefs.insert("autoApplyDialog", autoApplyDialog);
 	prefs.insert("liveAnalyzerFeed", livePreviewAction->isChecked());
+	if (fillCollapsedFromPrefs)
+		prefs.insert("slotFillCollapsed", fillCollapsed);
 }
 
 void VSTPluginFilterGUI::on_openPanelButton_clicked()
@@ -289,6 +484,7 @@ void VSTPluginFilterGUI::initPlugin()
 	palette.setColor(QPalette::Inactive, QPalette::WindowText, color);
 	ui->statusLabel->setPalette(palette);
 	ui->statusLabel->setText(text);
+	updateBusControls();
 }
 
 void VSTPluginFilterGUI::on_pathLineEdit_editingFinished()

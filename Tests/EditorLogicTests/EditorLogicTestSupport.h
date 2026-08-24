@@ -88,6 +88,7 @@ void testReferenceCardDerivesSharedPresentationState();
 void testVSTBusModelMigratesAndEdits();
 void testVSTPreviewEndpointSelection();
 void testCustomThemeStoreRoundTripsTokensAndJson();
+void testVSTSlotFillModel();
 void testFilterListModel();
 void testFilterListUndo();
 void testFilterCommandCatalogRoster();

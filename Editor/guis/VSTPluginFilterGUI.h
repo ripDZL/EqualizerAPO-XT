@@ -25,8 +25,11 @@
 #include "Editor/IFilterGUI.h"
 #include "Editor/helpers/VSTPluginLivePreview.h"
 #include "Editor/helpers/VSTPreviewEndpoint.h"
+#include "Editor/widgets/cards/VSTSlotFillModel.h"
 #include "vst/VSTPluginInstance.h"
 #include "vst/VSTPluginLibrary.h"
+
+class QCheckBox;
 
 namespace Ui {
 class VSTPluginFilterGUI;
@@ -39,10 +42,12 @@ class VSTPluginFilterGUI : public IFilterGUI
 public:
 	explicit VSTPluginFilterGUI(std::shared_ptr<VSTPluginLibrary> library, const std::wstring& chunkData, const std::unordered_map<std::wstring, float>& paramMap,
 		bool stereoInput = false, const std::optional<VST3BusContract>& busContract = std::nullopt,
-		const VSTPreviewEndpoint& previewEndpoint = {});
+		const VSTPreviewEndpoint& previewEndpoint = {},
+		std::vector<std::wstring> inputChannels = {}, std::vector<std::wstring> outputChannels = {});
 	~VSTPluginFilterGUI() override;
 
 	void store(QString& command, QString& parameters) override;
+	void configureSelectedChannels(std::vector<std::wstring>& selectedChannels) override;
 	void loadPreferences(const QVariantMap& prefs) override;
 	void storePreferences(QVariantMap& prefs) override;
 	void onAutomate();
@@ -57,6 +62,8 @@ private slots:
 	void on_embedAction_toggled(bool checked);
 	void stereoInputToggled(bool checked);
 	void livePreviewToggled(bool checked);
+	void busLayoutPicked();
+	void fillToggleClicked(bool checked);
 	void on_idle();
 
 private:
@@ -64,6 +71,9 @@ private:
 	bool embedPlugin();
 	void updateLivePreview();
 	void updatePermissionWarning();
+	void updateBusControls();
+	void updateFillRows();
+	void rebuildFillRow(bool output);
 
 	std::unique_ptr<Ui::VSTPluginFilterGUI> ui;
 	std::shared_ptr<VSTPluginLibrary> library;
@@ -74,10 +84,20 @@ private:
 	bool panelDialogOpen = false;
 	bool autoApplyDialog = false;
 	bool stereoInput = false;
-	// Preserved opaquely until the dedicated Input/Output controls land.
 	std::optional<VST3BusContract> busContract;
 	VSTPreviewEndpoint previewEndpoint;
 	VSTPluginLivePreview livePreview;
+	// Per-slot channel fill for the forced layouts, edited by the two plain
+	// combo rows below the bus dropdowns. A side's list drops when that
+	// side's layout changes, because the slot count no longer matches.
+	std::vector<std::wstring> inputChannels;
+	std::vector<std::wstring> outputChannels;
+	VSTSlotFillModel fillModel;
+	bool fillCollapsed = false;
+	bool fillCollapsedFromPrefs = false;
+	QWidget* inputFillRow = nullptr;
+	QWidget* outputFillRow = nullptr;
+	QCheckBox* fillToggle = nullptr;
 	QAction* stereoInputAction = nullptr;
 	QAction* livePreviewAction = nullptr;
 	QElapsedTimer lastReadTimer;

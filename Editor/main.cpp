@@ -407,8 +407,17 @@ int main(int argc, char* argv[])
 			SkinThemeData::registerBundledFonts(true);
 		}
 
+		if (application.arguments().contains(QStringLiteral("--scroll-bench")))
+			return SkinGallery::runScrollBench();
+		if (application.arguments().contains(QStringLiteral("--power-toggle-test")))
+			return SkinGallery::runPowerToggleTest();
 		if (application.arguments().contains(QStringLiteral("--selftest-vst")))
-			return SkinGallery::runVstRoundTripSelfTest();
+		{
+			// Both halves always run so one log shows every loss at once.
+			const int roundTrip = SkinGallery::runVstRoundTripSelfTest();
+			const int fill = SkinGallery::runVstFillSelfTest();
+			return (roundTrip != 0 || fill != 0) ? 1 : 0;
+		}
 
 		if (application.arguments().contains(QStringLiteral("--theme-lab-test")))
 			return ThemeEditorDialog::runSelfTest();

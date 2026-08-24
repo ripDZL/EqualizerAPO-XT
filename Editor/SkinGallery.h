@@ -57,6 +57,26 @@ int runCardSelectionTest(const QStringList& arguments);
 // the bus contract). Lived inline in main.cpp before audit #275 B7.
 int runVstRoundTripSelfTest();
 
+// Second half of --selftest-vst: the channel-fill menus of a VST row must
+// offer the channels selected at that row in both presentations, and follow
+// a Channel row above it. Field report (v2.41.2): under the heritage
+// (LegacyRows) presentation every fill combo listed only "Silence (-)" while
+// the card path offered every device channel, so a stereo-to-5.1 upmixer
+// could not be fed from the legacy rows at all.
+int runVstFillSelfTest();
+
+// Entry point behind --power-toggle-test: the header power toggle must
+// round-trip a row's text (off adds "# ", on removes it, nothing else
+// changes) and the re-enabled row must come back as its real editor, not
+// a raw-text fallback. Field report (v2.42.x, rack): powering a gain-less
+// biquad on left the card collapsed and its body a raw fragment.
+int runPowerToggleTest();
+
+// Entry point behind --scroll-bench: per-skin wall time of wheel-sized
+// scroll steps on a maximized-width viewport, for the "rack lags when
+// maximized" report. Diagnostic, not a CI gate.
+int runScrollBench();
+
 // Entry point behind --analysis-layout-test: arms the timed probe over the
 // live MainWindow (dock geometry, right/bottom relayout, restore) and later
 // exits the event loop with the verdict. Returns false when the required

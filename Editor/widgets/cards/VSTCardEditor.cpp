@@ -43,6 +43,7 @@
 #include "ReferenceCardView.h"
 #include "FileReferenceController.h"
 #include "VSTBusStrip.h"
+#include "VSTSlotFillRail.h"
 
 using std::shared_ptr;
 using std::unordered_map;
@@ -72,10 +73,13 @@ VSTCardEditor::VSTCardEditor(shared_ptr<VSTPluginLibrary> library, const wstring
 	const unordered_map<wstring, float>& paramMap, bool stereoInput,
 	const std::optional<VST3BusContract>& busContract,
 	std::vector<std::wstring> deviceChannelNames, FilterTable* filterTable,
-	const VSTPreviewEndpoint& previewEndpoint, QWidget* parent)
+	const VSTPreviewEndpoint& previewEndpoint, QWidget* parent,
+	std::vector<std::wstring> inputChannels, std::vector<std::wstring> outputChannels)
 	: IFilterGUI(parent), library(library), chunkData(chunkData), paramMap(paramMap),
-	busModel(busContract, stereoInput), deviceChannelNames(std::move(deviceChannelNames)),
-	filterTable(filterTable), previewEndpoint(previewEndpoint)
+	busModel(busContract, stereoInput), previewEndpoint(previewEndpoint),
+	inputChannels(std::move(inputChannels)), outputChannels(std::move(outputChannels)),
+	deviceChannelNames(std::move(deviceChannelNames)),
+	filterTable(filterTable)
 {
 	setObjectName(QStringLiteral("VSTCardEditor"));
 	setAttribute(Qt::WA_StyledBackground, true);
@@ -139,6 +143,13 @@ VSTCardEditor::VSTCardEditor(shared_ptr<VSTPluginLibrary> library, const wstring
 	removeBusAction->setToolTip(tr("Deletes the saved VST3 bus layouts from this line."));
 	removeBusAction->setEnabled(false);
 	connect(removeBusAction, SIGNAL(triggered()), this, SLOT(removeBusLayouts()));
+	// The way back from an explicit channel fill to the engine's implicit
+	// first-channels default (an identity-looking fill is NOT the same
+	// thing: it changes the untargeted channels' passthrough).
+	removeFillAction = menu->addAction(tr("Remove channel fill"));
+	removeFillAction->setToolTip(tr("Deletes the saved per-slot channel lists from this line."));
+	removeFillAction->setEnabled(false);
+	connect(removeFillAction, SIGNAL(triggered()), this, SLOT(removeChannelFill()));
 	livePreviewAction = menu->addAction(tr("Live analyzer feed"));
 	livePreviewAction->setCheckable(true);
 	livePreviewAction->setChecked(true);
@@ -157,6 +168,22 @@ VSTCardEditor::VSTCardEditor(shared_ptr<VSTPluginLibrary> library, const wstring
 	busStrip->setBusLayouts(busModel.input(), busModel.output());
 	connect(busStrip, &VSTBusStrip::busLayoutsPicked, this, &VSTCardEditor::busLayoutsPicked);
 	view->placeBusStrip(busStrip);
+
+	// The channel-fill rails sandwich the reference body inside the card:
+	// the input rail under the row header, the output rail under the body.
+	// Presence follows the contract (an Auto side has no rail), the fold
+	// latch only exists while both rails do.
+	inputRail = new VSTSlotFillRail(false, this);
+	connect(inputRail, &VSTSlotFillRail::slotPicked, this,
+		[this](int slot, const QString& value) { fillSlotPicked(slot, value, false); });
+	connect(inputRail, &VSTSlotFillRail::latchToggled, this, &VSTCardEditor::fillLatchToggled);
+	root->insertWidget(0, inputRail);
+	outputRail = new VSTSlotFillRail(true, this);
+	connect(outputRail, &VSTSlotFillRail::slotPicked, this,
+		[this](int slot, const QString& value) { fillSlotPicked(slot, value, true); });
+	root->insertWidget(root->indexOf(view) + 1, outputRail);
+	fillModel.setSelectedChannels(this->deviceChannelNames);
+	fillCollapsed = this->inputChannels.empty() && this->outputChannels.empty();
 
 	frame = new QFrame(this);
 	frame->setObjectName(QStringLiteral("VSTCardEmbedFrame"));
@@ -181,6 +208,7 @@ VSTCardEditor::VSTCardEditor(shared_ptr<VSTPluginLibrary> library, const wstring
 	SkinManager::instance()->prepareCommandRow(rowInfo, nullptr, nullptr, this);
 
 	updateBusControls();
+	updateFillRails();
 	updateReferenceState();
 	updatePermissionWarning();
 }
@@ -219,6 +247,8 @@ void VSTCardEditor::store(QString& command, QString& parameters)
 	{
 		cmd.busContract = *busModel.contract();
 		cmd.hasBusContract = true;
+		cmd.inputChannels = inputChannels;
+		cmd.outputChannels = outputChannels;
 	}
 	parameters += QString::fromStdWString(cmd.serialize());
 }
@@ -227,8 +257,15 @@ void VSTCardEditor::busLayoutsPicked(VST3BusLayout input, VST3BusLayout output)
 {
 	if (busModel.contract() && busModel.input() == input && busModel.output() == output)
 		return;
+	// A changed layout invalidates that side's per-slot channel fill: the
+	// slot count no longer matches, so the stale list would fail to parse.
+	if (input != busModel.input())
+		inputChannels.clear();
+	if (output != busModel.output())
+		outputChannels.clear();
 	busModel.setLayouts(input, output);
 	updateBusControls();
+	updateFillRails();
 	updateReferenceState();
 	updateModel();
 }
@@ -238,7 +275,10 @@ void VSTCardEditor::removeBusLayouts()
 	if (!busModel.contract())
 		return;
 	busModel.clear();
+	inputChannels.clear();
+	outputChannels.clear();
 	updateBusControls();
+	updateFillRails();
 	updateReferenceState();
 	updateModel();
 }
@@ -249,10 +289,92 @@ void VSTCardEditor::livePreviewToggled(bool checked)
 	updateLivePreview();
 }
 
+void VSTCardEditor::fillSlotPicked(int slot, const QString& value, bool output)
+{
+	fillModel.setContract(busModel.contract());
+	fillModel.setFill(inputChannels, outputChannels);
+	fillModel.pickSlot(output, slot, value.toStdWString());
+	inputChannels = fillModel.inputFill();
+	outputChannels = fillModel.outputFill();
+	updateFillRails();
+	updateModel();
+}
+
+void VSTCardEditor::fillLatchToggled()
+{
+	fillCollapsed = !fillCollapsed;
+	fillCollapsedFromPrefs = true;
+	updateFillRails();
+}
+
+void VSTCardEditor::removeChannelFill()
+{
+	if (inputChannels.empty() && outputChannels.empty())
+		return;
+	inputChannels.clear();
+	outputChannels.clear();
+	updateFillRails();
+	updateModel();
+}
+
+void VSTCardEditor::configureSelectedChannels(std::vector<std::wstring>& selectedChannels)
+{
+	fillModel.setSelectedChannels(selectedChannels);
+	updateFillRails();
+}
+
+void VSTCardEditor::updateFillRails()
+{
+	fillModel.setContract(busModel.contract());
+	fillModel.setFill(inputChannels, outputChannels);
+
+	const bool latchPresent = fillModel.latchPresent();
+	// A single rail never folds; the latch quietly disappears with it.
+	if (!latchPresent)
+		fillCollapsed = false;
+
+	QStringList choices;
+	for (const std::wstring& name : fillModel.selectedChannels())
+		choices.append(QString::fromStdWString(name));
+
+	for (VSTSlotFillRail* rail : {inputRail, outputRail})
+	{
+		const bool output = rail == outputRail;
+		rail->setChannelChoices(choices);
+		QList<VSTSlotFillRail::CellData> cells;
+		const int count = fillModel.slotCount(output);
+		for (int slot = 0; slot < count; slot++)
+		{
+			VSTSlotFillRail::CellData cell;
+			cell.role = QString::fromStdWString(fillModel.slotRole(output, slot));
+			cell.value = QString::fromStdWString(fillModel.slotValue(output, slot));
+			cell.silent = fillModel.slotSilent(output, slot);
+			cell.defaulted = fillModel.sideDefaulted(output);
+			cell.missing = fillModel.slotChannelMissing(output, slot);
+			cells.append(cell);
+		}
+		rail->setCells(cells);
+		rail->setCollapsed(fillCollapsed);
+	}
+	inputRail->setLatchVisible(latchPresent);
+	inputRail->setVisible(fillModel.railPresent(false));
+	outputRail->setVisible(fillModel.railPresent(true) && !fillCollapsed);
+
+	if (removeFillAction != nullptr)
+		removeFillAction->setEnabled(!inputChannels.empty() || !outputChannels.empty());
+}
+
 void VSTCardEditor::loadPreferences(const QVariantMap& prefs)
 {
 	autoApplyDialog = prefs.value("autoApplyDialog").toBool();
 	livePreviewAction->setChecked(prefs.value("liveAnalyzerFeed", true).toBool());
+
+	if (prefs.contains("slotFillCollapsed"))
+	{
+		fillCollapsed = prefs.value("slotFillCollapsed").toBool();
+		fillCollapsedFromPrefs = true;
+		updateFillRails();
+	}
 
 	if (prefs.value("embed").toBool())
 		embedAction->setChecked(true);   // will also call initPlugin via embedToggled
@@ -267,6 +389,10 @@ void VSTCardEditor::storePreferences(QVariantMap& prefs)
 	prefs.insert("embed", embedAction->isChecked());
 	prefs.insert("autoApplyDialog", autoApplyDialog);
 	prefs.insert("liveAnalyzerFeed", livePreviewAction->isChecked());
+	// Only a fold the user actually chose is worth remembering; the default
+	// (collapsed while both sides are implicit) re-derives on load.
+	if (fillCollapsedFromPrefs)
+		prefs.insert("slotFillCollapsed", fillCollapsed);
 }
 
 void VSTCardEditor::openPanel()
@@ -886,7 +1012,8 @@ REGISTER_FILTER_CARD_EDITOR(VSTPlugin, [](FilterTable* filterTable, const QStrin
 		editor = new VSTCardEditor(filter->getLibrary(), filter->getChunkData(), filter->getParamMap(),
 			filter->getStereoInput(), filter->getBusContract(),
 			filterTable != nullptr ? filterTable->getChannelNames() : std::vector<std::wstring>(),
-			filterTable, previewEndpoint);
+			filterTable, previewEndpoint, nullptr,
+			filter->getInputChannels(), filter->getOutputChannels());
 	}
 	else
 	{

@@ -125,6 +125,20 @@ void FilterTable::updateDeviceAndChannelMask(shared_ptr<AbstractAPOInfo> selecte
 
 void FilterTable::clearRows()
 {
+	// The view stays where it was across a rebuild. Deleting every row
+	// collapses the scroll range, and the rebuilt rows used to come back with
+	// the view thrown to the top of the document - on a long document every
+	// multi-row edit, undo or skin switch cost a scroll back down to the spot
+	// being edited. Captured here, not in updateGuis(): the skin switch
+	// tears the rows down first and rebuilds later, by which time the range
+	// is already gone. Only a table that still has rows has a position
+	// worth keeping (the second teardown of that sequence finds none).
+	if (gridLayout != nullptr && scrollArea != nullptr)
+	{
+		rebuildScrollX = scrollArea->horizontalScrollBar()->value();
+		rebuildScrollY = scrollArea->verticalScrollBar()->value();
+	}
+
 	// Persist each row's GUI preferences before its widget (and the GUI it owns)
 	// is destroyed, then null the pointer so a following updateGuis() does not
 	// read a dangling gui in its own preference-save pass.
@@ -277,6 +291,28 @@ void FilterTable::updateGuis()
 
 	disableWheelForWidgets();
 
+	if (scrollArea != nullptr && (rebuildScrollX != 0 || rebuildScrollY != 0))
+	{
+		// Restore the position clearRows() kept. Children added to a visible
+		// parent are shown by Qt through a queued call, and until then the
+		// grid counts them as empty: the table's size hint is zero and so is
+		// the scroll range. Show the rows now, have the scroll area
+		// re-measure (it only does so on a layout request, normally posted
+		// later), and the old position is valid again before the first
+		// repaint.
+		for (int i = 0; i < gridLayout->count(); i++)
+		{
+			if (QWidget* cell = gridLayout->itemAt(i)->widget())
+				cell->show();
+		}
+		QEvent layoutRequest(QEvent::LayoutRequest);
+		QCoreApplication::sendEvent(scrollArea, &layoutRequest);
+		scrollArea->horizontalScrollBar()->setValue(rebuildScrollX);
+		scrollArea->verticalScrollBar()->setValue(rebuildScrollY);
+	}
+	rebuildScrollX = 0;
+	rebuildScrollY = 0;
+
 	setUpdatesEnabled(updatesWereEnabled);
 
 	qDebug("Create took %d ms (prepare %d, editor guis %d, card rows %d, add %d, channels %d, rows %d)",
@@ -285,16 +321,30 @@ void FilterTable::updateGuis()
 	update();
 }
 
+FilterTable::Item* FilterTable::insertLine(const QString& line, Item* before)
+{
+	Item* newItem = addLine(line, before);
+	insertRowAt(int(model.items().indexOf(newItem)));
+	return newItem;
+}
+
+void FilterTable::removeLine(Item* item)
+{
+	// The index is read before the model frees the item.
+	const int index = int(model.items().indexOf(item));
+	if (index < 0)
+		return;
+	removeItem(item);
+	removeRowAt(index);
+}
+
 void FilterTable::addRowActivated(AddCardRow* addCardRow)
 {
 	// Picker under the row, append, splice one widget into the grid.
 	FilterTemplate filterTemplate;
 	const QPoint anchor = addCardRow->mapToGlobal(QPoint(8, addCardRow->height() - 4));
 	if (chooseFilterTemplate(&filterTemplate, anchor))
-	{
-		addLine(filterTemplate.getLine());
-		insertRowAt(int(model.items().count()) - 1);
-	}
+		insertLine(filterTemplate.getLine(), nullptr);
 }
 
 void FilterTable::insertSeamActivated()
@@ -307,8 +357,7 @@ void FilterTable::insertSeamActivated()
 	if (chooseFilterTemplate(&filterTemplate, anchor))
 	{
 		Item* first = model.items().isEmpty() ? nullptr : model.items().first();
-		addLine(filterTemplate.getLine(), first);
-		insertRowAt(0);
+		insertLine(filterTemplate.getLine(), first);
 	}
 }
 
@@ -393,7 +442,19 @@ IFilterGUI* FilterTable::createRowGui(Item* item, const FilterCardDescriptor* pr
 	case RowGuiDecision::RawRow:
 		return nullptr;
 	case RowGuiDecision::CardEditor:
-		return FilterCardEditorFactory::create(this, factoryKey, factoryValue);
+	{
+		IFilterGUI* cardGui = FilterCardEditorFactory::create(this, factoryKey, factoryValue);
+		if (cardGui != nullptr)
+			return cardGui;
+		// The decision only says the registry answers this keyword; the
+		// shared "Filter" creator still returns nullptr on purpose for an
+		// ordinary biquad line (FilterCardEditorRouter - that nullptr is
+		// load-bearing). It has to fall through to the legacy chain like it
+		// did before the policy extraction (audit #275 B4): returning the
+		// nullptr here left every plain "Filter: ON PK/LP/NO ..." row a
+		// collapsed raw fragment with no knob editor.
+		break;
+	}
 	case RowGuiDecision::LegacyChain:
 		break;
 	}
