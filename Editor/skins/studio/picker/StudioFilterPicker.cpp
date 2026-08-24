@@ -15,6 +15,7 @@
 
 #include "Editor/SkinManager.h"
 #include "Editor/helpers/GUIHelper.h"
+#include "Editor/skins/SkinThemeData.h"
 
 namespace
 {
@@ -263,12 +264,13 @@ StudioFilterPickerView::StudioFilterPickerView(const SkinTokens& tokens, QWidget
 		" background: %1; color: %2;"
 		" border: 1px solid %3; border-top-color: %4;"
 		" border-radius: 9px; padding: 6px 10px 6px 4px;"
-		" selection-background-color: %5; selection-color: #f8fafc;"
+		" selection-background-color: %5; selection-color: %8;"
 		" font-family: \"%6\"; font-size: 10pt; }"
 		"QLineEdit#StudioPickerSearch:focus {"
 		" border: 1px solid %5; background: %7; }")
 		.arg(sunken, skinTokens.text, skinTokens.border, innerShadow,
-			skinTokens.accent, skinTokens.fontFamily, focusBackground));
+			skinTokens.accent, skinTokens.fontFamily, focusBackground,
+			SkinThemeData::selectionText(skinTokens)));
 	// Arrow keys and Return typed in the search field drive the list below,
 	// so keyboard users never have to leave the field.
 	layout->addWidget(searchEdit);

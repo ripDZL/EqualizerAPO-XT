@@ -11,7 +11,7 @@
 * {
     outline: 0;
     selection-background-color: @ACCENT@;
-    selection-color: #1A1208;
+    selection-color: @SELECTION_TEXT@;
 }
 
 QWidget {
@@ -228,7 +228,7 @@ QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox {
     border: 1px solid #060809; border-bottom-color: #39424A;
     border-radius: 2px;
     padding: 3px 8px;
-    selection-background-color: @ACCENT@; selection-color: #1A1208;
+    selection-background-color: @ACCENT@; selection-color: @SELECTION_TEXT@;
 }
 QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus, QAbstractSpinBox:focus { border: 1px solid @ACCENT@; }
 QLineEdit:disabled, QAbstractSpinBox:disabled { color: #4E4A40; background: @BG@; }
@@ -1107,7 +1107,7 @@ QLineEdit#CommentCardText {
     border-radius: 2px;
     padding: 4px 10px;
     font-weight: 700; letter-spacing: 1px;
-    selection-background-color: @ACCENT@; selection-color: #1A1208;
+    selection-background-color: @ACCENT@; selection-color: @SELECTION_TEXT@;
 }
 QLineEdit#CommentCardText:focus { border: 1px solid @ACCENT@; border-top-color: @ACCENT@; }
 /* Powered down: the tape goes matte and its lettering fades with the

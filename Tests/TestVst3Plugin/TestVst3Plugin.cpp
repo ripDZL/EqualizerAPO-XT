@@ -53,6 +53,7 @@ bool upmixerMode = false;
 bool surround41Mode = false;
 bool surround41CineOnlyMode = false;
 bool busInfoMismatchMode = false;
+bool factoryHostContextNotImplementedMode = false;
 std::atomic<int> upmixerComponentCount{0};
 std::atomic<int> upmixerProcessCount{0};
 std::atomic<unsigned long long> surround41AcceptedOutputArrangement{
@@ -1150,6 +1151,13 @@ public:
 			hostContextSet = false;
 			return kResultOk;
 		}
+		if (factoryHostContextNotImplementedMode)
+		{
+			// Some real factories do not consume this optional capability, but
+			// remain fully usable VST3 factories.
+			hostContextSet = true;
+			return kNotImplemented;
+		}
 		if (hostContextSetCount++ != 0)
 			return kResultFalse;
 		IHostApplication* host = nullptr;
@@ -1193,6 +1201,7 @@ extern "C" __declspec(dllexport) bool InitDll()
 	rejectComponentInitialize = wcsstr(modulePath, L"RejectComponent.vst3") != nullptr;
 	componentStateUnavailable = wcsstr(modulePath, L"ControllerState.vst3") != nullptr;
 	busInfoMismatchMode = wcsstr(modulePath, L"BusInfoMismatch.vst3") != nullptr;
+	factoryHostContextNotImplementedMode = wcsstr(modulePath, L"FactoryHostContextNotImplemented.vst3") != nullptr;
 	upmixerMode = wcsstr(modulePath, L"Upmixer.vst3") != nullptr || busInfoMismatchMode;
 	surround41CineOnlyMode = wcsstr(modulePath, L"Surround41CineOnly.vst3") != nullptr;
 	surround41Mode = wcsstr(modulePath, L"Surround41.vst3") != nullptr || surround41CineOnlyMode;
@@ -1221,6 +1230,7 @@ extern "C" __declspec(dllexport) bool ExitDll()
 	surround41Mode = false;
 	surround41CineOnlyMode = false;
 	busInfoMismatchMode = false;
+	factoryHostContextNotImplementedMode = false;
 	return true;
 }
 

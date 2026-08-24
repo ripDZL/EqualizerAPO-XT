@@ -14,12 +14,155 @@
 #include <QFont>
 #include <QFontDatabase>
 #include <QStyleFactory>
+#include <QtMath>
+
+#include <limits>
 
 // finishTokens; header-only, no link dependency on the skin classes.
 #include "shared/SkinSupport.h"
 
 namespace
 {
+double relativeLuminance(const QColor& color)
+{
+	if (!color.isValid())
+		return 0.0;
+
+	auto linear = [](double channel) {
+		channel /= 255.0;
+		return channel <= 0.04045
+			? channel / 12.92
+			: qPow((channel + 0.055) / 1.055, 2.4);
+	};
+	return 0.2126 * linear(color.red())
+		+ 0.7152 * linear(color.green())
+		+ 0.0722 * linear(color.blue());
+}
+
+double contrastRatioForColors(const QColor& foreground, const QColor& background)
+{
+	if (!foreground.isValid() || !background.isValid())
+		return 0.0;
+	const double lighter = qMax(relativeLuminance(foreground), relativeLuminance(background));
+	const double darker = qMin(relativeLuminance(foreground), relativeLuminance(background));
+	return (lighter + 0.05) / (darker + 0.05);
+}
+
+double minimumInkContrast(const QColor& ink, const SkinTokens& tokens)
+{
+	const QColor grounds[] = {
+		QColor(tokens.background),
+		QColor(tokens.surface),
+		QColor(tokens.card),
+		QColor(tokens.cardHover),
+		QColor(tokens.cardSelected),
+		QColor(tokens.surfaceSunken)
+	};
+	double minimum = std::numeric_limits<double>::max();
+	for (const QColor& ground : grounds)
+		minimum = qMin(minimum, contrastRatioForColors(ink, ground));
+	return minimum;
+}
+
+QString raiseOrLowerInkForReadability(const QString& token, const SkinTokens& tokens)
+{
+	const QColor original(token);
+	if (!original.isValid() || minimumInkContrast(original, tokens) >= 4.5)
+		return token;
+
+	QColor hsl = original.toHsl();
+	int hue = 0;
+	int saturation = 0;
+	int lightness = 0;
+	int alpha = 255;
+	hsl.getHsl(&hue, &saturation, &lightness, &alpha);
+
+	const int direction = tokens.dark ? 1 : -1;
+	for (int candidateLightness = lightness;
+		candidateLightness >= 0 && candidateLightness <= 255;
+		candidateLightness += direction)
+	{
+		QColor candidate;
+		candidate.setHsl(hue, saturation, candidateLightness, alpha);
+		if (minimumInkContrast(candidate, tokens) >= 4.5)
+			return candidate.name(QColor::HexRgb).toUpper();
+	}
+
+	// A custom token table can place dark and light grounds together, where no
+	// single ink can meet the floor. Built-in palettes never take this path,
+	// but keeping the original preserves the user's edit for Theme Lab to flag.
+	return token;
+}
+
+void enforceTextReadability(SkinTokens& tokens)
+{
+	// Preserve each skin's hue and hierarchy, only moving an ink's HSL
+	// lightness far enough to pass every surface it is used on. This puts the
+	// contrast repair at the shared token seam so variants cannot drift.
+	tokens.text = raiseOrLowerInkForReadability(tokens.text, tokens);
+	tokens.mutedText = raiseOrLowerInkForReadability(tokens.mutedText, tokens);
+}
+
+QString bestInkForBackground(const QString& background, const SkinTokens& tokens)
+{
+	// A selection fill needs one of the palette's already-authored inks. Do not
+	// smuggle a literal black/white fallback into a custom theme.
+	const QString candidates[] = {
+		tokens.text, tokens.background, tokens.surface, tokens.card, tokens.mutedText
+	};
+	QString best = tokens.text;
+	double bestRatio = -1.0;
+	for (const QString& candidate : candidates)
+	{
+		const double ratio = contrastRatioForColors(QColor(candidate), QColor(background));
+		if (ratio > bestRatio)
+		{
+			best = candidate;
+			bestRatio = ratio;
+		}
+	}
+	return best;
+}
+
+QString repairInkForBackground(const QString& token, const QString& background)
+{
+	const QColor original(token);
+	const QColor ground(background);
+	if (!original.isValid() || !ground.isValid()
+		|| contrastRatioForColors(original, ground) >= 4.5)
+		return token;
+
+	QColor hsl = original.toHsl();
+	int hue = 0;
+	int saturation = 0;
+	int lightness = 0;
+	int alpha = 255;
+	hsl.getHsl(&hue, &saturation, &lightness, &alpha);
+	const int direction = relativeLuminance(ground) >= 0.179 ? -1 : 1;
+	for (int candidateLightness = lightness;
+		candidateLightness >= 0 && candidateLightness <= 255;
+		candidateLightness += direction)
+	{
+		QColor candidate;
+		candidate.setHsl(hue, saturation, candidateLightness, alpha);
+		if (contrastRatioForColors(candidate, ground) >= 4.5)
+			return candidate.name(QColor::HexRgb).toUpper();
+	}
+	return token;
+}
+
+void appendReadabilityCheck(QVector<SkinThemeData::ReadabilityCheck>& checks,
+	const QString& label, const char* foregroundToken, const QString& foreground,
+	const char* backgroundToken, const QString& background)
+{
+	SkinThemeData::ReadabilityCheck check;
+	check.label = label;
+	check.foregroundToken = QString::fromLatin1(foregroundToken);
+	check.backgroundToken = QString::fromLatin1(backgroundToken);
+	check.ratio = SkinThemeData::contrastRatio(foreground, background);
+	checks.append(check);
+}
+
 // Constitution: docs/skins/studio.md
 SkinTokens studioTokens(bool dark)
 {
@@ -986,12 +1129,95 @@ void applyTokensToApplication(QApplication& app, const QString& skinId, bool dar
 
 	app.setPalette(palette(themeTokens, dark));
 	app.setStyleSheet(substituteTokens(styleSheet, themeTokens)
-		+ comboArrowOverride() + fileDialogOverride());
+		+ tooltipOverride(themeTokens) + comboArrowOverride() + fileDialogOverride());
 }
 
 SkinTokens tokens(const QString& id, bool dark)
 {
-	return entry(id).tokens(dark);
+	SkinTokens result = entry(id).tokens(dark);
+	enforceTextReadability(result);
+	return result;
+}
+
+double contrastRatio(const QString& foreground, const QString& background)
+{
+	return contrastRatioForColors(QColor(foreground), QColor(background));
+}
+
+QVector<ReadabilityCheck> readabilityChecks(const SkinTokens& tokens)
+{
+	QVector<ReadabilityCheck> checks;
+	struct Surface
+	{
+		const char* token;
+		const char* label;
+		const QString* color;
+	};
+	const Surface surfaces[] = {
+		{ "background", "window", &tokens.background },
+		{ "surface", "input surface", &tokens.surface },
+		{ "card", "card", &tokens.card },
+		{ "cardHover", "hover card", &tokens.cardHover },
+		{ "cardSelected", "selected card", &tokens.cardSelected },
+		{ "surfaceSunken", "sunken surface", &tokens.surfaceSunken }
+	};
+	for (const Surface& surface : surfaces)
+	{
+		appendReadabilityCheck(checks,
+			QStringLiteral("Text on %1").arg(QString::fromLatin1(surface.label)),
+			"text", tokens.text, surface.token, *surface.color);
+		appendReadabilityCheck(checks,
+			QStringLiteral("Muted text on %1").arg(QString::fromLatin1(surface.label)),
+			"mutedText", tokens.mutedText, surface.token, *surface.color);
+	}
+	appendReadabilityCheck(checks, QStringLiteral("Selected text on accent"),
+		"selectionText", selectionText(tokens), "accent", tokens.accent);
+	return checks;
+}
+
+bool passesReadability(const SkinTokens& tokens)
+{
+	const QVector<ReadabilityCheck> checks = readabilityChecks(tokens);
+	for (const ReadabilityCheck& check : checks)
+	{
+		if (!check.passes())
+			return false;
+	}
+	return !checks.isEmpty();
+}
+
+void repairTextReadability(SkinTokens& tokens)
+{
+	enforceTextReadability(tokens);
+}
+
+QString selectionText(const SkinTokens& tokens)
+{
+	return repairInkForBackground(bestInkForBackground(tokens.accent, tokens), tokens.accent);
+}
+
+bool modesAreDistinct(const SkinTokens& light, const SkinTokens& dark)
+{
+	if (light.dark || !dark.dark)
+		return false;
+
+	const QColor lightBackground(light.background);
+	const QColor darkBackground(dark.background);
+	if (!lightBackground.isValid() || !darkBackground.isValid())
+		return false;
+
+	// The mode split is deliberately broad: a light window must read as light
+	// and a dark window must read as dark even before its accent is noticed.
+	return relativeLuminance(lightBackground) >= 0.55
+		&& relativeLuminance(darkBackground) <= 0.20
+		&& relativeLuminance(lightBackground) - relativeLuminance(darkBackground) >= 0.45;
+}
+
+QString tooltipOverride(const SkinTokens& tokens)
+{
+	return QStringLiteral(
+		"QToolTip { background: %1; color: %2; border: 1px solid %3; }")
+		.arg(tokens.card, tokens.text, tokens.border);
 }
 
 QString qssResource(const QString& id, bool dark)
@@ -1016,6 +1242,7 @@ QString substituteTokens(QString qss, const SkinTokens& tokens)
 		{ "@CARD_HOVER@", tokens.cardHover },
 		{ "@CARD_SELECTED@", tokens.cardSelected },
 		{ "@TEXT@", tokens.text },
+		{ "@SELECTION_TEXT@", selectionText(tokens) },
 		{ "@MUTED@", tokens.mutedText },
 		{ "@BORDER@", tokens.border },
 		{ "@GRAPH@", tokens.graph },
@@ -1095,7 +1322,7 @@ QPalette palette(const SkinTokens& tokens, bool dark)
 	palette.setColor(QPalette::ToolTipBase, card);
 	palette.setColor(QPalette::ToolTipText, text);
 	palette.setColor(QPalette::Highlight, accent);
-	palette.setColor(QPalette::HighlightedText, dark ? QColor(QStringLiteral("#0c0c16")) : QColor(QStringLiteral("#ffffff")));
+	palette.setColor(QPalette::HighlightedText, QColor(selectionText(tokens)));
 	palette.setColor(QPalette::PlaceholderText, QColor(tokens.mutedText));
 	palette.setColor(QPalette::Light, card.lighter(120));
 	palette.setColor(QPalette::Midlight, card.lighter(105));

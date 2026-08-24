@@ -9,7 +9,7 @@
 * {
     outline: 0;
     selection-background-color: @ACCENT@;
-    selection-color: #f8fafc;
+    selection-color: @SELECTION_TEXT@;
 }
 
 QWidget {
@@ -145,7 +145,7 @@ QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox {
     background: #0e0e0e; color: @TEXT@;
     border: 1px solid @BORDER@; border-radius: 0;
     padding: 4px 8px;
-    selection-background-color: @ACCENT@; selection-color: #f8fafc;
+    selection-background-color: @ACCENT@; selection-color: @SELECTION_TEXT@;
 }
 QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus, QAbstractSpinBox:focus { border: 1px solid @ACCENT@; background: #0a0a0a; }
 QLineEdit:disabled, QAbstractSpinBox:disabled { color: #555555; background: #141414; }

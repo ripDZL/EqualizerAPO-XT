@@ -13,7 +13,9 @@
 class QCheckBox;
 class QComboBox;
 class QLabel;
+class QPushButton;
 class QTableWidget;
+class ThemeLabPreview;
 
 class ThemeEditorDialog : public QDialog
 {
@@ -21,6 +23,7 @@ class ThemeEditorDialog : public QDialog
 
 public:
 	explicit ThemeEditorDialog(const QString& skinId, bool dark, QWidget* parent = nullptr);
+	static int runSelfTest();
 
 signals:
 	void builtInThemeRequested(const QString& skinId, bool dark);
@@ -39,13 +42,19 @@ private slots:
 	void resetActiveTheme();
 	void copyJson();
 	void exportJson();
+	void chooseColorAt(int row, int column);
+	void chooseSelectedColor();
+	void resetSelectedColor();
+	void repairTextReadability();
 
 private:
 	QString currentSkinId() const;
+	int selectedColorRow() const;
 	SkinTokens tokensFromTable(bool* ok = nullptr) const;
 	CustomThemeStore::Theme themeFromTable(const QString& name = QString()) const;
 	QString themeJson(const CustomThemeStore::Theme& theme) const;
 	void populateTable(const SkinTokens& tokens);
+	void setTableColor(int row, const QString& color);
 	void reloadSavedThemes(const QString& selectSkinId = QString());
 	bool selectedSavedTheme(CustomThemeStore::Theme* theme) const;
 
@@ -53,5 +62,9 @@ private:
 	QCheckBox* darkCheckBox = nullptr;
 	QComboBox* savedThemeComboBox = nullptr;
 	QTableWidget* colorTable = nullptr;
-	QLabel* previewLabel = nullptr;
+	ThemeLabPreview* previewWidget = nullptr;
+	QLabel* auditLabel = nullptr;
+	QPushButton* chooseColorButton = nullptr;
+	QPushButton* resetTokenButton = nullptr;
+	QPushButton* repairTextButton = nullptr;
 };

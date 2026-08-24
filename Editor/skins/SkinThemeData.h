@@ -53,6 +53,21 @@ struct SkinEntry
 	SkinTokens (*tokens)(bool dark) = nullptr;
 };
 
+// A named foreground/background pair used by Theme Lab and the non-widget
+// logic tests. Every item is ordinary, continuously-read text, so the
+// threshold is WCAG's 4.5:1 normal-text floor rather than a decorative-control
+// contrast target.
+struct ReadabilityCheck
+{
+	QString label;
+	QString foregroundToken;
+	QString backgroundToken;
+	double ratio = 0.0;
+	double minimum = 4.5;
+
+	bool passes() const { return ratio >= minimum; }
+};
+
 // Every built-in skin, in display order.
 const QVector<SkinEntry>& roster();
 // Just the ids, in the same order.
@@ -84,6 +99,35 @@ QString resolveId(const QString& id);
 
 // The token table for a (resolved or unresolved) skin id.
 SkinTokens tokens(const QString& id, bool dark);
+
+// WCAG contrast ratio for two opaque #RRGGBB values. Invalid colours return
+// zero so imported/custom theme errors cannot accidentally pass an audit.
+double contrastRatio(const QString& foreground, const QString& background);
+
+// The text-on-surface contract shared by every built-in and custom theme.
+// Theme Lab shows these rows live; the logic suite pins all built-in pairs.
+QVector<ReadabilityCheck> readabilityChecks(const SkinTokens& tokens);
+bool passesReadability(const SkinTokens& tokens);
+
+// Ink selected from the existing palette tokens for legible text over the
+// accent selection fill. Keeping this derived avoids a hidden black/white
+// fallback that would drift from a custom palette.
+QString selectionText(const SkinTokens& tokens);
+
+// Adjust only the primary and muted ink lightness, preserving their hue, until
+// they meet the shared readability contract where a single ink can do so.
+// Theme Lab offers this as an explicit one-click repair for custom palettes.
+void repairTextReadability(SkinTokens& tokens);
+
+// A light/dark pair must have the expected mode flag and a materially
+// different window luminance. This prevents a cosmetic checkbox from silently
+// producing two near-identical presentations.
+bool modesAreDistinct(const SkinTokens& light, const SkinTokens& dark);
+
+// A token-driven fallback appended after each modern sheet and used directly
+// by the heritage layer. Keeping this in the shared theme contract prevents a
+// system tooltip from falling back to the platform's light defaults.
+QString tooltipOverride(const SkinTokens& tokens);
 
 // The ":/skins/..." QSS resource path for the id, honouring the historical
 // precision_* file names of the minimal skin.

@@ -34,5 +34,10 @@ QSize CompactToolBar::sizeHint() const
 
 void CompactToolBar::updateMaximumHeight()
 {
-	setMaximumHeight(QToolBar::sizeHint().height());
+	const int toolbarHeight = QToolBar::sizeHint().height();
+	// sizeHint() is deliberately compact so rows do not claim excess width.
+	// The vertical action stack still needs its full base-toolbar height, or
+	// Qt lays out only the first action and clips the Remove/Edit controls.
+	setMinimumHeight(toolbarHeight);
+	setMaximumHeight(toolbarHeight);
 }

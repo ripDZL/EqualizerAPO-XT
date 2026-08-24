@@ -123,6 +123,21 @@ void runVst3HostTests()
 	harness.expectTrue(library->initialize() >= 0, "Windows VST3 module lifecycle initializes before factory access");
 	harness.expectTrue(library->getFactory() != nullptr, "VST3 factory is available after module initialization");
 
+	const wstring optionalFactoryHostContextBundle = prepareBundle(directory,
+		L"FactoryHostContextNotImplementedBundle.vst3", L"FactoryHostContextNotImplemented.vst3");
+	shared_ptr<VSTPluginLibrary> optionalFactoryHostContextLibrary = optionalFactoryHostContextBundle.empty()
+		? nullptr : VSTPluginLibrary::getInstance(optionalFactoryHostContextBundle);
+	const bool optionalFactoryHostContextInitialized = optionalFactoryHostContextLibrary != nullptr
+		&& optionalFactoryHostContextLibrary->initialize() >= 0;
+	harness.expectTrue(optionalFactoryHostContextInitialized,
+		"VST3 factory remains loadable when optional factory host context is not implemented");
+	if (optionalFactoryHostContextInitialized)
+	{
+		VSTPluginInstance optionalFactoryHostContextInstance(optionalFactoryHostContextLibrary, 2);
+		harness.expectTrue(optionalFactoryHostContextInstance.initialize(),
+			"VST3 component remains usable when factory host context is not implemented");
+	}
+
 	const wstring rawVst3Module = directory + L"\\TestVst3RawModule.dll";
 	const wstring stagedVst3Module = directory + L"\\TestVst3PluginModule.vst3";
 	if (CopyFileW(stagedVst3Module.c_str(), rawVst3Module.c_str(), FALSE) != FALSE)

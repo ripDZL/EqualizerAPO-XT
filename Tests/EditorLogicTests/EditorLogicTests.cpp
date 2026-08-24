@@ -153,6 +153,9 @@ int main(int argc, char** argv)
 		testElevatedCoordinatorArgumentHasOneSpelling();
 		testTheSkinRosterIsTheOneList();
 		testSkinTokensCarryExplicitMode();
+		testEveryBuiltInThemePassesTheReadabilityContract();
+		testTooltipContractFollowsThemeTokens();
+		testThemeLabCanRepairCustomTextContrast();
 		testTokenSubstitutionOffersAnAlphaForm();
 		testEverySkinSheetResolvesAllThemeTokens();
 		testEditableValueTextUsesDisplayedDecimalFormatFirst();

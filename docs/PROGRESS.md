@@ -30,8 +30,18 @@
 - [x] Passed offscreen `Editor.exe --skin-switch-test` (120 switches).
 - [x] Built and passed `EditorLogicTests.exe` (3371 checks).
 - [x] Built and passed `HybridConvTests.exe` (1635 checks).
+- [x] Reproduced real VST3 factory-host rejection: strict `IPluginFactory3::setHostContext` handling rejected FabFilter/iZotope `kNotImplemented`; a focused red/green host test now passes (103 VST3 host checks; 1635 native checks total).
+- [x] Swept installed production VST3 libraries with the repaired loader: 79/80 pass. The old `win-rnnoise\\rnnoise.vst3` bundle is an ACL-level access-denied failure; the configured newer RNNoise bundle passes.
+- [x] Built and hash-verified the AVX-512 `Editor.exe` and `EqualizerAPO.dll`, then installed only those two files into the registered test runtime with a workspace backup. The fresh Editor VST self-test timed out at 30 seconds and is not passing evidence.
+- [x] Probed the exact FabFilter Pro-Q 4 raw VST3 module through library and component/controller initialization: it passes with 2 inputs and 2 outputs. Repaired the two AVX-512 test shortcuts that pointed at a stale sandbox profile; the Program Files shortcut remains the baseline build.
+- [x] Reproduced Qt LegacyRows toolbar clipping: only Add was visible at 33px. `CompactToolBar` now reserves its full base-toolbar height; the red/green probe shows Add, Remove, and Edit visible. Installed a hash-verified Editor-only test overlay with this repair.
 - [ ] Manually validate real VST2/VST3 analyzer movement before an integration-candidate install.
+- [ ] Manually validate that a previously failing FabFilter or iZotope VST3 adds, loads, and opens without "library could not be loaded" in the installed test overlay.
+- [ ] Manually validate FabFilter Pro-Q 4 and LegacyRows removal through the repaired `EQ APO XT AVX-512` shortcut, not the Program Files Configuration Editor.
 - [ ] Manually validate Theme Lab save/apply/import/delete and restart persistence.
+- [x] Audited 20 themes × two modes: 4.5:1 text/muted/selection, distinct light/dark grounds, modern + LegacyRows tooltips; EditorLogic 4043 and `--theme-lab-test` passed.
+- [x] Rebuilt Theme Lab with picker/reset/repair, neutral control preview, audit, and safe custom-theme fallback.
+- [ ] Manually validate the new Theme Lab readability workflow and tooltip treatment in both a LegacyRows palette and a modern theme.
 - [ ] Manually validate LegacyRows palette selection and restart persistence in an integration candidate.
 - [ ] Manually validate a VST3 bundle import and plug-in load in an integration candidate.
 - [ ] Complete the manually dispatched CI test build and manual-host-test its integration candidate before any beta promotion.

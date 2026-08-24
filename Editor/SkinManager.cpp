@@ -18,9 +18,7 @@ namespace
 {
 QString heritageStyleSheet(const SkinTokens& tokens)
 {
-	const QColor accent(tokens.accent);
-	const QString selectionText =
-		accent.isValid() && accent.lightness() > 135 ? tokens.background : tokens.surface;
+	const QString selectedInk = SkinThemeData::selectionText(tokens);
 	return QStringLiteral(
 		"QMainWindow, QWidget#centralWidget, QWidget#WindowChromeHost {"
 		" background: %1; color: %7; font-family: \"%12\"; }"
@@ -79,8 +77,9 @@ QString heritageStyleSheet(const SkinTokens& tokens)
 			tokens.mutedText,
 			tokens.accent,
 			tokens.border,
-			selectionText,
-			tokens.fontFamily);
+			selectedInk,
+			tokens.fontFamily)
+		+ SkinThemeData::tooltipOverride(tokens);
 }
 }
 
@@ -137,11 +136,21 @@ void SkinManager::applyHeritage(const QString& newSkinId, bool dark)
 	QSettings settings(QString::fromWCharArray(EDITOR_REGPATH), QSettings::NativeFormat);
 	if (CustomThemeStore::findTheme(settings, newSkinId, &customTheme))
 	{
+		const SkinTokens customTokens = CustomThemeStore::tokensForTheme(customTheme);
 		activeSkin = Skins::byId(customTheme.baseTheme);
 		renderSkinId = SkinThemeData::entry(activeSkin->id()).paintBaseId;
-		skinId = customTheme.skinId();
 		darkMode = customTheme.dark;
-		currentTokens = CustomThemeStore::tokensForTheme(customTheme);
+		if (SkinThemeData::passesReadability(customTokens))
+		{
+			skinId = customTheme.skinId();
+			currentTokens = customTokens;
+		}
+		else
+		{
+			LogFStatic(L"Ignoring unreadable saved custom theme %s", reinterpret_cast<const wchar_t*>(customTheme.skinId().utf16()));
+			skinId = activeSkin->id();
+			currentTokens = activeSkin->tokens(darkMode);
+		}
 	}
 	else
 	{
@@ -177,7 +186,11 @@ void SkinManager::applySkin(const QString& newSkinId, bool dark)
 	QSettings settings(QString::fromWCharArray(EDITOR_REGPATH), QSettings::NativeFormat);
 	CustomThemeStore::Theme customTheme;
 	const bool isCustomTheme = CustomThemeStore::findTheme(settings, newSkinId, &customTheme);
-	const QString targetSkinId = isCustomTheme ? customTheme.skinId() : Skins::byId(newSkinId)->id();
+	const SkinTokens customTokens = isCustomTheme
+		? CustomThemeStore::tokensForTheme(customTheme) : SkinTokens();
+	const bool useCustomTheme = isCustomTheme && SkinThemeData::passesReadability(customTokens);
+	const QString fallbackSkinId = isCustomTheme ? customTheme.baseTheme : newSkinId;
+	const QString targetSkinId = useCustomTheme ? customTheme.skinId() : Skins::byId(fallbackSkinId)->id();
 	const bool targetDark = isCustomTheme ? customTheme.dark : dark;
 
 	// Re-dressing the app with the identical sheet is not free: Qt re-resolves
@@ -203,19 +216,21 @@ void SkinManager::applySkin(const QString& newSkinId, bool dark)
 
 	// Skins::byId applies legacy aliases (glassy->studio, industrial->rack) and
 	// falls back to the studio skin for unknown ids.
-	if (isCustomTheme)
+	if (useCustomTheme)
 	{
 		activeSkin = Skins::byId(customTheme.baseTheme);
 		renderSkinId = SkinThemeData::entry(activeSkin->id()).paintBaseId;
 		skinId = customTheme.skinId();
 		darkMode = customTheme.dark;
-		currentTokens = CustomThemeStore::tokensForTheme(customTheme);
+		currentTokens = customTokens;
 		SkinThemeData::applyTokensToApplication(*qApp, activeSkin->id(), darkMode,
 			currentTokens, false, true);
 	}
 	else
 	{
-		activeSkin = Skins::byId(newSkinId);
+		if (isCustomTheme)
+			LogFStatic(L"Ignoring unreadable saved custom theme %s", reinterpret_cast<const wchar_t*>(customTheme.skinId().utf16()));
+		activeSkin = Skins::byId(fallbackSkinId);
 		renderSkinId = SkinThemeData::entry(activeSkin->id()).paintBaseId;
 		skinId = activeSkin->id();
 		darkMode = dark;

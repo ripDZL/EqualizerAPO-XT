@@ -9,7 +9,7 @@
 * {
     outline: 0;
     selection-background-color: @ACCENT@;
-    selection-color: #06141A;
+    selection-color: @SELECTION_TEXT@;
 }
 
 QWidget {
@@ -335,7 +335,7 @@ QAbstractSpinBox {
     border-radius: 0;
     padding: 4px 8px;
     selection-background-color: @ACCENT@;
-    selection-color: #06141A;
+    selection-color: @SELECTION_TEXT@;
 }
 QAbstractSpinBox {
     font-family: "@MONO@", "Consolas", "Malgun Gothic", monospace;

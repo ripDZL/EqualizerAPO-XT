@@ -4,6 +4,8 @@
 #include <stdexcept>
 
 #include <QDir>
+#include <QColor>
+#include <QPalette>
 #include <QSet>
 #include <QFile>
 #include <QFileInfo>
@@ -150,6 +152,73 @@ void testSkinTokensCarryExplicitMode()
 	}
 }
 
+// A skin can be stylistically different without sacrificing ordinary text
+// readability. These checks cover every built-in token table in both modes,
+// including the Legacy Rows palettes that do not load a modern QSS sheet.
+void testEveryBuiltInThemePassesTheReadabilityContract()
+{
+	for (const QString& skinId : SkinThemeData::ids())
+	{
+		const SkinTokens light = SkinThemeData::tokens(skinId, false);
+		const SkinTokens dark = SkinThemeData::tokens(skinId, true);
+		expectTrue(SkinThemeData::modesAreDistinct(light, dark),
+			QStringLiteral("%1 has visibly different light and dark window grounds").arg(skinId));
+
+		for (const SkinTokens& tokens : { light, dark })
+		{
+			const QVector<SkinThemeData::ReadabilityCheck> checks =
+				SkinThemeData::readabilityChecks(tokens);
+			requireTrue(!checks.isEmpty(),
+				QStringLiteral("%1 exposes a non-empty readability audit").arg(skinId));
+			for (const SkinThemeData::ReadabilityCheck& check : checks)
+			{
+				expectTrue(check.passes(),
+					QStringLiteral("%1 %2 %3 is %4:1 (needs %5:1)")
+						.arg(skinId, tokens.dark ? QStringLiteral("dark") : QStringLiteral("light"),
+							check.label)
+						.arg(check.ratio, 0, 'f', 2)
+						.arg(check.minimum, 0, 'f', 2));
+			}
+			expectTrue(SkinThemeData::passesReadability(tokens),
+				QStringLiteral("%1 %2 passes the aggregate readability contract")
+					.arg(skinId, tokens.dark ? QStringLiteral("dark") : QStringLiteral("light")));
+		}
+	}
+}
+
+void testTooltipContractFollowsThemeTokens()
+{
+	const SkinTokens tokens = SkinThemeData::tokens(QStringLiteral("legacy-plum"), true);
+	const QString rule = SkinThemeData::tooltipOverride(tokens);
+	expectTrue(rule.contains(tokens.card),
+		"tooltip override uses the active card colour instead of a platform default");
+	expectTrue(rule.contains(tokens.text),
+		"tooltip override uses the active text colour instead of a platform default");
+	expectTrue(rule.contains(tokens.border),
+		"tooltip override carries the active border colour");
+
+	const QPalette palette = SkinThemeData::palette(tokens, true);
+	expectTrue(palette.color(QPalette::ToolTipBase) == QColor(tokens.card),
+		"tooltip palette base follows the active card token");
+	expectTrue(palette.color(QPalette::ToolTipText) == QColor(tokens.text),
+		"tooltip palette ink follows the active text token");
+	expectTrue(palette.color(QPalette::HighlightedText) == QColor(SkinThemeData::selectionText(tokens)),
+		"selected text palette follows the readable token-derived selection ink");
+}
+
+void testThemeLabCanRepairCustomTextContrast()
+{
+	SkinTokens custom = SkinThemeData::tokens(QStringLiteral("studio"), false);
+	custom.text = QStringLiteral("#FFFFFF");
+	custom.mutedText = QStringLiteral("#FFFFFF");
+	expectFalse(SkinThemeData::passesReadability(custom),
+		"the fixture starts with white text on a light custom theme");
+
+	SkinThemeData::repairTextReadability(custom);
+	expectTrue(SkinThemeData::passesReadability(custom),
+		"Theme Lab's text repair restores the full normal-text contrast contract");
+}
+
 // The alpha form a sheet needs to hold a token at partial opacity. QSS has no
 // variables and its rgba() takes three numbers, so without this a sheet had to
 // write the palette value out by hand and a token change stopped reaching it.
@@ -160,13 +229,13 @@ void testTokenSubstitutionOffersAnAlphaForm()
 	requireTrue(accent.isValid(), "the studio accent token parses as a colour");
 
 	const QString resolved = SkinThemeData::substituteTokens(
-		QStringLiteral("QWidget { background: rgba(@ACCENT_RGB@, 0.30); color: @ACCENT@; }"), tokens);
+		QStringLiteral("QWidget { background: rgba(@ACCENT_RGB@, 0.30); color: @SELECTION_TEXT@; }"), tokens);
 
 	expectTrue(resolved.contains(QStringLiteral("rgba(%1, %2, %3, 0.30)")
 			.arg(accent.red()).arg(accent.green()).arg(accent.blue())),
 		"the alpha form expands to the token's three channels, so rgba() gets numbers");
-	expectTrue(resolved.contains(QStringLiteral("color: ") + tokens.accent),
-		"and the plain form still expands to the hex value");
+	expectTrue(resolved.contains(QStringLiteral("color: ") + SkinThemeData::selectionText(tokens)),
+		"and the selected-text form expands to the readable derived ink");
 	expectFalse(resolved.contains(QStringLiteral("_RGB")),
 		"the longer sentinel is replaced before the shorter one, or the hex value would be left with _RGB stuck to it");
 
