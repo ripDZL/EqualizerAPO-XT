@@ -1,5 +1,7 @@
 # Progress
 
+- [x] Diagnosed and corrected the modern/Legacy split-menu theme regression: the initial 18px menu face/12px chevron was too large in the live UI, so generated token QSS now uses an 8px transparent face with a 6px chevron. The focused test failed with 120 geometry assertions before the correction and passes with EditorLogicTests 4283. Legacy VST status text uses active skin tokens. Clean AVX-512 Editor rebuilt; installed visual acceptance remains open because forced-offscreen Qt crashes locally.
+- [x] Backed up the prior test Editor (`F13921F032A5BCE8DA90A197944E1F1900E4EC20E65EF0023E219502219FE22E`) and installed the compact-arrow Editor into the active per-user AVX-512 runtime; the installed hash is `6B24EFD87C122F405F37DD31312D5681A4FB8FE7F0ADE89E869B21510C095210`.
 - [x] Fetched upstream v2.39.0 (`ff9c174`).
 - [x] Evaluated a direct `beta` merge; 149 conflicts made it unsuitable.
 - [x] Created local upstream-first feature-port branch.
@@ -42,6 +44,12 @@
 - [x] Audited 20 themes × two modes: 4.5:1 text/muted/selection, distinct light/dark grounds, modern + LegacyRows tooltips; EditorLogic 4043 and `--theme-lab-test` passed.
 - [x] Rebuilt Theme Lab with picker/reset/repair, neutral control preview, audit, and safe custom-theme fallback.
 - [x] Installed hash-verified `9f12df1c` Editor-only Theme Lab overlay in the registered AVX-512 test runtime; VST DLL + Program Files untouched.
+- [x] Reproduced the post-overlay FabFilter failure from `Editor.log`; later PID attribution shows the observed rejection came from the stale Editor-side loader, not the active v2.42.2 engine.
+- [x] Rebuilt the affected `Common` VST-host code and `EqualizerAPO.dll` at AVX-512; candidate SHA-256 `3A11AB586EE7D5A2C3A6A3D87FC3744F1E501AEC82F48369FC9FA5B04A8949B7`. AVX-512 `HybridConvTests.exe` passes 1,635 checks, including VST3 factory-host-context coverage (103 checks).
+- [x] Backed up the preflight v2.42.2 engine (`52E96A...`) at `artifacts/install-backups/fabfilter-engine-avx512-20260824-144041`, swapped only the registered runtime's `EqualizerAPO.dll`, and briefly restarted Windows Audio. The new `audiodg` process confirms the AVX-512 candidate SHA-256 is loaded.
+- [x] Identified the remaining FabFilter error as the stale Editor-side VST loader: failure PID 49932 was `Editor.exe`, while active `audiodg` was PID 39572. Rebuilt and hash-verified AVX-512 `Editor.exe` (`C54ECB...FF8A8`) is installed with a backup at `artifacts/install-backups/fabfilter-editor-avx512-20260824-151810`; its `--diagnose` check exits 0. The exact Pro-Q 4 factory probe passes. Agent-session Qt graphical self-tests crash for both old and new builds and are excluded from evidence.
+- [x] Corrected the log interpretation: its leading decimal field is a thread ID. Exact library load/unload passes 12 cycles, and a temporary Editor FilterEngine probe loads the real config and Pro-Q 4 successfully. Installed the temporary tagged diagnostic Editor (`BCB4A1...EE26B`) with backup `artifacts/install-backups/fabfilter-editor-diagnostic-avx512-20260824-165026`; manual UI retry must classify or clear the live error.
+- [ ] Manually retry the same FabFilter Pro-Q 4 row; it must load without the library error and retain normal audio processing.
 - [ ] Manually validate the new Theme Lab readability workflow and tooltip treatment in both a LegacyRows palette and a modern theme.
 - [ ] Manually validate LegacyRows palette selection and restart persistence in an integration candidate.
 - [ ] Manually validate a VST3 bundle import and plug-in load in an integration candidate.

@@ -77,6 +77,7 @@ void testTheSkinRosterIsTheOneList();
 void testSkinTokensCarryExplicitMode();
 void testEveryBuiltInThemePassesTheReadabilityContract();
 void testTooltipContractFollowsThemeTokens();
+void testSplitMenuButtonsFollowThemeTokens();
 void testThemeLabCanRepairCustomTextContrast();
 void testTokenSubstitutionOffersAnAlphaForm();
 void testEverySkinSheetResolvesAllThemeTokens();

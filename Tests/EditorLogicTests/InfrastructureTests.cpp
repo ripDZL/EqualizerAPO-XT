@@ -206,6 +206,33 @@ void testTooltipContractFollowsThemeTokens()
 		"selected text palette follows the readable token-derived selection ink");
 }
 
+// MenuButtonPopup owns a separate menu-button subcontrol. The core button
+// rules do not paint that rectangle, so a missing shared override reads as a
+// black clipped strip in modern cards and an unthemed square in Legacy Rows.
+void testSplitMenuButtonsFollowThemeTokens()
+{
+	for (const QString& skinId : SkinThemeData::ids())
+	{
+		for (bool dark : { false, true })
+		{
+			const SkinTokens tokens = SkinThemeData::tokens(skinId, dark);
+			const QString rule = SkinThemeData::toolButtonMenuOverride(tokens);
+			expectTrue(rule.contains(QStringLiteral("QToolButton::menu-button")),
+				QStringLiteral("%1 %2 paints a split-menu face").arg(skinId, dark ? QStringLiteral("dark") : QStringLiteral("light")));
+			expectTrue(rule.contains(QStringLiteral("QToolButton::menu-arrow")),
+				QStringLiteral("%1 %2 supplies a visible split-menu arrow").arg(skinId, dark ? QStringLiteral("dark") : QStringLiteral("light")));
+			expectTrue(rule.contains(QStringLiteral("width: 8px")),
+				QStringLiteral("%1 %2 keeps the split-menu target compact").arg(skinId, dark ? QStringLiteral("dark") : QStringLiteral("light")));
+			expectTrue(rule.contains(QStringLiteral("width: 6px; height: 6px")),
+				QStringLiteral("%1 %2 keeps the split-menu chevron a small visual cue").arg(skinId, dark ? QStringLiteral("dark") : QStringLiteral("light")));
+			expectTrue(rule.contains(QStringLiteral("width: 8px; background: transparent; border: 0;")),
+				QStringLiteral("%1 %2 does not paint a second button face at rest").arg(skinId, dark ? QStringLiteral("dark") : QStringLiteral("light")));
+			expectTrue(rule.contains(tokens.border) && rule.contains(tokens.cardHover) && rule.contains(tokens.cardSelected),
+				QStringLiteral("%1 %2 split-menu states use only active theme tokens").arg(skinId, dark ? QStringLiteral("dark") : QStringLiteral("light")));
+		}
+	}
+}
+
 void testThemeLabCanRepairCustomTextContrast()
 {
 	SkinTokens custom = SkinThemeData::tokens(QStringLiteral("studio"), false);

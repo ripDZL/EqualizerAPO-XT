@@ -225,19 +225,22 @@ void VSTPluginFilterGUI::initPlugin()
 	if (effect != nullptr)
 		return;
 
+	const SkinTokens& skinTokens = SkinManager::instance()->tokens();
+	const QColor normalStatusColor(skinTokens.text);
+	const QColor errorStatusColor(skinTokens.danger);
 	QColor color;
 	QString text;
 	if (library->getLibPath() == L"")
 	{
 		text = tr("No file selected.");
-		color = Qt::red;
+		color = errorStatusColor;
 	}
 	else
 	{
 		int result = library->initialize();
 		if (result < 0)
 		{
-			color = Qt::red;
+			color = errorStatusColor;
 
 			switch (result)
 			{
@@ -268,14 +271,14 @@ void VSTPluginFilterGUI::initPlugin()
 				effect->setLanguage(QLocale().language() == QLocale::German ? 2 : 1);
 				effect->setAutomateFunc(bind(&VSTPluginFilterGUI::onAutomate, this));
 
-				color = Qt::black;
+				color = normalStatusColor;
 				text = QString::fromStdWString(effect->getName());
 			}
 			else
 			{
 				effect.reset();
 
-				color = Qt::red;
+				color = errorStatusColor;
 				text = tr("Plugin crashed during initialization.");
 			}
 		}
@@ -384,8 +387,9 @@ void VSTPluginFilterGUI::on_embedAction_toggled(bool checked)
 				livePreview.stop();
 
 				QPalette palette = ui->statusLabel->palette();
-				palette.setColor(QPalette::Active, QPalette::WindowText, Qt::red);
-				palette.setColor(QPalette::Inactive, QPalette::WindowText, Qt::red);
+				const QColor errorStatusColor(SkinManager::instance()->tokens().danger);
+				palette.setColor(QPalette::Active, QPalette::WindowText, errorStatusColor);
+				palette.setColor(QPalette::Inactive, QPalette::WindowText, errorStatusColor);
 				ui->statusLabel->setPalette(palette);
 				ui->statusLabel->setText(tr("Plugin could not open a native editor panel."));
 			}

@@ -79,7 +79,8 @@ QString heritageStyleSheet(const SkinTokens& tokens)
 			tokens.border,
 			selectedInk,
 			tokens.fontFamily)
-		+ SkinThemeData::tooltipOverride(tokens);
+		+ SkinThemeData::tooltipOverride(tokens)
+		+ SkinThemeData::toolButtonMenuOverride(tokens);
 }
 }
 

@@ -153,6 +153,12 @@ QPalette palette(const SkinTokens& tokens, bool dark);
 // :/icons/modern/chevron-*.svg resources.
 QString comboArrowOverride();
 
+// App-wide split-menu override appended after every sheet. A QToolButton in
+// MenuButtonPopup mode owns a separate menu-button subcontrol; without this,
+// it falls back to the platform paint path and can appear as an unthemed dark
+// sliver beside the main button. The legacy presentation uses this too.
+QString toolButtonMenuOverride(const SkinTokens& tokens);
+
 // App-wide file-dialog override appended AFTER a skin sheet, like the combo
 // arrows: the non-native QFileDialog's navigation buttons are icon-only, so
 // every sheet's text-button QToolButton padding (up to 5px 12px on soft)

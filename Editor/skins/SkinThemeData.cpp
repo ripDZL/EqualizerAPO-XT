@@ -1129,7 +1129,8 @@ void applyTokensToApplication(QApplication& app, const QString& skinId, bool dar
 
 	app.setPalette(palette(themeTokens, dark));
 	app.setStyleSheet(substituteTokens(styleSheet, themeTokens)
-		+ tooltipOverride(themeTokens) + comboArrowOverride() + fileDialogOverride());
+		+ tooltipOverride(themeTokens) + comboArrowOverride()
+		+ toolButtonMenuOverride(themeTokens) + fileDialogOverride());
 }
 
 SkinTokens tokens(const QString& id, bool dark)
@@ -1295,6 +1296,25 @@ QString comboArrowOverride()
 		"QAbstractSpinBox::down-arrow {"
 		" image: url(:/icons/modern/chevron-down.svg); width: 12px; height: 12px;"
 		" border: none; background: transparent; }");
+}
+
+QString toolButtonMenuOverride(const SkinTokens& tokens)
+{
+	// MenuButtonPopup is a split control: Qt paints its menu half independently
+	// from the QToolButton face. Every bundled modern QSS sheet deliberately
+	// suppresses the legacy indicator, so reintroduce a real, token-aware arrow
+	// and face after the sheet has loaded. Heritage (Legacy Rows) appends this
+	// same rule rather than relying on a platform-coloured fallback.
+	return QStringLiteral(
+		"QToolButton::menu-button {"
+		" subcontrol-origin: padding; subcontrol-position: top right;"
+		" width: 8px; background: transparent; border: 0; border-left: 1px solid %1; }"
+		"QToolButton::menu-button:hover { background: %2; }"
+		"QToolButton::menu-button:pressed { background: %3; }"
+		"QToolButton::menu-arrow, QToolButton::menu-indicator {"
+		" image: url(:/icons/modern/chevron-down.svg); width: 6px; height: 6px;"
+		" border: none; background: transparent; }")
+		.arg(tokens.border, tokens.cardHover, tokens.cardSelected);
 }
 
 QString fileDialogOverride()
