@@ -4,8 +4,8 @@
     EqualizerAPO-XT-Setup.exe - the auto-detect front-door installer.
 
     It detects the machine's native CPU architecture and best supported x86
-    instruction set, then downloads and runs the matching per-variant Velopack
-    Setup.exe from the latest GitHub release. The user chooses nothing.
+    instruction set, then downloads and runs the matching per-machine Velopack
+    MSI from the latest GitHub release. The user chooses nothing.
 
     Design and rationale: docs/AutoDetectInstaller.md. The short version:
       - Built as a 32-bit (x86) Win32 GUI app so one binary runs on x64 natively
@@ -14,7 +14,7 @@
         machine even under emulation, so detection is accurate from x86.
       - It does NOT touch the six per-channel Velopack packages or their
         per-channel auto-update path; it only picks which one to install.
-      - The downloaded Setup.exe is verified against the SHA256SUMS.txt asset
+      - The downloaded MSI is verified against the SHA256SUMS.txt asset
         that CI publishes to the same release: the SHA-256 of the file must
         match the asset's line before anything is launched. If the checksums
         file cannot be downloaded, does not list the asset, or the hash
@@ -33,6 +33,7 @@
 #include <winhttp.h>
 #include <bcrypt.h>      // BCrypt* SHA-256 hashing (CNG)
 #include <shellapi.h>    // CommandLineToArgvW
+#include <shlobj.h>      // SHGetKnownFolderPath / FOLDERID_ProgramFilesX64
 #include <intrin.h>      // __cpuid, __cpuidex, _xgetbv
 #include <cstdlib>       // _wcstoui64 (Content-Length)
 #include <functional>
@@ -420,11 +421,11 @@ bool readSmallFile(const std::wstring& path, std::string& outData)
     return ok;
 }
 
-// Verify the downloaded installer against the SHA256SUMS.txt asset that CI
+// Verify the downloaded installer asset against the SHA256SUMS.txt asset that CI
 // publishes to the same release. Returns true only when the checksums file
 // downloads, lists the installer, and the SHA-256 matches. outActualHash,
 // when set, receives the computed digest so the window can show it.
-bool verifySetupChecksum(const std::wstring& setupFile, const std::wstring& setupName,
+bool verifyInstallerChecksum(const std::wstring& installerFile, const std::wstring& installerName,
     std::wstring& error, std::wstring* outActualHash = nullptr)
 {
     const std::wstring sumsFile = tempFilePath(kChecksumsAssetName);
@@ -448,7 +449,7 @@ bool verifySetupChecksum(const std::wstring& setupFile, const std::wstring& setu
         return false;
     }
 
-    const std::wstring expected = expectedHashFromChecksums(text, setupName);
+    const std::wstring expected = expectedHashFromChecksums(text, installerName);
     if (expected.empty())
     {
         error = L"The release's checksums file does not list the downloaded installer.";
@@ -456,7 +457,7 @@ bool verifySetupChecksum(const std::wstring& setupFile, const std::wstring& setu
     }
 
     std::wstring actual;
-    if (!sha256OfFile(setupFile, actual, error))
+    if (!sha256OfFile(installerFile, actual, error))
         return false;
     if (outActualHash != nullptr)
         *outActualHash = actual;
@@ -469,40 +470,94 @@ bool verifySetupChecksum(const std::wstring& setupFile, const std::wstring& setu
     return true;
 }
 
-// Launch the downloaded per-variant Setup.exe. When silent, forward Velopack's
-// -s/--silent and wait so a caller knows when the install finished; otherwise
-// hand off to Velopack's own install UI and return immediately.
-bool launchSetup(const std::wstring& setupPath, bool silent, DWORD& exitCode)
+bool programFilesX64(std::wstring& outPath)
 {
-    std::wstring commandLine = L"\"" + setupPath + L"\"";
-    if (silent)
-        commandLine += L" --silent";
-
-    STARTUPINFOW startup = {};
-    startup.cb = sizeof(startup);
-    winutil::UniqueProcessInformation proc;
-
-    // CreateProcessW may modify the command-line buffer, so pass a writable copy.
-    std::wstring mutableCommand = commandLine;
-    if (!CreateProcessW(setupPath.c_str(), &mutableCommand[0], nullptr, nullptr, FALSE,
-            0, nullptr, nullptr, &startup, proc.put()))
+    PWSTR rawPath = nullptr;
+    const HRESULT result = SHGetKnownFolderPath(FOLDERID_ProgramFilesX64,
+        KF_FLAG_DEFAULT, nullptr, &rawPath);
+    if (FAILED(result) || rawPath == nullptr)
     {
+        if (rawPath != nullptr)
+            CoTaskMemFree(rawPath);
         return false;
     }
 
-    if (silent)
+    outPath = rawPath;
+    CoTaskMemFree(rawPath);
+    return !outPath.empty();
+}
+
+bool systemMsiExecPath(std::wstring& outPath)
+{
+    wchar_t systemDirectory[MAX_PATH] = {};
+    const UINT length = GetSystemDirectoryW(systemDirectory, _countof(systemDirectory));
+    if (length == 0 || length >= _countof(systemDirectory))
+        return false;
+    outPath = std::wstring(systemDirectory) + L"\\msiexec.exe";
+    return true;
+}
+
+bool quoteMsiArgument(const std::wstring& value, std::wstring& quoted)
+{
+    // Windows file names cannot contain a double quote or a line break. Keep
+    // the command line closed even if a future caller passes untrusted text.
+    if (value.empty() || value.find_first_of(L"\"\r\n") != std::wstring::npos)
+        return false;
+    quoted = L"\"" + value + L"\"";
+    return true;
+}
+
+// Launch the verified MSI through the signed system msiexec with UAC. The
+// front door itself remains asInvoker; only the package that writes below
+// Program Files requests elevation. Waiting in both modes lets the UI report
+// cancellation/failure rather than claiming success after a handoff.
+bool launchMachineInstaller(const std::wstring& msiPath, const std::wstring& installDirectory,
+    bool silent, DWORD& exitCode, std::wstring& error)
+{
+    std::wstring quotedMsi;
+    std::wstring quotedInstallDirectory;
+    std::wstring msiexecPath;
+    if (!quoteMsiArgument(msiPath, quotedMsi) ||
+        !quoteMsiArgument(installDirectory, quotedInstallDirectory) ||
+        !systemMsiExecPath(msiexecPath))
     {
-        WaitForSingleObject(proc.process(), INFINITE);
-        // Audit #250 F045: an unchecked query left exitCode uninitialized
-        // garbage, letting silent mode report success for a failed setup.
-        if (!GetExitCodeProcess(proc.process(), &exitCode))
-            return false;
-    }
-    else
-    {
-        exitCode = 0;
+        error = L"The system-wide installer could not prepare a safe Windows Installer command.";
+        return false;
     }
 
+    std::wstring parameters = L"/i " + quotedMsi +
+        L" VELOPACK_INSTALLDIR=" + quotedInstallDirectory + L" /norestart";
+    if (silent)
+        parameters += L" /qn";
+
+    SHELLEXECUTEINFOW info = {};
+    info.cbSize = sizeof(info);
+    info.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI;
+    info.lpVerb = L"runas";
+    info.lpFile = msiexecPath.c_str();
+    info.lpParameters = parameters.c_str();
+    info.nShow = silent ? SW_HIDE : SW_SHOWNORMAL;
+    if (!ShellExecuteExW(&info))
+    {
+        const DWORD gle = GetLastError();
+        error = gle == ERROR_CANCELLED
+            ? L"Administrator approval was cancelled."
+            : L"Windows Installer could not be started (Windows error " + std::to_wstring(gle) + L").";
+        return false;
+    }
+    if (info.hProcess == nullptr)
+    {
+        error = L"Windows Installer started without a process handle.";
+        return false;
+    }
+
+    winutil::UniqueHandle process(info.hProcess);
+    if (WaitForSingleObject(process.get(), INFINITE) != WAIT_OBJECT_0 ||
+        !GetExitCodeProcess(process.get(), &exitCode))
+    {
+        error = L"Windows Installer could not report the installation result.";
+        return false;
+    }
     return true;
 }
 
@@ -612,8 +667,14 @@ int runInstallFlow(InstallerUi::InstallerWindow* ui, bool silent)
         ui->update([detected](Model& model) { finishStep(model, kStepDetect, detected); });
     }
 
-    const std::wstring setupName = assetName(channel);
-    const std::wstring outFile = tempFilePath(setupName);
+    std::wstring programFiles;
+    if (!programFilesX64(programFiles))
+        return fail(kStepLaunch, kExitLaunchFailed,
+            L"The Program Files directory could not be resolved for the system-wide installation.");
+    const std::wstring installDirectory = programFiles + L"\\" + machineInstallSubdirectory(channel);
+
+    const std::wstring installerName = machineInstallerAssetName(channel);
+    const std::wstring outFile = tempFilePath(installerName);
     if (outFile.empty())
         return fail(kStepDownload, kExitDownloadFailed,
             L"No temporary directory is available for the download.");
@@ -646,7 +707,7 @@ int runInstallFlow(InstallerUi::InstallerWindow* ui, bool silent)
     };
 
     std::wstring error;
-    const DownloadOutcome downloaded = downloadToFile(assetPath(channel), outFile, error, progress);
+    const DownloadOutcome downloaded = downloadToFile(machineInstallerAssetPath(channel), outFile, error, progress);
     if (downloaded == DownloadOutcome::Canceled)
     {
         if (ui != nullptr)
@@ -669,7 +730,7 @@ int runInstallFlow(InstallerUi::InstallerWindow* ui, bool silent)
     // Check the download against the release's SHA256SUMS.txt before anything
     // is executed. A failed or impossible verification discards the download.
     std::wstring actualHash;
-    if (!verifySetupChecksum(outFile, setupName, error, &actualHash))
+    if (!verifyInstallerChecksum(outFile, installerName, error, &actualHash))
     {
         DeleteFileW(outFile.c_str());
         return fail(kStepVerify, kExitVerifyFailed, error);
@@ -682,22 +743,28 @@ int runInstallFlow(InstallerUi::InstallerWindow* ui, bool silent)
     }
 
     // Only a verified file is tagged and launched.
-    tagAsInternetDownload(outFile, downloadUrl(channel));
+    tagAsInternetDownload(outFile, machineInstallerDownloadUrl(channel));
 
     if (ui != nullptr)
-        ui->update([](Model& model) { startStep(model, kStepLaunch, L"Handing off to the Velopack installer"); });
-    DWORD setupExit = 0;
-    if (!launchSetup(outFile, silent, setupExit))
-        return fail(kStepLaunch, kExitLaunchFailed,
-            L"The downloaded installer could not be started.");
+        ui->update([](Model& model) { startStep(model, kStepLaunch, L"Requesting administrator approval for the system-wide installer"); });
+    DWORD installerExit = 0;
+    if (!launchMachineInstaller(outFile, installDirectory, silent, installerExit, error))
+        return fail(kStepLaunch, kExitLaunchFailed, error);
+    const bool restartRequired = installerExit == ERROR_SUCCESS_REBOOT_REQUIRED;
+    if (installerExit != ERROR_SUCCESS && !restartRequired)
+        return fail(kStepLaunch, static_cast<int>(installerExit),
+            L"The system-wide installation did not complete (Windows Installer exit code " +
+                std::to_wstring(installerExit) + L").");
     if (silent)
-        return static_cast<int>(setupExit);
+        return static_cast<int>(installerExit);
 
     if (ui != nullptr)
     {
-        ui->update([](Model& model)
+        ui->update([restartRequired](Model& model)
         {
-            finishStep(model, kStepLaunch, L"Velopack installer started \u2014 this window closes itself");
+            finishStep(model, kStepLaunch, restartRequired
+                ? L"System-wide installation completed; Windows reports a restart is required"
+                : L"System-wide installation completed under Program Files");
             model.completed = true;
         });
         ui->finish(kExitSuccess, 1500);
@@ -719,7 +786,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, LPWSTR, int)
     {
         int index = kAvx2;
         const std::wstring channel = detectChannel(&index);
-        return reportDetection(channel, downloadUrl(channel), outPath, index);
+        return reportDetection(channel, machineInstallerDownloadUrl(channel), outPath, index);
     }
 
     // COM is for WIC (--ui-shot) and shell handoffs; the install flow itself

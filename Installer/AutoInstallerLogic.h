@@ -50,13 +50,18 @@ std::wstring channelForCpu(const CpuFeatures& features, int* outIndex = nullptr)
 
 // Per-variant installer asset name; the shared grammar header explains the
 // doubled channel.
-std::wstring assetName(const std::wstring& channel);
+std::wstring machineInstallerAssetName(const std::wstring& channel);
 
 // Always-latest download path. GitHub redirects /releases/latest/download/<asset>
 // to the newest release's asset, so this binary never needs rebuilding per release.
 std::wstring latestAssetPath(const std::wstring& asset);
-std::wstring assetPath(const std::wstring& channel);
-std::wstring downloadUrl(const std::wstring& channel);
+std::wstring machineInstallerAssetPath(const std::wstring& channel);
+std::wstring machineInstallerDownloadUrl(const std::wstring& channel);
+
+// A relative suffix only: AutoInstaller.cpp resolves the Program Files known
+// folder at runtime. Keeping the product root distinct protects a legacy
+// C:\\Program Files\\EqualizerAPO installation from a machine-wide XT install.
+std::wstring machineInstallSubdirectory(const std::wstring& channel);
 
 // Find fileName in sha256sum-style checksum text and return its digest as
 // lowercase hex. Each line is "<64 hex chars>  <name>"; the binary-mode form

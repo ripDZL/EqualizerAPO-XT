@@ -2,8 +2,9 @@
 
 `EqualizerAPO-XT-Setup.exe` is a small front-door installer. It detects the
 machine's CPU architecture and the best supported x86 instruction set, then
-downloads and runs the matching per-variant Velopack `Setup.exe`. The user picks
-nothing; the right build installs itself.
+downloads and runs the matching per-variant, per-machine Velopack MSI. The
+user picks nothing; the right build installs under
+`C:\Program Files\EqualizerAPO-XT\<channel>`.
 
 This document records why the feature is shaped the way it is and what it does
 *not* touch, so the working release pipeline stays understandable.
@@ -65,17 +66,19 @@ variants are packaged or how each one updates itself.
    | AVX (leaf 1 ECX[28], OS YMM state) | `x64-avx` |
    | none of the above | `x64-sse2` |
 
-3. **Download the matching installer** from the latest release using GitHub's
+3. **Download the matching system-wide installer** from the latest release using GitHub's
    `…/releases/latest/download/<asset>` redirect, so the detector never needs to
    be rebuilt per release and always installs the newest build. The per-variant
-   asset name is `EqualizerAPO-XT-<channel>-<channel>-Setup.exe` (the channel
+   MSI asset name is `EqualizerAPO-XT-<channel>-<channel>.msi` (the channel
    appears twice because each variant's `packId` already contains the channel).
 4. **Verify the download** against the release's `SHA256SUMS.txt` asset before
    anything is executed. See
    [Download integrity verification](#download-integrity-verification).
-5. **Run the verified `Setup.exe`.** By default Velopack shows its normal
-   install UI for the auto-selected variant. Passing `--silent` to the detector
-   forwards `-s/--silent` to that `Setup.exe` for fully unattended installs.
+5. **Run the verified MSI through Windows Installer.** The detector asks for
+   administrator approval only at this final stage, then passes
+   `VELOPACK_INSTALLDIR=C:\Program Files\EqualizerAPO-XT\<channel>` to the
+   per-machine MSI. Passing `--silent` runs Windows Installer with `/qn` and
+   `/norestart`; it never restarts Windows itself.
    Before the launch the verified file is tagged with a browser-style
    `Zone.Identifier` stream (Mark of the Web), so the child runs with its true
    internet origin recorded instead of executing as an unmarked dropped binary.
@@ -87,15 +90,16 @@ surface (everything in-box - `d2d1`, `dwrite`, `windowscodecs`, `dwmapi` - so
 the binary keeps zero external dependencies). It renders the four stages as a
 timeline: the detected CPU and chosen channel, a real progress bar with byte
 counts taken from `Content-Length`, the computed SHA-256 prefix once the
-checksum matched, and the Velopack hand-off. Failures render in an in-window
+checksum matched, and the elevated Windows Installer hand-off. Failures render in an in-window
 error panel with an "Open releases page" button instead of a `MessageBox`.
 Closing the window mid-download cancels it (exit code 5) and deletes the
 partial file.
 
 Auxiliary modes:
 
-- `--silent` is fully headless. No window, no dialogs; errors surface only
-  through the exit code, so unattended installs can never block on UI.
+- `--silent` suppresses the detector and MSI UI, but Windows can still show its
+  UAC consent prompt unless the caller is already elevated. Errors surface
+  through the exit code, and the installer always passes `/norestart`.
 - `--ui-shot <dir>` renders every window state (detecting, downloading,
   verifying, hand-off, both error panels) as PNGs at 1x and 2x through the
   same render function the live window uses. This is the review evidence for
@@ -110,21 +114,26 @@ regardless of process bitness, so detection from x86 is accurate.
 
 ### What it deliberately does not change
 
-- The six per-channel Velopack packages (`vpk pack --packId … --channel …`) are
-  untouched.
+- The six per-channel Velopack channels and their update feeds stay intact.
+  Each now ships both the existing per-user `…-Setup.exe` and a per-machine
+  `EqualizerAPO-XT-<channel>-<channel>.msi` installer.
 - Each installed variant keeps updating itself within its own channel via the
   build-time `EAPO_UPDATE_CHANNEL` define and the background updater in
   `services/update/VelopackBootstrap`.
-- The per-variant `…-Setup.exe` files remain on the release page for users who
-  want to pick a specific build by hand.
+- The per-variant `…-Setup.exe` files remain on the release page for existing
+  per-user installs and compatibility. The per-variant MSIs are the direct,
+  system-wide choice.
+- It does not uninstall or overwrite an existing per-user XT installation, and
+  it never touches the legacy `C:\Program Files\EqualizerAPO` installation.
 
 ## Download integrity verification
 
 CI publishes a `SHA256SUMS.txt` asset to every release. It contains one line
 per asset in the standard `sha256sum` format — `<lowercase-hex-sha256>` then
-two spaces then `<filename>` — and covers at least every `…-Setup.exe` asset.
+two spaces then `<filename>` — and covers every `…-Setup.exe` and `.msi`
+installer asset.
 
-After downloading the per-variant installer, the detector
+After downloading the per-variant MSI, the detector
 
 1. downloads `SHA256SUMS.txt` through the same
    `…/releases/latest/download/<asset>` redirect,
@@ -142,15 +151,14 @@ Exit codes in normal (non-`--detect-only`) mode:
 
 | Code | Meaning |
 | --- | --- |
-| 0 | success (with `--silent`, the per-variant `Setup.exe` exit code is forwarded instead) |
+| 0 | success (with `--silent`, the MSI exit code is forwarded instead) |
 | 2 | the installer download failed |
 | 3 | the verified installer could not be started |
 | 4 | integrity verification failed |
 | 5 | the user closed the window while the download was still running |
 
-Caveat for scripts: with `--silent`, a successful launch forwards the
-per-variant `Setup.exe`'s own exit code, so a nonzero code can also originate
-from Velopack rather than from the rows above. Treat 0 as success and any
+With `--silent`, the MSI's own exit code is forwarded, so a nonzero code can
+also originate from Windows Installer rather than from the rows above. Treat 0 as success and any
 nonzero code as failure instead of branching on specific values.
 
 Both files are fetched via the `latest` redirect, so a release published
@@ -199,7 +207,9 @@ its own table, which is the loudest of these guards.
   download. It first asks `Get-PreviousInstallerAsset.ps1` whether the previous
   release's binary can be reused (see the next section); only when the
   installer's inputs changed does it build a fresh copy
-  (`/p:Platform=Win32 /p:Configuration=Release`).
+  (`/p:Platform=Win32 /p:Configuration=Release`). Each per-channel packaging
+  step also requires Velopack to produce the grammar-derived per-machine MSI;
+  a release cannot be marked complete without it.
 
 ## Defender false positives and the installer's shape
 
@@ -244,7 +254,7 @@ the detection can be checked from a script.
 
 ## Limitations
 
-- The detector and the downloaded `Setup.exe` are unsigned, like the existing
+- The detector and the downloaded MSI are unsigned, like the existing
   per-channel installers, so SmartScreen will warn on first run. The SHA-256
   verification catches corrupted or substituted downloads, but it does not
   prove publisher identity the way a code signature would.

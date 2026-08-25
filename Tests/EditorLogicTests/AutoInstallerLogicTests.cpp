@@ -57,15 +57,18 @@ void testAutoInstallerChannelMapping()
 
 void testAutoInstallerAssetGrammar()
 {
-	expectEqual(wide(assetName(L"x64-avx2")),
-		QStringLiteral("EqualizerAPO-XT-x64-avx2-x64-avx2-Setup.exe"),
-		"asset name follows the shared grammar header");
-	const QString url = wide(downloadUrl(L"arm64-neon"));
+	expectEqual(wide(machineInstallerAssetName(L"x64-avx2")),
+		QStringLiteral("EqualizerAPO-XT-x64-avx2-x64-avx2.msi"),
+		"machine installer name follows the shared grammar header");
+	expectEqual(wide(machineInstallSubdirectory(L"x64-avx2")),
+		QStringLiteral("EqualizerAPO-XT\\x64-avx2"),
+		"machine installs stay below the XT root, away from legacy EqualizerAPO");
+	const QString url = wide(machineInstallerDownloadUrl(L"arm64-neon"));
 	expectTrue(url.startsWith(QStringLiteral("https://github.com/")),
 		"download URL is absolute https");
 	expectTrue(url.endsWith(QStringLiteral(
-		"/releases/latest/download/EqualizerAPO-XT-arm64-neon-arm64-neon-Setup.exe")),
-		"download URL uses the always-latest redirect path");
+		"/releases/latest/download/EqualizerAPO-XT-arm64-neon-arm64-neon.msi")),
+		"machine installer URL uses the always-latest redirect path");
 }
 
 void testAutoInstallerChecksumParsing()

@@ -70,6 +70,7 @@ Describe "New-ReleaseChecksums.ps1" {
         $plan = & $scriptPath -Repository owner/repo -Tag v9.9.9 -WorkspaceRoot "C:\ws" -PlanOnly
         $plan.ChecksumsAssetName | Should -Be "SHA256SUMS.txt"
         $plan.SumsPath | Should -Be "C:\ws\SHA256SUMS.txt"
+        $plan.InstallerAssetPattern | Should -Be '(-Setup\.exe|\.msi)$'
     }
 
     It "writes the exact format Installer/AutoInstaller.cpp parses" {

@@ -1,5 +1,7 @@
 # TODO
 
+- [ ] Run CI Pester 5/full packaging for the per-machine MSI change, then publish a beta build and manually verify the auto-detect installer writes only under `C:\Program Files\EqualizerAPO-XT\<channel>`. Do not auto-remove the existing per-user XT install or alter legacy `C:\Program Files\EqualizerAPO`.
+
 - [x] FabFilter Pro-Q manual test works; removed temporary debug/probe instrumentation.
 - [x] User confirmed the installed clean AVX-512 Editor `6B24EFD87C122F405F37DD31312D5681A4FB8FE7F0ADE89E869B21510C095210` shows an acceptable small arrow/separator beside Browse/Options.
 - [ ] Manually verify analyzer movement with real VST2 and VST3 plug-ins before any integration-candidate install.

@@ -67,9 +67,9 @@ std::wstring channelForCpu(const CpuFeatures& features, int* outIndex)
 	return L"x64-sse2";
 }
 
-std::wstring assetName(const std::wstring& channel)
+std::wstring machineInstallerAssetName(const std::wstring& channel)
 {
-	return ReleaseAssetNames::setupAssetName(channel);
+	return ReleaseAssetNames::msiAssetName(channel);
 }
 
 std::wstring latestAssetPath(const std::wstring& asset)
@@ -78,14 +78,19 @@ std::wstring latestAssetPath(const std::wstring& asset)
 		L"/releases/latest/download/" + asset;
 }
 
-std::wstring assetPath(const std::wstring& channel)
+std::wstring machineInstallerAssetPath(const std::wstring& channel)
 {
-	return latestAssetPath(assetName(channel));
+	return latestAssetPath(machineInstallerAssetName(channel));
 }
 
-std::wstring downloadUrl(const std::wstring& channel)
+std::wstring machineInstallerDownloadUrl(const std::wstring& channel)
 {
-	return std::wstring(L"https://github.com") + assetPath(channel);
+	return std::wstring(L"https://github.com") + machineInstallerAssetPath(channel);
+}
+
+std::wstring machineInstallSubdirectory(const std::wstring& channel)
+{
+	return L"EqualizerAPO-XT\\" + channel;
 }
 
 std::wstring expectedHashFromChecksums(const std::string& text, const std::wstring& fileName)
