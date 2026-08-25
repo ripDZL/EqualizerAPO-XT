@@ -70,8 +70,17 @@ bool parseFloatToken(const wstring& token, float& value)
 		return false;
 	wchar_t* end = nullptr;
 	errno = 0;
-	value = wcstof(token.c_str(), &end);
-	return errno != ERANGE && end != token.c_str() && *end == L'\0' && std::isfinite(value);
+	const float parsed = wcstof(token.c_str(), &end);
+	if (end == token.c_str() || *end != L'\0' || errno == ERANGE)
+		return false;
+
+	value = parsed;
+	return true;
+}
+
+bool parseFiniteFloatToken(const wstring& token, float& value)
+{
+	return parseFloatToken(token, value) && std::isfinite(value);
 }
 
 bool splitChannelFill(const wstring& value, vector<wstring>& fill)
@@ -155,16 +164,12 @@ VSTPluginCommand VSTPluginCommand::parse(const wstring& /*configPath*/, const ws
 	// one grammar.
 	VSTPluginCommand cmd;
 	const vector<wstring> parts = text::splitQuoted(parameters, L' ');
-	bool sawInputKey = false;
-	bool sawOutputKey = false;
 	bool sawLayoutValue = false;
 	bool sawDanglingBusKey = false;
 	for (size_t i = 0; i < parts.size(); i += 2)
 	{
 		if (parts[i] == L"Input" || parts[i] == L"Output")
 		{
-			sawInputKey = sawInputKey || parts[i] == L"Input";
-			sawOutputKey = sawOutputKey || parts[i] == L"Output";
 			if (i + 1 < parts.size())
 			{
 				VST3BusLayout ignoredLayout;
@@ -174,11 +179,11 @@ VSTPluginCommand VSTPluginCommand::parse(const wstring& /*configPath*/, const ws
 				sawDanglingBusKey = true;
 		}
 	}
-	// Input and Output have always been legal plug-in parameter names. A single
-	// numeric parameter (for example "Output 0.5") therefore stays on the legacy
-	// path. A recognized layout value, or the presence of both reserved keys,
-	// unambiguously opts into the new contract grammar.
-	const bool hasBusKey = sawDanglingBusKey || sawLayoutValue || (sawInputKey && sawOutputKey);
+	// Input and Output have always been legal plug-in parameter names. Only a
+	// recognized layout value can unambiguously opt into the new contract
+	// grammar; numeric pairs such as "Input 0.5 Output 0.5" stay compatible
+	// plug-in parameters.
+	const bool hasBusKey = sawDanglingBusKey || sawLayoutValue;
 
 	if (hasBusKey)
 	{
@@ -309,7 +314,7 @@ VSTPluginCommand VSTPluginCommand::parse(const wstring& /*configPath*/, const ws
 					return cmd;
 				}
 				float parameterValue = 0.0f;
-				if (!parseFloatToken(value, parameterValue))
+				if (!parseFiniteFloatToken(value, parameterValue))
 				{
 					cmd.error = L"parameter \"" + key + L"\" requires a numeric value";
 					return cmd;

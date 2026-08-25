@@ -56,7 +56,8 @@
 - [ ] Complete the manually dispatched CI test build and manual-host-test its integration candidate before any beta promotion.
 - [x] Integrated exact upstream v2.42.2 locally, retaining fork VST preview/safety and theme changes alongside upstream VST3 slot-fill controls; corrected the resulting SkinGallery VST constructor call.
 - [x] v2.42.2 validation: Release Editor build, EditorLogicTests (4306), HybridConvTests (1635), and EngineOrchestrationTests (1259) pass.
-- [ ] Await user approval for a v2.42.2 runtime test install; no v2.42.2 files are installed or pushed.
+- [x] User approved and completed a v2.42.2 runtime test install; beta promotion is authorized, but upstream/main remains out of scope.
 - [x] Built the v2.42.2 AVX-512 Editor (`38E60F...622CB`) and engine (`F5A474...974CE`); a fresh AVX-512 HybridConvTests run passes 1635 checks.
 - [x] User-approved test install overlaid only the active AVX-512 runtime's Editor and engine; backup `artifacts\\install-backups\\v2422-avx512-20260824-202257`; hashes verified and Windows Audio restored.
-- [ ] Real audio-host and plugin/UI acceptance on the installed v2.42.2 candidate remains required before push.
+- [x] User reported the installed v2.42.2 candidate works and approved beta promotion.
+- [x] Reconciled beta-only VST3 bus, legacy-parser, and capture channel-mask safeguards; AVX-512 HybridConvTests (1,635) and EngineOrchestrationTests (1,259) pass.

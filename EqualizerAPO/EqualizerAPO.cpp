@@ -501,7 +501,9 @@ HRESULT EqualizerAPO::LockForProcess(UINT32 u32NumInputConnections,
 	else
 		realChannelCount = inFormat.dwSamplesPerFrame;
 
-	const unsigned channelMask = apo::resolveChannelMask(engine.isCapture(),
+	// Initialize() knows the endpoint direction before LockForProcess builds the
+	// FilterEngine, so this must use the retained setup rather than its default.
+	const unsigned channelMask = apo::resolveChannelMask(engineSetup.capture,
 		inFormat.dwChannelMask, inFormat.dwSamplesPerFrame,
 		outFormat.dwChannelMask, outFormat.dwSamplesPerFrame);
 

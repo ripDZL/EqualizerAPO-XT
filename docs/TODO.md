@@ -14,6 +14,6 @@
 - [ ] Launch the repaired `EQ APO XT AVX-512` shortcut (not the Program Files Configuration Editor), then add/load/open FabFilter Pro-Q 4. It must not report "library could not be loaded" and must retain normal audio processing. The obsolete `C:\\Program Files\\VSTPlugins\\win-rnnoise\\rnnoise.vst3` remains access-denied and is outside this fix.
 - [ ] In LegacyRows, remove a disposable row through the visible red Remove icon.
 - [ ] Manually validate the rebuilt Theme Lab in both a LegacyRows palette and a modern theme: tooltip readability, light/dark visual separation, swatch picker, reset, text-contrast repair, preview-in-app, save/apply/import/export.
-- [ ] Do not merge, install, or promote this port without user approval.
+- [x] User approved beta promotion after manually testing the v2.42.2 candidate; this does not authorize another runtime install or upstream/main promotion.
 - [x] Installed the v2.42.2 AVX-512 two-file test candidate after user approval; backup `artifacts\\install-backups\\v2422-avx512-20260824-202257`.
-- [ ] Manually verify the installed v2.42.2 candidate: FabFilter Pro-Q, VST3 slot-fill controls, LegacyRows removal, modern/light-dark theme switch, and real audio playback before any push.
+- [x] User confirmed the installed v2.42.2 candidate works and approved beta promotion.

@@ -164,6 +164,8 @@ private:
 	void releaseVST3();
 	void configureVST3Buses(int requestedChannelCount);
 	void configureVST3Buses(int requestedInputChannelCount, int requestedOutputChannelCount);
+	Steinberg::tresult setVST3MainBusArrangements(Steinberg::Vst::SpeakerArrangement inputArrangement,
+		Steinberg::Vst::SpeakerArrangement outputArrangement);
 	void applyVST3BusActivation();
 	static int semanticSpeakerArrangementCandidatesForChannelNames(const std::vector<std::wstring>& channelNames,
 		Steinberg::Vst::SpeakerArrangement* candidates);
