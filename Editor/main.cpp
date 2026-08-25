@@ -418,6 +418,8 @@ int main(int argc, char* argv[])
 			const int fill = SkinGallery::runVstFillSelfTest();
 			return (roundTrip != 0 || fill != 0) ? 1 : 0;
 		}
+		if (application.arguments().contains(QStringLiteral("--selftest-vst3-panel")))
+			return SkinGallery::runVst3PanelProbe();
 
 		if (application.arguments().contains(QStringLiteral("--theme-lab-test")))
 			return ThemeEditorDialog::runSelfTest();

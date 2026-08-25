@@ -65,6 +65,11 @@ int runVstRoundTripSelfTest();
 // could not be fed from the legacy rows at all.
 int runVstFillSelfTest();
 
+// Opt-in regression probe for a real third-party VST3 editor through both
+// LegacyRows and modern-card Open-panel actions. The plug-in path comes only
+// from EAPO_VST3_EDITOR_PANEL_PROBE, keeping normal self-tests deterministic.
+int runVst3PanelProbe();
+
 // Entry point behind --power-toggle-test: the header power toggle must
 // round-trip a row's text (off adds "# ", on removes it, nothing else
 // changes) and the re-enabled row must come back as its real editor, not

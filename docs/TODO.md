@@ -1,5 +1,7 @@
 # TODO
 
+- [ ] After approval, install the Editor-only Denoiser test build and open Bertom Denoiser Classic from both LegacyRows and a modern card. It must open/close without crashing; live analyzer feed is intentionally available only when the panel is embedded.
+
 - [ ] Manually verify published `v2.42.3-beta.1` auto-detect Setup writes only under `C:\Program Files\EqualizerAPO-XT\<channel>`. Do not auto-remove the existing per-user XT install or alter legacy `C:\Program Files\EqualizerAPO`.
 
 - [x] FabFilter Pro-Q manual test works; removed temporary debug/probe instrumentation.

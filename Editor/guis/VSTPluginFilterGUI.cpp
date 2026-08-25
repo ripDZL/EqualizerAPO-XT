@@ -87,7 +87,7 @@ VSTPluginFilterGUI::VSTPluginFilterGUI(std::shared_ptr<VSTPluginLibrary> library
 	livePreviewAction = new QAction(tr("Live analyzer feed"), this);
 	livePreviewAction->setCheckable(true);
 	livePreviewAction->setChecked(true);
-	livePreviewAction->setToolTip(tr("Feed endpoint audio into the open plugin panel so analyzer graphs can animate."));
+	livePreviewAction->setToolTip(tr("Feed endpoint audio into an embedded plugin panel so analyzer graphs can animate."));
 	connect(livePreviewAction, &QAction::toggled, this, &VSTPluginFilterGUI::livePreviewToggled);
 	menu->addAction(livePreviewAction);
 	ui->optionsButton->setMenu(menu);
@@ -684,8 +684,14 @@ bool VSTPluginFilterGUI::embedPlugin()
 
 void VSTPluginFilterGUI::updateLivePreview()
 {
+	// A pop-out native panel shares its VST instance with the controller UI.
+	// Starting the optional preview worker there can call process() while the
+	// plug-in is entering its editor session. Some VST3s (including Bertom
+	// Denoiser Classic) do not tolerate that overlap and terminate the Editor.
+	// Embedded panels retain the analyzer feed; a pop-out panel prioritizes a
+	// stable native editor.
 	livePreview.update(effect.get(), livePreviewAction != nullptr && livePreviewAction->isChecked()
-		&& (embedded || panelDialogOpen), previewEndpoint);
+		&& embedded, previewEndpoint);
 }
 
 void VSTPluginFilterGUI::updatePermissionWarning()

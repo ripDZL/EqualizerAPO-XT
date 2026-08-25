@@ -4,8 +4,9 @@
 	Editor-side live preview feed for VST plugin panels. The audio service owns
 	the real processing instances; the editor owns a separate instance for the
 	visible plug-in GUI. This helper feeds copied endpoint audio into that
-	visible instance so analyzer-style plug-in UIs can animate while the panel is
-	open, without routing the preview audio back to the device.
+	visible instance so analyzer-style plug-in UIs can animate while embedded,
+	without routing the preview audio back to the device. Pop-out native panels
+	do not run this worker because they share the controller session.
 */
 
 #pragma once

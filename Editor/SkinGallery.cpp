@@ -12,6 +12,8 @@
 #include "filters/VSTPluginFilter.h"
 #include "filters/VSTPluginFilterFactory.h"
 #include "guis/VSTPluginFilterGUI.h"
+#include "vst/VSTPluginLibrary.h"
+#include "widgets/cards/VSTCardEditor.h"
 #include "widgets/cards/VSTSlotFillRail.h"
 #include "MainWindow.h"
 #include "diagnostics/ToolbarPixelProbe.h"
@@ -29,6 +31,7 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDataStream>
+#include <QDialog>
 #include <QDir>
 #include <QElapsedTimer>
 #include <QEnterEvent>
@@ -48,6 +51,7 @@
 #include <QLocale>
 #include <QMainWindow>
 #include <QMessageBox>
+#include <QMetaObject>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMouseEvent>
@@ -2893,6 +2897,85 @@ int SkinGallery::runVstFillSelfTest()
 	}
 	fprintf(stderr, "[VST fill selftest] %s (%d failure(s))\n", failures == 0 ? "PASS" : "FAIL", failures);
 	return failures == 0 ? 0 : 1;
+}
+
+int SkinGallery::runVst3PanelProbe()
+{
+	const QString pluginPath = qEnvironmentVariable("EAPO_VST3_EDITOR_PANEL_PROBE");
+	if (pluginPath.isEmpty() || !QFileInfo::exists(pluginPath))
+	{
+		fprintf(stderr, "[VST3 panel probe] missing EAPO_VST3_EDITOR_PANEL_PROBE path\n");
+		return 2;
+	}
+
+	fprintf(stderr, "[VST3 panel probe] step=library-create\n");
+	const std::shared_ptr<VSTPluginLibrary> library = VSTPluginLibrary::getInstance(pluginPath.toStdWString());
+	if (library == nullptr || !library->isVST3() || library->initialize() < 0)
+	{
+		fprintf(stderr, "[VST3 panel probe] library initialization failed\n");
+		return 1;
+	}
+
+	// Exercise both real Open-panel actions, not merely their shared dialog.
+	// Each gets the same parent widget, state restore and idle wiring as a user
+	// click while this probe closes its modal dialog deterministically.
+	auto runPanel = [](QWidget& owner, const char* slot, const char* label, int resultBase) {
+		owner.resize(640, 480);
+		owner.show();
+		QApplication::processEvents();
+
+		QEventLoop eventLoop;
+		QPointer<QDialog> panelDialog;
+		bool invoked = false;
+		bool dialogObserved = false;
+		bool dialogAccepted = false;
+		QTimer::singleShot(0, &owner, [&owner, slot, &invoked]() {
+			invoked = QMetaObject::invokeMethod(&owner, slot, Qt::DirectConnection);
+		});
+		QTimer::singleShot(250, &owner, [&panelDialog, &dialogObserved]() {
+			panelDialog = qobject_cast<QDialog*>(QApplication::activeModalWidget());
+			dialogObserved = !panelDialog.isNull();
+		});
+		QTimer::singleShot(1500, &owner, [&panelDialog, &dialogAccepted]() {
+			QDialog* dialog = panelDialog.data();
+			if (dialog == nullptr)
+				dialog = qobject_cast<QDialog*>(QApplication::activeModalWidget());
+			if (dialog != nullptr)
+			{
+				dialogAccepted = true;
+				dialog->accept();
+			}
+		});
+		QTimer::singleShot(2100, &owner, []() {
+			if (QDialog* dialog = qobject_cast<QDialog*>(QApplication::activeModalWidget()))
+				dialog->reject();
+		});
+		QTimer::singleShot(2400, &eventLoop, &QEventLoop::quit);
+		fprintf(stderr, "[VST3 panel probe] step=%s-open-panel\n", label);
+		eventLoop.exec();
+		const bool closed = QApplication::activeModalWidget() == nullptr;
+		fprintf(stderr, "[VST3 panel probe] step=%s-panel-finished invoked=%d observed=%d accepted=%d closed=%d\n",
+			label, invoked ? 1 : 0, dialogObserved ? 1 : 0, dialogAccepted ? 1 : 0, closed ? 1 : 0);
+		owner.hide();
+		QApplication::processEvents();
+		if (!invoked)
+			return resultBase;
+		if (!dialogObserved)
+			return resultBase + 1;
+		if (!dialogAccepted)
+			return resultBase + 2;
+		return closed ? 0 : resultBase + 3;
+	};
+
+	{
+		VSTPluginFilterGUI legacy(library, std::wstring(), std::unordered_map<std::wstring, float>());
+		const int legacyResult = runPanel(legacy, "on_openPanelButton_clicked", "legacy", 10);
+		if (legacyResult != 0)
+			return legacyResult;
+	}
+
+	VSTCardEditor modern(library, std::wstring(), std::unordered_map<std::wstring, float>());
+	return runPanel(modern, "panelButtonClicked", "modern", 20);
 }
 
 int SkinGallery::runScrollBench()
