@@ -949,7 +949,7 @@ jobs:
           -Repository "${{ github.repository }}" `
           -Tag "${{ steps.version.outputs.tag }}" `
           -PackVersion "${{ steps.version.outputs.pack_version }}" `
-          -TargetCommit "${{ github.sha }}" `
+          -TargetCommit "${{ needs.version-bump.outputs.bumped_sha || github.sha }}" `
           -WorkspaceRoot "${{ github.workspace }}" `
           -MissingChannels $missingChannels `
           -NeedsSource:("${{ steps.version.outputs.needs_source }}" -eq "true")
@@ -1051,7 +1051,7 @@ jobs:
           -Tag "${{ steps.version.outputs.tag }}" `
           -PackVersion "${{ steps.version.outputs.pack_version }}" `
           -WorkflowRunId "${{ github.run_id }}" `
-          -TargetCommit "${{ github.sha }}" `
+          -TargetCommit "${{ needs.version-bump.outputs.bumped_sha || github.sha }}" `
           -OutputPath $notesPath
         if ($LASTEXITCODE -ne 0) {
           exit $LASTEXITCODE
