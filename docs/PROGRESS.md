@@ -1,6 +1,6 @@
 # Progress
 
-- [x] 2026-08-25 Denoiser Classic popup-panel repair: stopped the optional live analyzer worker for pop-out native panels, which shared the controller instance and reproduced an access violation. Embedded panels retain the feed. Exact raw-module probe covers both LegacyRows and modern cards; Release Editor build, EditorLogic 4310, and HybridConv 1635 pass. Await approved test install/manual confirmation.
+- [x] 2026-08-25 Denoiser Classic popup-panel repair: stopped the optional live analyzer worker for pop-out native panels, which shared the controller instance and reproduced an access violation. Embedded panels retain the feed. Exact raw-module probe covers both LegacyRows and modern cards; Release Editor build, EditorLogic 4310, and HybridConv 1635 pass. User-approved Editor-only test build installed; next gate is manual confirmation.
 
 - 2026-08-25: published user-approved `v2.42.3-beta.1` from `28d868ae` after green run `32857546525` (Pester 5, cppcheck, memcheck, six variants, UI gates, cross-variant comparison). The 27-asset prerelease has a verified beta-pinned universal Setup, six system-wide MSIs/update feeds/full packages, source, and SHA256SUMS; repository completeness passes. No runtime install occurred. Next gate: manually verify it installs only to `C:\Program Files\EqualizerAPO-XT\<channel>` while preserving legacy/per-user installs.
 
