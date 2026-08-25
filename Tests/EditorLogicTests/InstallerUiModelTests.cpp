@@ -24,6 +24,9 @@ QString wide(const std::wstring& text)
 
 void testInstallerUiModelStepTransitions()
 {
+	expectEqual(wide(stepTitle(kStepLaunch)), QStringLiteral("Install system-wide"),
+		"launch stage names the machine-wide installation rather than a generic handoff");
+
 	Model model;
 	for (int i = 0; i < kStepCount; i++)
 		expectTrue(model.states[i] == StepState::Pending, "steps start pending");

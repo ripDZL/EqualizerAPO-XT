@@ -18,7 +18,7 @@ const wchar_t* stepTitle(int step)
 	case kStepDetect: return L"Select build";
 	case kStepDownload: return L"Download";
 	case kStepVerify: return L"Verify integrity";
-	case kStepLaunch: return L"Start installer";
+	case kStepLaunch: return L"Install system-wide";
 	default: return L"";
 	}
 }
