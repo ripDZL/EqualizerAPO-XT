@@ -53,7 +53,7 @@
 - [ ] Manually validate the new Theme Lab readability workflow and tooltip treatment in both a LegacyRows palette and a modern theme.
 - [ ] Manually validate LegacyRows palette selection and restart persistence in an integration candidate.
 - [ ] Manually validate a VST3 bundle import and plug-in load in an integration candidate.
-- [ ] Complete the manually dispatched CI test build and manual-host-test its integration candidate before any beta promotion.
+- [x] GitHub Actions run `32795860636` passed Pester 5, cppcheck, six native variants, UI gates, packaging, and cross-variant comparison; portable prerelease `v2.42.2-beta.1` is published from tested beta commit `7b2b349c`.
 - [x] Integrated exact upstream v2.42.2 locally, retaining fork VST preview/safety and theme changes alongside upstream VST3 slot-fill controls; corrected the resulting SkinGallery VST constructor call.
 - [x] v2.42.2 validation: Release Editor build, EditorLogicTests (4306), HybridConvTests (1635), and EngineOrchestrationTests (1259) pass.
 - [x] User approved and completed a v2.42.2 runtime test install; beta promotion is authorized, but upstream/main remains out of scope.
