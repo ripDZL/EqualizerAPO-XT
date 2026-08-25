@@ -16,4 +16,4 @@
 - [ ] Manually validate the rebuilt Theme Lab in both a LegacyRows palette and a modern theme: tooltip readability, light/dark visual separation, swatch picker, reset, text-contrast repair, preview-in-app, save/apply/import/export.
 - [x] User approved beta promotion after manually testing the v2.42.2 candidate; this does not authorize another runtime install or upstream/main promotion.
 - [x] Installed the v2.42.2 AVX-512 two-file test candidate after user approval; backup `artifacts\\install-backups\\v2422-avx512-20260824-202257`.
-- [x] User confirmed the installed v2.42.2 candidate works and approved beta promotion.
+- [x] User confirmed the installed v2.42.2 candidate works; the reconciled release is published to `origin/beta` at `76717818`.

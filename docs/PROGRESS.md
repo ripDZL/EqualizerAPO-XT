@@ -59,5 +59,5 @@
 - [x] User approved and completed a v2.42.2 runtime test install; beta promotion is authorized, but upstream/main remains out of scope.
 - [x] Built the v2.42.2 AVX-512 Editor (`38E60F...622CB`) and engine (`F5A474...974CE`); a fresh AVX-512 HybridConvTests run passes 1635 checks.
 - [x] User-approved test install overlaid only the active AVX-512 runtime's Editor and engine; backup `artifacts\\install-backups\\v2422-avx512-20260824-202257`; hashes verified and Windows Audio restored.
-- [x] User reported the installed v2.42.2 candidate works and approved beta promotion.
+- [x] User reported the installed v2.42.2 candidate works; the reconciled release is published to `origin/beta` at `76717818`.
 - [x] Reconciled beta-only VST3 bus, legacy-parser, and capture channel-mask safeguards; AVX-512 HybridConvTests (1,635) and EngineOrchestrationTests (1,259) pass.
