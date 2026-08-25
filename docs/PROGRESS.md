@@ -58,3 +58,5 @@
 - [x] v2.42.2 validation: Release Editor build, EditorLogicTests (4306), HybridConvTests (1635), and EngineOrchestrationTests (1259) pass.
 - [ ] Await user approval for a v2.42.2 runtime test install; no v2.42.2 files are installed or pushed.
 - [x] Built the v2.42.2 AVX-512 Editor (`38E60F...622CB`) and engine (`F5A474...974CE`); a fresh AVX-512 HybridConvTests run passes 1635 checks.
+- [x] User-approved test install overlaid only the active AVX-512 runtime's Editor and engine; backup `artifacts\\install-backups\\v2422-avx512-20260824-202257`; hashes verified and Windows Audio restored.
+- [ ] Real audio-host and plugin/UI acceptance on the installed v2.42.2 candidate remains required before push.

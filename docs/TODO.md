@@ -15,4 +15,5 @@
 - [ ] In LegacyRows, remove a disposable row through the visible red Remove icon.
 - [ ] Manually validate the rebuilt Theme Lab in both a LegacyRows palette and a modern theme: tooltip readability, light/dark visual separation, swatch picker, reset, text-contrast repair, preview-in-app, save/apply/import/export.
 - [ ] Do not merge, install, or promote this port without user approval.
-- [ ] With approval, install the v2.42.2 test candidate and manually verify FabFilter Pro-Q, VST3 slot-fill controls, LegacyRows removal, and a modern/light-dark theme switch before any push.
+- [x] Installed the v2.42.2 AVX-512 two-file test candidate after user approval; backup `artifacts\\install-backups\\v2422-avx512-20260824-202257`.
+- [ ] Manually verify the installed v2.42.2 candidate: FabFilter Pro-Q, VST3 slot-fill controls, LegacyRows removal, modern/light-dark theme switch, and real audio playback before any push.
