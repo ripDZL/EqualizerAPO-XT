@@ -56,7 +56,7 @@
 - [x] GitHub Actions run `32795860636` passed Pester 5, cppcheck, six native variants, UI gates, packaging, and cross-variant comparison; portable prerelease `v2.42.2-beta.1` is published from tested beta commit `7b2b349c`.
 - [x] Integrated exact upstream v2.42.2 locally, retaining fork VST preview/safety and theme changes alongside upstream VST3 slot-fill controls; corrected the resulting SkinGallery VST constructor call.
 - [x] v2.42.2 validation: Release Editor build, EditorLogicTests (4306), HybridConvTests (1635), and EngineOrchestrationTests (1259) pass.
-- [x] User approved and completed a v2.42.2 runtime test install; beta promotion is authorized, but upstream/main remains out of scope.
+- [x] User approved and completed a v2.42.2 runtime test install, validated the green beta build, and authorized promotion to main.
 - [x] Built the v2.42.2 AVX-512 Editor (`38E60F...622CB`) and engine (`F5A474...974CE`); a fresh AVX-512 HybridConvTests run passes 1635 checks.
 - [x] User-approved test install overlaid only the active AVX-512 runtime's Editor and engine; backup `artifacts\\install-backups\\v2422-avx512-20260824-202257`; hashes verified and Windows Audio restored.
 - [x] User reported the installed v2.42.2 candidate works; the reconciled release is published to `origin/beta` at `76717818`.
