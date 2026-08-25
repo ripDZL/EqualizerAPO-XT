@@ -16,5 +16,6 @@
 - [ ] In LegacyRows, remove a disposable row through the visible red Remove icon.
 - [ ] Manually validate the rebuilt Theme Lab in both a LegacyRows palette and a modern theme: tooltip readability, light/dark visual separation, swatch picker, reset, text-contrast repair, preview-in-app, save/apply/import/export.
 - [x] User approved beta and main promotion after manually testing the v2.42.2 candidate and reviewing the green beta build; the stable main pipeline is authorized.
+- [ ] Rerun the main stable pipeline after the prerelease-promotion gate repair; require its Pester 5, full matrix, and release jobs to pass.
 - [x] Installed the v2.42.2 AVX-512 two-file test candidate after user approval; backup `artifacts\\install-backups\\v2422-avx512-20260824-202257`.
 - [x] User confirmed the installed v2.42.2 candidate works; the reconciled release is published to `origin/beta` at `76717818`.

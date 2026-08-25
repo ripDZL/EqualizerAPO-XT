@@ -14,14 +14,18 @@ function Invoke-Git {
 # file whose header claims it is written exactly once - now true again).
 . (Join-Path $PSScriptRoot "Get-VersionPart.ps1")
 
-function Get-BumpKind {
+function Get-LastVersionTag {
   $lastTag = ""
   try {
     $lastTag = (& Invoke-Git describe --tags --match "v[0-9]*" --abbrev=0 2>$null)
   } catch {
     $lastTag = ""
   }
+  return $lastTag
+}
 
+function Get-BumpKind {
+  param([string]$LastTag)
   $range = if ([string]::IsNullOrWhiteSpace($lastTag)) { "HEAD" } else { "$lastTag..HEAD" }
   $messages = @(& Invoke-Git log --format=%B $range)
   $joined = ($messages -join "`n")
@@ -58,10 +62,30 @@ $major = Get-VersionPart "MAJOR" $lines
 $minor = Get-VersionPart "MINOR" $lines
 $revision = Get-VersionPart "REVISION" $lines
 
-$bumpKind = Get-BumpKind
+$lastTag = Get-LastVersionTag
+$bumpKind = Get-BumpKind -LastTag $lastTag
 $currentVersion = "$major.$minor.$revision"
 
-if ($bumpKind -eq "none") {
+# A portable beta is tagged with the version that will become stable, while
+# version.h remains at the preceding development version. If main contains
+# only docs after that prerelease, the old range calculation saw no fix/feat
+# and skipped the stable release entirely. Promote a newer prerelease base
+# before applying any post-beta Conventional Commit bump.
+$promotingPrerelease = $false
+if ($lastTag -match '^v(?<tagMajor>\d+)\.(?<tagMinor>\d+)\.(?<tagRevision>\d+)-[0-9A-Za-z][0-9A-Za-z.-]*$') {
+  $tagMajor = [int]$Matches.tagMajor
+  $tagMinor = [int]$Matches.tagMinor
+  $tagRevision = [int]$Matches.tagRevision
+  $tagIsNewer = ($tagMajor -gt $major) -or (($tagMajor -eq $major) -and (($tagMinor -gt $minor) -or (($tagMinor -eq $minor) -and ($tagRevision -gt $revision))))
+  if ($tagIsNewer) {
+    $major = $tagMajor
+    $minor = $tagMinor
+    $revision = $tagRevision
+    $promotingPrerelease = $true
+  }
+}
+
+if ($bumpKind -eq "none" -and -not $promotingPrerelease) {
   if ($Check) {
     Write-Host "No version-affecting commits since the last release; version stays at $currentVersion"
     exit 0
@@ -99,9 +123,17 @@ $nextLines = foreach ($line in $lines) {
 
 $nextVersion = "$major.$minor.$revision"
 if ($Check) {
-  Write-Host "Next $bumpKind version would be $nextVersion"
+  if ($promotingPrerelease -and $bumpKind -eq "none") {
+    Write-Host "Next prerelease promotion version would be $nextVersion"
+  } else {
+    Write-Host "Next $bumpKind version would be $nextVersion"
+  }
   exit 0
 }
 
 Set-Content -Path $VersionHeader -Value $nextLines -Encoding ASCII
-Write-Host "Bumped $VersionHeader to $nextVersion using $bumpKind rule"
+if ($promotingPrerelease -and $bumpKind -eq "none") {
+  Write-Host "Promoted prerelease $lastTag to stable version $nextVersion"
+} else {
+  Write-Host "Bumped $VersionHeader to $nextVersion using $bumpKind rule"
+}

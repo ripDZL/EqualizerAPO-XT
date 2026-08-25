@@ -61,3 +61,4 @@
 - [x] User-approved test install overlaid only the active AVX-512 runtime's Editor and engine; backup `artifacts\\install-backups\\v2422-avx512-20260824-202257`; hashes verified and Windows Audio restored.
 - [x] User reported the installed v2.42.2 candidate works; the reconciled release is published to `origin/beta` at `76717818`.
 - [x] Reconciled beta-only VST3 bus, legacy-parser, and capture channel-mask safeguards; AVX-512 HybridConvTests (1,635) and EngineOrchestrationTests (1,259) pass.
+- [x] Repaired the release gate: a newer nearest prerelease base now promotes `version.h` even when only docs commits follow it. An origin-only replay changes `2.42.1` to `2.42.2`; Pester 5/full-release CI is pending.
