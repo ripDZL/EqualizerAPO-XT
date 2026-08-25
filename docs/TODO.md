@@ -1,6 +1,6 @@
 # TODO
 
-- [ ] With explicit approval, publish a beta test release and manually verify its auto-detect installer writes only under `C:\Program Files\EqualizerAPO-XT\<channel>`. Core MSI commit `440bab7e` passed full CI run `32844223431`; the UI-only beta follow-up `687b14fa` passed local native/visual verification. Do not auto-remove the existing per-user XT install or alter legacy `C:\Program Files\EqualizerAPO`.
+- [ ] Finish fresh CI for the fork-route/prerelease-tag repair, publish approved `v2.42.3-beta.1`, then manually verify its auto-detect installer writes only under `C:\Program Files\EqualizerAPO-XT\<channel>`. Do not auto-remove the existing per-user XT install or alter legacy `C:\Program Files\EqualizerAPO`.
 
 - [x] FabFilter Pro-Q manual test works; removed temporary debug/probe instrumentation.
 - [x] User confirmed the installed clean AVX-512 Editor `6B24EFD87C122F405F37DD31312D5681A4FB8FE7F0ADE89E869B21510C095210` shows an acceptable small arrow/separator beside Browse/Options.

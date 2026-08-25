@@ -2,7 +2,7 @@
 
 EqualizerAPO-XT publishes installers through the Velopack release job in GitHub Actions. Each channel emits `releases.x64-avx2.json`, `EqualizerAPO-XT-x64-avx2-...-full.nupkg`, the compatibility per-user `...-Setup.exe`, and a per-machine `EqualizerAPO-XT-<channel>-<channel>.msi`.
 
-`UpdateChecker.exe` checks the latest GitHub Release for `115dkk/EqualizerAPO-XT` instead of the upstream SourceForge version endpoint. Its `-a` automatic mode keeps the 24 hour check throttle and respects the locally skipped version. Note (audit #250 F073): nothing registers a logon scheduled task for it anymore - that registration left with the NSIS installer. Automatic checking today is the Editor's in-app Velopack update; UpdateChecker is a manual discovery/notification tool until a logon check is deliberately reintroduced.
+`UpdateChecker.exe` checks the latest GitHub Release for `ripDZL/EqualizerAPO-XT` instead of the upstream SourceForge version endpoint. Its `-a` automatic mode keeps the 24 hour check throttle and respects the locally skipped version. Note (audit #250 F073): nothing registers a logon scheduled task for it anymore - that registration left with the NSIS installer. Automatic checking today is the Editor's in-app Velopack update; UpdateChecker is a manual discovery/notification tool until a logon check is deliberately reintroduced.
 
 The update flow is:
 

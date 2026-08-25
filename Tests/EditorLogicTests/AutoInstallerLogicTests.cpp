@@ -64,11 +64,19 @@ void testAutoInstallerAssetGrammar()
 		QStringLiteral("EqualizerAPO-XT\\x64-avx2"),
 		"machine installs stay below the XT root, away from legacy EqualizerAPO");
 	const QString url = wide(machineInstallerDownloadUrl(L"arm64-neon"));
-	expectTrue(url.startsWith(QStringLiteral("https://github.com/")),
-		"download URL is absolute https");
-	expectTrue(url.endsWith(QStringLiteral(
-		"/releases/latest/download/EqualizerAPO-XT-arm64-neon-arm64-neon.msi")),
-		"machine installer URL uses the always-latest redirect path");
+	expectEqual(url,
+		QStringLiteral("https://github.com/ripDZL/EqualizerAPO-XT/releases/latest/download/EqualizerAPO-XT-arm64-neon-arm64-neon.msi"),
+		"stable installer URL stays on this fork and uses the latest redirect");
+	expectEqual(wide(releasePageUrl()),
+		QStringLiteral("https://github.com/ripDZL/EqualizerAPO-XT/releases/latest"),
+		"stable error UI points to this fork's latest page");
+	const QString betaUrl = wide(machineInstallerDownloadUrl(L"arm64-neon", L"v2.42.3-beta.1"));
+	expectEqual(betaUrl,
+		QStringLiteral("https://github.com/ripDZL/EqualizerAPO-XT/releases/download/v2.42.3-beta.1/EqualizerAPO-XT-arm64-neon-arm64-neon.msi"),
+		"beta installer URL stays on this fork and pins the prerelease tag");
+	expectEqual(wide(releasePageUrl(L"v2.42.3-beta.1")),
+		QStringLiteral("https://github.com/ripDZL/EqualizerAPO-XT/releases/tag/v2.42.3-beta.1"),
+		"beta error UI points to the matching prerelease page");
 }
 
 void testAutoInstallerChecksumParsing()

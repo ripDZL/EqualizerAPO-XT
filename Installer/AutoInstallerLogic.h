@@ -55,8 +55,12 @@ std::wstring machineInstallerAssetName(const std::wstring& channel);
 // Always-latest download path. GitHub redirects /releases/latest/download/<asset>
 // to the newest release's asset, so this binary never needs rebuilding per release.
 std::wstring latestAssetPath(const std::wstring& asset);
-std::wstring machineInstallerAssetPath(const std::wstring& channel);
-std::wstring machineInstallerDownloadUrl(const std::wstring& channel);
+// A nonempty releaseTag pins a prerelease instead of using GitHub's stable-only
+// latest redirect. This makes beta test installers resolve their own assets.
+std::wstring releaseAssetPath(const std::wstring& asset, const std::wstring& releaseTag = std::wstring());
+std::wstring releasePageUrl(const std::wstring& releaseTag = std::wstring());
+std::wstring machineInstallerAssetPath(const std::wstring& channel, const std::wstring& releaseTag = std::wstring());
+std::wstring machineInstallerDownloadUrl(const std::wstring& channel, const std::wstring& releaseTag = std::wstring());
 
 // A relative suffix only: AutoInstaller.cpp resolves the Program Files known
 // folder at runtime. Keeping the product root distinct protects a legacy

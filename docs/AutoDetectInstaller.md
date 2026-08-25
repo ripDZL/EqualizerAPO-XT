@@ -66,9 +66,11 @@ variants are packaged or how each one updates itself.
    | AVX (leaf 1 ECX[28], OS YMM state) | `x64-avx` |
    | none of the above | `x64-sse2` |
 
-3. **Download the matching system-wide installer** from the latest release using GitHub's
-   `…/releases/latest/download/<asset>` redirect, so the detector never needs to
-   be rebuilt per release and always installs the newest build. The per-variant
+3. **Download the matching system-wide installer.** Stable installers use GitHub's
+   `…/releases/latest/download/<asset>` redirect, so they never need to be
+   rebuilt per release and always install the newest stable build. A beta installer
+   is built with `InstallerReleaseTag` and pins `…/releases/download/<tag>/<asset>`,
+   because GitHub's `latest` redirect deliberately excludes prereleases. The per-variant
    MSI asset name is `EqualizerAPO-XT-<channel>-<channel>.msi` (the channel
    appears twice because each variant's `packId` already contains the channel).
 4. **Verify the download** against the release's `SHA256SUMS.txt` asset before
@@ -135,8 +137,8 @@ installer asset.
 
 After downloading the per-variant MSI, the detector
 
-1. downloads `SHA256SUMS.txt` through the same
-   `…/releases/latest/download/<asset>` redirect,
+1. downloads `SHA256SUMS.txt` through the same stable/latest or beta-pinned
+   release route as the MSI,
 2. finds the line whose file name matches the downloaded asset (the name
    comparison ignores ASCII case, and the `sha256sum -b` binary-mode form
    `<hash> *<name>` is accepted too), and
@@ -161,9 +163,10 @@ With `--silent`, the MSI's own exit code is forwarded, so a nonzero code can
 also originate from Windows Installer rather than from the rows above. Treat 0 as success and any
 nonzero code as failure instead of branching on specific values.
 
-Both files are fetched via the `latest` redirect, so a release published
+Stable files are fetched via the `latest` redirect, so a release published
 between the two downloads can cause a one-off mismatch; running the installer
-again resolves it. `SHA256SUMS.txt` is the last asset CI uploads, so during
+again resolves it. A beta setup pins one tag and avoids that cross-release race.
+`SHA256SUMS.txt` is the last asset CI uploads, so during
 the final minute of a release publish (or after a half-failed release job) the
 checksums file can be missing and the installer fails with code 4 until the
 release job finishes or is re-run. The check protects the integrity of the download path. It is
@@ -207,7 +210,8 @@ its own table, which is the loudest of these guards.
   download. It first asks `Get-PreviousInstallerAsset.ps1` whether the previous
   release's binary can be reused (see the next section); only when the
   installer's inputs changed does it build a fresh copy
-  (`/p:Platform=Win32 /p:Configuration=Release`). Each per-channel packaging
+  (`/p:Platform=Win32 /p:Configuration=Release`). A prerelease setup adds
+  `/p:InstallerReleaseTag=vX.Y.Z-beta.N` so it resolves that exact tag. Each per-channel packaging
   step also requires Velopack to produce the grammar-derived per-machine MSI;
   a release cannot be marked complete without it.
 
@@ -222,8 +226,9 @@ release used to reset the file hash, so reputation never accumulated.
 
 What the installer does about it, in decreasing order of leverage:
 
-- **Hash stability.** The binary always resolves `/releases/latest`, so it
-  does not need a rebuild per release. `Get-PreviousInstallerAsset.ps1` reuses
+- **Hash stability.** Stable binaries resolve `/releases/latest`, so they do
+  not need a rebuild per release. Prerelease binaries pin their tag and are
+  intentionally rebuilt. `Get-PreviousInstallerAsset.ps1` reuses
   the previous release's exact bytes whenever `Installer/`, `release/`,
   `platform/windows/` and the embedded icon are untouched, so one hash keeps
   collecting download reputation across releases. `version.h` is deliberately

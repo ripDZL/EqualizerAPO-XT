@@ -48,6 +48,10 @@
 #include "InstallerUiModel.h"
 #include "InstallerWindow.h"
 
+#ifndef EAPO_INSTALLER_RELEASE_TAG
+#define EAPO_INSTALLER_RELEASE_TAG L""
+#endif
+
 // The decision logic (channel mapping, asset grammar, checksum parsing, flag
 // scan) lives in AutoInstallerLogic so EditorLogicTests can compile it; this
 // TU keeps the Win32 machinery and the entry point.
@@ -81,7 +85,8 @@ using UniqueBCryptHash = winutil::UniqueResource<BCryptHashTraits>;
 
 // GitHub repository that hosts the releases. Matches the GithubSource URL used by
 // the in-app updater (Editor/main.cpp).
-const wchar_t* kReleasesPage = EAPO_REPO_URL_W L"/releases/latest";
+const std::wstring kReleaseTag = EAPO_INSTALLER_RELEASE_TAG;
+const std::wstring kReleasesPage = releasePageUrl(kReleaseTag);
 const wchar_t* kUserAgent = L"EqualizerAPO-XT-Setup";
 
 // Checksums asset that CI publishes to every release, one sha256sum-style
@@ -431,7 +436,7 @@ bool verifyInstallerChecksum(const std::wstring& installerFile, const std::wstri
     const std::wstring sumsFile = tempFilePath(kChecksumsAssetName);
 
     std::wstring downloadError;
-    if (downloadToFile(latestAssetPath(kChecksumsAssetName), sumsFile, downloadError)
+    if (downloadToFile(releaseAssetPath(kChecksumsAssetName, kReleaseTag), sumsFile, downloadError)
         != DownloadOutcome::Ok)
     {
         error = L"The integrity checksums file could not be downloaded from the release page."
@@ -707,7 +712,7 @@ int runInstallFlow(InstallerUi::InstallerWindow* ui, bool silent)
     };
 
     std::wstring error;
-    const DownloadOutcome downloaded = downloadToFile(machineInstallerAssetPath(channel), outFile, error, progress);
+    const DownloadOutcome downloaded = downloadToFile(machineInstallerAssetPath(channel, kReleaseTag), outFile, error, progress);
     if (downloaded == DownloadOutcome::Canceled)
     {
         if (ui != nullptr)
@@ -743,7 +748,7 @@ int runInstallFlow(InstallerUi::InstallerWindow* ui, bool silent)
     }
 
     // Only a verified file is tagged and launched.
-    tagAsInternetDownload(outFile, machineInstallerDownloadUrl(channel));
+    tagAsInternetDownload(outFile, machineInstallerDownloadUrl(channel, kReleaseTag));
 
     if (ui != nullptr)
         ui->update([](Model& model) { startStep(model, kStepLaunch, L"Requesting administrator approval for the system-wide installer"); });
@@ -786,7 +791,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, LPWSTR, int)
     {
         int index = kAvx2;
         const std::wstring channel = detectChannel(&index);
-        return reportDetection(channel, machineInstallerDownloadUrl(channel), outPath, index);
+        return reportDetection(channel, machineInstallerDownloadUrl(channel, kReleaseTag), outPath, index);
     }
 
     // COM is for WIC (--ui-shot) and shell handoffs; the install flow itself

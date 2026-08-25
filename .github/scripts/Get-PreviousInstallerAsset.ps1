@@ -14,10 +14,10 @@ The decision is deliberately conservative: any anomaly (no previous release,
 missing asset, unfetchable tag, changed watch path) falls back to a fresh
 build, which is always correct - just reputation-less.
 
-version.h is intentionally NOT watched: it only stamps the version resource
-(and the repository slug, which never changes without touching the watched
-grammar anyway). A reused binary therefore reports the version of the release
-that last changed the installer - that is its real version.
+version.h is intentionally NOT watched: it only stamps the version resource.
+The repository slug lives in release/DistributionConfig.h, which is already a
+watched release input. A reused binary therefore reports the version of the
+release that last changed the installer - that is its real version.
 
 Returns a pscustomobject: Reuse (bool), PreviousTag, Reason. On Reuse=true
 the previous asset has been downloaded to OutputPath.
