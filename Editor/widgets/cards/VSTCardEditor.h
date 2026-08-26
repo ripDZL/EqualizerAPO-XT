@@ -58,7 +58,7 @@ public:
 		QWidget* parent = nullptr,
 		std::vector<std::wstring> inputChannels = {},
 		std::vector<std::wstring> outputChannels = {});
-	~VSTCardEditor();
+	~VSTCardEditor() override;
 
 	void store(QString& command, QString& parameters) override;
 	void configureSelectedChannels(std::vector<std::wstring>& selectedChannels) override;
