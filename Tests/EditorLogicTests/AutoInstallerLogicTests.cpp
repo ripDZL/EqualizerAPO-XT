@@ -63,6 +63,14 @@ void testAutoInstallerAssetGrammar()
 	expectEqual(wide(machineInstallSubdirectory(L"x64-avx2")),
 		QStringLiteral("EqualizerAPO-XT-x64-avx2"),
 		"machine installs use the channel pack root in Program Files, away from legacy EqualizerAPO");
+	expectEqual(wide(resolveProgramFilesX64Path(L"C:\\Program Files", L"C:\\Registry Fallback")),
+		QStringLiteral("C:\\Program Files"),
+		"a resolved shell known-folder path stays authoritative");
+	expectEqual(wide(resolveProgramFilesX64Path(L"", L"C:\\Program Files")),
+		QStringLiteral("C:\\Program Files"),
+		"x86 known-folder failure falls back to the protected native registry path");
+	expectTrue(resolveProgramFilesX64Path(L"", L"").empty(),
+		"missing trusted Program Files sources still fail safely");
 	const QString url = wide(machineInstallerDownloadUrl(L"arm64-neon"));
 	expectEqual(url,
 		QStringLiteral("https://github.com/ripDZL/EqualizerAPO-XT/releases/latest/download/EqualizerAPO-XT-arm64-neon-arm64-neon.msi"),

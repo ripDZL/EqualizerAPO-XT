@@ -1,5 +1,7 @@
 # Progress
 
+- [x] 2026-08-26 universal Setup x86 Program Files repair: reproduced the shown pre-download failure as `FOLDERID_ProgramFilesX64 = 0x80070002` only under x86; x64 and x86 `/reg:64` both resolve `C:\Program Files`. The front door now falls back only to the protected native `ProgramFilesDir` registry value. Resolver regression coverage, Win32 Installer Release build, and EditorLogicTests 4313 pass. No installed files were touched; user package test remains.
+
 - [x] 2026-08-26 installer-scope diagnosis: the local release-test helper downloaded the per-user channel Setup EXE rather than the per-machine MSI, so v2.42.4 was created under AppData. The helper now defaults to the MSI, preserves `-InstallerKind PerUser` for CI repro jobs, and resolves the machine target as `C:\Program Files\EqualizerAPO-XT-<channel>`. Published MSI metadata confirms `ALLUSERS=1` plus `VELOPACK_INSTALLDIR`; local release-asset selection/checksum checks, Installer build, and EditorLogicTests 4310 pass. Existing AppData files were not touched.
 
 - [x] 2026-08-25 Denoiser Classic popup-panel repair: stopped the optional live analyzer worker for pop-out native panels, which shared the controller instance and reproduced an access violation. Embedded panels retain the feed. Exact raw-module probe covers both LegacyRows and modern cards; Release Editor build, EditorLogic 4310, and HybridConv 1635 pass. User-approved Editor-only test build installed; on 2026-08-26 the user confirmed open/close works in both UI modes.

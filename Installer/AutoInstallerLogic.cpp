@@ -108,6 +108,12 @@ std::wstring machineInstallSubdirectory(const std::wstring& channel)
 	return L"EqualizerAPO-XT-" + channel;
 }
 
+std::wstring resolveProgramFilesX64Path(const std::wstring& knownFolderPath,
+	const std::wstring& registryProgramFilesPath)
+{
+	return knownFolderPath.empty() ? registryProgramFilesPath : knownFolderPath;
+}
+
 std::wstring expectedHashFromChecksums(const std::string& text, const std::wstring& fileName)
 {
 	std::string narrowName;

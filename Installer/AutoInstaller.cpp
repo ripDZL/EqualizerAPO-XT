@@ -477,18 +477,42 @@ bool verifyInstallerChecksum(const std::wstring& installerFile, const std::wstri
 
 bool programFilesX64(std::wstring& outPath)
 {
+    std::wstring knownFolderPath;
     PWSTR rawPath = nullptr;
     const HRESULT result = SHGetKnownFolderPath(FOLDERID_ProgramFilesX64,
         KF_FLAG_DEFAULT, nullptr, &rawPath);
-    if (FAILED(result) || rawPath == nullptr)
+    if (SUCCEEDED(result) && rawPath != nullptr)
+        knownFolderPath = rawPath;
+    if (rawPath != nullptr)
+        CoTaskMemFree(rawPath);
+
+    // Some Windows configurations return ERROR_FILE_NOT_FOUND for this
+    // known folder when the front door runs as x86 under WOW64, even though
+    // the native 64-bit Program Files location exists. Read the 64-bit
+    // system registry view rather than trusting a caller-controlled
+    // environment variable as the fallback installation target.
+    std::wstring registryProgramFilesPath;
+    HKEY key = nullptr;
+    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE,
+            L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion", 0,
+            KEY_QUERY_VALUE | KEY_WOW64_64KEY, &key) == ERROR_SUCCESS)
     {
-        if (rawPath != nullptr)
-            CoTaskMemFree(rawPath);
-        return false;
+        DWORD type = 0;
+        DWORD byteCount = 0;
+        if (RegQueryValueExW(key, L"ProgramFilesDir", nullptr, &type, nullptr, &byteCount) == ERROR_SUCCESS &&
+            type == REG_SZ && byteCount >= sizeof(wchar_t))
+        {
+            std::wstring value(byteCount / sizeof(wchar_t), L'\0');
+            if (RegQueryValueExW(key, L"ProgramFilesDir", nullptr, &type,
+                    reinterpret_cast<BYTE*>(&value[0]), &byteCount) == ERROR_SUCCESS)
+            {
+                registryProgramFilesPath.assign(value.c_str());
+            }
+        }
+        RegCloseKey(key);
     }
 
-    outPath = rawPath;
-    CoTaskMemFree(rawPath);
+    outPath = resolveProgramFilesX64Path(knownFolderPath, registryProgramFilesPath);
     return !outPath.empty();
 }
 

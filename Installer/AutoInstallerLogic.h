@@ -67,6 +67,12 @@ std::wstring machineInstallerDownloadUrl(const std::wstring& channel, const std:
 // C:\\Program Files\\EqualizerAPO installation from a machine-wide XT install.
 std::wstring machineInstallSubdirectory(const std::wstring& channel);
 
+// Prefer the shell-known Program Files path, but use the protected native
+// registry value when an x86 caller cannot resolve FOLDERID_ProgramFilesX64.
+// Empty means neither trusted source was available.
+std::wstring resolveProgramFilesX64Path(const std::wstring& knownFolderPath,
+	const std::wstring& registryProgramFilesPath);
+
 // Find fileName in sha256sum-style checksum text and return its digest as
 // lowercase hex. Each line is "<64 hex chars>  <name>"; the binary-mode form
 // "<hash> *<name>" is accepted too, and the name comparison ignores ASCII
