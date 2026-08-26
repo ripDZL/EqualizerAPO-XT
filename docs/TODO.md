@@ -1,8 +1,7 @@
 # TODO
 
 - [x] Installed the approved Editor-only Denoiser test build; configuration, engine, and plug-ins are unchanged.
-- [x] User reports the installed Bertom Denoiser Classic panel test works.
-- [ ] If only one UI was covered, open Bertom Denoiser Classic from the other of LegacyRows or a modern card. It must open/close without crashing; live analyzer feed is intentionally available only when the panel is embedded.
+- [x] User confirmed Bertom Denoiser Classic opens/closes without crashing in both LegacyRows and modern cards.
 
 - [ ] Manually verify published `v2.42.3-beta.1` auto-detect Setup writes only under `C:\Program Files\EqualizerAPO-XT\<channel>`. Do not auto-remove the existing per-user XT install or alter legacy `C:\Program Files\EqualizerAPO`.
 
