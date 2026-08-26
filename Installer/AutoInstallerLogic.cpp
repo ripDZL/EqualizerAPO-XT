@@ -105,7 +105,7 @@ std::wstring machineInstallerDownloadUrl(const std::wstring& channel, const std:
 
 std::wstring machineInstallSubdirectory(const std::wstring& channel)
 {
-	return L"EqualizerAPO-XT\\" + channel;
+	return L"EqualizerAPO-XT-" + channel;
 }
 
 std::wstring expectedHashFromChecksums(const std::string& text, const std::wstring& fileName)

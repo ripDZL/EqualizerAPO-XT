@@ -2,7 +2,8 @@ Describe "Install-ReleaseBuild.ps1" {
     BeforeAll {
         $scriptPath = Join-Path $PSScriptRoot "..\Install-ReleaseBuild.ps1"
         $channel = "x64-avx2"
-        $asset = "EqualizerAPO-XT-$channel-$channel-Setup.exe"
+        $asset = "EqualizerAPO-XT-$channel-$channel.msi"
+        $perUserAsset = "EqualizerAPO-XT-$channel-$channel-Setup.exe"
     }
 
     BeforeEach {
@@ -12,7 +13,7 @@ Describe "Install-ReleaseBuild.ps1" {
         [System.IO.File]::WriteAllBytes($setup, [byte[]](1, 2, 3, 4))
     }
 
-    It "accepts a setup listed with its exact SHA-256" {
+    It "uses the per-machine MSI by default" {
         $hash = (Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash.ToLowerInvariant()
         [System.IO.File]::WriteAllText((Join-Path $download "SHA256SUMS.txt"),
             "$hash  $asset`n")
@@ -20,6 +21,20 @@ Describe "Install-ReleaseBuild.ps1" {
             -DownloadDirectory $download -SkipDownload -SkipInstall `
             -SkipInstallRootResolution -PassThru
         $result.SetupPath | Should -Be $setup
+    }
+
+    It "uses the per-user setup only when explicitly requested" {
+        $perUserSetup = Join-Path $download $perUserAsset
+        [System.IO.File]::WriteAllBytes($perUserSetup, [byte[]](5, 6, 7, 8))
+        $hash = (Get-FileHash -LiteralPath $perUserSetup -Algorithm SHA256).Hash.ToLowerInvariant()
+        [System.IO.File]::WriteAllText((Join-Path $download "SHA256SUMS.txt"),
+            "$hash  $perUserAsset`n")
+
+        $result = & $scriptPath -Repository owner/repo -Tag v1 -Channel $channel `
+            -DownloadDirectory $download -InstallerKind PerUser -SkipDownload -SkipInstall `
+            -SkipInstallRootResolution -PassThru
+
+        $result.SetupPath | Should -Be $perUserSetup
     }
 
     It "rejects a checksum mismatch" {
@@ -42,7 +57,7 @@ Describe "Install-ReleaseBuild.ps1" {
         } | Should -Throw "*does not list*"
     }
 
-    It "can tolerate a missing setup for cleanup-only reinstall steps" {
+    It "can tolerate a missing installer for cleanup-only reinstall steps" {
         Remove-Item -LiteralPath $setup
         {
             & $scriptPath -Repository owner/repo -Tag v1 -Channel $channel `

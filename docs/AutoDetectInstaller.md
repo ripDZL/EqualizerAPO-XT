@@ -4,7 +4,7 @@
 machine's CPU architecture and the best supported x86 instruction set, then
 downloads and runs the matching per-variant, per-machine Velopack MSI. The
 user picks nothing; the right build installs under
-`C:\Program Files\EqualizerAPO-XT\<channel>`.
+`C:\Program Files\EqualizerAPO-XT-<channel>`.
 
 This document records why the feature is shaped the way it is and what it does
 *not* touch, so the working release pipeline stays understandable.
@@ -78,7 +78,7 @@ variants are packaged or how each one updates itself.
    [Download integrity verification](#download-integrity-verification).
 5. **Run the verified MSI through Windows Installer.** The detector asks for
    administrator approval only at this final stage, then passes
-   `VELOPACK_INSTALLDIR=C:\Program Files\EqualizerAPO-XT\<channel>` to the
+   `VELOPACK_INSTALLDIR=C:\Program Files\EqualizerAPO-XT-<channel>` to the
    per-machine MSI. Passing `--silent` runs Windows Installer with `/qn` and
    `/norestart`; it never restarts Windows itself.
    Before the launch the verified file is tagged with a browser-style

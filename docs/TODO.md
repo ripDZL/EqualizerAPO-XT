@@ -3,7 +3,7 @@
 - [x] Installed the approved Editor-only Denoiser test build; configuration, engine, and plug-ins are unchanged.
 - [x] User confirmed Bertom Denoiser Classic opens/closes without crashing in both LegacyRows and modern cards.
 
-- [ ] Manually verify published `v2.42.3-beta.1` auto-detect Setup writes only under `C:\Program Files\EqualizerAPO-XT\<channel>`. Do not auto-remove the existing per-user XT install or alter legacy `C:\Program Files\EqualizerAPO`.
+- [ ] Package and user-test the next machine installer. It must write only to `C:\Program Files\EqualizerAPO-XT-x64-avx512`; do not remove the existing per-user v2.42.4 copy or alter legacy `C:\Program Files\EqualizerAPO`.
 
 - [x] FabFilter Pro-Q manual test works; removed temporary debug/probe instrumentation.
 - [x] User confirmed the installed clean AVX-512 Editor `6B24EFD87C122F405F37DD31312D5681A4FB8FE7F0ADE89E869B21510C095210` shows an acceptable small arrow/separator beside Browse/Options.

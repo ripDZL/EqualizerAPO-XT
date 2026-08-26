@@ -4,6 +4,7 @@ param(
     [AllowEmptyString()] [string] $Tag,
     [Parameter(Mandatory)] [string] $Channel,
     [Parameter(Mandatory)] [string] $DownloadDirectory,
+    [ValidateSet("Machine", "PerUser")] [string] $InstallerKind = "Machine",
     [string] $GitHubEnvironmentPath,
     [switch] $SkipDownload,
     [switch] $SkipInstall,
@@ -14,7 +15,14 @@ param(
 
 $ErrorActionPreference = "Stop"
 Import-Module (Join-Path $PSScriptRoot "ReleaseAssets.psm1") -Force
-$asset = Get-SetupAssetName -Channel $Channel
+$asset = if ($InstallerKind -eq "Machine") {
+    Get-MsiAssetName -Channel $Channel
+}
+else {
+    Get-SetupAssetName -Channel $Channel
+}
+$packId = Get-VelopackPackId -Channel $Channel
+$machineInstallRoot = Join-Path $env:ProgramFiles $packId
 New-Item -ItemType Directory -Force -Path $DownloadDirectory | Out-Null
 
 if (-not $SkipDownload) {
@@ -65,24 +73,32 @@ else {
 }
 
 if (-not $SkipInstall) {
-    $process = Start-Process -FilePath $setup -ArgumentList "--silent" -PassThru -Wait
-    if ($process.ExitCode -ne 0) {
-        throw "Setup exited with $($process.ExitCode)"
+    if ($InstallerKind -eq "Machine") {
+        $msiExec = Join-Path $env:WINDIR "System32\msiexec.exe"
+        $arguments = "/i `"$setup`" VELOPACK_INSTALLDIR=`"$machineInstallRoot`" /qn /norestart"
+        $process = Start-Process -FilePath $msiExec -ArgumentList $arguments -Verb RunAs -PassThru -Wait
+    }
+    else {
+        $process = Start-Process -FilePath $setup -ArgumentList "--silent" -PassThru -Wait
+    }
+    if ($process.ExitCode -notin @(0, 3010)) {
+        throw "$InstallerKind installer exited with $($process.ExitCode)"
     }
 }
 
 $root = $null
 $current = $null
 if (-not $SkipInstallRootResolution) {
-    $packId = Get-VelopackPackId -Channel $Channel
-    $candidates = @(
-        (Join-Path $env:LOCALAPPDATA $packId),
-        (Join-Path $env:ProgramData $packId)
-    )
+    $candidates = if ($InstallerKind -eq "Machine") {
+        @($machineInstallRoot, (Join-Path $env:ProgramData $packId))
+    }
+    else {
+        @((Join-Path $env:LOCALAPPDATA $packId), (Join-Path $env:ProgramData $packId))
+    }
     $root = $candidates |
         Where-Object { Test-Path -LiteralPath (Join-Path $_ "Update.exe") } |
         Select-Object -First 1
-    if (-not $root) {
+    if (-not $root -and $InstallerKind -eq "PerUser") {
         $root = Get-ChildItem -LiteralPath $env:LOCALAPPDATA -Directory -ErrorAction SilentlyContinue |
             Where-Object {
                 $_.Name -like "EqualizerAPO-XT*" -and
@@ -101,6 +117,7 @@ if (-not $SkipInstallRootResolution) {
 if ($PassThru) {
     [pscustomobject]@{
         SetupPath = $setup
+        InstallerKind = $InstallerKind
         InstallRoot = $root
         CurrentDirectory = $current
     }

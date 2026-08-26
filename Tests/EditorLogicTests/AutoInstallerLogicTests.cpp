@@ -61,8 +61,8 @@ void testAutoInstallerAssetGrammar()
 		QStringLiteral("EqualizerAPO-XT-x64-avx2-x64-avx2.msi"),
 		"machine installer name follows the shared grammar header");
 	expectEqual(wide(machineInstallSubdirectory(L"x64-avx2")),
-		QStringLiteral("EqualizerAPO-XT\\x64-avx2"),
-		"machine installs stay below the XT root, away from legacy EqualizerAPO");
+		QStringLiteral("EqualizerAPO-XT-x64-avx2"),
+		"machine installs use the channel pack root in Program Files, away from legacy EqualizerAPO");
 	const QString url = wide(machineInstallerDownloadUrl(L"arm64-neon"));
 	expectEqual(url,
 		QStringLiteral("https://github.com/ripDZL/EqualizerAPO-XT/releases/latest/download/EqualizerAPO-XT-arm64-neon-arm64-neon.msi"),

@@ -551,6 +551,7 @@ jobs:
               -Repository "${{ github.repository }}" `
               -Tag "${{ github.event.inputs.release_tag }}" `
               -Channel "x64-avx2" `
+              -InstallerKind PerUser `
               -DownloadDirectory (Join-Path $env:RUNNER_TEMP "release-dl") `
               -GitHubEnvironmentPath $env:GITHUB_ENV
 

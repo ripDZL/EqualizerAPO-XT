@@ -1,5 +1,7 @@
 # Progress
 
+- [x] 2026-08-26 installer-scope diagnosis: the local release-test helper downloaded the per-user channel Setup EXE rather than the per-machine MSI, so v2.42.4 was created under AppData. The helper now defaults to the MSI, preserves `-InstallerKind PerUser` for CI repro jobs, and resolves the machine target as `C:\Program Files\EqualizerAPO-XT-<channel>`. Published MSI metadata confirms `ALLUSERS=1` plus `VELOPACK_INSTALLDIR`; local release-asset selection/checksum checks, Installer build, and EditorLogicTests 4310 pass. Existing AppData files were not touched.
+
 - [x] 2026-08-25 Denoiser Classic popup-panel repair: stopped the optional live analyzer worker for pop-out native panels, which shared the controller instance and reproduced an access violation. Embedded panels retain the feed. Exact raw-module probe covers both LegacyRows and modern cards; Release Editor build, EditorLogic 4310, and HybridConv 1635 pass. User-approved Editor-only test build installed; on 2026-08-26 the user confirmed open/close works in both UI modes.
 
 - 2026-08-25: published user-approved `v2.42.3-beta.1` from `28d868ae` after green run `32857546525` (Pester 5, cppcheck, memcheck, six variants, UI gates, cross-variant comparison). The 27-asset prerelease has a verified beta-pinned universal Setup, six system-wide MSIs/update feeds/full packages, source, and SHA256SUMS; repository completeness passes. No runtime install occurred. Next gate: manually verify it installs only to `C:\Program Files\EqualizerAPO-XT\<channel>` while preserving legacy/per-user installs.
