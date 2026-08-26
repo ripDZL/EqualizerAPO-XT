@@ -87,6 +87,7 @@ void testFileReferenceControllerOwnsPathState();
 void testReferenceCardDerivesSharedPresentationState();
 void testVSTBusModelMigratesAndEdits();
 void testVSTPreviewEndpointSelection();
+void testVSTPopupLivePreviewPolicy();
 void testCustomThemeStoreRoundTripsTokensAndJson();
 void testVSTSlotFillModel();
 void testFilterListModel();

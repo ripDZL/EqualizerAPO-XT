@@ -4,9 +4,11 @@
 	Editor-side live preview feed for VST plugin panels. The audio service owns
 	the real processing instances; the editor owns a separate instance for the
 	visible plug-in GUI. This helper feeds copied endpoint audio into that
-	visible instance so analyzer-style plug-in UIs can animate while embedded,
-	without routing the preview audio back to the device. Pop-out native panels
-	do not run this worker because they share the controller session.
+	visible instance so analyzer-style plug-in UIs can animate without routing
+	the preview audio back to the device. Normal pop-out native panels also
+	receive the feed. Bertom Denoiser Classic is a narrow exception because its
+	controller crashes if process() overlaps the native editor session; the
+	popup-preview policy isolates that plug-in.
 */
 
 #pragma once

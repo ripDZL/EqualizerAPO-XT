@@ -43,6 +43,7 @@
 #include "Editor/skins/ISkin.h"
 #include "VSTPluginFilterGUIDialog.h"
 #include "VSTPluginFilterGUI.h"
+#include "Editor/helpers/VSTPopupLivePreviewPolicy.h"
 #include "ui_VSTPluginFilterGUI.h"
 
 using std::bind;
@@ -87,7 +88,7 @@ VSTPluginFilterGUI::VSTPluginFilterGUI(std::shared_ptr<VSTPluginLibrary> library
 	livePreviewAction = new QAction(tr("Live analyzer feed"), this);
 	livePreviewAction->setCheckable(true);
 	livePreviewAction->setChecked(true);
-	livePreviewAction->setToolTip(tr("Feed endpoint audio into an embedded plugin panel so analyzer graphs can animate."));
+	livePreviewAction->setToolTip(tr("Feed endpoint audio into the open plugin panel so analyzer graphs can animate. Bertom Denoiser Classic stays protected in a separate panel to avoid its known crash."));
 	connect(livePreviewAction, &QAction::toggled, this, &VSTPluginFilterGUI::livePreviewToggled);
 	menu->addAction(livePreviewAction);
 	ui->optionsButton->setMenu(menu);
@@ -684,14 +685,13 @@ bool VSTPluginFilterGUI::embedPlugin()
 
 void VSTPluginFilterGUI::updateLivePreview()
 {
-	// A pop-out native panel shares its VST instance with the controller UI.
-	// Starting the optional preview worker there can call process() while the
-	// plug-in is entering its editor session. Some VST3s (including Bertom
-	// Denoiser Classic) do not tolerate that overlap and terminate the Editor.
-	// Embedded panels retain the analyzer feed; a pop-out panel prioritizes a
-	// stable native editor.
-	livePreview.update(effect.get(), livePreviewAction != nullptr && livePreviewAction->isChecked()
-		&& embedded, previewEndpoint);
+	// Normal pop-out native panels retain the live analyzer feed. Bertom
+	// Denoiser Classic is excluded by the popup-preview policy because its
+	// native editor terminates the host when process() overlaps that controller
+	// session.
+	livePreview.update(effect.get(), VSTPopupLivePreviewPolicy::shouldRun(
+		livePreviewAction != nullptr && livePreviewAction->isChecked(), embedded, panelDialogOpen,
+		library->getLibPath()), previewEndpoint);
 }
 
 void VSTPluginFilterGUI::updatePermissionWarning()

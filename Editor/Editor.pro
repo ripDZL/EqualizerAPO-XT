@@ -529,6 +529,7 @@ HEADERS  += \
 	diagnostics/SkinSwitchStorm.h \
 	helpers/QtSndfileHandle.h \
 	helpers/VSTPreviewEndpoint.h \
+	helpers/VSTPopupLivePreviewPolicy.h \
 	helpers/VSTPluginLivePreview.h \
 	SkinGallery.h \
 	SkinTokens.h \

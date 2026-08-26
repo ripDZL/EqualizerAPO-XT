@@ -1,5 +1,7 @@
 # TODO
 
+- [ ] Install-test the AVX-512 live-preview Editor candidate (`build-Editor-x64-v2422-port\release\Editor.exe`, SHA-256 `8185116EFFEEB26B9B472550A6FCFD914172AF73ED5E7630A0D92BDB8717CF54`). With Live analyzer feed enabled, a normal separate VST panel must respond to the active microphone in both modern cards and LegacyRows. Bertom Denoiser Classic must still open/close without crashing; its separate panel intentionally has no live feed.
+
 - [x] Installed the approved Editor-only Denoiser test build; configuration, engine, and plug-ins are unchanged.
 - [x] User confirmed Bertom Denoiser Classic opens/closes without crashing in both LegacyRows and modern cards.
 

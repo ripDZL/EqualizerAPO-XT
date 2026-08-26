@@ -166,6 +166,7 @@ int main(int argc, char** argv)
 		testReferenceCardDerivesSharedPresentationState();
 		testVSTBusModelMigratesAndEdits();
 		testVSTPreviewEndpointSelection();
+		testVSTPopupLivePreviewPolicy();
 		testCustomThemeStoreRoundTripsTokensAndJson();
 		testVSTSlotFillModel();
 		testFilterListModel();

@@ -1,5 +1,7 @@
 # Progress
 
+- [x] 2026-08-26 live VST-preview regression: `083d138e` narrowed popup preview to embedded panels while fixing Bertom Denoiser Classic, removing normal separate-panel microphone/analyzer updates. Added a narrow popup policy used by both LegacyRows and modern cards: normal native panels regain the feed, while only `Bertom_DenoiserClassic.vst3` remains protected. The focused policy test failed at 1/4318 before the repair and passes at 4319; AVX-512 Editor Release build 2.42.4.0 SHA-256 `8185116EFFEEB26B9B472550A6FCFD914172AF73ED5E7630A0D92BDB8717CF54` passes. No installed files changed; manual runtime verification remains.
+
 - [x] 2026-08-26 local test candidate: rebuilt the repaired universal `EqualizerAPO-XT-Setup.exe` (2.42.4.0, SHA-256 `4B39DF838B213F639759C3767561B20DF3DB26C0D410F8BB8BC729E4E2C1CCBB`) and its no-install `--detect-only` check exits 0. It is ready for explicit user-approved Program Files install testing; no installed files changed.
 
 - [x] 2026-08-26 universal Setup x86 Program Files repair: reproduced the shown pre-download failure as `FOLDERID_ProgramFilesX64 = 0x80070002` only under x86; x64 and x86 `/reg:64` both resolve `C:\Program Files`. The front door now falls back only to the protected native `ProgramFilesDir` registry value. Resolver regression coverage, Win32 Installer Release build, and EditorLogicTests 4313 pass. No installed files were touched; user package test remains.

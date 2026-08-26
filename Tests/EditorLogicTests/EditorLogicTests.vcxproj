@@ -112,6 +112,7 @@ if exist "$(LIBSNDFILE_LIB)\*.dll" copy /Y "$(LIBSNDFILE_LIB)\*.dll" "$(OutDir)"
     <ClCompile Include="ReferenceCardStateTests.cpp" />
     <ClCompile Include="VSTBusModelTests.cpp" />
     <ClCompile Include="VSTPreviewEndpointTests.cpp" />
+    <ClCompile Include="VSTPopupLivePreviewPolicyTests.cpp" />
     <ClCompile Include="CustomThemeStoreTests.cpp" />
     <ClCompile Include="VSTSlotFillModelTests.cpp" />
     <ClCompile Include="InfrastructureTests.cpp" />
@@ -179,6 +180,7 @@ if exist "$(LIBSNDFILE_LIB)\*.dll" copy /Y "$(LIBSNDFILE_LIB)\*.dll" "$(OutDir)"
     <ClInclude Include="..\..\Benchmark\BatchPlan.h" />
     <ClInclude Include="..\..\Editor\helpers\ConvolutionPathHelper.h" />
     <ClInclude Include="..\..\Editor\helpers\VSTPreviewEndpoint.h" />
+    <ClInclude Include="..\..\Editor\helpers\VSTPopupLivePreviewPolicy.h" />
     <ClInclude Include="..\..\Editor\import\ConfigDependencyScanner.h" />
     <ClInclude Include="..\..\Editor\import\ImportExecutor.h" />
     <ClInclude Include="..\..\Editor\import\LegacyMigrationPolicy.h" />
