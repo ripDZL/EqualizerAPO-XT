@@ -1,5 +1,7 @@
 # Progress
 
+- [x] 2026-08-26 local test candidate: rebuilt the repaired universal `EqualizerAPO-XT-Setup.exe` (2.42.4.0, SHA-256 `4B39DF838B213F639759C3767561B20DF3DB26C0D410F8BB8BC729E4E2C1CCBB`) and its no-install `--detect-only` check exits 0. It is ready for explicit user-approved Program Files install testing; no installed files changed.
+
 - [x] 2026-08-26 universal Setup x86 Program Files repair: reproduced the shown pre-download failure as `FOLDERID_ProgramFilesX64 = 0x80070002` only under x86; x64 and x86 `/reg:64` both resolve `C:\Program Files`. The front door now falls back only to the protected native `ProgramFilesDir` registry value. Resolver regression coverage, Win32 Installer Release build, and EditorLogicTests 4313 pass. No installed files were touched; user package test remains.
 
 - [x] 2026-08-26 installer-scope diagnosis: the local release-test helper downloaded the per-user channel Setup EXE rather than the per-machine MSI, so v2.42.4 was created under AppData. The helper now defaults to the MSI, preserves `-InstallerKind PerUser` for CI repro jobs, and resolves the machine target as `C:\Program Files\EqualizerAPO-XT-<channel>`. Published MSI metadata confirms `ALLUSERS=1` plus `VELOPACK_INSTALLDIR`; local release-asset selection/checksum checks, Installer build, and EditorLogicTests 4310 pass. Existing AppData files were not touched.

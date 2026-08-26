@@ -1,5 +1,7 @@
 # Session Summary
 
+- 2026-08-26 local test candidate: rebuilt `Installer\Release\EqualizerAPO-XT-Setup.exe` from the fallback repair. It reports 2.42.4.0, SHA-256 `4B39DF838B213F639759C3767561B20DF3DB26C0D410F8BB8BC729E4E2C1CCBB`, and safe `--detect-only` exits 0. It has not been run to install anything; the next gate is explicit user-approved live Setup testing.
+
 - 2026-08-26 universal Setup x86 repair: the screenshot's Program Files error occurs before downloading because `FOLDERID_ProgramFilesX64` returns `0x80070002` to this x86 front door, even though native x64 resolves `C:\Program Files`. The new fallback reads only the protected 64-bit `ProgramFilesDir` registry value, not an environment variable. The resolver regression, x86 registry probe, Win32 Installer Release build, and EditorLogicTests 4313 pass. Existing AppData and legacy installations remain untouched; package and manual Setup test are next.
 
 - 2026-08-26 installer scope: v2.42.4’s AppData install was caused by `Install-ReleaseBuild.ps1` selecting the legacy per-user channel Setup EXE. The published universal Setup and the released MSI contain the correct machine-install path/property behavior. The helper now defaults to the MSI; per-user selection is explicit for audio CI repro jobs. Machine target is `C:\Program Files\EqualizerAPO-XT-<channel>`. Verified released MSI tables, exact release-asset selection/checksums, Installer build, and EditorLogicTests 4310. No installed files were removed or overwritten; next gate is a user-approved MSI test.

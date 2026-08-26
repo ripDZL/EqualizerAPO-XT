@@ -3,7 +3,7 @@
 - [x] Installed the approved Editor-only Denoiser test build; configuration, engine, and plug-ins are unchanged.
 - [x] User confirmed Bertom Denoiser Classic opens/closes without crashing in both LegacyRows and modern cards.
 
-- [ ] Package and user-test the repaired universal Setup. On this Windows configuration, verify it gets past the prior Program Files lookup error and writes only to `C:\Program Files\EqualizerAPO-XT-x64-avx512`; do not remove the existing per-user v2.42.4 copy or alter legacy `C:\Program Files\EqualizerAPO`.
+- [ ] User-test the prepared repaired universal Setup (`Installer\Release\EqualizerAPO-XT-Setup.exe`, SHA-256 `4B39DF838B213F639759C3767561B20DF3DB26C0D410F8BB8BC729E4E2C1CCBB`). It must get past the prior Program Files lookup error and write only to `C:\Program Files\EqualizerAPO-XT-x64-avx512`; do not remove the existing per-user v2.42.4 copy or alter legacy `C:\Program Files\EqualizerAPO`.
 
 - [x] FabFilter Pro-Q manual test works; removed temporary debug/probe instrumentation.
 - [x] User confirmed the installed clean AVX-512 Editor `6B24EFD87C122F405F37DD31312D5681A4FB8FE7F0ADE89E869B21510C095210` shows an acceptable small arrow/separator beside Browse/Options.
