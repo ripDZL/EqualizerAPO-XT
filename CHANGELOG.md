@@ -14,6 +14,17 @@ tags are clean `vX.Y.Z` names. Installers for every version are on the
 
 ## Unreleased
 
+- **Live VST analyzer panels show the current microphone input again.** The
+  Bertom Denoiser Classic crash guard had disabled preview for every separate
+  native VST panel. Normal plug-ins now receive the feed in both modern cards
+  and legacy rows, while the known Bertom native-panel exception stays
+  protected.
+- **The auto-detect installer can find Program Files on affected Windows
+  hosts.** Its x86 front door now falls back to the protected native registry
+  value when the Program Files known-folder lookup is unavailable, instead of
+  failing before the download begins. The release test helper also selects the
+  system-wide MSI by default.
+
 ## v2.42.2 — 2026-08-25
 
 - **Scrolling a maximized window is smooth in the Rack skin again.** The
