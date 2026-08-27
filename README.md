@@ -91,7 +91,7 @@ After installation the Editor keeps itself current: it downloads newer releases 
 
 ## Documentation
 
-User documentation lives in the [GitHub Wiki](https://github.com/115dkk/EqualizerAPO-XT/wiki) in English and Korean, synced from `Wiki/github-wiki/` in this repository. Developer notes live under [docs/](docs/).
+User documentation lives in the [GitHub Wiki](https://github.com/115dkk/EqualizerAPO-XT/wiki) in English and Korean, synced from `Wiki/github-wiki/` in this repository. Developer notes live under [docs/](docs/), including the [branch and release workflow](docs/BranchWorkflow.md).
 
 ## Building
 

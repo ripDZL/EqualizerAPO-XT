@@ -1,6 +1,6 @@
 # TODO
 
-- [x] Fast-forwarded `beta` to the v2.42.5 mainline (`76204c`). Future policy: work/test through `beta`, then only user-approved promotion to `main` starts a stable release.
+- [x] Fast-forwarded `beta` to the v2.42.5 mainline. Future policy: work/test through `beta`, then only user-approved promotion to `main` starts a stable release. The durable guide is `docs/BranchWorkflow.md`, linked from the README.
 
 - [x] Published stable `v2.42.5` from `4b723927` after all six variant builds, Pester, cppcheck, memcheck, cross-variant comparison, packaging, and release completeness passed in run `33029195723`.
 

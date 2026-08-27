@@ -1,6 +1,6 @@
 # AI Context
 
-- 2026-08-27 branch policy (user): develop and test through `beta`; do not send ordinary work directly to `main`. After explicit approval, fast-forward `beta` into `main` for the stable release workflow. Keep `beta` aligned with the post-release mainline; both currently point to `76204c7373c82d30a4ecc917a3b2abf9554c598f` after `v2.42.5`.
+- 2026-08-27 branch policy (user): develop and test through `beta`; do not send ordinary work directly to `main`. After explicit approval, fast-forward `beta` into `main` for the stable release workflow. Keep `beta` aligned with the post-release mainline. The durable guide is `docs/BranchWorkflow.md`, linked from the README.
 
 - 2026-08-27 stable `v2.42.5` is published from `4b723927514c3df28d1108fd9c22dc1c76cc9fca` with 33 assets: [release](https://github.com/ripDZL/EqualizerAPO-XT/releases/tag/v2.42.5), [run 33029195723](https://github.com/ripDZL/EqualizerAPO-XT/actions/runs/33029195723). All six variant builds, Pester, cppcheck, memcheck, cross-variant comparison, packaging, and release completeness pass. It contains the live VST-preview restoration and Program Files installer repairs. The local branch is fast-forwarded to the CI version-bump commit; the existing Program Files Editor remains the manually tested overlay, not a release reinstall.
 
