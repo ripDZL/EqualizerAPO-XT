@@ -8,6 +8,8 @@ TheFireKahuna의 equalizerAPO64 트리에서 포크된 뒤(마지막 업스트�
 
 ## Unreleased
 
+## v2.42.5 — 2026-08-27
+
 - **VST 분석기 패널이 현재 마이크 입력을 다시 보여 줍니다.** Bertom
   Denoiser Classic 크래시 방지책이 분리된 모든 네이티브 VST 패널의 미리보기를
   꺼 버렸습니다. 이제 일반 플러그인은 현대 카드와 레거시 행 모두에서 피드를

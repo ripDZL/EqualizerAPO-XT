@@ -14,6 +14,8 @@ tags are clean `vX.Y.Z` names. Installers for every version are on the
 
 ## Unreleased
 
+## v2.42.5 — 2026-08-27
+
 - **Live VST analyzer panels show the current microphone input again.** The
   Bertom Denoiser Classic crash guard had disabled preview for every separate
   native VST panel. Normal plug-ins now receive the feed in both modern cards
