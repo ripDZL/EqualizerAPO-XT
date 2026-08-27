@@ -1,5 +1,7 @@
 # Session Summary
 
+- 2026-08-26 live-preview runtime result: user reports the installed AVX-512 Editor restores normal separate-panel live VST preview. The Bertom Denoiser Classic native-popup exception remains unchanged and was not newly re-tested.
+
 - 2026-08-26 live-preview candidate installed: after the user closed Editor, overlaid only `C:\Program Files\EqualizerAPO-XT-x64-avx512\current\Editor.exe`. Previous SHA-256 `02AD1CB1840AA96E90EB25EA171B80E72577048FD7326C22E3093691FE727B1C` is backed up at `artifacts\install-backups\live-preview-popup-avx512-20260826-204754\Editor.exe`; installed SHA-256 `8185116EFFEEB26B9B472550A6FCFD914172AF73ED5E7630A0D92BDB8717CF54` is verified. Engine, configuration, plug-ins, and audio services are unchanged. Next gate: a normal VST `Open panel` responds to the current microphone in both UI modes; Bertom still opens/closes without crashing.
 
 - 2026-08-26 live VST-preview repair: the earlier Denoiser popup stability fix globally changed separate native VST panels to run without the microphone/analyzer feed. `VSTPopupLivePreviewPolicy` now restores the feed for normal `Open panel` plug-ins in both LegacyRows and modern cards, while retaining the narrow `Bertom_DenoiserClassic.vst3` exception that prevents its native-panel crash. The focused regression test was red at 1/4318 and green at 4319 checks. AVX-512 Editor 2.42.4.0 candidate SHA-256 `8185116EFFEEB26B9B472550A6FCFD914172AF73ED5E7630A0D92BDB8717CF54` is built, not installed. Next gate: live microphone response in a normal panel and safe Bertom open/close.

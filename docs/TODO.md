@@ -1,6 +1,6 @@
 # TODO
 
-- [ ] Live-test the installed AVX-512 preview Editor (`C:\Program Files\EqualizerAPO-XT-x64-avx512\current\Editor.exe`, SHA-256 `8185116EFFEEB26B9B472550A6FCFD914172AF73ED5E7630A0D92BDB8717CF54`). With Live analyzer feed enabled, a normal separate VST panel must respond to the active microphone in both modern cards and LegacyRows. Bertom Denoiser Classic must still open/close without crashing; its separate panel intentionally has no live feed.
+- [x] User reports the installed AVX-512 preview Editor (`C:\Program Files\EqualizerAPO-XT-x64-avx512\current\Editor.exe`, SHA-256 `8185116EFFEEB26B9B472550A6FCFD914172AF73ED5E7630A0D92BDB8717CF54`) fixes the missing normal separate-panel live VST preview. This result does not newly re-test the deliberate Bertom Denoiser Classic popup exception.
 
 - [x] Installed the approved Editor-only Denoiser test build; configuration, engine, and plug-ins are unchanged.
 - [x] User confirmed Bertom Denoiser Classic opens/closes without crashing in both LegacyRows and modern cards.
