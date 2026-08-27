@@ -28,7 +28,7 @@ void testTheSkinRosterIsTheOneList()
 {
 	const QVector<SkinThemeData::SkinEntry>& roster = SkinThemeData::roster();
 	const QStringList expectedIds = {
-		QStringLiteral("studio"), QStringLiteral("minimal"), QStringLiteral("soft"),
+		QStringLiteral("studio"), QStringLiteral("clarity"), QStringLiteral("minimal"), QStringLiteral("soft"),
 		QStringLiteral("rack"), QStringLiteral("matrix"), QStringLiteral("midnight"),
 		QStringLiteral("arctic"), QStringLiteral("ember"), QStringLiteral("violet"),
 		QStringLiteral("solar"), QStringLiteral("obsidian"), QStringLiteral("aurora"),
@@ -71,6 +71,10 @@ void testTheSkinRosterIsTheOneList()
 		"Midnight Console rides the Studio QSS grammar");
 	expectTrue(SkinThemeData::entry(QStringLiteral("midnight")).paintBaseId == QStringLiteral("studio"),
 		"Midnight Console rides the Studio paint grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("clarity")).qssBaseName == QStringLiteral("precision"),
+		"Clarity High Contrast rides the precision QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("clarity")).paintBaseId == QStringLiteral("minimal"),
+		"Clarity High Contrast reuses Precision's layout grammar");
 	expectTrue(SkinThemeData::entry(QStringLiteral("arctic")).qssBaseName == QStringLiteral("soft"),
 		"Arctic Bloom rides the Soft QSS grammar");
 	expectTrue(SkinThemeData::entry(QStringLiteral("arctic")).paintBaseId == QStringLiteral("soft"),
@@ -129,6 +133,34 @@ void testTheSkinRosterIsTheOneList()
 		"Legacy Bronze keeps the native legacy-row font");
 	expectTrue(SkinThemeData::tokens(QStringLiteral("legacy-bronze"), true).accent == QStringLiteral("#C58B48"),
 		"Legacy Bronze carries the requested bronze accent");
+
+	// Clarity is deliberately stronger than the ordinary 4.5:1 floor: labels,
+	// values, focus rings and knob travel must remain unmistakable in both
+	// Modern cards and Legacy Rows, which consume this same token table.
+	for (const SkinTokens& tokens : {
+		SkinThemeData::tokens(QStringLiteral("clarity"), false),
+		SkinThemeData::tokens(QStringLiteral("clarity"), true)
+	})
+	{
+		expectTrue(tokens.highContrast,
+			QStringLiteral("Clarity %1 enables high-visibility control geometry")
+				.arg(tokens.dark ? QStringLiteral("dark") : QStringLiteral("light")));
+		expectTrue(SkinThemeData::contrastRatio(tokens.text, tokens.card) >= 15.0,
+			QStringLiteral("Clarity %1 primary labels exceed 15:1 on cards")
+				.arg(tokens.dark ? QStringLiteral("dark") : QStringLiteral("light")));
+		expectTrue(SkinThemeData::contrastRatio(tokens.mutedText, tokens.card) >= 9.0,
+			QStringLiteral("Clarity %1 secondary labels exceed 9:1 on cards")
+				.arg(tokens.dark ? QStringLiteral("dark") : QStringLiteral("light")));
+		expectTrue(SkinThemeData::contrastRatio(tokens.accent, tokens.card) >= 4.5,
+			QStringLiteral("Clarity %1 control accent stays readable on cards")
+				.arg(tokens.dark ? QStringLiteral("dark") : QStringLiteral("light")));
+		expectTrue(SkinThemeData::contrastRatio(tokens.focusRing, tokens.card) >= 4.5,
+			QStringLiteral("Clarity %1 keyboard focus stays readable on cards")
+				.arg(tokens.dark ? QStringLiteral("dark") : QStringLiteral("light")));
+		expectTrue(tokens.rowHeight >= 40,
+			QStringLiteral("Clarity %1 reserves a readable row height")
+				.arg(tokens.dark ? QStringLiteral("dark") : QStringLiteral("light")));
+	}
 
 	// The two stored aliases from earlier releases, which are the only ids that
 	// cannot be derived from the roster.

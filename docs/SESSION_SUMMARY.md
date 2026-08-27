@@ -1,5 +1,7 @@
 # Session Summary
 
+- 2026-08-27 Clarity High Contrast: added built-in `clarity` for both Modern and Legacy Rows with a dark/light pair, maximum legibility tokens, clear focus/selection states, and thicker knobs plus numeric values. Requirement review found Legacy Preamp still used a platform `QDial`; it is now the shared bipolar `AudioKnob`, and CI owns a dedicated required Clarity Legacy gallery. The new roster/contrast regression first failed, then passed in `EditorLogicTests` (4,391 checks). Release Editor build, `--theme-lab-test`, and representative fresh Modern/Legacy gallery screenshots pass. AVX-512 Editor-only candidate `D28EEB7F098A2C16A66E6FF5383484E6C6AF9CFD83641D9B40DC771AE7FFD287` is built, not installed. Next gate: user test the four combinations before beta push.
+
 - 2026-08-27 branch workflow: `beta` is fast-forwarded to the v2.42.5 line. User policy: develop/test on `beta`; promote only user-approved beta work to `main` for stable release. Do not send ordinary work directly to `main`. The durable guide is `docs/BranchWorkflow.md`, linked from the README.
 
 - 2026-08-27 stable release: `v2.42.5` is published from `4b723927514c3df28d1108fd9c22dc1c76cc9fca` with 33 assets. Run `33029195723` passed all six variants, Pester, cppcheck, memcheck, cross-variant comparison, packaging, and release completeness. The release contains the normal popup live VST-preview restoration and Program Files installer repairs. Local branch fast-forwarded to the CI bump commit; no new runtime install occurred.

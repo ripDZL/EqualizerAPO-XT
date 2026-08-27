@@ -212,6 +212,65 @@ SkinTokens studioTokens(bool dark)
 	return t;
 }
 
+// Constitution: docs/skins/clarity.md
+SkinTokens clarityTokens(bool dark)
+{
+	SkinTokens t;
+	t.dark = dark;
+	t.fontFamily = QStringLiteral("Segoe UI");
+	t.monoFontFamily = QStringLiteral("Consolas");
+	t.borderRadius = 4;
+	t.rowHeight = 44;
+	t.toolbarHeight = 40;
+	t.cardPadding = 14;
+	t.cardGap = 10;
+	t.graphRadius = 4;
+	t.channelGroupIndent = 20;
+	t.channelGroupStyle = SkinTokens::TreeLines;
+	t.badgeStyle = SkinTokens::OutlineOnly;
+	t.zebraStripe = true;
+	t.cardRailWidth = 4;
+	t.highContrast = true;
+	if (dark)
+	{
+		t.background = QStringLiteral("#000000");
+		t.surface = QStringLiteral("#0C0C0C");
+		t.card = QStringLiteral("#000000");
+		t.cardHover = QStringLiteral("#151515");
+		t.cardSelected = QStringLiteral("#003D71");
+		t.text = QStringLiteral("#FFFFFF");
+		t.mutedText = QStringLiteral("#D4D4D4");
+		t.border = QStringLiteral("#8D8D8D");
+		t.graph = QStringLiteral("#000000");
+		t.graphGridMinor = QStringLiteral("#303030");
+		t.accent = QStringLiteral("#0078D4");
+		t.accent2 = QStringLiteral("#B48EFA");
+		t.success = QStringLiteral("#39D98A");
+		t.warning = QStringLiteral("#FFD166");
+		t.danger = QStringLiteral("#FF6B6B");
+	}
+	else
+	{
+		t.background = QStringLiteral("#F2F2F2");
+		t.surface = QStringLiteral("#FFFFFF");
+		t.card = QStringLiteral("#FFFFFF");
+		t.cardHover = QStringLiteral("#E5F2FF");
+		t.cardSelected = QStringLiteral("#C9E8FF");
+		t.text = QStringLiteral("#000000");
+		t.mutedText = QStringLiteral("#303030");
+		t.border = QStringLiteral("#555555");
+		t.graph = QStringLiteral("#FFFFFF");
+		t.graphGridMinor = QStringLiteral("#C8C8C8");
+		t.accent = QStringLiteral("#005A9E");
+		t.accent2 = QStringLiteral("#5B21B6");
+		t.success = QStringLiteral("#0B6E3C");
+		t.warning = QStringLiteral("#8A4B00");
+		t.danger = QStringLiteral("#B00020");
+	}
+	finishTokens(t);
+	return t;
+}
+
 // Constitution: docs/skins/minimal.md
 SkinTokens minimalTokens(bool dark)
 {
@@ -1049,6 +1108,7 @@ const QVector<SkinEntry>& roster()
 	// the default skin and it is what an unknown id falls back to.
 	static const QVector<SkinEntry> entries = {
 		{ QStringLiteral("studio"), QStringLiteral("studio"), QStringLiteral("studio"), &studioTokens },
+		{ QStringLiteral("clarity"), QStringLiteral("precision"), QStringLiteral("minimal"), &clarityTokens },
 		// The minimal skin's sheets are precision_light.qss / precision_dark.qss;
 		// the name predates the skin's rename and the files were left alone.
 		{ QStringLiteral("minimal"), QStringLiteral("precision"), QStringLiteral("minimal"), &minimalTokens },

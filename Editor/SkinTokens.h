@@ -54,6 +54,10 @@ struct SkinTokens
 	int cardGap = 8;
 	int graphRadius = 10;
 	int density = 1;
+	// Accessibility-first variants use stronger control geometry in the shared
+	// Precision painters, not merely a different palette. This keeps a saved
+	// custom theme based on that variant readable too.
+	bool highContrast = false;
 	bool showCardMiniGraphs = false;
 	bool zebraStripe = false;
 	// Width (in px) of the coloured rail drawn on the left edge of each filter

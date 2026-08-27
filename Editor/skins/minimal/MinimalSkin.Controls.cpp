@@ -11,6 +11,177 @@
 #include <QtMath>
 
 #include "Editor/skins/shared/SkinPaint.h"
+#include "Editor/skins/SkinThemeData.h"
+
+namespace
+{
+void paintHighContrastKnob(QPainter& painter, const QRect& rect, const KnobState& state,
+	const SkinTokens& tokens)
+{
+	painter.setRenderHint(QPainter::Antialiasing);
+
+	const QColor primary(tokens.text);
+	const QColor secondary(tokens.mutedText);
+	const QColor outline(tokens.border);
+	const QColor track(state.enabled ? tokens.border : tokens.mutedText);
+	const QColor active(state.enabled ? tokens.accent : tokens.mutedText);
+	const QColor face(state.enabled ? tokens.card : tokens.surface);
+	const bool hasNumber = !state.valueText.isEmpty();
+	const qreal radius = hasNumber ? 11.0 : qMax<qreal>(12.0,
+		qMin(rect.width(), rect.height()) * 0.38);
+
+	QFont valueFont(tokens.monoFontFamily);
+	valueFont.setBold(true);
+	valueFont.setPointSizeF(10.0);
+
+	QPointF center;
+	QRectF valueRect;
+	if (hasNumber)
+	{
+		const qreal gap = 8.0;
+		qreal available = rect.width() - 2.0 * radius - gap - 6.0;
+		qreal width = QFontMetricsF(valueFont).horizontalAdvance(state.valueText);
+		while (width > available && valueFont.pointSizeF() > 7.0)
+		{
+			valueFont.setPointSizeF(valueFont.pointSizeF() - 0.5);
+			width = QFontMetricsF(valueFont).horizontalAdvance(state.valueText);
+		}
+		const qreal pairWidth = width + gap + 2.0 * radius;
+		const qreal left = rect.left() + (rect.width() - pairWidth) / 2.0;
+		valueRect = QRectF(left, rect.top(), width, rect.height());
+		center = QPointF(left + width + gap + radius, QRectF(rect).center().y());
+	}
+	else
+	{
+		center = QRectF(rect).center();
+	}
+
+	const QRectF dial(center.x() - radius, center.y() - radius, radius * 2.0, radius * 2.0);
+	painter.setBrush(face);
+	painter.setPen(QPen(state.enabled ? outline : secondary, 2.0));
+	painter.drawEllipse(dial);
+
+	const QRectF arc = dial.adjusted(3.0, 3.0, -3.0, -3.0);
+	QPen trackPen(track, 3.0);
+	trackPen.setCapStyle(Qt::RoundCap);
+	painter.setPen(trackPen);
+	painter.setBrush(Qt::NoBrush);
+	painter.drawArc(arc, -135 * 16, -270 * 16);
+
+	QPen activePen(active, 4.0);
+	activePen.setCapStyle(Qt::RoundCap);
+	painter.setPen(activePen);
+	if (state.bipolar)
+	{
+		QPen detentPen(primary, 2.0);
+		detentPen.setCapStyle(Qt::RoundCap);
+		painter.setPen(detentPen);
+		painter.drawLine(skinArcPoint(center, radius - 5.0, -270.0),
+			skinArcPoint(center, radius + 1.0, -270.0));
+		painter.setPen(activePen);
+		const double deviation = 270.0 * (state.ratio - 0.5);
+		painter.drawArc(arc, -270 * 16, -qRound(deviation * 16.0));
+	}
+	else
+	{
+		painter.drawArc(arc, -135 * 16, -qRound(270.0 * state.ratio * 16.0));
+	}
+
+	const double valueDegrees = -(135.0 + 270.0 * state.ratio);
+	QPen indicatorPen(state.enabled ? primary : secondary, 2.5);
+	indicatorPen.setCapStyle(Qt::RoundCap);
+	painter.setPen(indicatorPen);
+	painter.drawLine(skinArcPoint(center, radius * 0.25, valueDegrees),
+		skinArcPoint(center, radius - 4.0, valueDegrees));
+
+	if (hasNumber)
+	{
+		painter.setFont(valueFont);
+		painter.setPen(state.enabled ? primary : secondary);
+		painter.drawText(valueRect, Qt::AlignLeft | Qt::AlignVCenter, state.valueText);
+	}
+	else if (state.enabled && (state.hovered || state.dragging))
+	{
+		QFont readoutFont(tokens.monoFontFamily);
+		readoutFont.setBold(true);
+		readoutFont.setPointSizeF(8.0);
+		painter.setFont(readoutFont);
+		painter.setPen(primary);
+		painter.drawText(dial, Qt::AlignCenter, QStringLiteral("%1%").arg(qRound(state.ratio * 100.0)));
+	}
+
+	if (state.focused)
+	{
+		painter.setPen(QPen(QColor(tokens.focusRing), 2.0));
+		painter.setBrush(Qt::NoBrush);
+		painter.drawRoundedRect(QRectF(rect).adjusted(1.0, 1.0, -1.0, -1.0), 3.0, 3.0);
+	}
+}
+
+void paintHighContrastSegmentedControl(QPainter& painter, const SegmentedControlState& state,
+	const SkinTokens& tokens)
+{
+	if (state.labels.isEmpty())
+		return;
+
+	painter.setRenderHint(QPainter::Antialiasing, true);
+	painter.setRenderHint(QPainter::TextAntialiasing, true);
+	const QRectF bounds(state.rect);
+	const QColor primary(tokens.text);
+	const QColor secondary(tokens.mutedText);
+	const QColor selectedInk(SkinThemeData::selectionText(tokens));
+	painter.fillRect(bounds, QColor(tokens.surfaceSunken));
+
+	QFont font(tokens.fontFamily);
+	font.setBold(true);
+	font.setPointSizeF(9.5);
+	for (int i = 0; i < state.labels.size(); ++i)
+	{
+		const QRectF cell = state.segmentRect(i).adjusted(2.0, 3.0, -2.0, -3.0);
+		const bool selected = state.enabled && i == state.selectedIndex;
+		const bool pressed = state.enabled && i == state.pressedIndex;
+		const bool hovered = state.enabled && i == state.hoveredIndex && !pressed;
+		QColor fill = QColor(tokens.card);
+		QColor ink = primary;
+		QColor border = QColor(tokens.border);
+		if (!state.enabled)
+		{
+			fill = QColor(tokens.surface);
+			ink = secondary;
+		}
+		else if (pressed)
+		{
+			fill = primary;
+			ink = QColor(tokens.surface);
+			border = primary;
+		}
+		else if (selected)
+		{
+			fill = QColor(tokens.accent);
+			ink = selectedInk;
+			border = QColor(tokens.accent);
+		}
+		else if (hovered)
+		{
+			fill = QColor(tokens.cardHover);
+			border = QColor(tokens.accent);
+		}
+
+		painter.setBrush(fill);
+		painter.setPen(QPen(border, selected || pressed ? 2.0 : 1.0));
+		painter.drawRoundedRect(cell, 3.0, 3.0);
+		painter.setFont(font);
+		painter.setPen(ink);
+		painter.drawText(cell.adjusted(4.0, 0.0, -4.0, 0.0), Qt::AlignCenter,
+			QFontMetricsF(font).elidedText(state.labels.at(i), Qt::ElideRight, cell.width() - 8.0));
+	}
+
+	painter.setBrush(Qt::NoBrush);
+	painter.setPen(QPen(QColor(state.focused && state.enabled ? tokens.focusRing : tokens.border),
+		state.focused && state.enabled ? 2.0 : 1.0));
+	painter.drawRoundedRect(bounds.adjusted(0.5, 0.5, -0.5, -0.5), 4.0, 4.0);
+}
+}
 
 // "The number is the control; the knob is confirmation." The figure is the
 // brightest ink in the row - painted here when the widget supplies
@@ -22,6 +193,12 @@
 // accent (active-state law).
 void MinimalSkin::paintKnob(QPainter& painter, const QRect& rect, const KnobState& state, const SkinTokens& tokens) const
 {
+	if (tokens.highContrast)
+	{
+		paintHighContrastKnob(painter, rect, state, tokens);
+		return;
+	}
+
 	painter.setRenderHint(QPainter::Antialiasing);
 
 	const QColor hairline(tokens.border);
@@ -149,6 +326,12 @@ void MinimalSkin::paintKnob(QPainter& painter, const QRect& rect, const KnobStat
 // disabled. Every one of them is separable at a glance from the others.
 void MinimalSkin::paintSegmentedControl(QPainter& painter, const SegmentedControlState& state, const SkinTokens& tokens) const
 {
+	if (tokens.highContrast)
+	{
+		paintHighContrastSegmentedControl(painter, state, tokens);
+		return;
+	}
+
 	if (state.labels.isEmpty())
 		return;
 

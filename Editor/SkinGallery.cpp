@@ -82,6 +82,7 @@
 #include "Editor/FilterTable.h"
 #include "Editor/SkinManager.h"
 #include "Editor/guis/CopyFilterGUI.h"
+#include "Editor/guis/PreampFilterGUI.h"
 #include "Editor/helpers/GUIHelper.h"
 #include "Editor/skins/ISkin.h"
 #include "Editor/skins/Skins.h"
@@ -99,6 +100,7 @@
 #include "Editor/widgets/SkinComboBox.h"
 #include "Editor/widgets/TitleBar.h"
 #include "Editor/widgets/UpdateToast.h"
+#include "Editor/widgets/AudioKnob.h"
 #include "Editor/widgets/subwooferrouting/SubwooferRoutingEditorDialog.h"
 #include "Editor/widgets/cards/SubwooferRoutingCardEditor.h"
 #include "Editor/widgets/routing/IRoutingRenderer.h"
@@ -1674,6 +1676,21 @@ int renderHeritage(const QDir& outDir, const QString& configPath, const QStringL
 				buildRows(scrollArea, configPath, lines);
 				scrollArea.show();
 				QCoreApplication::processEvents();
+
+				// High-contrast Legacy Rows must keep the Preamp gain control on
+				// the shared AudioKnob painter. A platform QDial is not enough:
+				// it would lose the explicit travel arc, pointer, and zero detent.
+				if (SkinManager::instance()->tokens().highContrast)
+				{
+					const auto* preamp = scrollArea.findChild<PreampFilterGUI*>();
+					const auto* knob = preamp == nullptr ? nullptr
+						: preamp->findChild<AudioKnob*>(QStringLiteral("dial"));
+					if (knob == nullptr)
+					{
+						qWarning("SkinGallery: high-contrast Legacy Preamp is not using AudioKnob");
+						failures++;
+					}
+				}
 
 				QPixmap dump = scrollArea.widget()->grab();
 				const QString fileName = outDir.filePath(QStringLiteral("heritage_%1_%2_%3.png")

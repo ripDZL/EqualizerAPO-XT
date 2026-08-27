@@ -21,7 +21,7 @@
 param(
     [Parameter(Mandatory)] [string] $WorkspaceRoot,
     [Parameter(Mandatory)]
-    [ValidateSet("selftest-vst", "skin-gallery", "skin-switch", "analysis-layout", "card-move", "card-selection", "power-toggle")]
+    [ValidateSet("selftest-vst", "skin-gallery", "clarity-legacy-gallery", "skin-switch", "analysis-layout", "card-move", "card-selection", "power-toggle")]
     [string] $Gate,
     [string] $Platform = "x64",
     [switch] $PlanOnly
@@ -54,6 +54,17 @@ $gates = @{
         }
         LogPath    = Join-Path $WorkspaceRoot "skin-gallery\skin-gallery.log"
         PostChecks = @("gallery-not-empty")
+    }
+    "clarity-legacy-gallery" = [pscustomobject]@{
+        # Clarity promises the same no-ambiguity treatment in Legacy Rows as
+        # in modern cards. Keep this narrow so it is a fast, focused gate.
+        Arguments  = @("--skin-gallery", (Join-Path $WorkspaceRoot "clarity-legacy-gallery"), "--skin-gallery-skins", "clarity")
+        ExtraEnv   = @{
+            QT_FORCE_STDERR_LOGGING = "1"
+            EAPO_GALLERY_LEGACY     = "1"
+        }
+        LogPath    = Join-Path $WorkspaceRoot "clarity-legacy-gallery\clarity-legacy-gallery.log"
+        PostChecks = @("gallery-not-empty", "clarity-legacy-shots")
     }
     "skin-switch" = [pscustomobject]@{
         Arguments  = @("--skin-switch-test")
@@ -184,6 +195,19 @@ foreach ($check in $plan.PostChecks) {
             # on a mismatch; this only guards against an empty run.
             if ($pngs.Count -lt 1) {
                 throw "Gallery produced no PNGs"
+            }
+        }
+        "clarity-legacy-shots" {
+            $outDir = $plan.Arguments[1]
+            $expected = @(
+                "heritage_clarity_dark_normal.png",
+                "heritage_clarity_dark_disabled.png",
+                "heritage_clarity_light_normal.png",
+                "heritage_clarity_light_disabled.png"
+            )
+            $missing = @($expected | Where-Object { -not (Test-Path (Join-Path $outDir $_)) })
+            if ($missing.Count -ne 0) {
+                throw "Clarity Legacy gallery missed expected screenshots: $($missing -join ', ')"
             }
         }
         "analysis-screenshot" {
