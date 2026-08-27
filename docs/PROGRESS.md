@@ -1,5 +1,7 @@
 # Progress
 
+- [x] 2026-08-27 published stable `v2.42.5` from `4b723927514c3df28d1108fd9c22dc1c76cc9fca` with 33 release assets. GitHub Actions run `33029195723` passed cppcheck, version bump, matrix preparation, memcheck, Pester, six native variants, cross-variant comparison, and release creation/completeness. It ships the live VST-preview and Program Files installer repairs.
+
 - [x] 2026-08-26 user reports the installed AVX-512 Editor candidate restores the missing normal live VST preview. This is the reported runtime acceptance result; Bertom Denoiser Classic's deliberate native-popup feed exception is unchanged and was not re-tested in this pass.
 
 - [x] 2026-08-26 installed the user-approved live-preview AVX-512 Editor-only candidate into `C:\Program Files\EqualizerAPO-XT-x64-avx512\current\Editor.exe`. Previous SHA-256 `02AD1CB1840AA96E90EB25EA171B80E72577048FD7326C22E3093691FE727B1C` is backed up at `artifacts\install-backups\live-preview-popup-avx512-20260826-204754\Editor.exe`; installed SHA-256 `8185116EFFEEB26B9B472550A6FCFD914172AF73ED5E7630A0D92BDB8717CF54` matches the candidate. Engine, configuration, plug-ins, and audio services are unchanged. Manual runtime verification is next.

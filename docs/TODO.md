@@ -1,5 +1,7 @@
 # TODO
 
+- [x] Published stable `v2.42.5` from `4b723927` after all six variant builds, Pester, cppcheck, memcheck, cross-variant comparison, packaging, and release completeness passed in run `33029195723`.
+
 - [x] User reports the installed AVX-512 preview Editor (`C:\Program Files\EqualizerAPO-XT-x64-avx512\current\Editor.exe`, SHA-256 `8185116EFFEEB26B9B472550A6FCFD914172AF73ED5E7630A0D92BDB8717CF54`) fixes the missing normal separate-panel live VST preview. This result does not newly re-test the deliberate Bertom Denoiser Classic popup exception.
 
 - [x] Installed the approved Editor-only Denoiser test build; configuration, engine, and plug-ins are unchanged.

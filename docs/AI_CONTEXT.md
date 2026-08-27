@@ -1,5 +1,7 @@
 # AI Context
 
+- 2026-08-27 stable `v2.42.5` is published from `4b723927514c3df28d1108fd9c22dc1c76cc9fca` with 33 assets: [release](https://github.com/ripDZL/EqualizerAPO-XT/releases/tag/v2.42.5), [run 33029195723](https://github.com/ripDZL/EqualizerAPO-XT/actions/runs/33029195723). All six variant builds, Pester, cppcheck, memcheck, cross-variant comparison, packaging, and release completeness pass. It contains the live VST-preview restoration and Program Files installer repairs. The local branch is fast-forwarded to the CI version-bump commit; the existing Program Files Editor remains the manually tested overlay, not a release reinstall.
+
 - 2026-08-26 live-preview manual result: the user reports the installed AVX-512 candidate fixed the missing live VST preview. This confirms the reported normal separate-panel path; the Bertom popup exception remains deliberately unchanged and was not re-tested in this pass.
 
 - 2026-08-26 installed live-preview candidate: user-approved Editor-only overlay in `C:\Program Files\EqualizerAPO-XT-x64-avx512\current\Editor.exe`; installed SHA-256 `8185116EFFEEB26B9B472550A6FCFD914172AF73ED5E7630A0D92BDB8717CF54`, prior SHA-256 `02AD1CB1840AA96E90EB25EA171B80E72577048FD7326C22E3093691FE727B1C`, backup `artifacts\install-backups\live-preview-popup-avx512-20260826-204754\Editor.exe`. Engine, configuration, plug-ins, and audio services are unchanged. Manual gate: normal VST `Open panel` live microphone response in modern cards and LegacyRows; verify Bertom still opens/closes safely.
