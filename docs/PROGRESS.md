@@ -1,5 +1,7 @@
 # Progress
 
+- [x] 2026-08-26 installed the user-approved live-preview AVX-512 Editor-only candidate into `C:\Program Files\EqualizerAPO-XT-x64-avx512\current\Editor.exe`. Previous SHA-256 `02AD1CB1840AA96E90EB25EA171B80E72577048FD7326C22E3093691FE727B1C` is backed up at `artifacts\install-backups\live-preview-popup-avx512-20260826-204754\Editor.exe`; installed SHA-256 `8185116EFFEEB26B9B472550A6FCFD914172AF73ED5E7630A0D92BDB8717CF54` matches the candidate. Engine, configuration, plug-ins, and audio services are unchanged. Manual runtime verification is next.
+
 - [x] 2026-08-26 live VST-preview regression: `083d138e` narrowed popup preview to embedded panels while fixing Bertom Denoiser Classic, removing normal separate-panel microphone/analyzer updates. Added a narrow popup policy used by both LegacyRows and modern cards: normal native panels regain the feed, while only `Bertom_DenoiserClassic.vst3` remains protected. The focused policy test failed at 1/4318 before the repair and passes at 4319; AVX-512 Editor Release build 2.42.4.0 SHA-256 `8185116EFFEEB26B9B472550A6FCFD914172AF73ED5E7630A0D92BDB8717CF54` passes. No installed files changed; manual runtime verification remains.
 
 - [x] 2026-08-26 local test candidate: rebuilt the repaired universal `EqualizerAPO-XT-Setup.exe` (2.42.4.0, SHA-256 `4B39DF838B213F639759C3767561B20DF3DB26C0D410F8BB8BC729E4E2C1CCBB`) and its no-install `--detect-only` check exits 0. It is ready for explicit user-approved Program Files install testing; no installed files changed.
