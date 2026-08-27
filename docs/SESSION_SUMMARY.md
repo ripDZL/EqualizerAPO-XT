@@ -1,5 +1,7 @@
 # Session Summary
 
+- 2026-08-27 branch workflow: `beta` is fast-forwarded to `76204c` after v2.42.5. User policy: develop/test on `beta`; promote only user-approved beta work to `main` for stable release. Do not send ordinary work directly to `main`.
+
 - 2026-08-27 stable release: `v2.42.5` is published from `4b723927514c3df28d1108fd9c22dc1c76cc9fca` with 33 assets. Run `33029195723` passed all six variants, Pester, cppcheck, memcheck, cross-variant comparison, packaging, and release completeness. The release contains the normal popup live VST-preview restoration and Program Files installer repairs. Local branch fast-forwarded to the CI bump commit; no new runtime install occurred.
 
 - 2026-08-26 live-preview runtime result: user reports the installed AVX-512 Editor restores normal separate-panel live VST preview. The Bertom Denoiser Classic native-popup exception remains unchanged and was not newly re-tested.
