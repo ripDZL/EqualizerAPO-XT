@@ -67,6 +67,18 @@ void testTheSkinRosterIsTheOneList()
 	requireTrue(ids.size() == roster.size(), "ids() has one entry per roster skin, in the same order");
 	expectTrue(ids == expectedIds,
 		"ids() preserves the exact scoped roster and its display order");
+	const QStringList expectedMenuIds = {
+		QStringLiteral("studio"), QStringLiteral("clarity"), QStringLiteral("graphite"),
+		QStringLiteral("minimal"), QStringLiteral("soft"), QStringLiteral("rack"),
+		QStringLiteral("matrix"), QStringLiteral("midnight"), QStringLiteral("arctic"),
+		QStringLiteral("ember"), QStringLiteral("violet"), QStringLiteral("solar"),
+		QStringLiteral("obsidian"), QStringLiteral("aurora"), QStringLiteral("forge"),
+		QStringLiteral("nebula"), QStringLiteral("noir"), QStringLiteral("legacy-slate"),
+		QStringLiteral("legacy-blue"), QStringLiteral("legacy-forest"),
+		QStringLiteral("legacy-bronze"), QStringLiteral("legacy-plum")
+	};
+	expectTrue(SkinThemeData::menuIds() == expectedMenuIds,
+		"the Interface menu groups Clarity High Contrast beside Graphite Clarity without renumbering shortcut ids");
 	expectTrue(SkinThemeData::entry(QStringLiteral("midnight")).qssBaseName == QStringLiteral("studio"),
 		"Midnight Console rides the Studio QSS grammar");
 	expectTrue(SkinThemeData::entry(QStringLiteral("midnight")).paintBaseId == QStringLiteral("studio"),

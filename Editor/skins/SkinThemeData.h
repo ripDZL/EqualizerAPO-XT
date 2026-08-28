@@ -68,10 +68,13 @@ struct ReadabilityCheck
 	bool passes() const { return ratio >= minimum; }
 };
 
-// Every built-in skin, in display order.
+// Every built-in skin, in stable registration order.
 const QVector<SkinEntry>& roster();
-// Just the ids, in the same order.
+// Just the ids, in the same stable order.
 QStringList ids();
+// The Interface-menu display order. It groups related themes without changing
+// ids(), whose stable order owns the existing Ctrl+Alt shortcut assignments.
+QStringList menuIds();
 // The entry for a stored id, alias-resolved. Never null: an unknown id resolves
 // to the first entry, the way resolveId() has always fallen back to Studio.
 const SkinEntry& entry(const QString& id);

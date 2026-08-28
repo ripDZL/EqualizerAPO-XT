@@ -1165,8 +1165,8 @@ void registerBundledFonts(bool includeSarasa)
 
 const QVector<SkinEntry>& roster()
 {
-	// Display order. Studio is first, and that is load-bearing twice over: it is
-	// the default skin and it is what an unknown id falls back to.
+	// Stable registration order. Studio is first, and that is load-bearing twice
+	// over: it is the default skin and what an unknown id falls back to.
 	static const QVector<SkinEntry> entries = {
 		{ QStringLiteral("studio"), QStringLiteral("studio"), QStringLiteral("studio"), &studioTokens },
 		{ QStringLiteral("clarity"), QStringLiteral("precision"), QStringLiteral("minimal"), &clarityTokens },
@@ -1191,7 +1191,7 @@ const QVector<SkinEntry>& roster()
 		{ QStringLiteral("legacy-forest"), QStringLiteral("precision"), QStringLiteral("minimal"), &legacyForestTokens },
 		{ QStringLiteral("legacy-bronze"), QStringLiteral("precision"), QStringLiteral("minimal"), &legacyBronzeTokens },
 		{ QStringLiteral("legacy-plum"), QStringLiteral("precision"), QStringLiteral("minimal"), &legacyPlumTokens },
-		// Append new built-ins: Ctrl+Alt+n bindings derive from this display order.
+		// Append new built-ins: Ctrl+Alt+n bindings derive from this stable order.
 		{ QStringLiteral("graphite"), QStringLiteral("precision"), QStringLiteral("minimal"), &graphiteTokens },
 	};
 	return entries;
@@ -1203,6 +1203,24 @@ QStringList ids()
 	result.reserve(roster().size());
 	for (const SkinEntry& skin : roster())
 		result.append(skin.id);
+	return result;
+}
+
+QStringList menuIds()
+{
+	QStringList result = ids();
+	const int graphiteIndex = result.indexOf(QStringLiteral("graphite"));
+	if (graphiteIndex < 0)
+		return result;
+
+	const QString graphiteId = result.takeAt(graphiteIndex);
+	const int clarityIndex = result.indexOf(QStringLiteral("clarity"));
+	if (clarityIndex < 0)
+	{
+		result.append(graphiteId);
+		return result;
+	}
+	result.insert(clarityIndex + 1, graphiteId);
 	return result;
 }
 
