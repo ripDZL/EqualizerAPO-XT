@@ -1,5 +1,7 @@
 # Session Summary
 
+- 2026-08-28 user-approved beta push: `origin/beta` fast-forwarded `e9fadd7a..f5f0ebde` after the user reports the installed Clarity-menu build looks good. It includes the theme grouping, gallery/test coverage, and install record. `main`, releases, installers, engine, and audio services are unchanged. Await beta CI before a release or stable promotion.
+
 - 2026-08-28 user-approved Clarity-menu test install: backed up Program Files AVX-512 `Editor.exe` (`1069728D7657A75EF4F4BEB37DAB56D1345B6659CF8FA610E619D330EFFE7147`) at `artifacts\install-backups\clarity-menu-avx512-20260828-185900\Editor.exe`, then installed and hash-verified local `aaca996` Editor (`6A5255E70E0B0485D26869E30A23842E58D4757081220C45ACD61CBA055A2B59`; v2.47.1.0). Only Editor changed; no engine/config/plug-in/audio-service, remote, or release change. Manual test: check the grouped Interface menu and apply both Clarity themes.
 
 - 2026-08-28 local-only Clarity menu: grouped `Clarity High Contrast` and `Graphite Clarity` together in View > Interface, with stable roster shortcut ordinals. EditorLogic 4,572, Release AVX-512 Editor, Clarity/Graphite dark/light menu gallery, and 12-shot Legacy readability gallery pass. No push, release, installer, or installed-runtime change; next is explicit user direction.
