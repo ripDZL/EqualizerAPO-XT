@@ -75,6 +75,8 @@ QStringList ids();
 // The Interface-menu display order. It groups related themes without changing
 // ids(), whose stable order owns the existing Ctrl+Alt shortcut assignments.
 QStringList menuIds();
+// The historic Ctrl+Alt ordinal for a built-in skin. Zero means no binding.
+int shortcutNumber(const QString& id);
 // The entry for a stored id, alias-resolved. Never null: an unknown id resolves
 // to the first entry, the way resolveId() has always fallen back to Studio.
 const SkinEntry& entry(const QString& id);

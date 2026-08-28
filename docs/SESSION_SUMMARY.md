@@ -1,5 +1,7 @@
 # Session Summary
 
+- 2026-08-28 local-only Clarity menu: grouped `Clarity High Contrast` and `Graphite Clarity` together in View > Interface, with stable roster shortcut ordinals. EditorLogic 4,572, Release AVX-512 Editor, Clarity/Graphite dark/light menu gallery, and 12-shot Legacy readability gallery pass. No push, release, installer, or installed-runtime change; next is explicit user direction.
+
 - 2026-08-28 beta test install: green beta run `33214676823` tested commit `2d91bd6d` and produced the AVX-512 artifact. With user approval, backed up the 75-file Program Files runtime at `artifacts\install-backups\beta-v2471-avx512-20260828-182654`, paused/restored Windows Audio, overlaid and hash-verified all 64 v2.47.1 files, and opened Editor. `main` and releases remain unchanged. Next gate: user runtime testing.
 
 - 2026-08-28 beta promotion: user approved fast-forwarding `origin/beta` from `0523964a` to `242a3f86`, the validated v2.47.1 integration. `main`, release state, installers, and installed runtime are unchanged. Next gate: beta CI; do not release or promote to `main` until it is green.

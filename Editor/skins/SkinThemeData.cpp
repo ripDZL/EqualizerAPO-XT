@@ -1224,6 +1224,12 @@ QStringList menuIds()
 	return result;
 }
 
+int shortcutNumber(const QString& id)
+{
+	const int index = ids().indexOf(id);
+	return index < 0 ? 0 : index + 1;
+}
+
 const SkinEntry& entry(const QString& id)
 {
 	const QString resolved = resolveId(id);

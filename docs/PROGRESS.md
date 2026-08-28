@@ -1,5 +1,7 @@
 # Progress
 
+- [x] 2026-08-28 local-only Clarity-menu follow-up: `Graphite Clarity` is directly after `Clarity High Contrast` in View > Interface while the stable roster continues to own shortcut ordinals. `EditorLogicTests` 4,572, Release AVX-512 Editor, Clarity/Graphite light/dark `thememenu` gallery, and 12-shot Legacy readability gallery pass. No remote, release, installer, or installed runtime changed.
+
 - [x] 2026-08-28 user-approved beta test install: green run `33214676823` produced AVX-512 artifact `EqualizerAPO-x64-avx512` for beta `2d91bd6d`. Backed up all 75 files from `C:\Program Files\EqualizerAPO-XT-x64-avx512\current` to `artifacts\install-backups\beta-v2471-avx512-20260828-182654`; paused/restored Windows Audio; overlaid and hash-verified all 64 candidate files. Editor/engine are v2.47.1.0 and Editor is running. No `main` or release change occurred.
 
 - [x] 2026-08-28 user approved and completed beta promotion: fast-forwarded `origin/beta` `0523964a..242a3f86` with the validated v2.47.1 integration. Preflight confirmed the old beta tip was an ancestor and `git diff --check` was clean. No `main` push, release, installer execution, or installed-runtime change occurred. Await beta CI before any release or stable promotion.

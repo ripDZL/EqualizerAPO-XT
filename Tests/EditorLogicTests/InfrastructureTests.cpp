@@ -79,6 +79,13 @@ void testTheSkinRosterIsTheOneList()
 	};
 	expectTrue(SkinThemeData::menuIds() == expectedMenuIds,
 		"the Interface menu groups Clarity High Contrast beside Graphite Clarity without renumbering shortcut ids");
+	for (const QString& skinId : expectedMenuIds)
+	{
+		expectTrue(SkinThemeData::shortcutNumber(skinId) == expectedIds.indexOf(skinId) + 1,
+			QStringLiteral("%1 keeps its historic Interface-menu Ctrl+Alt shortcut").arg(skinId));
+	}
+	expectTrue(SkinThemeData::shortcutNumber(QStringLiteral("unknown")) == 0,
+		"an unknown skin has no Interface-menu shortcut");
 	expectTrue(SkinThemeData::entry(QStringLiteral("midnight")).qssBaseName == QStringLiteral("studio"),
 		"Midnight Console rides the Studio QSS grammar");
 	expectTrue(SkinThemeData::entry(QStringLiteral("midnight")).paintBaseId == QStringLiteral("studio"),

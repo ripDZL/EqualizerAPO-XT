@@ -46,6 +46,7 @@
 #include <QHBoxLayout>
 #include <QImage>
 #include <QKeyEvent>
+#include <QKeySequence>
 #include <QLabel>
 #include <QLineEdit>
 #include <QLocale>
@@ -86,6 +87,8 @@
 #include "Editor/guis/PreampFilterGUI.h"
 #include "Editor/helpers/GUIHelper.h"
 #include "Editor/skins/ISkin.h"
+#include "Editor/skins/SkinDisplayNames.h"
+#include "Editor/skins/SkinThemeData.h"
 #include "Editor/skins/Skins.h"
 #include "Editor/widgets/AddCardRow.h"
 #include "Editor/widgets/EqGraphView.h"
@@ -527,7 +530,7 @@ QString buildFileDialogFixture(const QDir& outDir)
 // renderSkin() renders, per skin and per mode: every gallery row in
 // kStatesPerRow states (normal + hover from renderStates(commented=false), and
 // disabled from renderStates(commented=true)), plus the registered fixed
-// chrome shots (picker x3, toolbar, titlebar, menubar, menu, analysis,
+// chrome shots (picker x3, toolbar, titlebar, menubar, menu, thememenu, analysis,
 // addrow x2, seam, toast, controls, filedialog, graph x2, copyfold x5,
 // multiconvfold x2, logic, channelscope). run() multiplies these by skins x 2
 // modes to self-check the
@@ -556,6 +559,7 @@ const QList<GalleryScenario>& galleryScenarios()
 		{ QStringLiteral("titlebar"), { QStringLiteral("normal") } },
 		{ QStringLiteral("menubar"), { QStringLiteral("normal") } },
 		{ QStringLiteral("menu"), { QStringLiteral("normal") } },
+		{ QStringLiteral("thememenu"), { QStringLiteral("normal") } },
 		{ QStringLiteral("addrow"), { QStringLiteral("normal"), QStringLiteral("hover") } },
 		{ QStringLiteral("seam"), { QStringLiteral("hover") } },
 		{ QStringLiteral("toast"), { QStringLiteral("normal") } },
@@ -1183,6 +1187,33 @@ int renderSkin(const QDir& outDir, const QString& skinId, const QString& configP
 		menu->show();
 		QApplication::processEvents();
 		failures += saveGrab(menu, outDir, skinId, mode, QStringLiteral("menu"), QStringLiteral("normal")) ? 0 : 1;
+		delete menu;
+	}
+
+	// The actual built-in section of View > Interface. The gallery makes the
+	// Clarity pairing and its historic Ctrl+Alt bindings visible in every skin
+	// and mode, instead of leaving a menu-order change to a source-only check.
+	{
+		QMenu* menu = new QMenu();
+		menu->setObjectName(QStringLiteral("GalleryThemeMenu"));
+		QAction* modernAction = menu->addAction(QStringLiteral("Modern cards"));
+		modernAction->setCheckable(true);
+		modernAction->setChecked(true);
+		QAction* legacyAction = menu->addAction(QStringLiteral("Legacy rows"));
+		legacyAction->setCheckable(true);
+		menu->addSeparator();
+		for (const QString& menuSkinId : SkinThemeData::menuIds())
+		{
+			QAction* action = menu->addAction(SkinDisplayNames::displayName(menuSkinId));
+			action->setCheckable(true);
+			const int shortcutNumber = SkinThemeData::shortcutNumber(menuSkinId);
+			if (shortcutNumber > 0)
+				action->setShortcut(QKeySequence(QStringLiteral("Ctrl+Alt+%1").arg(shortcutNumber)));
+			action->setChecked(menuSkinId == QStringLiteral("clarity"));
+		}
+		menu->show();
+		QApplication::processEvents();
+		failures += saveGrab(menu, outDir, skinId, mode, QStringLiteral("thememenu"), QStringLiteral("normal")) ? 0 : 1;
 		delete menu;
 	}
 

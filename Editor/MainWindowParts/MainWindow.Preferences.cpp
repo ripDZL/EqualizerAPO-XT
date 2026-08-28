@@ -247,15 +247,14 @@ void MainWindow::setupRedesignActions()
 
 	skinActionGroup = new QActionGroup(this);
 	skinActionGroup->setExclusive(true);
-	const QStringList shortcutSkinIds = SkinThemeData::ids();
 	for (const QString& skinId : SkinThemeData::menuIds())
 	{
 		QAction* action = interfaceMenu->addAction(SkinDisplayNames::displayName(skinId));
 		action->setCheckable(true);
 		action->setData(skinId);
-		const int shortcutIndex = shortcutSkinIds.indexOf(skinId);
-		if (shortcutIndex >= 0)
-			action->setShortcut(QKeySequence(QStringLiteral("Ctrl+Alt+%1").arg(shortcutIndex + 1)));
+		const int shortcutNumber = SkinThemeData::shortcutNumber(skinId);
+		if (shortcutNumber > 0)
+			action->setShortcut(QKeySequence(QStringLiteral("Ctrl+Alt+%1").arg(shortcutNumber)));
 		skinActionGroup->addAction(action);
 	}
 	QSettings customThemeSettings(QString::fromWCharArray(EDITOR_REGPATH), QSettings::NativeFormat);
