@@ -1,5 +1,7 @@
 # TODO
 
+- [ ] With explicit approval, create a new integration worktree from `upstream/main` (`v2.47.1`) and port the tested Graphite/Clarity plus retained fork VST behavior. Resolve and revalidate the 18 preflight conflicts before any beta push; do not merge the current v2.42.5-derived candidate directly into upstream.
+
 - [ ] Complete the release-acceptance test for the installed Clarity/Graphite AVX-512 Editor candidate (`B528D825C13789A781ECE675AE7B642A6D1758765CCF4487919DE2828948165D`) at `C:\Program Files\EqualizerAPO-XT-x64-avx512\current\Editor.exe`. The user reports it seems to work; verify both themes in Modern and Legacy Rows, each in Dark and Light modes: labels, focus, disabled state, knob position/value, and VST rows (including wrapped VST3 channel fills) must remain unambiguous. The beta update is prepared locally; push its fast-forward only after explicit approval.
 
 - [x] Fast-forwarded `beta` to the v2.42.5 mainline. Future policy: work/test through `beta`, then only user-approved promotion to `main` starts a stable release. The durable guide is `docs/BranchWorkflow.md`, linked from the README.
