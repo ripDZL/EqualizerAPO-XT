@@ -11,7 +11,7 @@ Describe "Invoke-EditorOffscreenTest.ps1 planning" {
     }
 
     It "copies the velopack SONAME for every gate" {
-        foreach ($gate in @("selftest-vst", "skin-gallery", "skin-switch", "analysis-layout", "card-move", "card-selection", "power-toggle", "routing-edit")) {
+        foreach ($gate in @("selftest-vst", "skin-gallery", "readability-legacy-gallery", "skin-switch", "analysis-layout", "card-move", "card-selection", "power-toggle", "routing-edit")) {
             (PlanFor $gate).VelopackDllSource |
                 Should -Be "C:\ws\deps\velopack_libc\lib\velopack_libc_win_x64_msvc.dll"
         }
@@ -24,7 +24,16 @@ Describe "Invoke-EditorOffscreenTest.ps1 planning" {
             Should -Be "C:\ws\Tests\TestVst3Plugin\x64\Release\TestVst3Plugin.vst3"
         $plan.ExtraEnv["EAPO_GALLERY_VST2_PLUGIN"] |
             Should -Be "C:\ws\Tests\TestVst2Plugin\x64\Release\TestVst2Plugin.dll"
+        $plan.LogPath | Should -Be "C:\ws\skin-gallery\skin-gallery.log"
         $plan.PostChecks | Should -Contain "gallery-not-empty"
+    }
+
+    It "runs the readability themes through a dedicated Legacy Rows gallery" {
+        $plan = PlanFor "readability-legacy-gallery"
+        $plan.Arguments | Should -Be @("--skin-gallery", "C:\ws\readability-legacy-gallery", "--skin-gallery-skins", "clarity,graphite")
+        $plan.ExtraEnv["EAPO_GALLERY_LEGACY"] | Should -Be "1"
+        $plan.LogPath | Should -Be "C:\ws\readability-legacy-gallery\readability-legacy-gallery.log"
+        $plan.PostChecks | Should -Contain "readability-legacy-shots"
     }
 
     It "keeps the switch and move latency budgets" {
@@ -44,7 +53,7 @@ Describe "Invoke-EditorOffscreenTest.ps1 planning" {
     }
 
     It "captures stderr for the GUI-subsystem gates that log through qWarning" {
-        foreach ($gate in @("skin-switch", "analysis-layout", "card-move", "card-selection", "power-toggle", "routing-edit")) {
+        foreach ($gate in @("skin-gallery", "readability-legacy-gallery", "skin-switch", "analysis-layout", "card-move", "card-selection", "power-toggle", "routing-edit")) {
             $plan = PlanFor $gate
             $plan.LogPath | Should -Not -BeNullOrEmpty
             $plan.ExtraEnv["QT_FORCE_STDERR_LOGGING"] | Should -Be "1"
@@ -69,6 +78,7 @@ Describe "New-ReleaseChecksums.ps1" {
         $plan = & $scriptPath -Repository owner/repo -Tag v9.9.9 -WorkspaceRoot "C:\ws" -PlanOnly
         $plan.ChecksumsAssetName | Should -Be "SHA256SUMS.txt"
         $plan.SumsPath | Should -Be "C:\ws\SHA256SUMS.txt"
+        $plan.InstallerAssetPattern | Should -Be '(-Setup\.exe|\.msi)$'
     }
 
     It "writes the exact format Installer/AutoInstaller.cpp parses" {

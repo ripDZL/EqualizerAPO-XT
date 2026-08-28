@@ -54,6 +54,9 @@ bool upmixerMode = false;
 bool surround41Mode = false;
 bool surround41CineOnlyMode = false;
 bool busInfoMismatchMode = false;
+bool factoryHostContextNotImplementedMode = false;
+bool sidechainBusMode = false;
+bool adaptingArrangementMode = false;
 bool toneGeneratorMode = false;
 std::atomic<int> upmixerComponentCount{0};
 std::atomic<int> upmixerProcessCount{0};
@@ -417,24 +420,28 @@ public:
 		return kResultOk;
 	}
 	tresult PLUGIN_API setIoMode(IoMode) override { return kResultOk; }
-	int32 PLUGIN_API getBusCount(MediaType type, BusDirection) override { return type == kAudio ? 1 : 0; }
+	int32 PLUGIN_API getBusCount(MediaType type, BusDirection direction) override
+	{
+		return type == kAudio ? (sidechainBusMode && direction == kInput ? 2 : 1) : 0;
+	}
 	tresult PLUGIN_API getBusInfo(MediaType type, BusDirection direction, int32 index, BusInfo& info) override
 	{
-		if (type != kAudio || index != 0)
+		if (type != kAudio || index < 0 || index >= getBusCount(type, direction))
 			return kInvalidArgument;
 		std::memset(&info, 0, sizeof(info));
 		info.mediaType = kAudio;
 		info.direction = direction;
 		info.channelCount = 2;
-		info.busType = kMain;
-		info.flags = BusInfo::kDefaultActive;
-		copyString128(info.name, direction == kInput ? L"Stereo In" : L"Stereo Out");
+		info.busType = index == 0 ? kMain : kAux;
+		info.flags = index == 0 ? BusInfo::kDefaultActive : 0;
+		copyString128(info.name, index == 0
+			? (direction == kInput ? L"Stereo In" : L"Stereo Out") : L"Stereo Sidechain");
 		return kResultOk;
 	}
 	tresult PLUGIN_API getRoutingInfo(RoutingInfo&, RoutingInfo&) override { return kNotImplemented; }
-	tresult PLUGIN_API activateBus(MediaType type, BusDirection, int32 index, TBool) override
+	tresult PLUGIN_API activateBus(MediaType type, BusDirection direction, int32 index, TBool) override
 	{
-		return type == kAudio && index == 0 ? kResultOk : kInvalidArgument;
+		return type == kAudio && index >= 0 && index < getBusCount(type, direction) ? kResultOk : kInvalidArgument;
 	}
 	tresult PLUGIN_API setActive(TBool state) override { active.store(state != 0); return kResultOk; }
 	tresult PLUGIN_API setState(IBStream* stream) override { return readState(stream, state) ? kResultOk : kResultFalse; }
@@ -446,11 +453,18 @@ public:
 	tresult PLUGIN_API setBusArrangements(SpeakerArrangement* inputs, int32 numIns,
 		SpeakerArrangement* outputs, int32 numOuts) override
 	{
-		return numIns == 1 && numOuts == 1 && inputs != nullptr && outputs != nullptr
-			&& inputs[0] == SpeakerArr::kStereo && outputs[0] == SpeakerArr::kStereo ? kResultOk : kResultFalse;
+		const int expectedInputBusCount = sidechainBusMode ? 2 : 1;
+		return numIns == expectedInputBusCount && numOuts == 1 && inputs != nullptr && outputs != nullptr
+			&& inputs[0] == SpeakerArr::kStereo && outputs[0] == SpeakerArr::kStereo
+			&& (!sidechainBusMode || inputs[1] == SpeakerArr::kStereo) ? kResultOk : kResultFalse;
 	}
-	tresult PLUGIN_API getBusArrangement(BusDirection, int32 index, SpeakerArrangement& arrangement) override
+	tresult PLUGIN_API getBusArrangement(BusDirection direction, int32 index, SpeakerArrangement& arrangement) override
 	{
+		if (sidechainBusMode && direction == kInput && index == 1)
+		{
+			arrangement = SpeakerArr::kStereo;
+			return kResultOk;
+		}
 		if (index != 0)
 			return kInvalidArgument;
 		arrangement = SpeakerArr::kStereo;
@@ -695,6 +709,12 @@ public:
 		const bool surroundIntoStereo = isSurround(inputs[0]) && outputs[0] == SpeakerArr::kStereo;
 		if (!symmetric && !stereoIntoSurround && !surroundIntoStereo)
 			return kResultFalse;
+		if (adaptingArrangementMode && symmetric && isSurround(inputs[0]))
+		{
+			inputArrangement = SpeakerArr::k71Cine;
+			outputArrangement = SpeakerArr::k71Cine;
+			return kResultFalse;
+		}
 		inputArrangement = inputs[0];
 		outputArrangement = outputs[0];
 		return kResultOk;
@@ -1122,7 +1142,7 @@ public:
 		{
 			if (surround41Mode)
 				instance = static_cast<IComponent*>(new TestSurround41Component());
-			else if (upmixerMode)
+			else if (upmixerMode || adaptingArrangementMode)
 				instance = static_cast<IComponent*>(new TestUpmixerComponent());
 			else
 			{
@@ -1176,6 +1196,13 @@ public:
 			hostContextSet = false;
 			return kResultOk;
 		}
+		if (factoryHostContextNotImplementedMode)
+		{
+			// Some real factories do not consume this optional capability, but
+			// remain fully usable VST3 factories.
+			hostContextSet = true;
+			return kNotImplemented;
+		}
 		if (hostContextSetCount++ != 0)
 			return kResultFalse;
 		IHostApplication* host = nullptr;
@@ -1219,6 +1246,9 @@ extern "C" __declspec(dllexport) bool InitDll()
 	rejectComponentInitialize = wcsstr(modulePath, L"RejectComponent.vst3") != nullptr;
 	componentStateUnavailable = wcsstr(modulePath, L"ControllerState.vst3") != nullptr;
 	busInfoMismatchMode = wcsstr(modulePath, L"BusInfoMismatch.vst3") != nullptr;
+	factoryHostContextNotImplementedMode = wcsstr(modulePath, L"FactoryHostContextNotImplemented.vst3") != nullptr;
+	sidechainBusMode = wcsstr(modulePath, L"SidechainBus.vst3") != nullptr;
+	adaptingArrangementMode = wcsstr(modulePath, L"AdaptedArrangement.vst3") != nullptr;
 	upmixerMode = wcsstr(modulePath, L"Upmixer.vst3") != nullptr || busInfoMismatchMode;
 	surround41CineOnlyMode = wcsstr(modulePath, L"Surround41CineOnly.vst3") != nullptr;
 	surround41Mode = wcsstr(modulePath, L"Surround41.vst3") != nullptr || surround41CineOnlyMode;
@@ -1248,7 +1278,10 @@ extern "C" __declspec(dllexport) bool ExitDll()
 	surround41Mode = false;
 	surround41CineOnlyMode = false;
 	busInfoMismatchMode = false;
-	toneGeneratorMode = false;
+factoryHostContextNotImplementedMode = false;
+sidechainBusMode = false;
+adaptingArrangementMode = false;
+toneGeneratorMode = false;
 	return true;
 }
 

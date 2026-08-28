@@ -798,7 +798,7 @@ std::vector<ShotFixture> shotFixtures()
 		L"SHA-256 matches the published checksum (" + shortHash(
 			L"91fb5d115b20f8d78fb8e3ff4f0e81334122b9819fda29923d0e4c9be27e9757") + L")");
 	finishStep(handoff, kStepLaunch,
-		L"Velopack installer started \u2014 this window closes itself");
+		L"System-wide installation completed under Program Files");
 	handoff.completed = true;
 	fixtures.push_back({ L"04-handoff", handoff });
 

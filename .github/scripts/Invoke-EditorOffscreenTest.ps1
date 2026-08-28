@@ -21,7 +21,7 @@
 param(
     [Parameter(Mandatory)] [string] $WorkspaceRoot,
     [Parameter(Mandatory)]
-    [ValidateSet("selftest-vst", "skin-gallery", "skin-switch", "analysis-layout", "card-move", "card-selection", "power-toggle", "routing-edit")]
+    [ValidateSet("selftest-vst", "skin-gallery", "readability-legacy-gallery", "skin-switch", "analysis-layout", "card-move", "card-selection", "power-toggle", "routing-edit")]
     [string] $Gate,
     [string] $Platform = "x64",
     [switch] $PlanOnly
@@ -48,11 +48,23 @@ $gates = @{
         # states and the VST2 stale-keys warning. A copy named Upmixer.vst3
         # flips TestVst3Plugin into its Stereo -> 7.1 mode (filename-driven).
         ExtraEnv   = @{
+            QT_FORCE_STDERR_LOGGING = "1"
             EAPO_GALLERY_VST3_PLUGIN  = Join-Path $WorkspaceRoot "Tests\TestVst3Plugin\$Platform\Release\TestVst3Plugin.vst3"
             EAPO_GALLERY_VST2_PLUGIN  = Join-Path $WorkspaceRoot "Tests\TestVst2Plugin\$Platform\Release\TestVst2Plugin.dll"
         }
-        LogPath    = $null
+        LogPath    = Join-Path $WorkspaceRoot "skin-gallery\skin-gallery.log"
         PostChecks = @("gallery-not-empty")
+    }
+    "readability-legacy-gallery" = [pscustomobject]@{
+        # The readability themes promise the same no-ambiguity treatment in
+        # Legacy Rows as in modern cards. Keep this narrow and deliberate.
+        Arguments  = @("--skin-gallery", (Join-Path $WorkspaceRoot "readability-legacy-gallery"), "--skin-gallery-skins", "clarity,graphite")
+        ExtraEnv   = @{
+            QT_FORCE_STDERR_LOGGING = "1"
+            EAPO_GALLERY_LEGACY     = "1"
+        }
+        LogPath    = Join-Path $WorkspaceRoot "readability-legacy-gallery\readability-legacy-gallery.log"
+        PostChecks = @("gallery-not-empty", "readability-legacy-shots")
     }
     "skin-switch" = [pscustomobject]@{
         Arguments  = @("--skin-switch-test")
@@ -189,6 +201,19 @@ foreach ($check in $plan.PostChecks) {
             # on a mismatch; this only guards against an empty run.
             if ($pngs.Count -lt 1) {
                 throw "Gallery produced no PNGs"
+            }
+        }
+        "readability-legacy-shots" {
+            $outDir = $plan.Arguments[1]
+            $expected = foreach ($themeId in @("clarity", "graphite")) {
+                foreach ($mode in @("dark", "light")) {
+                    "heritage_${themeId}_${mode}_normal.png"
+                    "heritage_${themeId}_${mode}_disabled.png"
+                }
+            }
+            $missing = @($expected | Where-Object { -not (Test-Path (Join-Path $outDir $_)) })
+            if ($missing.Count -ne 0) {
+                throw "Readability Legacy gallery missed expected screenshots: $($missing -join ', ')"
             }
         }
         "analysis-screenshot" {

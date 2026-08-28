@@ -17,6 +17,7 @@ Describe "New-ReleaseNotes.ps1" {
                 )
                 foreach ($channel in $channels) {
                     $assets += @{ name = "EqualizerAPO-XT-$channel-$channel-Setup.exe"; size = 10; browser_download_url = "https://example/$channel" }
+                    $assets += @{ name = "EqualizerAPO-XT-$channel-$channel.msi"; size = 10; browser_download_url = "https://example/$channel-msi" }
                     $assets += @{ name = "releases.$channel.json"; size = 10; browser_download_url = "https://example/$channel-feed" }
                 }
                 # Prefix neighbours: exact/prefix classification must not let
@@ -62,6 +63,7 @@ Describe "New-ReleaseNotes.ps1" {
         $notes = Get-Content $output -Raw
         foreach ($channel in (Import-PowerShellDataFile $manifestPath).Variants.Channel) {
             $notes | Should -Match ([regex]::Escape("Manual installer for the $channel channel."))
+            $notes | Should -Match ([regex]::Escape("System-wide installer for the $channel channel."))
             $notes | Should -Match ([regex]::Escape("Velopack update feed for the $channel channel."))
         }
         $notes | Should -Match ([regex]::Escape("Velopack full package for the x64-avx channel."))

@@ -150,6 +150,7 @@ public:
 	const QList<std::shared_ptr<AbstractAPOInfo>>& getOutputDevices() const;
 	const QList<std::shared_ptr<AbstractAPOInfo>>& getInputDevices() const;
 	std::shared_ptr<AbstractAPOInfo> getSelectedDevice() const;
+	std::shared_ptr<AbstractAPOInfo> getPreviewDeviceContext() const;
 	int getSelectedChannelMask() const;
 
 	const QSet<Item*>& getSelectedItems() const;
@@ -223,7 +224,7 @@ private:
 	// lookup, legacy factory chain, card override for commented lines,
 	// decorator gating). Shared by updateGuis() and updateSingleRowGui() so
 	// policy edits happen once.
-	IFilterGUI* createRowGui(const QString& line, const FilterCardDescriptor* preparedDescriptor = nullptr);
+	IFilterGUI* createRowGui(Item* item, const FilterCardDescriptor* preparedDescriptor = nullptr);
 	// Inserts the mime data's lines at dropRow and makes them the selection.
 	// Shared by paste() and dropEvent(). Returns the number of inserted lines
 	// so the callers can take the incremental single-row path.
@@ -290,6 +291,7 @@ private:
 	QList<std::shared_ptr<AbstractAPOInfo>> outputDevices;
 	QList<std::shared_ptr<AbstractAPOInfo>> inputDevices;
 	std::shared_ptr<AbstractAPOInfo> selectedDevice;
+	Item* previewContextItem = nullptr;
 	int selectedChannelMask = 0;
 	QString configPath;
 	int minimumHeightHint = 0;

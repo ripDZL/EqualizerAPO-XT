@@ -9,6 +9,10 @@ Describe "ReleaseAssets grammar module" {
             Should -Be "EqualizerAPO-XT-x64-avx2-x64-avx2-Setup.exe"
         Get-SetupAssetName -Channel "arm64-neon" |
             Should -Be "EqualizerAPO-XT-arm64-neon-arm64-neon-Setup.exe"
+        Get-MsiAssetName -Channel "x64-avx2" |
+            Should -Be "EqualizerAPO-XT-x64-avx2-x64-avx2.msi"
+        Get-MsiAssetName -Channel "arm64-neon" |
+            Should -Be "EqualizerAPO-XT-arm64-neon-arm64-neon.msi"
     }
 
     It "spells the companion assets" {
@@ -27,6 +31,7 @@ Describe "ReleaseAssets grammar module" {
         $header | Should -Match 'productPrefix\[\] = L"EqualizerAPO-XT";'
         $header | Should -Match 'checksumsAssetName\[\] = L"SHA256SUMS\.txt";'
         $header | Should -Match ([regex]::Escape('velopackPackId(channel) + L"-" + channel + L"-Setup.exe"'))
+        $header | Should -Match ([regex]::Escape('velopackPackId(channel) + L"-" + channel + L".msi"'))
         $header | Should -Match ([regex]::Escape('std::wstring(productPrefix) + L"-" + channel'))
         $header | Should -Match ([regex]::Escape('std::wstring(productPrefix) + L"-Setup.exe"'))
     }
@@ -53,6 +58,8 @@ Describe "ReleaseAssets grammar module" {
         foreach ($channel in @($manifest.Variants.Channel)) {
             Get-SetupAssetName -Channel $channel |
                 Should -Match "^EqualizerAPO-XT-$([regex]::Escape($channel))-$([regex]::Escape($channel))-Setup\.exe$"
+            Get-MsiAssetName -Channel $channel |
+                Should -Match "^EqualizerAPO-XT-$([regex]::Escape($channel))-$([regex]::Escape($channel))\.msi$"
         }
     }
 

@@ -27,6 +27,8 @@
 
 #include "Editor/IFilterGUI.h"
 #include "Editor/helpers/PanelPreviewFeeder.h"
+#include "Editor/helpers/VSTPluginLivePreview.h"
+#include "Editor/helpers/VSTPreviewEndpoint.h"
 #include "Editor/widgets/cards/ReferenceCardView.h"
 #include "Editor/widgets/cards/VSTBusModel.h"
 #include "Editor/widgets/cards/VSTSlotFillModel.h"
@@ -53,6 +55,7 @@ public:
 		const std::optional<VST3BusContract>& busContract = std::nullopt,
 		std::vector<std::wstring> deviceChannelNames = std::vector<std::wstring>(),
 		FilterTable* filterTable = nullptr,
+		const VSTPreviewEndpoint& previewEndpoint = {},
 		QWidget* parent = nullptr,
 		std::vector<std::wstring> inputChannels = {},
 		std::vector<std::wstring> outputChannels = {});
@@ -70,10 +73,12 @@ private slots:
 	void autoApplyToggled(bool checked);
 	void pathCommitted(const QString& text);
 	void selectFile();
+	void selectVST3Bundle();
 	void importToConfig();
 	void embedToggled(bool checked);
 	void busLayoutsPicked(VST3BusLayout input, VST3BusLayout output);
 	void removeBusLayouts();
+	void livePreviewToggled(bool checked);
 	void fillSlotPicked(int slot, const QString& value, bool output);
 	void fillLatchToggled();
 	void removeChannelFill();
@@ -82,6 +87,7 @@ private slots:
 private:
 	void initPlugin();
 	bool embedPlugin();
+	void updateLivePreview();
 	void updateReferenceState();
 	void updateBusControls();
 	void updateFillRails();
@@ -94,6 +100,7 @@ private:
 	std::wstring chunkData;
 	std::unordered_map<std::wstring, float> paramMap;
 	bool embedded = false;
+	bool panelDialogOpen = false;
 	bool autoApplyDialog = true;
 	VSTBusModel busModel;
 	// Per-slot channel fill for the forced layouts. The card has no editor
@@ -119,6 +126,8 @@ private:
 	// updateBusControls, consumed by updateReferenceState.
 	QString busStatusText;
 	ReferenceCardState::Severity busStatusSeverity = ReferenceCardState::Severity::None;
+	VSTPreviewEndpoint previewEndpoint;
+	VSTPluginLivePreview livePreview;
 	QElapsedTimer lastReadTimer;
 
 	FileReferenceController* reference = nullptr;
@@ -137,6 +146,7 @@ private:
 	QAction* removeBusAction = nullptr;
 	QAction* removeFillAction = nullptr;
 	VSTBusStrip* busStrip = nullptr;
+	QAction* livePreviewAction = nullptr;
 	VSTSlotFillRail* inputRail = nullptr;
 	VSTSlotFillRail* outputRail = nullptr;
 	QFrame* frame = nullptr;

@@ -57,15 +57,34 @@ void testAutoInstallerChannelMapping()
 
 void testAutoInstallerAssetGrammar()
 {
-	expectEqual(wide(assetName(L"x64-avx2")),
-		QStringLiteral("EqualizerAPO-XT-x64-avx2-x64-avx2-Setup.exe"),
-		"asset name follows the shared grammar header");
-	const QString url = wide(downloadUrl(L"arm64-neon"));
-	expectTrue(url.startsWith(QStringLiteral("https://github.com/")),
-		"download URL is absolute https");
-	expectTrue(url.endsWith(QStringLiteral(
-		"/releases/latest/download/EqualizerAPO-XT-arm64-neon-arm64-neon-Setup.exe")),
-		"download URL uses the always-latest redirect path");
+	expectEqual(wide(machineInstallerAssetName(L"x64-avx2")),
+		QStringLiteral("EqualizerAPO-XT-x64-avx2-x64-avx2.msi"),
+		"machine installer name follows the shared grammar header");
+	expectEqual(wide(machineInstallSubdirectory(L"x64-avx2")),
+		QStringLiteral("EqualizerAPO-XT-x64-avx2"),
+		"machine installs use the channel pack root in Program Files, away from legacy EqualizerAPO");
+	expectEqual(wide(resolveProgramFilesX64Path(L"C:\\Program Files", L"C:\\Registry Fallback")),
+		QStringLiteral("C:\\Program Files"),
+		"a resolved shell known-folder path stays authoritative");
+	expectEqual(wide(resolveProgramFilesX64Path(L"", L"C:\\Program Files")),
+		QStringLiteral("C:\\Program Files"),
+		"x86 known-folder failure falls back to the protected native registry path");
+	expectTrue(resolveProgramFilesX64Path(L"", L"").empty(),
+		"missing trusted Program Files sources still fail safely");
+	const QString url = wide(machineInstallerDownloadUrl(L"arm64-neon"));
+	expectEqual(url,
+		QStringLiteral("https://github.com/ripDZL/EqualizerAPO-XT/releases/latest/download/EqualizerAPO-XT-arm64-neon-arm64-neon.msi"),
+		"stable installer URL stays on this fork and uses the latest redirect");
+	expectEqual(wide(releasePageUrl()),
+		QStringLiteral("https://github.com/ripDZL/EqualizerAPO-XT/releases/latest"),
+		"stable error UI points to this fork's latest page");
+	const QString betaUrl = wide(machineInstallerDownloadUrl(L"arm64-neon", L"v2.42.3-beta.1"));
+	expectEqual(betaUrl,
+		QStringLiteral("https://github.com/ripDZL/EqualizerAPO-XT/releases/download/v2.42.3-beta.1/EqualizerAPO-XT-arm64-neon-arm64-neon.msi"),
+		"beta installer URL stays on this fork and pins the prerelease tag");
+	expectEqual(wide(releasePageUrl(L"v2.42.3-beta.1")),
+		QStringLiteral("https://github.com/ripDZL/EqualizerAPO-XT/releases/tag/v2.42.3-beta.1"),
+		"beta error UI points to the matching prerelease page");
 }
 
 void testAutoInstallerChecksumParsing()

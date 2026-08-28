@@ -11,6 +11,7 @@ Describe "Publish-Release.ps1 resume planning" {
             )
             foreach ($channel in $channels) {
                 $assets += "EqualizerAPO-XT-$channel-$channel-Setup.exe"
+                $assets += "EqualizerAPO-XT-$channel-$channel.msi"
                 $assets += "releases.$channel.json"
             }
             $assets
@@ -32,6 +33,21 @@ Describe "Publish-Release.ps1 resume planning" {
         $assets = @($assets | Where-Object {
             $_ -ne "EqualizerAPO-XT-$missing-$missing-Setup.exe" -and
             $_ -ne "releases.$missing.json"
+        })
+        $plan = & $scriptPath -Repository owner/repo -Tag v9.9.9 -PackVersion 9.9.9 `
+            -ManifestPath $manifestPath -AssetNames $assets `
+            -ReleaseNotes "old notes" -PassThru
+        $plan.Complete | Should -BeFalse
+        $plan.MissingChannels | Should -Be @($missing)
+        $plan.NeedsChecksums | Should -BeTrue
+        $plan.NeedsNotes | Should -BeTrue
+    }
+
+    It "requires the system-wide MSI before considering a channel complete" {
+        $assets = @(CompleteAssets 9.9.9)
+        $missing = $channels[2]
+        $assets = @($assets | Where-Object {
+            $_ -ne "EqualizerAPO-XT-$missing-$missing.msi"
         })
         $plan = & $scriptPath -Repository owner/repo -Tag v9.9.9 -PackVersion 9.9.9 `
             -ManifestPath $manifestPath -AssetNames $assets `

@@ -20,6 +20,11 @@ function Get-SetupAssetName {
     "$(Get-VelopackPackId -Channel $Channel)-$Channel-Setup.exe"
 }
 
+function Get-MsiAssetName {
+    param([Parameter(Mandatory)] [string] $Channel)
+    "$(Get-VelopackPackId -Channel $Channel)-$Channel.msi"
+}
+
 function Get-UniversalSetupAssetName {
     "$script:ProductPrefix-Setup.exe"
 }
@@ -54,6 +59,6 @@ function Select-PreviousReleaseTag {
     return $null
 }
 
-Export-ModuleMember -Function Get-VelopackPackId, Get-SetupAssetName,
+Export-ModuleMember -Function Get-VelopackPackId, Get-SetupAssetName, Get-MsiAssetName,
 Get-UniversalSetupAssetName, Get-FeedAssetName, Get-SourceZipAssetName,
 Get-ChecksumsAssetName, Select-PreviousReleaseTag

@@ -32,6 +32,15 @@ inline std::wstring setupAssetName(const std::wstring& channel)
 	return velopackPackId(channel) + L"-" + channel + L"-Setup.exe";
 }
 
+// The per-machine Velopack MSI mirrors the setup executable's doubled
+// channel shape. The auto-detect front door downloads this asset so it can
+// install into Program Files; the setup executable remains available for
+// existing per-user installs.
+inline std::wstring msiAssetName(const std::wstring& channel)
+{
+	return velopackPackId(channel) + L"-" + channel + L".msi";
+}
+
 inline std::wstring universalSetupAssetName()
 {
 	return std::wstring(productPrefix) + L"-Setup.exe";

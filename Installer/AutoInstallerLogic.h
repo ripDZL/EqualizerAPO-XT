@@ -50,13 +50,28 @@ std::wstring channelForCpu(const CpuFeatures& features, int* outIndex = nullptr)
 
 // Per-variant installer asset name; the shared grammar header explains the
 // doubled channel.
-std::wstring assetName(const std::wstring& channel);
+std::wstring machineInstallerAssetName(const std::wstring& channel);
 
 // Always-latest download path. GitHub redirects /releases/latest/download/<asset>
 // to the newest release's asset, so this binary never needs rebuilding per release.
 std::wstring latestAssetPath(const std::wstring& asset);
-std::wstring assetPath(const std::wstring& channel);
-std::wstring downloadUrl(const std::wstring& channel);
+// A nonempty releaseTag pins a prerelease instead of using GitHub's stable-only
+// latest redirect. This makes beta test installers resolve their own assets.
+std::wstring releaseAssetPath(const std::wstring& asset, const std::wstring& releaseTag = std::wstring());
+std::wstring releasePageUrl(const std::wstring& releaseTag = std::wstring());
+std::wstring machineInstallerAssetPath(const std::wstring& channel, const std::wstring& releaseTag = std::wstring());
+std::wstring machineInstallerDownloadUrl(const std::wstring& channel, const std::wstring& releaseTag = std::wstring());
+
+// A relative suffix only: AutoInstaller.cpp resolves the Program Files known
+// folder at runtime. Keeping the product root distinct protects a legacy
+// C:\\Program Files\\EqualizerAPO installation from a machine-wide XT install.
+std::wstring machineInstallSubdirectory(const std::wstring& channel);
+
+// Prefer the shell-known Program Files path, but use the protected native
+// registry value when an x86 caller cannot resolve FOLDERID_ProgramFilesX64.
+// Empty means neither trusted source was available.
+std::wstring resolveProgramFilesX64Path(const std::wstring& knownFolderPath,
+	const std::wstring& registryProgramFilesPath);
 
 // Find fileName in sha256sum-style checksum text and return its digest as
 // lowercase hex. Each line is "<64 hex chars>  <name>"; the binary-mode form

@@ -38,12 +38,15 @@ VSTPluginFilterGUIDialog::VSTPluginFilterGUIDialog(QWidget* parent, VSTPluginIns
 
 	HWND hwnd = (HWND)ui->frame->winId();
 
-	short width, height;
+	short width = 0;
+	short height = 0;
 
 	// Size the plugin for the monitor the dialog opens on. The parent is already
 	// shown, so its device pixel ratio is reliable; the dialog's own is not yet.
 	double scaleFactor = (parent != nullptr) ? parent->devicePixelRatioF() : devicePixelRatioF();
-	effect->startEditing(hwnd, &width, &height, scaleFactor);
+	panelOpened = effect->startEditing(hwnd, &width, &height, scaleFactor);
+	if (!panelOpened)
+		return;
 
 	ui->frame->setFixedSize(width, height);
 	effect->setSizeWindowFunc(bind(&VSTPluginFilterGUIDialog::onSizeWindow, this, _1, _2));
@@ -51,8 +54,11 @@ VSTPluginFilterGUIDialog::VSTPluginFilterGUIDialog(QWidget* parent, VSTPluginIns
 
 VSTPluginFilterGUIDialog::~VSTPluginFilterGUIDialog()
 {
-	effect->stopEditing();
-	effect->setSizeWindowFunc(nullptr);
+	if (panelOpened && effect != nullptr)
+	{
+		effect->stopEditing();
+		effect->setSizeWindowFunc(nullptr);
+	}
 }
 
 QPushButton* VSTPluginFilterGUIDialog::getApplyButton()
@@ -63,6 +69,11 @@ QPushButton* VSTPluginFilterGUIDialog::getApplyButton()
 QCheckBox* VSTPluginFilterGUIDialog::getAutoApplyCheckBox()
 {
 	return ui->autoApplyCheckBox;
+}
+
+bool VSTPluginFilterGUIDialog::hasPluginPanel() const
+{
+	return panelOpened;
 }
 
 void VSTPluginFilterGUIDialog::onSizeWindow(int w, int h)

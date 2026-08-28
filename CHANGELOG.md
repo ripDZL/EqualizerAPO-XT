@@ -14,6 +14,14 @@ tags are clean `vX.Y.Z` names. Installers for every version are on the
 
 ## Unreleased
 
+- **Clarity and Graphite Clarity make the Editor easier to read.** Both new
+  themes cover Modern cards and Legacy Rows in dark and light modes with
+  clear labels, focus states, disabled rows, controls, and knob values.
+  Graphite uses a dark-grey instrument style, while Clarity prioritizes
+  maximum contrast.
+- **Legacy VST3 channel-fill controls wrap cleanly.** Long channel layouts no
+  longer overlap their labels or controls.
+
 ## v2.47.1 — 2026-08-28
 
 - **Minimal skin: the Copy and MultiConvolution step list is editable

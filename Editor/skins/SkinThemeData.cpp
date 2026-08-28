@@ -14,12 +14,155 @@
 #include <QFont>
 #include <QFontDatabase>
 #include <QStyleFactory>
+#include <QtMath>
+
+#include <limits>
 
 // finishTokens; header-only, no link dependency on the skin classes.
 #include "shared/SkinSupport.h"
 
 namespace
 {
+double relativeLuminance(const QColor& color)
+{
+	if (!color.isValid())
+		return 0.0;
+
+	auto linear = [](double channel) {
+		channel /= 255.0;
+		return channel <= 0.04045
+			? channel / 12.92
+			: qPow((channel + 0.055) / 1.055, 2.4);
+	};
+	return 0.2126 * linear(color.red())
+		+ 0.7152 * linear(color.green())
+		+ 0.0722 * linear(color.blue());
+}
+
+double contrastRatioForColors(const QColor& foreground, const QColor& background)
+{
+	if (!foreground.isValid() || !background.isValid())
+		return 0.0;
+	const double lighter = qMax(relativeLuminance(foreground), relativeLuminance(background));
+	const double darker = qMin(relativeLuminance(foreground), relativeLuminance(background));
+	return (lighter + 0.05) / (darker + 0.05);
+}
+
+double minimumInkContrast(const QColor& ink, const SkinTokens& tokens)
+{
+	const QColor grounds[] = {
+		QColor(tokens.background),
+		QColor(tokens.surface),
+		QColor(tokens.card),
+		QColor(tokens.cardHover),
+		QColor(tokens.cardSelected),
+		QColor(tokens.surfaceSunken)
+	};
+	double minimum = std::numeric_limits<double>::max();
+	for (const QColor& ground : grounds)
+		minimum = qMin(minimum, contrastRatioForColors(ink, ground));
+	return minimum;
+}
+
+QString raiseOrLowerInkForReadability(const QString& token, const SkinTokens& tokens)
+{
+	const QColor original(token);
+	if (!original.isValid() || minimumInkContrast(original, tokens) >= 4.5)
+		return token;
+
+	QColor hsl = original.toHsl();
+	int hue = 0;
+	int saturation = 0;
+	int lightness = 0;
+	int alpha = 255;
+	hsl.getHsl(&hue, &saturation, &lightness, &alpha);
+
+	const int direction = tokens.dark ? 1 : -1;
+	for (int candidateLightness = lightness;
+		candidateLightness >= 0 && candidateLightness <= 255;
+		candidateLightness += direction)
+	{
+		QColor candidate;
+		candidate.setHsl(hue, saturation, candidateLightness, alpha);
+		if (minimumInkContrast(candidate, tokens) >= 4.5)
+			return candidate.name(QColor::HexRgb).toUpper();
+	}
+
+	// A custom token table can place dark and light grounds together, where no
+	// single ink can meet the floor. Built-in palettes never take this path,
+	// but keeping the original preserves the user's edit for Theme Lab to flag.
+	return token;
+}
+
+void enforceTextReadability(SkinTokens& tokens)
+{
+	// Preserve each skin's hue and hierarchy, only moving an ink's HSL
+	// lightness far enough to pass every surface it is used on. This puts the
+	// contrast repair at the shared token seam so variants cannot drift.
+	tokens.text = raiseOrLowerInkForReadability(tokens.text, tokens);
+	tokens.mutedText = raiseOrLowerInkForReadability(tokens.mutedText, tokens);
+}
+
+QString bestInkForBackground(const QString& background, const SkinTokens& tokens)
+{
+	// A selection fill needs one of the palette's already-authored inks. Do not
+	// smuggle a literal black/white fallback into a custom theme.
+	const QString candidates[] = {
+		tokens.text, tokens.background, tokens.surface, tokens.card, tokens.mutedText
+	};
+	QString best = tokens.text;
+	double bestRatio = -1.0;
+	for (const QString& candidate : candidates)
+	{
+		const double ratio = contrastRatioForColors(QColor(candidate), QColor(background));
+		if (ratio > bestRatio)
+		{
+			best = candidate;
+			bestRatio = ratio;
+		}
+	}
+	return best;
+}
+
+QString repairInkForBackground(const QString& token, const QString& background)
+{
+	const QColor original(token);
+	const QColor ground(background);
+	if (!original.isValid() || !ground.isValid()
+		|| contrastRatioForColors(original, ground) >= 4.5)
+		return token;
+
+	QColor hsl = original.toHsl();
+	int hue = 0;
+	int saturation = 0;
+	int lightness = 0;
+	int alpha = 255;
+	hsl.getHsl(&hue, &saturation, &lightness, &alpha);
+	const int direction = relativeLuminance(ground) >= 0.179 ? -1 : 1;
+	for (int candidateLightness = lightness;
+		candidateLightness >= 0 && candidateLightness <= 255;
+		candidateLightness += direction)
+	{
+		QColor candidate;
+		candidate.setHsl(hue, saturation, candidateLightness, alpha);
+		if (contrastRatioForColors(candidate, ground) >= 4.5)
+			return candidate.name(QColor::HexRgb).toUpper();
+	}
+	return token;
+}
+
+void appendReadabilityCheck(QVector<SkinThemeData::ReadabilityCheck>& checks,
+	const QString& label, const char* foregroundToken, const QString& foreground,
+	const char* backgroundToken, const QString& background)
+{
+	SkinThemeData::ReadabilityCheck check;
+	check.label = label;
+	check.foregroundToken = QString::fromLatin1(foregroundToken);
+	check.backgroundToken = QString::fromLatin1(backgroundToken);
+	check.ratio = SkinThemeData::contrastRatio(foreground, background);
+	checks.append(check);
+}
+
 // Constitution: docs/skins/studio.md
 SkinTokens studioTokens(bool dark)
 {
@@ -64,6 +207,126 @@ SkinTokens studioTokens(bool dark)
 		t.graphGridMinor = QStringLiteral("#CCD6EA");
 		t.accent = QStringLiteral("#2F6BFF");
 		t.accent2 = QStringLiteral("#8A4DFF");
+	}
+	finishTokens(t);
+	return t;
+}
+
+// Constitution: docs/skins/clarity.md
+SkinTokens clarityTokens(bool dark)
+{
+	SkinTokens t;
+	t.dark = dark;
+	t.fontFamily = QStringLiteral("Segoe UI");
+	t.monoFontFamily = QStringLiteral("Consolas");
+	t.borderRadius = 4;
+	t.rowHeight = 44;
+	t.toolbarHeight = 40;
+	t.cardPadding = 14;
+	t.cardGap = 10;
+	t.graphRadius = 4;
+	t.channelGroupIndent = 20;
+	t.channelGroupStyle = SkinTokens::TreeLines;
+	t.badgeStyle = SkinTokens::OutlineOnly;
+	t.zebraStripe = true;
+	t.cardRailWidth = 4;
+	t.highContrast = true;
+	if (dark)
+	{
+		t.background = QStringLiteral("#000000");
+		t.surface = QStringLiteral("#0C0C0C");
+		t.card = QStringLiteral("#000000");
+		t.cardHover = QStringLiteral("#151515");
+		t.cardSelected = QStringLiteral("#00233A");
+		t.text = QStringLiteral("#FFFFFF");
+		t.mutedText = QStringLiteral("#D4D4D4");
+		t.border = QStringLiteral("#8D8D8D");
+		t.graph = QStringLiteral("#000000");
+		t.graphGridMinor = QStringLiteral("#303030");
+		t.accent = QStringLiteral("#0078D4");
+		t.accent2 = QStringLiteral("#B48EFA");
+		t.success = QStringLiteral("#39D98A");
+		t.warning = QStringLiteral("#FFD166");
+		t.danger = QStringLiteral("#FF6B6B");
+	}
+	else
+	{
+		t.background = QStringLiteral("#F2F2F2");
+		t.surface = QStringLiteral("#FFFFFF");
+		t.card = QStringLiteral("#FFFFFF");
+		t.cardHover = QStringLiteral("#E5F2FF");
+		t.cardSelected = QStringLiteral("#C9E8FF");
+		t.text = QStringLiteral("#000000");
+		t.mutedText = QStringLiteral("#303030");
+		t.border = QStringLiteral("#555555");
+		t.graph = QStringLiteral("#FFFFFF");
+		t.graphGridMinor = QStringLiteral("#C8C8C8");
+		t.accent = QStringLiteral("#005A9E");
+		t.accent2 = QStringLiteral("#5B21B6");
+		t.success = QStringLiteral("#0B6E3C");
+		t.warning = QStringLiteral("#8A4B00");
+		t.danger = QStringLiteral("#B00020");
+	}
+	finishTokens(t);
+	return t;
+}
+
+// Constitution: docs/skins/graphite.md
+SkinTokens graphiteTokens(bool dark)
+{
+	SkinTokens t;
+	t.dark = dark;
+	t.fontFamily = QStringLiteral("Segoe UI");
+	t.monoFontFamily = QStringLiteral("Consolas");
+	// A dense, square instrument panel rather than Clarity in a new colour:
+	// wide rails, wire plates and graduated scope bars carry its hierarchy.
+	t.borderRadius = 0;
+	t.rowHeight = 48;
+	t.toolbarHeight = 42;
+	t.cardPadding = 12;
+	t.cardGap = 6;
+	t.graphRadius = 0;
+	t.channelGroupIndent = 24;
+	t.channelGroupStyle = SkinTokens::GradientBar;
+	t.badgeStyle = SkinTokens::WireframeBorder;
+	t.zebraStripe = false;
+	t.cardRailWidth = 6;
+	t.highContrast = true;
+	if (dark)
+	{
+		t.background = QStringLiteral("#191C20");
+		t.surface = QStringLiteral("#24282E");
+		t.card = QStringLiteral("#1F2329");
+		t.cardHover = QStringLiteral("#1B1F24");
+		t.cardSelected = QStringLiteral("#00233A");
+		t.text = QStringLiteral("#FFFFFF");
+		t.mutedText = QStringLiteral("#D7DBE0");
+		t.border = QStringLiteral("#A6ADB5");
+		t.graph = QStringLiteral("#15171A");
+		t.graphGridMinor = QStringLiteral("#3D434A");
+		t.accent = QStringLiteral("#54B9FF");
+		t.accent2 = QStringLiteral("#D0B0FF");
+		t.success = QStringLiteral("#4CD97B");
+		t.warning = QStringLiteral("#FFD166");
+		t.danger = QStringLiteral("#FF6B6B");
+	}
+	else
+	{
+		t.background = QStringLiteral("#ECEFF2");
+		t.surface = QStringLiteral("#FFFFFF");
+		t.card = QStringLiteral("#F8F9FA");
+		t.cardHover = QStringLiteral("#E1E8EF");
+		t.cardSelected = QStringLiteral("#E5F3FB");
+		t.text = QStringLiteral("#111315");
+		t.mutedText = QStringLiteral("#2D333B");
+		t.border = QStringLiteral("#4B5560");
+		t.graph = QStringLiteral("#FFFFFF");
+		t.graphGridMinor = QStringLiteral("#C7CDD4");
+		t.accent = QStringLiteral("#005F9E");
+		t.accent2 = QStringLiteral("#5B21B6");
+		t.success = QStringLiteral("#0B6E3C");
+		t.warning = QStringLiteral("#8A4B00");
+		t.danger = QStringLiteral("#B00020");
 	}
 	finishTokens(t);
 	return t;
@@ -265,6 +528,588 @@ SkinTokens matrixTokens(bool dark)
 	finishTokens(t);
 	return t;
 }
+
+SkinTokens midnightTokens(bool dark)
+{
+	SkinTokens t = studioTokens(dark);
+	if (dark)
+	{
+		t.background = QStringLiteral("#040817");
+		t.surface = QStringLiteral("#0A1021");
+		t.card = QStringLiteral("#10182E");
+		t.cardHover = QStringLiteral("#172342");
+		t.cardSelected = QStringLiteral("#123B66");
+		t.text = QStringLiteral("#EEF5FF");
+		t.mutedText = QStringLiteral("#91A6C8");
+		t.border = QStringLiteral("#1F3355");
+		t.graph = QStringLiteral("#020611");
+		t.graphGridMinor = QStringLiteral("#18304E");
+		t.accent = QStringLiteral("#3DDCFF");
+		t.accent2 = QStringLiteral("#7C6CFF");
+		t.success = QStringLiteral("#2BEFA3");
+		t.warning = QStringLiteral("#F8C45D");
+		t.danger = QStringLiteral("#FF5D73");
+	}
+	else
+	{
+		t.background = QStringLiteral("#EAF4FF");
+		t.surface = QStringLiteral("#F8FCFF");
+		t.card = QStringLiteral("#FFFFFF");
+		t.cardHover = QStringLiteral("#EEF7FF");
+		t.cardSelected = QStringLiteral("#CFE9FF");
+		t.text = QStringLiteral("#10233A");
+		t.mutedText = QStringLiteral("#5F748D");
+		t.border = QStringLiteral("#BAD5EF");
+		t.graph = QStringLiteral("#F6FBFF");
+		t.graphGridMinor = QStringLiteral("#D8E9FA");
+		t.accent = QStringLiteral("#0978D8");
+		t.accent2 = QStringLiteral("#6159E8");
+		t.success = QStringLiteral("#0F9F75");
+		t.warning = QStringLiteral("#B7791F");
+		t.danger = QStringLiteral("#D93654");
+	}
+	finishTokens(t);
+	return t;
+}
+
+SkinTokens arcticTokens(bool dark)
+{
+	SkinTokens t = softTokens(dark);
+	if (dark)
+	{
+		t.background = QStringLiteral("#071013");
+		t.surface = QStringLiteral("#0D1A1F");
+		t.card = QStringLiteral("#14272E");
+		t.cardHover = QStringLiteral("#1B343D");
+		t.cardSelected = QStringLiteral("#164C55");
+		t.text = QStringLiteral("#E9FCFF");
+		t.mutedText = QStringLiteral("#95B8C2");
+		t.border = QStringLiteral("#27444C");
+		t.graph = QStringLiteral("#041014");
+		t.graphGridMinor = QStringLiteral("#17343C");
+		t.accent = QStringLiteral("#62E6F2");
+		t.accent2 = QStringLiteral("#8EF7C9");
+		t.success = QStringLiteral("#7FF0B8");
+		t.warning = QStringLiteral("#FFE08A");
+		t.danger = QStringLiteral("#FF8FA3");
+	}
+	else
+	{
+		t.background = QStringLiteral("#F0FBFC");
+		t.surface = QStringLiteral("#FBFEFF");
+		t.card = QStringLiteral("#FFFFFF");
+		t.cardHover = QStringLiteral("#EAF8FA");
+		t.cardSelected = QStringLiteral("#D7F4F8");
+		t.text = QStringLiteral("#173238");
+		t.mutedText = QStringLiteral("#66838B");
+		t.border = QStringLiteral("#C8E4EA");
+		t.graph = QStringLiteral("#F8FEFF");
+		t.graphGridMinor = QStringLiteral("#D7EDF1");
+		t.accent = QStringLiteral("#1597A6");
+		t.accent2 = QStringLiteral("#30B37D");
+		t.success = QStringLiteral("#15985F");
+		t.warning = QStringLiteral("#B38A16");
+		t.danger = QStringLiteral("#CB4B63");
+	}
+	finishTokens(t);
+	return t;
+}
+
+SkinTokens emberTokens(bool dark)
+{
+	SkinTokens t = rackTokens(dark);
+	if (dark)
+	{
+		t.background = QStringLiteral("#100806");
+		t.surface = QStringLiteral("#1A100C");
+		t.card = QStringLiteral("#27160F");
+		t.cardHover = QStringLiteral("#332016");
+		t.cardSelected = QStringLiteral("#4A2812");
+		t.text = QStringLiteral("#FFEFE1");
+		t.mutedText = QStringLiteral("#B99B84");
+		t.border = QStringLiteral("#563121");
+		t.graph = QStringLiteral("#0A0503");
+		t.graphGridMinor = QStringLiteral("#3A2318");
+		t.accent = QStringLiteral("#FF9A3D");
+		t.accent2 = QStringLiteral("#FFD166");
+		t.success = QStringLiteral("#88D97A");
+		t.warning = QStringLiteral("#FFC44D");
+		t.danger = QStringLiteral("#FF5A3D");
+	}
+	else
+	{
+		t.background = QStringLiteral("#FFF0E4");
+		t.surface = QStringLiteral("#FFF9F2");
+		t.card = QStringLiteral("#FFFFFF");
+		t.cardHover = QStringLiteral("#FFEBD8");
+		t.cardSelected = QStringLiteral("#FFD6A8");
+		t.text = QStringLiteral("#372014");
+		t.mutedText = QStringLiteral("#866651");
+		t.border = QStringLiteral("#E2B98F");
+		t.graph = QStringLiteral("#FFF8EE");
+		t.graphGridMinor = QStringLiteral("#F0D2B2");
+		t.accent = QStringLiteral("#C85A13");
+		t.accent2 = QStringLiteral("#9B6A00");
+		t.success = QStringLiteral("#2F8A4A");
+		t.warning = QStringLiteral("#A86E00");
+		t.danger = QStringLiteral("#C93626");
+	}
+	finishTokens(t);
+	return t;
+}
+
+SkinTokens violetTokens(bool dark)
+{
+	SkinTokens t = matrixTokens(dark);
+	if (dark)
+	{
+		t.background = QStringLiteral("#090616");
+		t.surface = QStringLiteral("#120D22");
+		t.card = QStringLiteral("#1B1431");
+		t.cardHover = QStringLiteral("#251C43");
+		t.cardSelected = QStringLiteral("#2B1C5A");
+		t.text = QStringLiteral("#F4ECFF");
+		t.mutedText = QStringLiteral("#AA98C9");
+		t.border = QStringLiteral("#3B2B62");
+		t.graph = QStringLiteral("#070410");
+		t.graphGridMinor = QStringLiteral("#2D2450");
+		t.accent = QStringLiteral("#B56CFF");
+		t.accent2 = QStringLiteral("#42E8FF");
+		t.success = QStringLiteral("#65F0B4");
+		t.warning = QStringLiteral("#FFD36A");
+		t.danger = QStringLiteral("#FF64A6");
+	}
+	else
+	{
+		t.background = QStringLiteral("#F8F1FF");
+		t.surface = QStringLiteral("#FFFFFF");
+		t.card = QStringLiteral("#FEFBFF");
+		t.cardHover = QStringLiteral("#F2E7FF");
+		t.cardSelected = QStringLiteral("#E5D5FF");
+		t.text = QStringLiteral("#27183D");
+		t.mutedText = QStringLiteral("#75648E");
+		t.border = QStringLiteral("#D8C7EE");
+		t.graph = QStringLiteral("#FFFBFF");
+		t.graphGridMinor = QStringLiteral("#E6D8F6");
+		t.accent = QStringLiteral("#7B2FD3");
+		t.accent2 = QStringLiteral("#008FAB");
+		t.success = QStringLiteral("#198754");
+		t.warning = QStringLiteral("#A26A00");
+		t.danger = QStringLiteral("#C93476");
+	}
+	finishTokens(t);
+	return t;
+}
+
+SkinTokens solarTokens(bool dark)
+{
+	SkinTokens t = minimalTokens(dark);
+	if (dark)
+	{
+		t.background = QStringLiteral("#002B36");
+		t.surface = QStringLiteral("#073642");
+		t.card = QStringLiteral("#0A3A46");
+		t.cardHover = QStringLiteral("#104653");
+		t.cardSelected = QStringLiteral("#123F55");
+		t.text = QStringLiteral("#EEE8D5");
+		t.mutedText = QStringLiteral("#93A1A1");
+		t.border = QStringLiteral("#315862");
+		t.graph = QStringLiteral("#001F27");
+		t.graphGridMinor = QStringLiteral("#16424D");
+		t.accent = QStringLiteral("#268BD2");
+		t.accent2 = QStringLiteral("#D33682");
+		t.success = QStringLiteral("#859900");
+		t.warning = QStringLiteral("#B58900");
+		t.danger = QStringLiteral("#DC322F");
+	}
+	else
+	{
+		t.background = QStringLiteral("#FDF6E3");
+		t.surface = QStringLiteral("#FFFBEF");
+		t.card = QStringLiteral("#FFFFFF");
+		t.cardHover = QStringLiteral("#F7EFD8");
+		t.cardSelected = QStringLiteral("#E9F1D2");
+		t.text = QStringLiteral("#073642");
+		t.mutedText = QStringLiteral("#657B83");
+		t.border = QStringLiteral("#D8CBA6");
+		t.graph = QStringLiteral("#FFF8E6");
+		t.graphGridMinor = QStringLiteral("#EDE0BD");
+		t.accent = QStringLiteral("#268BD2");
+		t.accent2 = QStringLiteral("#D33682");
+		t.success = QStringLiteral("#6C8500");
+		t.warning = QStringLiteral("#A66F00");
+		t.danger = QStringLiteral("#CB2D2A");
+	}
+	finishTokens(t);
+	return t;
+}
+
+SkinTokens obsidianTokens(bool dark)
+{
+	SkinTokens t = studioTokens(dark);
+	t.borderRadius = 12;
+	t.rowHeight = 42;
+	t.cardPadding = 14;
+	t.cardGap = 10;
+	t.graphRadius = 12;
+	if (dark)
+	{
+		t.background = QStringLiteral("#02040A");
+		t.surface = QStringLiteral("#070B14");
+		t.card = QStringLiteral("#0D1322");
+		t.cardHover = QStringLiteral("#141D31");
+		t.cardSelected = QStringLiteral("#11284E");
+		t.text = QStringLiteral("#F4F8FF");
+		t.mutedText = QStringLiteral("#8997B2");
+		t.border = QStringLiteral("#202C45");
+		t.graph = QStringLiteral("#01030A");
+		t.graphGridMinor = QStringLiteral("#17243A");
+		t.accent = QStringLiteral("#34D6FF");
+		t.accent2 = QStringLiteral("#B66CFF");
+		t.success = QStringLiteral("#43F0B0");
+		t.warning = QStringLiteral("#FFCF70");
+		t.danger = QStringLiteral("#FF5F8C");
+	}
+	else
+	{
+		t.background = QStringLiteral("#E9EEF7");
+		t.surface = QStringLiteral("#F7FAFF");
+		t.card = QStringLiteral("#FFFFFF");
+		t.cardHover = QStringLiteral("#EEF4FC");
+		t.cardSelected = QStringLiteral("#D9E7FF");
+		t.text = QStringLiteral("#111927");
+		t.mutedText = QStringLiteral("#61708A");
+		t.border = QStringLiteral("#C0CDDF");
+		t.graph = QStringLiteral("#F5F8FD");
+		t.graphGridMinor = QStringLiteral("#D9E2F0");
+		t.accent = QStringLiteral("#0077B6");
+		t.accent2 = QStringLiteral("#7C3BC8");
+		t.success = QStringLiteral("#138A67");
+		t.warning = QStringLiteral("#A66F00");
+		t.danger = QStringLiteral("#C93462");
+	}
+	finishTokens(t);
+	return t;
+}
+
+SkinTokens auroraTokens(bool dark)
+{
+	SkinTokens t = softTokens(dark);
+	t.borderRadius = 18;
+	t.rowHeight = 50;
+	t.cardPadding = 16;
+	t.cardGap = 12;
+	t.graphRadius = 18;
+	if (dark)
+	{
+		t.background = QStringLiteral("#03110F");
+		t.surface = QStringLiteral("#0A1D1B");
+		t.card = QStringLiteral("#102B29");
+		t.cardHover = QStringLiteral("#173B38");
+		t.cardSelected = QStringLiteral("#154E49");
+		t.text = QStringLiteral("#ECFFF8");
+		t.mutedText = QStringLiteral("#9BBDB4");
+		t.border = QStringLiteral("#28514C");
+		t.graph = QStringLiteral("#020B0B");
+		t.graphGridMinor = QStringLiteral("#163933");
+		t.accent = QStringLiteral("#66F0C2");
+		t.accent2 = QStringLiteral("#7D8CFF");
+		t.success = QStringLiteral("#86F6A8");
+		t.warning = QStringLiteral("#FFE08A");
+		t.danger = QStringLiteral("#FF8AA6");
+	}
+	else
+	{
+		t.background = QStringLiteral("#EFFAF5");
+		t.surface = QStringLiteral("#FCFFFD");
+		t.card = QStringLiteral("#FFFFFF");
+		t.cardHover = QStringLiteral("#EAF8F2");
+		t.cardSelected = QStringLiteral("#D7F4EA");
+		t.text = QStringLiteral("#17302C");
+		t.mutedText = QStringLiteral("#67837B");
+		t.border = QStringLiteral("#CBE2DA");
+		t.graph = QStringLiteral("#F8FFFB");
+		t.graphGridMinor = QStringLiteral("#DAEEE8");
+		t.accent = QStringLiteral("#159873");
+		t.accent2 = QStringLiteral("#4F5ECF");
+		t.success = QStringLiteral("#178A4D");
+		t.warning = QStringLiteral("#B18100");
+		t.danger = QStringLiteral("#C94B72");
+	}
+	finishTokens(t);
+	return t;
+}
+
+SkinTokens forgeTokens(bool dark)
+{
+	SkinTokens t = rackTokens(dark);
+	t.borderRadius = 5;
+	t.rowHeight = 38;
+	t.cardPadding = 10;
+	t.cardGap = 7;
+	t.graphRadius = 6;
+	if (dark)
+	{
+		t.background = QStringLiteral("#090706");
+		t.surface = QStringLiteral("#14110E");
+		t.card = QStringLiteral("#211A14");
+		t.cardHover = QStringLiteral("#2D231A");
+		t.cardSelected = QStringLiteral("#4A2B13");
+		t.text = QStringLiteral("#F5E7D6");
+		t.mutedText = QStringLiteral("#B49D83");
+		t.border = QStringLiteral("#51402E");
+		t.graph = QStringLiteral("#050403");
+		t.graphGridMinor = QStringLiteral("#342B22");
+		t.accent = QStringLiteral("#E19A4B");
+		t.accent2 = QStringLiteral("#55D6B0");
+		t.success = QStringLiteral("#87D66A");
+		t.warning = QStringLiteral("#FFC560");
+		t.danger = QStringLiteral("#F05F45");
+	}
+	else
+	{
+		t.background = QStringLiteral("#F4EEE6");
+		t.surface = QStringLiteral("#FFFBF4");
+		t.card = QStringLiteral("#FFFFFF");
+		t.cardHover = QStringLiteral("#F7EBDC");
+		t.cardSelected = QStringLiteral("#F5D9B4");
+		t.text = QStringLiteral("#2B2119");
+		t.mutedText = QStringLiteral("#746758");
+		t.border = QStringLiteral("#D5C1A9");
+		t.graph = QStringLiteral("#FFF8EE");
+		t.graphGridMinor = QStringLiteral("#E9D3B8");
+		t.accent = QStringLiteral("#A85F16");
+		t.accent2 = QStringLiteral("#147A61");
+		t.success = QStringLiteral("#2E8044");
+		t.warning = QStringLiteral("#9C6500");
+		t.danger = QStringLiteral("#B83D2A");
+	}
+	finishTokens(t);
+	return t;
+}
+
+SkinTokens nebulaTokens(bool dark)
+{
+	SkinTokens t = matrixTokens(dark);
+	t.rowHeight = 38;
+	t.channelGroupIndent = 26;
+	t.cardPadding = 13;
+	t.cardGap = 10;
+	t.cardRailWidth = 5;
+	t.graphRadius = 0;
+	if (dark)
+	{
+		t.background = QStringLiteral("#07030F");
+		t.surface = QStringLiteral("#100820");
+		t.card = QStringLiteral("#1B1032");
+		t.cardHover = QStringLiteral("#261848");
+		t.cardSelected = QStringLiteral("#351D67");
+		t.text = QStringLiteral("#F7EDFF");
+		t.mutedText = QStringLiteral("#AA96C8");
+		t.border = QStringLiteral("#3C2B62");
+		t.graph = QStringLiteral("#05020C");
+		t.graphGridMinor = QStringLiteral("#2B2148");
+		t.accent = QStringLiteral("#FF5DD8");
+		t.accent2 = QStringLiteral("#4EE8FF");
+		t.success = QStringLiteral("#67F7B4");
+		t.warning = QStringLiteral("#FFD36D");
+		t.danger = QStringLiteral("#FF618A");
+	}
+	else
+	{
+		t.background = QStringLiteral("#F8F1FF");
+		t.surface = QStringLiteral("#FFFFFF");
+		t.card = QStringLiteral("#FEFBFF");
+		t.cardHover = QStringLiteral("#F2E9FF");
+		t.cardSelected = QStringLiteral("#E8D8FF");
+		t.text = QStringLiteral("#27153D");
+		t.mutedText = QStringLiteral("#76628E");
+		t.border = QStringLiteral("#DAC7EE");
+		t.graph = QStringLiteral("#FFFBFF");
+		t.graphGridMinor = QStringLiteral("#E8D8F6");
+		t.accent = QStringLiteral("#C02CA2");
+		t.accent2 = QStringLiteral("#008CA6");
+		t.success = QStringLiteral("#198754");
+		t.warning = QStringLiteral("#A26A00");
+		t.danger = QStringLiteral("#C93462");
+	}
+	finishTokens(t);
+	return t;
+}
+
+SkinTokens noirTokens(bool dark)
+{
+	SkinTokens t = minimalTokens(dark);
+	t.rowHeight = 34;
+	t.cardPadding = 9;
+	t.cardGap = 6;
+	t.channelGroupIndent = 18;
+	t.graphRadius = 0;
+	t.zebraStripe = true;
+	if (dark)
+	{
+		t.background = QStringLiteral("#050505");
+		t.surface = QStringLiteral("#0C0C0D");
+		t.card = QStringLiteral("#151516");
+		t.cardHover = QStringLiteral("#202023");
+		t.cardSelected = QStringLiteral("#2E3038");
+		t.text = QStringLiteral("#F0F0EE");
+		t.mutedText = QStringLiteral("#9A9A96");
+		t.border = QStringLiteral("#343438");
+		t.graph = QStringLiteral("#020202");
+		t.graphGridMinor = QStringLiteral("#242428");
+		t.accent = QStringLiteral("#D7DEE8");
+		t.accent2 = QStringLiteral("#C8A96A");
+		t.success = QStringLiteral("#72C27D");
+		t.warning = QStringLiteral("#D7A84F");
+		t.danger = QStringLiteral("#D86464");
+	}
+	else
+	{
+		t.background = QStringLiteral("#EDEDE8");
+		t.surface = QStringLiteral("#FAFAF7");
+		t.card = QStringLiteral("#FFFFFF");
+		t.cardHover = QStringLiteral("#F2F2ED");
+		t.cardSelected = QStringLiteral("#E4E8EF");
+		t.text = QStringLiteral("#1A1A1A");
+		t.mutedText = QStringLiteral("#666663");
+		t.border = QStringLiteral("#C9C9C4");
+		t.graph = QStringLiteral("#FFFFFF");
+		t.graphGridMinor = QStringLiteral("#E2E2DC");
+		t.accent = QStringLiteral("#4E5968");
+		t.accent2 = QStringLiteral("#8A6A27");
+		t.success = QStringLiteral("#2F8048");
+		t.warning = QStringLiteral("#8A6500");
+		t.danger = QStringLiteral("#A83A3A");
+	}
+	finishTokens(t);
+	return t;
+}
+
+struct LegacyPalette
+{
+	const char* background;
+	const char* surface;
+	const char* card;
+	const char* cardHover;
+	const char* cardSelected;
+	const char* text;
+	const char* mutedText;
+	const char* border;
+	const char* graph;
+	const char* graphGridMinor;
+	const char* accent;
+	const char* accent2;
+	const char* success;
+	const char* warning;
+	const char* danger;
+};
+
+SkinTokens legacyVariantTokens(bool dark, const LegacyPalette& darkPalette, const LegacyPalette& lightPalette)
+{
+	const LegacyPalette& p = dark ? darkPalette : lightPalette;
+	SkinTokens t = minimalTokens(dark);
+	t.fontFamily = QStringLiteral("Segoe UI");
+	t.monoFontFamily = QStringLiteral("Consolas");
+	t.borderRadius = 5;
+	t.rowHeight = 36;
+	t.channelGroupIndent = 16;
+	t.channelGroupStyle = SkinTokens::TreeLines;
+	t.badgeStyle = SkinTokens::OutlineOnly;
+	t.zebraStripe = false;
+	t.background = QLatin1String(p.background);
+	t.surface = QLatin1String(p.surface);
+	t.card = QLatin1String(p.card);
+	t.cardHover = QLatin1String(p.cardHover);
+	t.cardSelected = QLatin1String(p.cardSelected);
+	t.text = QLatin1String(p.text);
+	t.mutedText = QLatin1String(p.mutedText);
+	t.border = QLatin1String(p.border);
+	t.graph = QLatin1String(p.graph);
+	t.graphGridMinor = QLatin1String(p.graphGridMinor);
+	t.accent = QLatin1String(p.accent);
+	t.accent2 = QLatin1String(p.accent2);
+	t.success = QLatin1String(p.success);
+	t.warning = QLatin1String(p.warning);
+	t.danger = QLatin1String(p.danger);
+	finishTokens(t);
+	return t;
+}
+
+SkinTokens legacySlateTokens(bool dark)
+{
+	static constexpr LegacyPalette darkPalette{
+		"#111418", "#1A1E24", "#242930", "#2C333B", "#354154",
+		"#ECEFF4", "#A7B0BD", "#48515D", "#0B0D10", "#303841",
+		"#6EA8FE", "#9AA7B8", "#6BCB8F", "#E5B567", "#E06C75"
+	};
+	static constexpr LegacyPalette lightPalette{
+		"#ECEFF3", "#F7F8FA", "#FFFFFF", "#EEF2F6", "#DDE8F8",
+		"#1C232D", "#667080", "#C2CAD5", "#FFFFFF", "#D8DEE8",
+		"#2F6FD6", "#5E6A7A", "#2E8A57", "#9B6500", "#B33A42"
+	};
+	return legacyVariantTokens(dark, darkPalette, lightPalette);
+}
+
+SkinTokens legacyBlueTokens(bool dark)
+{
+	static constexpr LegacyPalette darkPalette{
+		"#08111C", "#101C2B", "#18283B", "#20344C", "#143B66",
+		"#EAF4FF", "#9DB4CC", "#2F4A66", "#050B12", "#1C3348",
+		"#48A6FF", "#7CC7FF", "#61D394", "#F1C45F", "#FF6B7A"
+	};
+	static constexpr LegacyPalette lightPalette{
+		"#EAF3FC", "#F7FBFF", "#FFFFFF", "#ECF6FF", "#D7EAFF",
+		"#162B40", "#60788E", "#BCD3E8", "#FFFFFF", "#D8E8F6",
+		"#1D75C9", "#268FAE", "#218A54", "#A66F00", "#BD3B48"
+	};
+	return legacyVariantTokens(dark, darkPalette, lightPalette);
+}
+
+SkinTokens legacyForestTokens(bool dark)
+{
+	static constexpr LegacyPalette darkPalette{
+		"#0B130E", "#121F17", "#1B2A21", "#25382C", "#1F4A35",
+		"#EEF8EF", "#A8B9A9", "#3D5845", "#050B07", "#223A2B",
+		"#6BCB8F", "#A1D47A", "#78D88A", "#E3C566", "#E36B66"
+	};
+	static constexpr LegacyPalette lightPalette{
+		"#EEF5EE", "#FAFCF8", "#FFFFFF", "#EFF7EE", "#DDEFDD",
+		"#1F3023", "#687A68", "#C3D5C1", "#FFFFFF", "#DCEADB",
+		"#2F8A57", "#5B8E36", "#238044", "#9A7600", "#B5443F"
+	};
+	return legacyVariantTokens(dark, darkPalette, lightPalette);
+}
+
+SkinTokens legacyBronzeTokens(bool dark)
+{
+	static constexpr LegacyPalette darkPalette{
+		"#17100A", "#241910", "#322318", "#402E20", "#5A351B",
+		"#F8EDE0", "#C2A78A", "#65462F", "#0E0905", "#3F2D20",
+		"#C58B48", "#E0B15E", "#87C56F", "#E6BC55", "#E06A4D"
+	};
+	static constexpr LegacyPalette lightPalette{
+		"#F3ECE3", "#FFF9F1", "#FFFFFF", "#F8ECDC", "#F1D8B8",
+		"#332317", "#806850", "#D7C0A6", "#FFFFFF", "#E7D2B8",
+		"#A86420", "#8B6A2A", "#3F874A", "#9F6F00", "#B84830"
+	};
+	return legacyVariantTokens(dark, darkPalette, lightPalette);
+}
+
+SkinTokens legacyPlumTokens(bool dark)
+{
+	static constexpr LegacyPalette darkPalette{
+		"#140D19", "#201428", "#2B1D36", "#362545", "#442566",
+		"#F8ECFF", "#B8A0C6", "#523A61", "#0B0610", "#33243F",
+		"#B06BFF", "#E06BB4", "#73DCA0", "#FFD06A", "#FF6F91"
+	};
+	static constexpr LegacyPalette lightPalette{
+		"#F4ECF8", "#FFFAFF", "#FFFFFF", "#F5ECFB", "#E9D9F8",
+		"#2D1D38", "#776284", "#D8C5E3", "#FFFFFF", "#E9D8F0",
+		"#8046B8", "#B84C88", "#248A57", "#A67000", "#BE3D62"
+	};
+	return legacyVariantTokens(dark, darkPalette, lightPalette);
+}
 }
 
 namespace SkinThemeData
@@ -323,13 +1168,31 @@ const QVector<SkinEntry>& roster()
 	// Display order. Studio is first, and that is load-bearing twice over: it is
 	// the default skin and it is what an unknown id falls back to.
 	static const QVector<SkinEntry> entries = {
-		{ QStringLiteral("studio"), QStringLiteral("studio"), &studioTokens },
+		{ QStringLiteral("studio"), QStringLiteral("studio"), QStringLiteral("studio"), &studioTokens },
+		{ QStringLiteral("clarity"), QStringLiteral("precision"), QStringLiteral("minimal"), &clarityTokens },
 		// The minimal skin's sheets are precision_light.qss / precision_dark.qss;
 		// the name predates the skin's rename and the files were left alone.
-		{ QStringLiteral("minimal"), QStringLiteral("precision"), &minimalTokens },
-		{ QStringLiteral("soft"), QStringLiteral("soft"), &softTokens },
-		{ QStringLiteral("rack"), QStringLiteral("rack"), &rackTokens },
-		{ QStringLiteral("matrix"), QStringLiteral("matrix"), &matrixTokens },
+		{ QStringLiteral("minimal"), QStringLiteral("precision"), QStringLiteral("minimal"), &minimalTokens },
+		{ QStringLiteral("soft"), QStringLiteral("soft"), QStringLiteral("soft"), &softTokens },
+		{ QStringLiteral("rack"), QStringLiteral("rack"), QStringLiteral("rack"), &rackTokens },
+		{ QStringLiteral("matrix"), QStringLiteral("matrix"), QStringLiteral("matrix"), &matrixTokens },
+		{ QStringLiteral("midnight"), QStringLiteral("studio"), QStringLiteral("studio"), &midnightTokens },
+		{ QStringLiteral("arctic"), QStringLiteral("soft"), QStringLiteral("soft"), &arcticTokens },
+		{ QStringLiteral("ember"), QStringLiteral("rack"), QStringLiteral("rack"), &emberTokens },
+		{ QStringLiteral("violet"), QStringLiteral("matrix"), QStringLiteral("matrix"), &violetTokens },
+		{ QStringLiteral("solar"), QStringLiteral("precision"), QStringLiteral("minimal"), &solarTokens },
+		{ QStringLiteral("obsidian"), QStringLiteral("studio"), QStringLiteral("studio"), &obsidianTokens },
+		{ QStringLiteral("aurora"), QStringLiteral("soft"), QStringLiteral("soft"), &auroraTokens },
+		{ QStringLiteral("forge"), QStringLiteral("rack"), QStringLiteral("rack"), &forgeTokens },
+		{ QStringLiteral("nebula"), QStringLiteral("matrix"), QStringLiteral("matrix"), &nebulaTokens },
+		{ QStringLiteral("noir"), QStringLiteral("precision"), QStringLiteral("minimal"), &noirTokens },
+		{ QStringLiteral("legacy-slate"), QStringLiteral("precision"), QStringLiteral("minimal"), &legacySlateTokens },
+		{ QStringLiteral("legacy-blue"), QStringLiteral("precision"), QStringLiteral("minimal"), &legacyBlueTokens },
+		{ QStringLiteral("legacy-forest"), QStringLiteral("precision"), QStringLiteral("minimal"), &legacyForestTokens },
+		{ QStringLiteral("legacy-bronze"), QStringLiteral("precision"), QStringLiteral("minimal"), &legacyBronzeTokens },
+		{ QStringLiteral("legacy-plum"), QStringLiteral("precision"), QStringLiteral("minimal"), &legacyPlumTokens },
+		// Append new built-ins: Ctrl+Alt+n bindings derive from this display order.
+		{ QStringLiteral("graphite"), QStringLiteral("precision"), QStringLiteral("minimal"), &graphiteTokens },
 	};
 	return entries;
 }
@@ -376,12 +1239,18 @@ QString resolveId(const QString& id)
 void applyToApplication(QApplication& app, const QString& skinId, bool dark,
 	bool setFusionStyle, bool includeSarasa)
 {
+	const QString resolvedId = resolveId(skinId);
+	applyTokensToApplication(app, resolvedId, dark, tokens(resolvedId, dark), setFusionStyle, includeSarasa);
+}
+
+void applyTokensToApplication(QApplication& app, const QString& skinId, bool dark,
+	const SkinTokens& themeTokens, bool setFusionStyle, bool includeSarasa)
+{
 	registerBundledFonts(includeSarasa);
 	if (setFusionStyle)
 		app.setStyle(QStyleFactory::create(QStringLiteral("fusion")));
 
 	const QString resolvedId = resolveId(skinId);
-	const SkinTokens themeTokens = tokens(resolvedId, dark);
 	QString styleSheet;
 	QFile sheet(qssResource(resolvedId, dark));
 	if (!sheet.open(QFile::ReadOnly) && resolvedId != QLatin1String("studio"))
@@ -391,12 +1260,96 @@ void applyToApplication(QApplication& app, const QString& skinId, bool dark,
 
 	app.setPalette(palette(themeTokens, dark));
 	app.setStyleSheet(substituteTokens(styleSheet, themeTokens)
-		+ comboArrowOverride() + fileDialogOverride());
+		+ tooltipOverride(themeTokens) + comboArrowOverride()
+		+ toolButtonMenuOverride(themeTokens) + fileDialogOverride());
 }
 
 SkinTokens tokens(const QString& id, bool dark)
 {
-	return entry(id).tokens(dark);
+	SkinTokens result = entry(id).tokens(dark);
+	enforceTextReadability(result);
+	return result;
+}
+
+double contrastRatio(const QString& foreground, const QString& background)
+{
+	return contrastRatioForColors(QColor(foreground), QColor(background));
+}
+
+QVector<ReadabilityCheck> readabilityChecks(const SkinTokens& tokens)
+{
+	QVector<ReadabilityCheck> checks;
+	struct Surface
+	{
+		const char* token;
+		const char* label;
+		const QString* color;
+	};
+	const Surface surfaces[] = {
+		{ "background", "window", &tokens.background },
+		{ "surface", "input surface", &tokens.surface },
+		{ "card", "card", &tokens.card },
+		{ "cardHover", "hover card", &tokens.cardHover },
+		{ "cardSelected", "selected card", &tokens.cardSelected },
+		{ "surfaceSunken", "sunken surface", &tokens.surfaceSunken }
+	};
+	for (const Surface& surface : surfaces)
+	{
+		appendReadabilityCheck(checks,
+			QStringLiteral("Text on %1").arg(QString::fromLatin1(surface.label)),
+			"text", tokens.text, surface.token, *surface.color);
+		appendReadabilityCheck(checks,
+			QStringLiteral("Muted text on %1").arg(QString::fromLatin1(surface.label)),
+			"mutedText", tokens.mutedText, surface.token, *surface.color);
+	}
+	appendReadabilityCheck(checks, QStringLiteral("Selected text on accent"),
+		"selectionText", selectionText(tokens), "accent", tokens.accent);
+	return checks;
+}
+
+bool passesReadability(const SkinTokens& tokens)
+{
+	const QVector<ReadabilityCheck> checks = readabilityChecks(tokens);
+	for (const ReadabilityCheck& check : checks)
+	{
+		if (!check.passes())
+			return false;
+	}
+	return !checks.isEmpty();
+}
+
+void repairTextReadability(SkinTokens& tokens)
+{
+	enforceTextReadability(tokens);
+}
+
+QString selectionText(const SkinTokens& tokens)
+{
+	return repairInkForBackground(bestInkForBackground(tokens.accent, tokens), tokens.accent);
+}
+
+bool modesAreDistinct(const SkinTokens& light, const SkinTokens& dark)
+{
+	if (light.dark || !dark.dark)
+		return false;
+
+	const QColor lightBackground(light.background);
+	const QColor darkBackground(dark.background);
+	if (!lightBackground.isValid() || !darkBackground.isValid())
+		return false;
+
+	// The mode split is deliberately broad: a light window must read as light
+	// and a dark window must read as dark even before its accent is noticed.
+	return relativeLuminance(lightBackground) >= 0.55
+		&& relativeLuminance(darkBackground) <= 0.20
+		&& relativeLuminance(lightBackground) - relativeLuminance(darkBackground) >= 0.45;
+}
+
+QString tooltipOverride(const SkinTokens& tokens)
+{
+	return QStringLiteral(
+		"QToolTip { background: %1; color: %2; border: 1px solid %3; }")
+		.arg(tokens.card, tokens.text, tokens.border);
 }
 
 QString qssResource(const QString& id, bool dark)
@@ -421,6 +1374,7 @@ QString substituteTokens(QString qss, const SkinTokens& tokens)
 		{ "@CARD_HOVER@", tokens.cardHover },
 		{ "@CARD_SELECTED@", tokens.cardSelected },
 		{ "@TEXT@", tokens.text },
+		{ "@SELECTION_TEXT@", selectionText(tokens) },
 		{ "@MUTED@", tokens.mutedText },
 		{ "@BORDER@", tokens.border },
 		{ "@GRAPH@", tokens.graph },
@@ -475,6 +1429,25 @@ QString comboArrowOverride()
 		" border: none; background: transparent; }");
 }
 
+QString toolButtonMenuOverride(const SkinTokens& tokens)
+{
+	// MenuButtonPopup is a split control: Qt paints its menu half independently
+	// from the QToolButton face. Every bundled modern QSS sheet deliberately
+	// suppresses the legacy indicator, so reintroduce a real, token-aware arrow
+	// and face after the sheet has loaded. Heritage (Legacy Rows) appends this
+	// same rule rather than relying on a platform-coloured fallback.
+	return QStringLiteral(
+		"QToolButton::menu-button {"
+		" subcontrol-origin: padding; subcontrol-position: top right;"
+		" width: 8px; background: transparent; border: 0; border-left: 1px solid %1; }"
+		"QToolButton::menu-button:hover { background: %2; }"
+		"QToolButton::menu-button:pressed { background: %3; }"
+		"QToolButton::menu-arrow, QToolButton::menu-indicator {"
+		" image: url(:/icons/modern/chevron-down.svg); width: 6px; height: 6px;"
+		" border: none; background: transparent; }")
+		.arg(tokens.border, tokens.cardHover, tokens.cardSelected);
+}
+
 QString fileDialogOverride()
 {
 	return QStringLiteral(
@@ -500,7 +1473,7 @@ QPalette palette(const SkinTokens& tokens, bool dark)
 	palette.setColor(QPalette::ToolTipBase, card);
 	palette.setColor(QPalette::ToolTipText, text);
 	palette.setColor(QPalette::Highlight, accent);
-	palette.setColor(QPalette::HighlightedText, dark ? QColor(QStringLiteral("#0c0c16")) : QColor(QStringLiteral("#ffffff")));
+	palette.setColor(QPalette::HighlightedText, QColor(selectionText(tokens)));
 	palette.setColor(QPalette::PlaceholderText, QColor(tokens.mutedText));
 	palette.setColor(QPalette::Light, card.lighter(120));
 	palette.setColor(QPalette::Midlight, card.lighter(105));

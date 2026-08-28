@@ -32,6 +32,9 @@ PreampFilterGUI::PreampFilterGUI(double dbGain)
 	ui->setupUi(this);
 
 	ui->dial->setFixedSize(GUIHelper::scale(QSize(100, 66)));
+	// Gain has a real neutral point. AudioKnob forwards this to the active
+	// skin so Clarity can draw an explicit zero detent in Legacy Rows too.
+	ui->dial->setBipolar(true);
 	ui->doubleSpinBox->setValue(dbGain);
 }
 

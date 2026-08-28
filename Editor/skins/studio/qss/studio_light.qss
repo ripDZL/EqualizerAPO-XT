@@ -9,7 +9,7 @@
 * {
     outline: 0;
     selection-background-color: @ACCENT@;
-    selection-color: @CARD@;
+    selection-color: @SELECTION_TEXT@;
 }
 
 QWidget {
@@ -268,7 +268,7 @@ QAbstractSpinBox {
     border-radius: 8px;
     padding: 4px 8px;
     selection-background-color: @ACCENT@;
-    selection-color: @CARD@;
+    selection-color: @SELECTION_TEXT@;
 }
 /* Numbers wear the mono face; words stay sans. */
 QAbstractSpinBox {

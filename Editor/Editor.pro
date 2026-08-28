@@ -250,6 +250,8 @@ SOURCES += main.cpp\
 	guis/LoudnessCorrectionFilterGUIDialog.cpp \
 	helpers/CrashHandler.cpp \
 	helpers/QtSndfileHandle.cpp \
+	helpers/VSTPreviewEndpoint.cpp \
+	helpers/VSTPluginLivePreview.cpp \
 	SkinGallery.cpp \
 	SkinManager.cpp \
 	skins/ISkin.cpp \
@@ -257,6 +259,8 @@ SOURCES += main.cpp\
 	skins/HeritageSkin.cpp \
 	skins/shared/SkinFileIcons.cpp \
 	skins/SkinThemeData.cpp \
+	skins/SkinDisplayNames.cpp \
+	skins/CustomThemeStore.cpp \
 	widgets/AddCardRow.cpp \
 	widgets/ActivatableListChrome.cpp \
 	widgets/AudioKnob.cpp \
@@ -323,6 +327,7 @@ SOURCES += main.cpp\
 	widgets/ValueScrubBox.cpp \
 	widgets/DialogChrome.cpp \
 	widgets/TitleBar.cpp \
+	widgets/ThemeEditorDialog.cpp \
 	widgets/routing/CopyRoutingAdapter.cpp \
 	widgets/routing/RoutingFold.cpp \
 	widgets/routing/MultiConvolutionRoutingAdapter.cpp \
@@ -528,6 +533,9 @@ HEADERS  += \
 	diagnostics/ToolbarPixelProbe.h \
 	diagnostics/SkinSwitchStorm.h \
 	helpers/QtSndfileHandle.h \
+	helpers/VSTPreviewEndpoint.h \
+	helpers/VSTPopupLivePreviewPolicy.h \
+	helpers/VSTPluginLivePreview.h \
 	SkinGallery.h \
 	SkinTokens.h \
 	SkinManager.h \
@@ -539,6 +547,8 @@ HEADERS  += \
 	skins/shared/SkinPaint.h \
 	skins/shared/SkinSupport.h \
 	skins/SkinThemeData.h \
+	skins/SkinDisplayNames.h \
+	skins/CustomThemeStore.h \
 	widgets/AddCardRow.h \
 	widgets/ActivatableListChrome.h \
 	widgets/AudioKnob.h \
@@ -602,6 +612,7 @@ HEADERS  += \
 	widgets/ValueScrubBox.h \
 	widgets/DialogChrome.h \
 	widgets/TitleBar.h \
+	widgets/ThemeEditorDialog.h \
 	widgets/routing/CopyRoutingAdapter.h \
 	widgets/routing/RoutingFold.h \
 	widgets/routing/MultiConvolutionRoutingAdapter.h \

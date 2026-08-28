@@ -67,25 +67,51 @@ std::wstring channelForCpu(const CpuFeatures& features, int* outIndex)
 	return L"x64-sse2";
 }
 
-std::wstring assetName(const std::wstring& channel)
+std::wstring machineInstallerAssetName(const std::wstring& channel)
 {
-	return ReleaseAssetNames::setupAssetName(channel);
+	return ReleaseAssetNames::msiAssetName(channel);
 }
 
 std::wstring latestAssetPath(const std::wstring& asset)
 {
-	return std::wstring(L"/") + EAPO_REPO_SLUG_W +
-		L"/releases/latest/download/" + asset;
+	return releaseAssetPath(asset);
 }
 
-std::wstring assetPath(const std::wstring& channel)
+std::wstring releaseAssetPath(const std::wstring& asset, const std::wstring& releaseTag)
 {
-	return latestAssetPath(assetName(channel));
+	const std::wstring route = releaseTag.empty()
+		? L"/releases/latest/download/"
+		: L"/releases/download/" + releaseTag + L"/";
+	return std::wstring(L"/") + EAPO_REPO_SLUG_W + route + asset;
 }
 
-std::wstring downloadUrl(const std::wstring& channel)
+std::wstring releasePageUrl(const std::wstring& releaseTag)
 {
-	return std::wstring(L"https://github.com") + assetPath(channel);
+	const std::wstring route = releaseTag.empty()
+		? L"/releases/latest"
+		: L"/releases/tag/" + releaseTag;
+	return std::wstring(L"https://github.com/") + EAPO_REPO_SLUG_W + route;
+}
+
+std::wstring machineInstallerAssetPath(const std::wstring& channel, const std::wstring& releaseTag)
+{
+	return releaseAssetPath(machineInstallerAssetName(channel), releaseTag);
+}
+
+std::wstring machineInstallerDownloadUrl(const std::wstring& channel, const std::wstring& releaseTag)
+{
+	return std::wstring(L"https://github.com") + machineInstallerAssetPath(channel, releaseTag);
+}
+
+std::wstring machineInstallSubdirectory(const std::wstring& channel)
+{
+	return L"EqualizerAPO-XT-" + channel;
+}
+
+std::wstring resolveProgramFilesX64Path(const std::wstring& knownFolderPath,
+	const std::wstring& registryProgramFilesPath)
+{
+	return knownFolderPath.empty() ? registryProgramFilesPath : knownFolderPath;
 }
 
 std::wstring expectedHashFromChecksums(const std::string& text, const std::wstring& fileName)

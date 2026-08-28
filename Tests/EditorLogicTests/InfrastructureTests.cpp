@@ -4,6 +4,8 @@
 #include <stdexcept>
 
 #include <QDir>
+#include <QColor>
+#include <QPalette>
 #include <QSet>
 #include <QFile>
 #include <QFileInfo>
@@ -25,7 +27,18 @@
 void testTheSkinRosterIsTheOneList()
 {
 	const QVector<SkinThemeData::SkinEntry>& roster = SkinThemeData::roster();
-	requireTrue(roster.size() >= 5, "the roster carries the five built-in skins");
+	const QStringList expectedIds = {
+		QStringLiteral("studio"), QStringLiteral("clarity"), QStringLiteral("minimal"), QStringLiteral("soft"),
+		QStringLiteral("rack"), QStringLiteral("matrix"), QStringLiteral("midnight"),
+		QStringLiteral("arctic"), QStringLiteral("ember"), QStringLiteral("violet"),
+		QStringLiteral("solar"), QStringLiteral("obsidian"), QStringLiteral("aurora"),
+		QStringLiteral("forge"), QStringLiteral("nebula"), QStringLiteral("noir"),
+		QStringLiteral("legacy-slate"), QStringLiteral("legacy-blue"),
+		QStringLiteral("legacy-forest"), QStringLiteral("legacy-bronze"),
+		QStringLiteral("legacy-plum"), QStringLiteral("graphite")
+	};
+	requireTrue(roster.size() == expectedIds.size(),
+		"the roster carries exactly the base skins and the three scoped variant sets");
 	expectTrue(roster.first().id == QStringLiteral("studio"),
 		"studio is first, which is what an unknown id falls back to and what the default is");
 
@@ -34,7 +47,12 @@ void testTheSkinRosterIsTheOneList()
 	{
 		expectFalse(skin.id.isEmpty(), "every entry has an id");
 		expectFalse(skin.qssBaseName.isEmpty(), "every entry names its style sheet");
+		expectFalse(skin.paintBaseId.isEmpty(), "every entry names its paint grammar");
 		expectTrue(skin.tokens != nullptr, "every entry carries its token table");
+		expectTrue(SkinThemeData::entry(skin.paintBaseId).id == skin.paintBaseId,
+			"every paint grammar is a registered skin id");
+		expectTrue(SkinThemeData::entry(skin.paintBaseId).paintBaseId == skin.paintBaseId,
+			"every paint grammar is a self-rooting base skin");
 		expectFalse(seen.contains(skin.id),
 			QStringLiteral("%1 appears once").arg(skin.id));
 		seen.insert(skin.id);
@@ -47,8 +65,125 @@ void testTheSkinRosterIsTheOneList()
 
 	const QStringList ids = SkinThemeData::ids();
 	requireTrue(ids.size() == roster.size(), "ids() has one entry per roster skin, in the same order");
-	for (int index = 0; index < ids.size(); index++)
-		expectTrue(ids[index] == roster[index].id, "ids() preserves the roster order, which is the display order");
+	expectTrue(ids == expectedIds,
+		"ids() preserves the exact scoped roster and its display order");
+	expectTrue(SkinThemeData::entry(QStringLiteral("midnight")).qssBaseName == QStringLiteral("studio"),
+		"Midnight Console rides the Studio QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("midnight")).paintBaseId == QStringLiteral("studio"),
+		"Midnight Console rides the Studio paint grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("clarity")).qssBaseName == QStringLiteral("precision"),
+		"Clarity High Contrast rides the precision QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("clarity")).paintBaseId == QStringLiteral("minimal"),
+		"Clarity High Contrast reuses Precision's layout grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("graphite")).qssBaseName == QStringLiteral("precision"),
+		"Graphite Clarity rides the Precision QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("graphite")).paintBaseId == QStringLiteral("minimal"),
+		"Graphite Clarity reuses Precision's layout grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("arctic")).qssBaseName == QStringLiteral("soft"),
+		"Arctic Bloom rides the Soft QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("arctic")).paintBaseId == QStringLiteral("soft"),
+		"Arctic Bloom rides the Soft paint grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("ember")).qssBaseName == QStringLiteral("rack"),
+		"Ember Rack rides the Rack QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("ember")).paintBaseId == QStringLiteral("rack"),
+		"Ember Rack rides the Rack paint grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("violet")).qssBaseName == QStringLiteral("matrix"),
+		"Violet Pulse rides the Matrix QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("violet")).paintBaseId == QStringLiteral("matrix"),
+		"Violet Pulse rides the Matrix paint grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("solar")).qssBaseName == QStringLiteral("precision"),
+		"Solar Paper rides the Minimal QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("solar")).paintBaseId == QStringLiteral("minimal"),
+		"Solar Paper rides the Minimal paint grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("obsidian")).qssBaseName == QStringLiteral("studio"),
+		"Obsidian Glass rides the Studio QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("obsidian")).paintBaseId == QStringLiteral("studio"),
+		"Obsidian Glass rides the Studio paint grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("aurora")).qssBaseName == QStringLiteral("soft"),
+		"Aurora Veil rides the Soft QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("aurora")).paintBaseId == QStringLiteral("soft"),
+		"Aurora Veil rides the Soft paint grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("forge")).qssBaseName == QStringLiteral("rack"),
+		"Copper Forge rides the Rack QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("forge")).paintBaseId == QStringLiteral("rack"),
+		"Copper Forge rides the Rack paint grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("nebula")).qssBaseName == QStringLiteral("matrix"),
+		"Neon Nebula rides the Matrix QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("nebula")).paintBaseId == QStringLiteral("matrix"),
+		"Neon Nebula rides the Matrix paint grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("noir")).qssBaseName == QStringLiteral("precision"),
+		"Noir Chrome rides the Minimal QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("noir")).paintBaseId == QStringLiteral("minimal"),
+		"Noir Chrome rides the Minimal paint grammar");
+	for (const QString& variant : { QStringLiteral("legacy-slate"), QStringLiteral("legacy-blue"),
+		QStringLiteral("legacy-forest"), QStringLiteral("legacy-bronze"), QStringLiteral("legacy-plum") })
+	{
+		expectTrue(SkinThemeData::entry(variant).qssBaseName == QStringLiteral("precision"),
+			QStringLiteral("%1 rides the Precision QSS grammar").arg(variant));
+		expectTrue(SkinThemeData::entry(variant).paintBaseId == QStringLiteral("minimal"),
+			QStringLiteral("%1 rides the Minimal paint grammar").arg(variant));
+	}
+	expectTrue(SkinThemeData::tokens(QStringLiteral("obsidian"), true).graphRadius == 12,
+		"Obsidian Glass keeps its larger graph radius");
+	expectTrue(SkinThemeData::tokens(QStringLiteral("aurora"), true).borderRadius == 18,
+		"Aurora Veil keeps its softer radius");
+	expectTrue(SkinThemeData::tokens(QStringLiteral("forge"), true).graphRadius == 6,
+		"Copper Forge keeps its compact graph radius");
+	expectTrue(SkinThemeData::tokens(QStringLiteral("nebula"), true).cardRailWidth == 5,
+		"Neon Nebula keeps its matrix card rail");
+	expectTrue(SkinThemeData::tokens(QStringLiteral("noir"), true).zebraStripe,
+		"Noir Chrome keeps its minimal zebra stripes");
+	expectTrue(SkinThemeData::tokens(QStringLiteral("legacy-bronze"), true).fontFamily == QStringLiteral("Segoe UI"),
+		"Legacy Bronze keeps the native legacy-row font");
+	expectTrue(SkinThemeData::tokens(QStringLiteral("legacy-bronze"), true).accent == QStringLiteral("#C58B48"),
+		"Legacy Bronze carries the requested bronze accent");
+
+	// The readability themes are deliberately stronger than the ordinary 4.5:1
+	// floor: labels, values, focus rings and knob travel must remain unmistakable
+	// in both Modern cards and Legacy Rows, which consume this same token table.
+	for (const QString& themeId : { QStringLiteral("clarity"), QStringLiteral("graphite") })
+	{
+		for (const SkinTokens& tokens : {
+			SkinThemeData::tokens(themeId, false),
+			SkinThemeData::tokens(themeId, true)
+		})
+		{
+			const QString mode = tokens.dark ? QStringLiteral("dark") : QStringLiteral("light");
+			const auto expectReadableSurface = [&](const QString& surfaceName, const QString& surface)
+			{
+				expectTrue(SkinThemeData::contrastRatio(tokens.text, surface) >= 15.0,
+					QStringLiteral("%1 %2 primary labels exceed 15:1 on %3")
+						.arg(themeId, mode, surfaceName));
+				expectTrue(SkinThemeData::contrastRatio(tokens.mutedText, surface) >= 9.0,
+					QStringLiteral("%1 %2 secondary labels exceed 9:1 on %3")
+						.arg(themeId, mode, surfaceName));
+			};
+			expectTrue(tokens.highContrast,
+				QStringLiteral("%1 %2 enables high-visibility control geometry").arg(themeId, mode));
+			expectReadableSurface(QStringLiteral("card"), tokens.card);
+			expectReadableSurface(QStringLiteral("card hover"), tokens.cardHover);
+			expectReadableSurface(QStringLiteral("card selection"), tokens.cardSelected);
+			expectTrue(SkinThemeData::contrastRatio(tokens.accent, tokens.card) >= 4.5,
+				QStringLiteral("%1 %2 control accent stays readable on cards").arg(themeId, mode));
+			expectTrue(SkinThemeData::contrastRatio(tokens.focusRing, tokens.card) >= 4.5,
+				QStringLiteral("%1 %2 keyboard focus stays readable on cards").arg(themeId, mode));
+			expectTrue(tokens.rowHeight >= 40,
+				QStringLiteral("%1 %2 reserves a readable row height").arg(themeId, mode));
+		}
+	}
+	expectTrue(SkinThemeData::tokens(QStringLiteral("graphite"), true).background == QStringLiteral("#191C20"),
+		"Graphite Clarity stays charcoal in dark mode instead of collapsing to black");
+	const SkinTokens clarity = SkinThemeData::tokens(QStringLiteral("clarity"), true);
+	const SkinTokens graphite = SkinThemeData::tokens(QStringLiteral("graphite"), true);
+	expectTrue(graphite.borderRadius == 0 && graphite.graphRadius == 0,
+		"Graphite Clarity uses square instrument edges instead of Clarity's rounded cards");
+	expectTrue(graphite.cardRailWidth > clarity.cardRailWidth && graphite.cardGap < clarity.cardGap,
+		"Graphite Clarity uses a heavier signal rail and denser card rhythm");
+	expectTrue(graphite.channelGroupStyle == SkinTokens::GradientBar && graphite.channelGroupIndent > clarity.channelGroupIndent,
+		"Graphite Clarity leads nested rows with a wide signal bar instead of tree lines");
+	expectTrue(graphite.badgeStyle == SkinTokens::WireframeBorder && !graphite.zebraStripe
+			&& graphite.rowHeight > clarity.rowHeight,
+		"Graphite Clarity uses square wire plates and solid taller rows, not Clarity striping");
 
 	// The two stored aliases from earlier releases, which are the only ids that
 	// cannot be derived from the roster.
@@ -72,6 +207,100 @@ void testSkinTokensCarryExplicitMode()
 	}
 }
 
+// A skin can be stylistically different without sacrificing ordinary text
+// readability. These checks cover every built-in token table in both modes,
+// including the Legacy Rows palettes that do not load a modern QSS sheet.
+void testEveryBuiltInThemePassesTheReadabilityContract()
+{
+	for (const QString& skinId : SkinThemeData::ids())
+	{
+		const SkinTokens light = SkinThemeData::tokens(skinId, false);
+		const SkinTokens dark = SkinThemeData::tokens(skinId, true);
+		expectTrue(SkinThemeData::modesAreDistinct(light, dark),
+			QStringLiteral("%1 has visibly different light and dark window grounds").arg(skinId));
+
+		for (const SkinTokens& tokens : { light, dark })
+		{
+			const QVector<SkinThemeData::ReadabilityCheck> checks =
+				SkinThemeData::readabilityChecks(tokens);
+			requireTrue(!checks.isEmpty(),
+				QStringLiteral("%1 exposes a non-empty readability audit").arg(skinId));
+			for (const SkinThemeData::ReadabilityCheck& check : checks)
+			{
+				expectTrue(check.passes(),
+					QStringLiteral("%1 %2 %3 is %4:1 (needs %5:1)")
+						.arg(skinId, tokens.dark ? QStringLiteral("dark") : QStringLiteral("light"),
+							check.label)
+						.arg(check.ratio, 0, 'f', 2)
+						.arg(check.minimum, 0, 'f', 2));
+			}
+			expectTrue(SkinThemeData::passesReadability(tokens),
+				QStringLiteral("%1 %2 passes the aggregate readability contract")
+					.arg(skinId, tokens.dark ? QStringLiteral("dark") : QStringLiteral("light")));
+		}
+	}
+}
+
+void testTooltipContractFollowsThemeTokens()
+{
+	const SkinTokens tokens = SkinThemeData::tokens(QStringLiteral("legacy-plum"), true);
+	const QString rule = SkinThemeData::tooltipOverride(tokens);
+	expectTrue(rule.contains(tokens.card),
+		"tooltip override uses the active card colour instead of a platform default");
+	expectTrue(rule.contains(tokens.text),
+		"tooltip override uses the active text colour instead of a platform default");
+	expectTrue(rule.contains(tokens.border),
+		"tooltip override carries the active border colour");
+
+	const QPalette palette = SkinThemeData::palette(tokens, true);
+	expectTrue(palette.color(QPalette::ToolTipBase) == QColor(tokens.card),
+		"tooltip palette base follows the active card token");
+	expectTrue(palette.color(QPalette::ToolTipText) == QColor(tokens.text),
+		"tooltip palette ink follows the active text token");
+	expectTrue(palette.color(QPalette::HighlightedText) == QColor(SkinThemeData::selectionText(tokens)),
+		"selected text palette follows the readable token-derived selection ink");
+}
+
+// MenuButtonPopup owns a separate menu-button subcontrol. The core button
+// rules do not paint that rectangle, so a missing shared override reads as a
+// black clipped strip in modern cards and an unthemed square in Legacy Rows.
+void testSplitMenuButtonsFollowThemeTokens()
+{
+	for (const QString& skinId : SkinThemeData::ids())
+	{
+		for (bool dark : { false, true })
+		{
+			const SkinTokens tokens = SkinThemeData::tokens(skinId, dark);
+			const QString rule = SkinThemeData::toolButtonMenuOverride(tokens);
+			expectTrue(rule.contains(QStringLiteral("QToolButton::menu-button")),
+				QStringLiteral("%1 %2 paints a split-menu face").arg(skinId, dark ? QStringLiteral("dark") : QStringLiteral("light")));
+			expectTrue(rule.contains(QStringLiteral("QToolButton::menu-arrow")),
+				QStringLiteral("%1 %2 supplies a visible split-menu arrow").arg(skinId, dark ? QStringLiteral("dark") : QStringLiteral("light")));
+			expectTrue(rule.contains(QStringLiteral("width: 8px")),
+				QStringLiteral("%1 %2 keeps the split-menu target compact").arg(skinId, dark ? QStringLiteral("dark") : QStringLiteral("light")));
+			expectTrue(rule.contains(QStringLiteral("width: 6px; height: 6px")),
+				QStringLiteral("%1 %2 keeps the split-menu chevron a small visual cue").arg(skinId, dark ? QStringLiteral("dark") : QStringLiteral("light")));
+			expectTrue(rule.contains(QStringLiteral("width: 8px; background: transparent; border: 0;")),
+				QStringLiteral("%1 %2 does not paint a second button face at rest").arg(skinId, dark ? QStringLiteral("dark") : QStringLiteral("light")));
+			expectTrue(rule.contains(tokens.border) && rule.contains(tokens.cardHover) && rule.contains(tokens.cardSelected),
+				QStringLiteral("%1 %2 split-menu states use only active theme tokens").arg(skinId, dark ? QStringLiteral("dark") : QStringLiteral("light")));
+		}
+	}
+}
+
+void testThemeLabCanRepairCustomTextContrast()
+{
+	SkinTokens custom = SkinThemeData::tokens(QStringLiteral("studio"), false);
+	custom.text = QStringLiteral("#FFFFFF");
+	custom.mutedText = QStringLiteral("#FFFFFF");
+	expectFalse(SkinThemeData::passesReadability(custom),
+		"the fixture starts with white text on a light custom theme");
+
+	SkinThemeData::repairTextReadability(custom);
+	expectTrue(SkinThemeData::passesReadability(custom),
+		"Theme Lab's text repair restores the full normal-text contrast contract");
+}
+
 // The alpha form a sheet needs to hold a token at partial opacity. QSS has no
 // variables and its rgba() takes three numbers, so without this a sheet had to
 // write the palette value out by hand and a token change stopped reaching it.
@@ -82,13 +311,13 @@ void testTokenSubstitutionOffersAnAlphaForm()
 	requireTrue(accent.isValid(), "the studio accent token parses as a colour");
 
 	const QString resolved = SkinThemeData::substituteTokens(
-		QStringLiteral("QWidget { background: rgba(@ACCENT_RGB@, 0.30); color: @ACCENT@; }"), tokens);
+		QStringLiteral("QWidget { background: rgba(@ACCENT_RGB@, 0.30); color: @SELECTION_TEXT@; }"), tokens);
 
 	expectTrue(resolved.contains(QStringLiteral("rgba(%1, %2, %3, 0.30)")
 			.arg(accent.red()).arg(accent.green()).arg(accent.blue())),
 		"the alpha form expands to the token's three channels, so rgba() gets numbers");
-	expectTrue(resolved.contains(QStringLiteral("color: ") + tokens.accent),
-		"and the plain form still expands to the hex value");
+	expectTrue(resolved.contains(QStringLiteral("color: ") + SkinThemeData::selectionText(tokens)),
+		"and the selected-text form expands to the readable derived ink");
 	expectFalse(resolved.contains(QStringLiteral("_RGB")),
 		"the longer sentinel is replaced before the shorter one, or the hex value would be left with _RGB stuck to it");
 
@@ -114,7 +343,7 @@ void testEverySkinSheetResolvesAllThemeTokens()
 			const QString resource = SkinThemeData::qssResource(skinId, dark);
 			const QString sourcePath = repoRoot.filePath(
 				QStringLiteral("Editor/skins/%1/qss/%2")
-					.arg(skinId, QFileInfo(resource).fileName()));
+					.arg(SkinThemeData::entry(skinId).paintBaseId, QFileInfo(resource).fileName()));
 			QFile file(sourcePath);
 			expectTrue(file.open(QIODevice::ReadOnly | QIODevice::Text),
 				QStringLiteral("loads %1 source sheet").arg(resource));
@@ -192,6 +421,37 @@ void testFileReferenceControllerOwnsPathState()
 	const QString farSelection = root.filePath(QStringLiteral("outside/plugin.dll"));
 	expectPath(FileReferenceController::displayPathForBaseDirectory(
 		baseDirectory, farSelection), farSelection);
+
+	const QString vst3Bundle = root.filePath(QStringLiteral("outside/Portable.vst3"));
+	const QString vst3Module = vst3Bundle + QStringLiteral("/Contents/x86_64-win/Portable.vst3");
+	requireTrue(root.mkpath(QFileInfo(vst3Module).absolutePath()),
+		"file-reference test creates the VST3 bundle fixture");
+	QFile module(vst3Module);
+	requireTrue(module.open(QIODevice::WriteOnly),
+		"file-reference test creates the VST3 module fixture");
+	module.close();
+	expectTrue(FileReferenceController::isVST3BundleDirectory(vst3Bundle),
+		"VST3 bundle directory is an eligible direct VST selection");
+	expectFalse(FileReferenceController::isVST3BundleDirectory(vst3Module),
+		"VST3 module file must not masquerade as a bundle selection");
+	expectFalse(FileReferenceController::isVST3BundleDirectory(root.filePath(QStringLiteral("outside"))),
+		"ordinary directories are not VST3 bundle selections");
+
+	FileReferenceController vstReference(
+		QStringLiteral("vst"), QStringLiteral("kept-plugin.dll"));
+	vstReference.setResolvedPath(farSelection);
+	expectFalse(vstReference.setVST3BundleSelection(
+		root.filePath(QStringLiteral("outside")), root.filePath(QStringLiteral("outside"))),
+		"invalid VST3 selection must be rejected before controller state changes");
+	expectEqual(vstReference.writtenPath(), QStringLiteral("kept-plugin.dll"),
+		"rejected VST3 selection preserves the saved library path");
+	expectPath(vstReference.resolvedPath(), farSelection);
+	expectTrue(vstReference.setVST3BundleSelection(
+		vst3Bundle, root.filePath(QStringLiteral("outside"))),
+		"valid VST3 selection updates the controller");
+	expectEqual(vstReference.writtenPath(), QStringLiteral("Portable.vst3"),
+		"valid VST3 selection uses the configured base directory");
+	expectPath(vstReference.resolvedPath(), vst3Bundle);
 }
 
 void testAnalysisWorkerRecovery()

@@ -1,0 +1,67 @@
+/*
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+
+	Editor-side live preview feed for VST plugin panels. The audio service owns
+	the real processing instances; the editor owns a separate instance for the
+	visible plug-in GUI. This helper feeds copied endpoint audio into that
+	visible instance so analyzer-style plug-in UIs can animate without routing
+	the preview audio back to the device. Normal pop-out native panels also
+	receive the feed. Bertom Denoiser Classic is a narrow exception because its
+	controller crashes if process() overlaps the native editor session; the
+	popup-preview policy isolates that plug-in.
+*/
+
+#pragma once
+
+#include <atomic>
+#include <memory>
+#include <thread>
+#include <vector>
+
+#include "Editor/helpers/VSTPreviewEndpoint.h"
+
+class VSTPluginInstance;
+
+class VSTPluginLivePreview
+{
+public:
+	VSTPluginLivePreview();
+	~VSTPluginLivePreview();
+
+	void setEnabled(bool enabled);
+	bool isEnabled() const;
+	void update(VSTPluginInstance* effect, bool panelVisible, const VSTPreviewEndpoint& previewEndpoint = {});
+	void stop();
+
+private:
+	class WasapiCapture;
+
+	void start(VSTPluginInstance* effect, const VSTPreviewEndpoint& previewEndpoint);
+	void processLoop();
+	void processOneBlock();
+	void allocateBuffers(int inputChannels, int outputChannels);
+
+	std::unique_ptr<WasapiCapture> selectedEndpointCapture;
+	std::unique_ptr<WasapiCapture> inputCapture;
+	std::unique_ptr<WasapiCapture> communicationsInputCapture;
+	std::unique_ptr<WasapiCapture> playbackCapture;
+	std::thread processingWorker;
+	std::atomic<bool> processingStopRequested{ false };
+	VSTPluginInstance* effect = nullptr;
+	VSTPreviewEndpoint activeEndpoint;
+	bool enabled = true;
+	bool active = false;
+	int previewSampleRate = 48000;
+	int inputChannelCount = 0;
+	int outputChannelCount = 0;
+	static constexpr int blockSize = 512;
+
+	std::vector<std::vector<float>> floatInputs;
+	std::vector<std::vector<float>> floatOutputs;
+	std::vector<float*> floatInputPtrs;
+	std::vector<float*> floatOutputPtrs;
+	std::vector<std::vector<double>> doubleInputs;
+	std::vector<std::vector<double>> doubleOutputs;
+	std::vector<double*> doubleInputPtrs;
+	std::vector<double*> doubleOutputPtrs;
+};

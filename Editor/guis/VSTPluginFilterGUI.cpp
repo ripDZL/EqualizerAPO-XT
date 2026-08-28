@@ -29,6 +29,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMenu>
+#include <QMessageBox>
 #include <QStringList>
 
 #define WIN32_LEAN_AND_MEAN
@@ -42,6 +43,7 @@
 #include "Editor/skins/ISkin.h"
 #include "VSTPluginFilterGUIDialog.h"
 #include "VSTPluginFilterGUI.h"
+#include "Editor/helpers/VSTPopupLivePreviewPolicy.h"
 #include "ui_VSTPluginFilterGUI.h"
 
 using std::bind;
@@ -54,9 +56,10 @@ using std::placeholders::_2;
 
 VSTPluginFilterGUI::VSTPluginFilterGUI(std::shared_ptr<VSTPluginLibrary> library, const std::wstring& chunkData, const std::unordered_map<std::wstring, float>& paramMap,
 	bool stereoInput, const std::optional<VST3BusContract>& busContract,
+	const VSTPreviewEndpoint& previewEndpoint,
 	std::vector<std::wstring> inputChannels, std::vector<std::wstring> outputChannels)
 	: ui(std::make_unique<Ui::VSTPluginFilterGUI>()), library(library), chunkData(chunkData), paramMap(paramMap),
-	stereoInput(stereoInput), busContract(busContract),
+	stereoInput(stereoInput), busContract(busContract), previewEndpoint(previewEndpoint),
 	inputChannels(std::move(inputChannels)), outputChannels(std::move(outputChannels))
 {
 	ui->setupUi(this);
@@ -82,6 +85,12 @@ VSTPluginFilterGUI::VSTPluginFilterGUI(std::shared_ptr<VSTPluginLibrary> library
 	stereoInputAction->setToolTip(tr("Use for upmixers that expand a stereo signal to multichannel."));
 	connect(stereoInputAction, &QAction::toggled, this, &VSTPluginFilterGUI::stereoInputToggled);
 	menu->addAction(stereoInputAction);
+	livePreviewAction = new QAction(tr("Live analyzer feed"), this);
+	livePreviewAction->setCheckable(true);
+	livePreviewAction->setChecked(true);
+	livePreviewAction->setToolTip(tr("Feed endpoint audio into the open plugin panel so analyzer graphs can animate. Bertom Denoiser Classic stays protected in a separate panel to avoid its known crash."));
+	connect(livePreviewAction, &QAction::toggled, this, &VSTPluginFilterGUI::livePreviewToggled);
+	menu->addAction(livePreviewAction);
 	ui->optionsButton->setMenu(menu);
 
 	// The VST3 main-bus contract as two plain dropdowns. The layout names are
@@ -106,12 +115,16 @@ VSTPluginFilterGUI::VSTPluginFilterGUI(std::shared_ptr<VSTPluginLibrary> library
 	// lists or the selected channels change.
 	QGridLayout* grid = static_cast<QGridLayout*>(layout());
 	inputFillRow = new QWidget(this);
-	new QHBoxLayout(inputFillRow);
-	static_cast<QHBoxLayout*>(inputFillRow->layout())->setContentsMargins(0, 0, 0, 0);
+	QGridLayout* inputFillLayout = new QGridLayout(inputFillRow);
+	inputFillLayout->setContentsMargins(0, 0, 0, 0);
+	inputFillLayout->setHorizontalSpacing(GUIHelper::scale(6.0));
+	inputFillLayout->setVerticalSpacing(GUIHelper::scale(3.0));
 	grid->addWidget(inputFillRow, 3, 0, 1, 4);
 	outputFillRow = new QWidget(this);
-	new QHBoxLayout(outputFillRow);
-	static_cast<QHBoxLayout*>(outputFillRow->layout())->setContentsMargins(0, 0, 0, 0);
+	QGridLayout* outputFillLayout = new QGridLayout(outputFillRow);
+	outputFillLayout->setContentsMargins(0, 0, 0, 0);
+	outputFillLayout->setHorizontalSpacing(GUIHelper::scale(6.0));
+	outputFillLayout->setVerticalSpacing(GUIHelper::scale(3.0));
 	grid->addWidget(outputFillRow, 4, 0, 1, 4);
 	fillCollapsed = this->inputChannels.empty() && this->outputChannels.empty();
 
@@ -130,6 +143,7 @@ VSTPluginFilterGUI::VSTPluginFilterGUI(std::shared_ptr<VSTPluginLibrary> library
 
 VSTPluginFilterGUI::~VSTPluginFilterGUI()
 {
+	livePreview.stop();
 	if (effect != nullptr)
 	{
 		if (embedded)
@@ -174,6 +188,12 @@ void VSTPluginFilterGUI::stereoInputToggled(bool checked)
 		return;
 	stereoInput = checked;
 	updateModel();
+}
+
+void VSTPluginFilterGUI::livePreviewToggled(bool checked)
+{
+	livePreview.setEnabled(checked);
+	updateLivePreview();
 }
 
 void VSTPluginFilterGUI::busLayoutPicked()
@@ -237,8 +257,8 @@ void VSTPluginFilterGUI::updateFillRows()
 void VSTPluginFilterGUI::rebuildFillRow(bool output)
 {
 	QWidget* row = output ? outputFillRow : inputFillRow;
-	QHBoxLayout* box = static_cast<QHBoxLayout*>(row->layout());
-	while (QLayoutItem* item = box->takeAt(0))
+	QGridLayout* grid = static_cast<QGridLayout*>(row->layout());
+	while (QLayoutItem* item = grid->takeAt(0))
 	{
 		if (item->widget() != nullptr)
 			item->widget()->deleteLater();
@@ -247,26 +267,35 @@ void VSTPluginFilterGUI::rebuildFillRow(bool output)
 	if (!output)
 		fillToggle = nullptr;
 
+	QWidget* heading = nullptr;
 	if (!output && fillModel.latchPresent())
 	{
 		fillToggle = new QCheckBox(tr("Channel fill"), row);
 		fillToggle->setChecked(!fillCollapsed);
 		fillToggle->setToolTip(tr("Choose which channels occupy the negotiated bus slots."));
 		connect(fillToggle, &QCheckBox::toggled, this, &VSTPluginFilterGUI::fillToggleClicked);
-		box->addWidget(fillToggle);
+		heading = fillToggle;
 	}
 	else
 	{
-		box->addWidget(new QLabel(output ? tr("Output fill") : tr("Input fill"), row));
+		heading = new QLabel(output ? tr("Output fill") : tr("Input fill"), row);
 	}
+	grid->addWidget(heading, 0, 0, Qt::AlignLeft | Qt::AlignTop);
+	grid->setColumnMinimumWidth(0, heading->sizeHint().width() + GUIHelper::scale(8.0));
 
 	if (!fillCollapsed)
 	{
+		constexpr int slotsPerLine = 3;
 		const int count = fillModel.slotCount(output);
 		for (int slot = 0; slot < count; slot++)
 		{
-			box->addWidget(new QLabel(QString::fromStdWString(fillModel.slotRole(output, slot)), row));
-			QComboBox* combo = new QComboBox(row);
+			QWidget* slotEditor = new QWidget(row);
+			slotEditor->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+			QHBoxLayout* slotLayout = new QHBoxLayout(slotEditor);
+			slotLayout->setContentsMargins(0, 0, 0, 0);
+			slotLayout->setSpacing(GUIHelper::scale(3.0));
+			slotLayout->addWidget(new QLabel(QString::fromStdWString(fillModel.slotRole(output, slot)), slotEditor));
+			QComboBox* combo = new QComboBox(slotEditor);
 			combo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
 			for (const std::wstring& name : fillModel.selectedChannels())
 				combo->addItem(QString::fromStdWString(name), QString::fromStdWString(name));
@@ -292,10 +321,11 @@ void VSTPluginFilterGUI::rebuildFillRow(bool output)
 				updateFillRows();
 				updateModel();
 			});
-			box->addWidget(combo);
+			slotLayout->addWidget(combo);
+			grid->addWidget(slotEditor, slot / slotsPerLine, 1 + slot % slotsPerLine);
 		}
 	}
-	box->addStretch(1);
+	grid->setColumnStretch(4, 1);
 }
 
 void VSTPluginFilterGUI::updateBusControls()
@@ -322,6 +352,7 @@ void VSTPluginFilterGUI::updateBusControls()
 void VSTPluginFilterGUI::loadPreferences(const QVariantMap& prefs)
 {
 	autoApplyDialog = prefs.value("autoApplyDialog", true).toBool();
+	livePreviewAction->setChecked(prefs.value("liveAnalyzerFeed", true).toBool());
 
 	if (prefs.contains("slotFillCollapsed"))
 	{
@@ -341,6 +372,7 @@ void VSTPluginFilterGUI::storePreferences(QVariantMap& prefs)
 {
 	prefs.insert("embed", ui->embedAction->isChecked());
 	prefs.insert("autoApplyDialog", autoApplyDialog);
+	prefs.insert("liveAnalyzerFeed", livePreviewAction->isChecked());
 	if (fillCollapsedFromPrefs)
 		prefs.insert("slotFillCollapsed", fillCollapsed);
 }
@@ -361,22 +393,35 @@ void VSTPluginFilterGUI::on_openPanelButton_clicked()
 	{
 		effect->writeToEffect(chunkData, paramMap);
 
-		// Before the dialog's startEditing: the feed prepares the instance
-		// for the loopback mix format, which must happen while the processor
-		// is still deactivated.
-		previewFeeder.start(effect.get());
+		const auto previewPath = VSTPopupLivePreviewPolicy::selectFeedPath(
+			livePreviewAction != nullptr && livePreviewAction->isChecked(), previewEndpoint.isValid(),
+			false, true, library->getLibPath());
+		// The upstream panel feeder must prepare a VST3 before startEditing.
+		if (previewPath == VSTPopupLivePreviewPolicy::FeedPath::PanelPreview)
+			previewFeeder.start(effect.get());
 
 		VSTPluginFilterGUIDialog dialog(this, effect.get(), autoApplyDialog);
+		if (!dialog.hasPluginPanel())
+		{
+			previewFeeder.stop();
+			QMessageBox::information(this, tr("VST plug-in"),
+				tr("This plug-in does not provide a native editor panel."));
+			return;
+		}
 		connect(dialog.getApplyButton(), SIGNAL(pressed()), SLOT(applyDialog()));
 		connect(dialog.getAutoApplyCheckBox(), SIGNAL(toggled(bool)), SLOT(autoApplyToggled(bool)));
 		connect(QAbstractEventDispatcher::instance(), SIGNAL(aboutToBlock()), SLOT(on_idle()));
 
+		panelDialogOpen = true;
+		updateLivePreview();
 		if (dialog.exec() == QDialog::Accepted)
 		{
 			effect->readFromEffect(chunkData, paramMap);
 			updateModel();
 			updatePermissionWarning();
 		}
+		panelDialogOpen = false;
+		updateLivePreview();
 		disconnect(QAbstractEventDispatcher::instance(), SIGNAL(aboutToBlock()), this, SLOT(on_idle()));
 		previewFeeder.stop();
 	}
@@ -399,19 +444,22 @@ void VSTPluginFilterGUI::initPlugin()
 	if (effect != nullptr)
 		return;
 
+	const SkinTokens& skinTokens = SkinManager::instance()->tokens();
+	const QColor normalStatusColor(skinTokens.text);
+	const QColor errorStatusColor(skinTokens.danger);
 	QColor color;
 	QString text;
 	if (library->getLibPath() == L"")
 	{
 		text = tr("No file selected.");
-		color = Qt::red;
+		color = errorStatusColor;
 	}
 	else
 	{
 		int result = library->initialize();
 		if (result < 0)
 		{
-			color = Qt::red;
+			color = errorStatusColor;
 
 			switch (result)
 			{
@@ -442,14 +490,14 @@ void VSTPluginFilterGUI::initPlugin()
 				effect->setLanguage(QLocale().language() == QLocale::German ? 2 : 1);
 				effect->setAutomateFunc(bind(&VSTPluginFilterGUI::onAutomate, this));
 
-				color = Qt::black;
+				color = normalStatusColor;
 				text = QString::fromStdWString(effect->getName());
 			}
 			else
 			{
 				effect.reset();
 
-				color = Qt::red;
+				color = errorStatusColor;
 				text = tr("Plugin crashed during initialization.");
 			}
 		}
@@ -473,6 +521,7 @@ void VSTPluginFilterGUI::on_pathLineEdit_editingFinished()
 			oldId = effect->uniqueID();
 			if (ui->embedAction->isChecked())
 				on_embedAction_toggled(false);
+			livePreview.stop();
 			effect.reset();
 		}
 
@@ -545,14 +594,18 @@ void VSTPluginFilterGUI::on_embedAction_toggled(bool checked)
 
 		if (enable)
 		{
-			// Before embedPlugin()'s startEditing, for the same deactivation
-			// contract as the dialog path.
-			previewFeeder.start(effect.get());
+			const auto previewPath = VSTPopupLivePreviewPolicy::selectFeedPath(
+				livePreviewAction != nullptr && livePreviewAction->isChecked(), previewEndpoint.isValid(),
+				true, false, library->getLibPath());
+			// The upstream panel feeder must prepare a VST3 before startEditing.
+			if (previewPath == VSTPopupLivePreviewPolicy::FeedPath::PanelPreview)
+				previewFeeder.start(effect.get());
 
 			if (embedPlugin())
 			{
 				effect->setSizeWindowFunc(bind(&VSTPluginFilterGUI::onSizeWindow, this, _1, _2));
 				connect(QAbstractEventDispatcher::instance(), SIGNAL(aboutToBlock()), SLOT(on_idle()));
+				updateLivePreview();
 			}
 			else
 			{
@@ -560,12 +613,14 @@ void VSTPluginFilterGUI::on_embedAction_toggled(bool checked)
 				embedded = false;
 				ui->frame->setVisible(false);
 				ui->statusLabel->setVisible(true);
+				livePreview.stop();
 
 				QPalette palette = ui->statusLabel->palette();
-				palette.setColor(QPalette::Active, QPalette::WindowText, Qt::red);
-				palette.setColor(QPalette::Inactive, QPalette::WindowText, Qt::red);
+				const QColor errorStatusColor(SkinManager::instance()->tokens().danger);
+				palette.setColor(QPalette::Active, QPalette::WindowText, errorStatusColor);
+				palette.setColor(QPalette::Inactive, QPalette::WindowText, errorStatusColor);
 				ui->statusLabel->setPalette(palette);
-				ui->statusLabel->setText(tr("Plugin crashed when opening panel."));
+				ui->statusLabel->setText(tr("Plugin could not open a native editor panel."));
 			}
 		}
 		else
@@ -573,6 +628,7 @@ void VSTPluginFilterGUI::on_embedAction_toggled(bool checked)
 			previewFeeder.stop();
 			if (effect != nullptr)
 			{
+				livePreview.stop();
 				effect->stopEditing();
 				effect->setSizeWindowFunc(nullptr);
 			}
@@ -661,6 +717,17 @@ bool VSTPluginFilterGUI::embedPlugin()
 	}
 
 	return result;
+}
+
+void VSTPluginFilterGUI::updateLivePreview()
+{
+	const auto previewPath = VSTPopupLivePreviewPolicy::selectFeedPath(
+		livePreviewAction != nullptr && livePreviewAction->isChecked(), previewEndpoint.isValid(),
+		embedded, panelDialogOpen, library->getLibPath());
+	livePreview.update(effect.get(),
+		previewPath == VSTPopupLivePreviewPolicy::FeedPath::SelectedEndpoint, previewEndpoint);
+	if (previewPath != VSTPopupLivePreviewPolicy::FeedPath::PanelPreview)
+		previewFeeder.stop();
 }
 
 void VSTPluginFilterGUI::updatePermissionWarning()

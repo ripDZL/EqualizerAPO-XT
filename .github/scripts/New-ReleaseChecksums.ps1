@@ -1,12 +1,13 @@
 <#
 .SYNOPSIS
-    Builds and uploads SHA256SUMS.txt for a release's setup executables.
+    Builds and uploads SHA256SUMS.txt for a release's installer assets.
 
 .DESCRIPTION
     Extracted from the inline "Publish release checksums" step in build.yml
     (audit #275 TD-24): the auto-detect installer refuses to run a downloaded
-    per-channel Setup.exe whose SHA-256 does not match this file
+    per-channel MSI whose SHA-256 does not match this file
     (Installer/AutoInstaller.cpp), so the file must list every *-Setup.exe
+    and .msi installer asset
     asset in the exact format the parser reads - and the parser was tested
     while the writer was not. Format-ChecksumLines is the pure writer half
     Pester pins: sha256sum-compatible lines, lowercase hex, two spaces, LF,
@@ -41,14 +42,15 @@ if ($PlanOnly) {
     return [pscustomobject]@{
         ChecksumsAssetName = Get-ChecksumsAssetName
         SumsPath           = Join-Path $WorkspaceRoot (Get-ChecksumsAssetName)
-        SetupAssetPattern  = '-Setup\.exe$'
+        InstallerAssetPattern = '(-Setup\.exe|\.msi)$'
     }
 }
 
+$installerAssetPattern = '(-Setup\.exe|\.msi)$'
 $assetNames = @(gh release view $Tag --repo $Repository --json assets --jq '.assets[].name' |
-    Where-Object { $_ -match '-Setup\.exe$' })
+    Where-Object { $_ -match $installerAssetPattern })
 if ($assetNames.Count -eq 0) {
-    throw "No setup executables found on release $Tag; nothing to checksum."
+    throw "No installer assets found on release $Tag; nothing to checksum."
 }
 
 $downloadDir = Join-Path $WorkspaceRoot "checksum-input"

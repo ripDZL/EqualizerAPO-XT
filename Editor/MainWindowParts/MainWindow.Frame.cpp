@@ -31,10 +31,10 @@
 void MainWindow::setupWindowChrome()
 {
 	QSettings settings(QString::fromWCharArray(EDITOR_REGPATH), QSettings::NativeFormat);
-	// Heritage (legacy rows) keeps the stock Windows caption: the custom
-	// title strip is part of the modern presentation.
-	useCustomFrame = !settings.value(QLatin1String(EditorSettings::Keys::NativeTitleBar), false).toBool()
-		&& !settings.value(QLatin1String(EditorSettings::Keys::LegacyRows), false).toBool();
+	// The custom title strip is the only caption the skin layer can colour. It
+	// now also serves LegacyRows so dark heritage themes cover the whole window;
+	// interface/nativeTitleBar remains the explicit escape hatch.
+	useCustomFrame = !settings.value(QLatin1String(EditorSettings::Keys::NativeTitleBar), false).toBool();
 	if (!useCustomFrame)
 		return;
 

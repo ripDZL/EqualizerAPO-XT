@@ -69,6 +69,8 @@ foreach ($artifact in $buildArtifacts) {
         Skipped      = $MissingChannels -notcontains $channel
         PackId       = Get-VelopackPackId -Channel $channel
         PackTitle    = $variantEntry.Title
+        MachineInstallerAssetName = Get-MsiAssetName -Channel $channel
+        InstallerScope = "PerMachine"
         Framework    = if ($variant -like "ARM64*" -or $variant -like "arm64*") { "vcredist143-arm64" } else { "vcredist143-x64" }
         PackDir      = Join-Path $WorkspaceRoot "velopack-input\$channel"
         OutputDir    = Join-Path $WorkspaceRoot "velopack-output\$channel"
@@ -176,6 +178,8 @@ foreach ($work in $plan.Channels) {
         '--outputDir', $work.OutputDir,
         '--channel', $work.Channel,
         '--framework', $work.Framework,
+        '--msi',
+        '--instLocation', $work.InstallerScope,
         '--noPortable',
         '--skipVeloAppCheck'
     )
@@ -186,13 +190,14 @@ foreach ($work in $plan.Channels) {
     if ($LASTEXITCODE -ne 0) { throw "vpk pack failed for channel $($work.Channel) with exit code $LASTEXITCODE" }
 
     # The asset-name grammar (ReleaseAssets.psm1) rests on the observation
-    # that vpk names its outputs <packId>-<channel>-Setup.exe and
-    # releases.<channel>.json. Publish-Release.ps1's missing-channel resume
+    # that vpk names its outputs <packId>-<channel>-Setup.exe,
+    # <packId>-<channel>.msi, and releases.<channel>.json. Publish-Release.ps1's missing-channel resume
     # matches release assets against that grammar, so if a VelopackVpkVersion
     # bump ever changes the naming, every channel would read as missing forever.
     # Assert the contract right where the files are produced (audit #275
     # TD-12) instead.
     foreach ($expected in @((Get-SetupAssetName -Channel $work.Channel),
+                            $work.MachineInstallerAssetName,
                             (Get-FeedAssetName -Channel $work.Channel))) {
         if (-not (Test-Path (Join-Path $work.OutputDir $expected))) {
             throw ("vpk pack did not produce '$expected' in $($work.OutputDir). " +

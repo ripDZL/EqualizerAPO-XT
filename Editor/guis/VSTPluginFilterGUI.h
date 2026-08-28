@@ -24,6 +24,8 @@
 #include <QElapsedTimer>
 #include "Editor/IFilterGUI.h"
 #include "Editor/helpers/PanelPreviewFeeder.h"
+#include "Editor/helpers/VSTPluginLivePreview.h"
+#include "Editor/helpers/VSTPreviewEndpoint.h"
 #include "Editor/widgets/cards/VSTSlotFillModel.h"
 #include "vst/VSTPluginInstance.h"
 #include "vst/VSTPluginLibrary.h"
@@ -41,6 +43,7 @@ class VSTPluginFilterGUI : public IFilterGUI
 public:
 	explicit VSTPluginFilterGUI(std::shared_ptr<VSTPluginLibrary> library, const std::wstring& chunkData, const std::unordered_map<std::wstring, float>& paramMap,
 		bool stereoInput = false, const std::optional<VST3BusContract>& busContract = std::nullopt,
+		const VSTPreviewEndpoint& previewEndpoint = {},
 		std::vector<std::wstring> inputChannels = {}, std::vector<std::wstring> outputChannels = {});
 	~VSTPluginFilterGUI() override;
 
@@ -59,6 +62,7 @@ private slots:
 	void on_selectButton_clicked();
 	void on_embedAction_toggled(bool checked);
 	void stereoInputToggled(bool checked);
+	void livePreviewToggled(bool checked);
 	void busLayoutPicked();
 	void fillToggleClicked(bool checked);
 	void on_idle();
@@ -66,6 +70,7 @@ private slots:
 private:
 	void initPlugin();
 	bool embedPlugin();
+	void updateLivePreview();
 	void updatePermissionWarning();
 	void updateBusControls();
 	void updateFillRows();
@@ -77,9 +82,12 @@ private:
 	std::wstring chunkData;
 	std::unordered_map<std::wstring, float> paramMap;
 	bool embedded = false;
+	bool panelDialogOpen = false;
 	bool autoApplyDialog = true;
 	bool stereoInput = false;
 	std::optional<VST3BusContract> busContract;
+	VSTPreviewEndpoint previewEndpoint;
+	VSTPluginLivePreview livePreview;
 	// Per-slot channel fill for the forced layouts, edited by the two plain
 	// combo rows below the bus dropdowns. A side's list drops when that
 	// side's layout changes, because the slot count no longer matches.
@@ -92,6 +100,7 @@ private:
 	QWidget* outputFillRow = nullptr;
 	QCheckBox* fillToggle = nullptr;
 	QAction* stereoInputAction = nullptr;
+	QAction* livePreviewAction = nullptr;
 	QElapsedTimer lastReadTimer;
 	// Declared after effect on purpose: reverse member destruction stops the
 	// pump before the instance it feeds goes away.

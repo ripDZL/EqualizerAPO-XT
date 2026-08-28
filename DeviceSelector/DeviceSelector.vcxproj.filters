@@ -41,6 +41,7 @@
     <ClCompile Include="..\services\install\ApoRegistration.cpp">
       <Filter>shared modules</Filter>
     </ClCompile>
+    <ClCompile Include="..\Editor\skins\CustomThemeStore.cpp" />
     <ClCompile Include="DeviceTestDialog.cpp" />
     <ClCompile Include="OpacityIconEngine.cpp" />
     <ClCompile Include="DeviceTestThread.cpp" />
@@ -56,6 +57,7 @@
     <ClInclude Include="..\services\windows\WindowsService.h">
       <Filter>shared modules</Filter>
     </ClInclude>
+    <ClInclude Include="..\Editor\skins\CustomThemeStore.h" />
     <ClInclude Include="OpacityIconEngine.h" />
     <ClInclude Include="ReceiveThread.h" />
     <ClInclude Include="resource.h" />

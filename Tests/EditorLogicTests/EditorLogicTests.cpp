@@ -155,6 +155,10 @@ int main(int argc, char** argv)
 		testElevatedCoordinatorArgumentHasOneSpelling();
 		testTheSkinRosterIsTheOneList();
 		testSkinTokensCarryExplicitMode();
+		testEveryBuiltInThemePassesTheReadabilityContract();
+		testTooltipContractFollowsThemeTokens();
+		testSplitMenuButtonsFollowThemeTokens();
+		testThemeLabCanRepairCustomTextContrast();
 		testTokenSubstitutionOffersAnAlphaForm();
 		testEverySkinSheetResolvesAllThemeTokens();
 		testEditableValueTextUsesDisplayedDecimalFormatFirst();
@@ -162,6 +166,9 @@ int main(int argc, char** argv)
 		testFileReferenceControllerOwnsPathState();
 		testReferenceCardDerivesSharedPresentationState();
 		testVSTBusModelMigratesAndEdits();
+		testVSTPreviewEndpointSelection();
+		testVSTPopupLivePreviewPolicy();
+		testCustomThemeStoreRoundTripsTokensAndJson();
 		testVSTSlotFillModel();
 		testPanelMonitorGateOpensOnlyForSelfGeneratedAudio();
 		testPanelMonitorGateArmDelayOutlivesReverbTails();

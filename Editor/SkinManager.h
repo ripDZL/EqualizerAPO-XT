@@ -36,15 +36,20 @@ public:
 
 	const SkinTokens& tokens() const;
 	const QString& currentSkinId() const;
+	// The built-in skin supplying card/chrome renderers. For a token variant
+	// and a saved custom theme this can differ from currentSkinId(), which
+	// remains the selected id for persistence and Interface-menu selection.
+	const QString& baseSkinId() const;
 	bool isDark() const;
 	void applySkin(const QString& skinId, bool dark);
+	void applyTokenPreview(const QString& skinId, bool dark, const SkinTokens& tokens);
 
-	// The heritage presentation behind the LegacyRows mode: no stylesheet, the
-	// platform's standard palette, and classic light token values for the few
-	// custom painters (analysis graph, knobs). The legacy rows are meant to be
-	// the unmodernized original editor, not skinned widgets inside modern
-	// chrome.
-	void applyHeritage();
+	// The heritage presentation behind the LegacyRows mode: legacy row widgets
+	// and filter GUIs stay on their original code path, while the surrounding
+	// editor chrome and the few custom painters (analysis graph, knobs) receive
+	// a simple token palette. This keeps legacy rows functional without mixing
+	// in modern card behavior.
+	void applyHeritage(const QString& skinId, bool dark);
 	bool isHeritage() const;
 
 	// The Copy routing renderer for the active skin. Each skin draws channel
@@ -136,8 +141,10 @@ private:
 	ISkin* activeSkin = nullptr;
 	SkinTokens currentTokens;
 	QString skinId = QStringLiteral("studio");
+	QString renderSkinId = QStringLiteral("studio");
 	bool darkMode = true;
 	bool heritageMode = false;
+	bool previewMode = false;
 	// True once applySkin() has dressed the application at least once. The
 	// constructor seeds skinId/tokens without applying a stylesheet, so the
 	// same-skin short-circuit in applySkin() must not fire before then.

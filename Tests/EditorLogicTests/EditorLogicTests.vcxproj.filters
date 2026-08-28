@@ -38,6 +38,9 @@
     <ClCompile Include="..\..\Editor\helpers\ConvolutionPathHelper.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Editor\helpers\VSTPreviewEndpoint.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Editor\import\ConfigDependencyScanner.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -69,6 +72,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="VSTBusModelTests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="VSTPreviewEndpointTests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CustomThemeStoreTests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="AutoInstallerLogicTests.cpp">
@@ -116,6 +125,9 @@
     <ClCompile Include="..\..\Editor\skins\SkinThemeData.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Editor\skins\CustomThemeStore.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Editor\widgets\EditableValueText.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -134,6 +146,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Editor\helpers\ConvolutionPathHelper.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Editor\helpers\VSTPreviewEndpoint.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Editor\import\ConfigDependencyScanner.h">
@@ -176,6 +191,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Editor\skins\SkinThemeData.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Editor\skins\CustomThemeStore.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Editor\widgets\EditableValueText.h">

@@ -50,6 +50,14 @@ Describe "New-VelopackRelease.ps1 planning" {
         $plan.ReleaseName | Should -Be "EqualizerAPO-XT 9.9.9"
     }
 
+    It "plans the grammar-derived per-machine MSI for every channel" {
+        $tree = NewInputRoot @("EqualizerAPO-x64-avx2")
+        $plan = PlanFor $tree @("x64-avx2")
+        $plan.Channels[0].MachineInstallerAssetName |
+            Should -Be "EqualizerAPO-XT-x64-avx2-x64-avx2.msi"
+        $plan.Channels[0].InstallerScope | Should -Be "PerMachine"
+    }
+
     It "packs under the manifest's display title" {
         # The Start menu / Apps & Features name is manifest data (Title), not
         # a string convention over the artifact name.

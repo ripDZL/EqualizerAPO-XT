@@ -230,6 +230,32 @@ Describe "Bump-Version.ps1" {
         }
     }
 
+    Context "prerelease promotion" {
+        It "promotes a newer prerelease base when only docs commits follow it" {
+            $repo = New-FixtureRepo
+            Set-FixtureVersion -Repo $repo -Major 1 -Minor 2 -Revision 3
+            Add-FixtureCommit -Repo $repo -Subject "fix: prepare the beta candidate"
+            Add-FixtureTag -Repo $repo -Tag "v1.2.4-beta.1"
+            Add-FixtureCommit -Repo $repo -Subject "docs: approve the beta"
+            $r = Invoke-Bump -Repo $repo
+            $r.ExitCode | Should -Be 0
+            $r.Output | Should -Match "Promoted prerelease v1.2.4-beta.1 to stable version 1.2.4"
+            Get-FixtureVersion -Repo $repo | Should -Be "1.2.4"
+        }
+
+        It "reports a prerelease promotion without modifying version.h in check mode" {
+            $repo = New-FixtureRepo
+            Set-FixtureVersion -Repo $repo -Major 1 -Minor 2 -Revision 3
+            Add-FixtureCommit -Repo $repo -Subject "fix: prepare the beta candidate"
+            Add-FixtureTag -Repo $repo -Tag "v1.2.4-beta.1"
+            Add-FixtureCommit -Repo $repo -Subject "docs: approve the beta"
+            $r = Invoke-Bump -Repo $repo -Check
+            $r.ExitCode | Should -Be 0
+            $r.Output | Should -Match "Next prerelease promotion version would be 1.2.4"
+            Get-FixtureVersion -Repo $repo | Should -Be "1.2.3"
+        }
+    }
+
     Context "-Check reports without modifying version.h" {
         It "reports the would-be version and leaves the header untouched" {
             $repo = New-FixtureRepo

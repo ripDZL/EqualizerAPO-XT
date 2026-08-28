@@ -52,14 +52,14 @@ if (Test-Path $manifestPath) {
 }
 
 $UnknownChannelSortOrder = 100
-$UnknownChannelGuidance = "Special-purpose asset. Use one of the setup executables for normal installation."
+$UnknownChannelGuidance = "Special-purpose asset. Use the recommended auto-detect installer or a per-channel system-wide MSI for normal installation."
 
 # The architecture-agnostic front-door installer (docs/AutoDetectInstaller.md).
 # It is not a channel: it detects the CPU at install time and pulls the matching
 # per-channel build. Featured first in the download table.
 $UniversalInstallerName = Get-UniversalSetupAssetName
 $UniversalInstallerSortOrder = -1
-$UniversalInstallerGuidance = "Recommended. Detects your CPU (architecture and AVX level) and installs the matching build automatically. Use this unless you have a reason to pick a specific build below."
+$UniversalInstallerGuidance = "Recommended. Detects your CPU (architecture and AVX level), then requests administrator approval to install the matching build under Program Files\\EqualizerAPO-XT."
 
 function Invoke-GhJson {
   param(
@@ -94,13 +94,14 @@ function Get-ChannelFromAssetName {
     [string]$AssetName
   )
 
-  # Exact names from the grammar module (setup, feed), and the pack-id prefix
+  # Exact names from the grammar module (setup, MSI, feed), and the pack-id prefix
   # for the versioned nupkgs. Longest pack id first so e.g. x64-avx cannot
   # claim an x64-avx2 nupkg by prefix.
   $byPackIdLength = @($ChannelTable.Keys | Sort-Object `
     { (Get-VelopackPackId -Channel $_).Length } -Descending)
   foreach ($channel in $byPackIdLength) {
     if ($AssetName -ieq (Get-SetupAssetName -Channel $channel)) { return $channel }
+    if ($AssetName -ieq (Get-MsiAssetName -Channel $channel)) { return $channel }
     if ($AssetName -ieq (Get-FeedAssetName -Channel $channel)) { return $channel }
     if ($AssetName -match '\.nupkg$' -and
         $AssetName.StartsWith("$(Get-VelopackPackId -Channel $channel)-", `
@@ -150,20 +151,23 @@ function Get-AssetPurpose {
 
   $channel = Get-ChannelFromAssetName $AssetName
 
+  if ($AssetName -match "\.msi$") {
+    return "System-wide installer for the $channel channel. Requires administrator approval and installs under Program Files."
+  }
   if ($AssetName -match "-Setup\.exe$") {
-    return "Manual installer for the $channel channel."
+    return "Manual installer for the $channel channel. Per-user legacy install."
   }
   if ($AssetName -match "^releases\..*\.json$") {
     return "Velopack update feed for the $channel channel. UpdateChecker reads this file."
   }
   if ($AssetName -match "-full\.nupkg$") {
-    return "Velopack full package for the $channel channel. Normal manual installs should use the setup executable instead."
+    return "Velopack full package for the $channel channel. Normal manual installs should use the system-wide MSI instead."
   }
   if ($AssetName -match "-delta\.nupkg$") {
     return "Velopack delta package for the $channel channel. Update clients use it to reduce download size."
   }
   if ($AssetName -ieq "SHA256SUMS.txt") {
-    return "SHA-256 checksums for the setup executables. The auto-detect installer verifies its download against this file."
+    return "SHA-256 checksums for installer assets. The auto-detect installer verifies its MSI download against this file."
   }
   if ($AssetName -match "^EqualizerAPO-XT-source-.*\.zip$") {
     return "Source snapshot for this exact release commit."
@@ -221,19 +225,21 @@ $release = Invoke-GhJson -Arguments @("api", "repos/$Repository/releases/tags/$T
 $assets = @($release.assets | Sort-Object name)
 $installerAssets = @(
   $assets |
-    Where-Object { $_.name -match "-Setup\.exe$" } |
+    Where-Object { $_.name -match "(-Setup\.exe|\.msi)$" } |
     Sort-Object @{ Expression = {
         if ($_.name -ieq $UniversalInstallerName) {
           $UniversalInstallerSortOrder
-        } else {
+        } elseif ($_.name -match "\.msi$") {
           Get-ChannelSortOrder (Get-ChannelFromAssetName $_.name)
+        } else {
+          100 + (Get-ChannelSortOrder (Get-ChannelFromAssetName $_.name))
         }
       } }, name
 )
 $sourceAssets = @($assets | Where-Object { $_.name -match "^EqualizerAPO-XT-source-.*\.zip$" })
 
 if ($installerAssets.Count -eq 0) {
-  throw "No setup executable assets were found for release $Tag"
+  throw "No installer assets were found for release $Tag"
 }
 
 if ($sourceAssets.Count -eq 0) {
@@ -285,7 +291,7 @@ foreach ($asset in $installerAssets) {
 }
 
 [void]$lines.Add("")
-[void]$lines.Add('The recommended download auto-detects your CPU and installs the matching build. The per-channel setup executables are for picking a specific build by hand. The `.nupkg` and `releases.*.json` files are for the Velopack/update pipeline.')
+[void]$lines.Add('The recommended download auto-detects your CPU and installs the matching build under `Program Files\\EqualizerAPO-XT`. Per-channel MSIs are for choosing a build directly. Per-channel setup executables remain for legacy per-user installs. The `.nupkg` and `releases.*.json` files are for the Velopack/update pipeline.')
 [void]$lines.Add("")
 [void]$lines.Add("## All files")
 [void]$lines.Add("")

@@ -20,6 +20,8 @@
 #include "vst/VSTPluginInstance.h"
 #include "vst/VSTPluginLibrary.h"
 #include "filters/VSTPluginCommand.h"
+#include "Editor/FilterTable.h"
+#include "Editor/helpers/VSTPreviewEndpoint.h"
 #include "VSTPluginFilterGUI.h"
 #include "VSTPluginFilterGUIFactory.h"
 #include "../FilterGUIFactoryRegistry.h"
@@ -29,6 +31,11 @@ REGISTER_FILTER_GUI_FACTORY(FilterGUIFactoryOrder::VSTPlugin, VSTPluginFilterGUI
 using std::list;
 using std::unordered_map;
 using std::wstring;
+
+void VSTPluginFilterGUIFactory::initialize(FilterTable* filterTable)
+{
+	this->filterTable = filterTable;
+}
 
 QList<FilterTemplate> VSTPluginFilterGUIFactory::createFilterTemplates()
 {
@@ -43,6 +50,8 @@ IFilterGUI* VSTPluginFilterGUIFactory::createFilterGUI(QString& command, QString
 
 	if (command == "VSTPlugin")
 	{
+		const VSTPreviewEndpoint previewEndpoint = vstPreviewEndpointForSelectedDevice(
+			filterTable != nullptr ? filterTable->getPreviewDeviceContext() : nullptr);
 		// Parse straight into the shared command struct. This reuses the engine's
 		// exact parameter grammar without building (and immediately destroying) a
 		// real VSTPluginFilter, and never loads a plugin binary: getInstance only
@@ -52,12 +61,12 @@ IFilterGUI* VSTPluginFilterGUIFactory::createFilterGUI(QString& command, QString
 			? std::optional<VST3BusContract>(cmd.busContract) : std::nullopt;
 		std::shared_ptr<VSTPluginLibrary> library = cmd.libraryPath.empty() ? nullptr : VSTPluginLibrary::getInstance(cmd.libraryPath);
 		if (library != nullptr)
-			result = new VSTPluginFilterGUI(library, cmd.chunkData, cmd.paramMap, cmd.stereoInput, busContract,
-				cmd.inputChannels, cmd.outputChannels);
+			result = new VSTPluginFilterGUI(library, cmd.chunkData, cmd.paramMap, cmd.stereoInput,
+				busContract, previewEndpoint, cmd.inputChannels, cmd.outputChannels);
 		else
 			result = new VSTPluginFilterGUI(VSTPluginLibrary::getInstance(L""), L"",
 				unordered_map<wstring, float>(), cmd.stereoInput, busContract,
-				cmd.inputChannels, cmd.outputChannels);
+				previewEndpoint, cmd.inputChannels, cmd.outputChannels);
 	}
 
 	return result;

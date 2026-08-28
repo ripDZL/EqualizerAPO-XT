@@ -40,6 +40,27 @@ all five skins.** Condensed answers:
 | 6 | corner/edge | 8px glass, lighter top edge / darker sunken edge | radius 0, 1px hairlines, no header plate | 12px cards, pills, faked two-step shadows | 3px machined corners, bezels, grooves, four screws | radius 0, 1px rules, 3px status rail, 24px grid texture |
 | 7 | hierarchy lead | luminance backed by weight | text brightness, one mono size | size and whitespace (48px headers) | physical depth (raised/flat/recessed) | grid position, uniform type |
 
+### Accessibility variants amendment (2026-08-27)
+
+The table above is the immutable record of the original five-skin integration.
+Clarity and Graphite are later built-ins and must meet the same seven-item
+gate, not merely present a new palette. `InfrastructureTests` pins their
+different structural tokens; the readability gallery renders both variants in
+Modern and Legacy Rows, dark/light, active/disabled.
+
+| # | item | Clarity High Contrast | Graphite Clarity |
+|---|---|---|---|
+| 1 | type announcement | rounded 4px outline tile | square wireframe plate beside a 6px signal rail |
+| 2 | hover | striped high-contrast card brightens | dense square instrument card keeps its broad rail and etched darker face |
+| 3 | disabled | rounded striped card remains visibly bounded | square wire plate and broad rail remain as the solid disabled silhouette |
+| 4 | Include row | rounded, spaced path line | compact square path plate with the fixed broad rail |
+| 5 | VST row | rounded high-contrast module | square wire-panel module; its slot fills wrap into readable three-cell lines |
+| 6 | corner/edge | 4px card and graph corners, 10px gaps, 4px rail | 0px card and graph corners, 6px gaps, 6px rail |
+| 7 | hierarchy lead | zebra striping, 44px row, tree lanes | solid 48px instrument rows with 24px gradient scope bars |
+
+Verdict: pass. Graphite differs from Clarity in geometry, badge language,
+scope treatment, density, and hierarchy—not only colour.
+
 The closest structural pair is studio/soft (both keep the stock card
 silhouette); they still separate by radius language, elevation strategy
 (alpha-glass with top-edge reflection vs two-step elevation), knob vocabulary

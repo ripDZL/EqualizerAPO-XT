@@ -18,6 +18,7 @@
 */
 
 #include <cstdio>
+#include <cstdlib>
 #include "text/WideString.h"
 #include "platform/windows/TextEncoding.h"
 #include "services/registry/RegistryPaths.h"
@@ -77,6 +78,7 @@
 #include "Editor/helpers/GUIHelper.h"
 #include "Editor/helpers/EditorSettings.h"
 #include "Editor/skins/SkinThemeData.h"
+#include "Editor/widgets/ThemeEditorDialog.h"
 
 
 namespace
@@ -368,10 +370,10 @@ int main(int argc, char* argv[])
 	do
 	{
 		// LegacyRows is a whole presentation, not just a row widget: the
-		// heritage editor runs with the platform's native widget style, the
-		// stock ClearType font engine, and system fonts. The skinned mode
-		// keeps the redesign stack below. Read the mode before QApplication
-		// so the font-engine choice follows an in-process restart.
+		// heritage editor keeps the legacy row widgets and stock ClearType font
+		// engine, then applies a compact token palette around the shared chrome.
+		// Read the mode before QApplication so the font-engine choice follows an
+		// in-process restart.
 		bool legacyRowsMode;
 		{
 			QSettings settings(QString::fromWCharArray(EDITOR_REGPATH), QSettings::NativeFormat);
@@ -419,6 +421,18 @@ int main(int argc, char* argv[])
 			const int fill = SkinGallery::runVstFillSelfTest();
 			return (roundTrip != 0 || fill != 0) ? 1 : 0;
 		}
+		if (application.arguments().contains(QStringLiteral("--selftest-vst3-panel")))
+			return SkinGallery::runVst3PanelProbe();
+
+		if (application.arguments().contains(QStringLiteral("--theme-lab-test")))
+		{
+			// Theme Lab is an offscreen one-shot, like the screenshot gallery.
+			// Qt can retain a background resource during teardown on that platform,
+			// so exit after the verdict rather than leaving the test runner hung.
+			const int status = ThemeEditorDialog::runSelfTest();
+			std::fflush(nullptr);
+			std::_Exit(status);
+		}
 
 		// Headless screenshot gallery (skin program). Runs before the registry
 		// skin/translator setup on purpose: the gallery applies each skin itself
@@ -461,7 +475,8 @@ int main(int argc, char* argv[])
 		QSettings settings(QString::fromWCharArray(EDITOR_REGPATH), QSettings::NativeFormat);
 		if (legacyRowsMode)
 		{
-			SkinManager::instance()->applyHeritage();
+			const EditorSettings::SkinChoice choice = EditorSettings::readSkinChoice(settings, GUIHelper::isDarkMode());
+			SkinManager::instance()->applyHeritage(choice.id, choice.dark);
 		}
 		else
 		{

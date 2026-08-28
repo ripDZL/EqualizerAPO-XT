@@ -35,8 +35,9 @@ $manifest = Import-PowerShellDataFile $ManifestPath
 $missingChannels = @()
 foreach ($channel in @($manifest.Variants.Channel)) {
     $setup = Get-SetupAssetName -Channel $channel
+    $msi = Get-MsiAssetName -Channel $channel
     $feed = Get-FeedAssetName -Channel $channel
-    if ($AssetNames -notcontains $setup -or $AssetNames -notcontains $feed) {
+    if ($AssetNames -notcontains $setup -or $AssetNames -notcontains $msi -or $AssetNames -notcontains $feed) {
         $missingChannels += $channel
     }
 }

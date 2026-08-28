@@ -123,6 +123,58 @@ void runVst3HostTests()
 	harness.expectTrue(library->initialize() >= 0, "Windows VST3 module lifecycle initializes before factory access");
 	harness.expectTrue(library->getFactory() != nullptr, "VST3 factory is available after module initialization");
 
+	const wstring sidechainBusBundle = prepareBundle(directory, L"SidechainBusBundle.vst3", L"SidechainBus.vst3");
+	shared_ptr<VSTPluginLibrary> sidechainBusLibrary = VSTPluginLibrary::getInstance(sidechainBusBundle);
+	harness.expectTrue(!sidechainBusBundle.empty() && sidechainBusLibrary != nullptr
+		&& sidechainBusLibrary->initialize() >= 0,
+		"VST3 component with an inactive sidechain bus library initializes");
+	{
+		VSTPluginInstance sidechainBusInstance(sidechainBusLibrary, 2);
+		harness.expectTrue(!sidechainBusBundle.empty() && sidechainBusInstance.initialize(),
+			"VST3 component with an inactive sidechain bus initializes");
+		sidechainBusInstance.setBusChannelNameHints(vst3BusLayoutChannelNames(VST3BusLayout::Stereo),
+			vst3BusLayoutChannelNames(VST3BusLayout::Stereo));
+		harness.expectTrue(sidechainBusInstance.negotiateBusLayouts(VST3BusLayout::Stereo,
+			VST3BusLayout::Stereo, 2),
+			"VST3 host preserves each inactive auxiliary bus layout");
+	}
+
+	const wstring adaptedArrangementBundle = prepareBundle(directory,
+		L"AdaptedArrangementBundle.vst3", L"AdaptedArrangement.vst3");
+	shared_ptr<VSTPluginLibrary> adaptedArrangementLibrary = VSTPluginLibrary::getInstance(adaptedArrangementBundle);
+	harness.expectTrue(!adaptedArrangementBundle.empty() && adaptedArrangementLibrary != nullptr
+		&& adaptedArrangementLibrary->initialize() >= 0,
+		"VST3 component that adapts a proposed bus layout library initializes");
+	{
+		VSTPluginInstance adaptedArrangementInstance(adaptedArrangementLibrary, 2);
+		harness.expectTrue(adaptedArrangementInstance.initialize(),
+			"VST3 component that adapts a proposed bus layout initializes");
+		adaptedArrangementInstance.setBusChannelNameHints(vst3BusLayoutChannelNames(VST3BusLayout::Surround71),
+			vst3BusLayoutChannelNames(VST3BusLayout::Surround71));
+		harness.expectTrue(adaptedArrangementInstance.negotiateBusLayouts(VST3BusLayout::Surround71,
+			VST3BusLayout::Surround71, 8),
+			"VST3 host accepts a supported layout adapted after a false proposal result");
+		harness.expectEqual(adaptedArrangementInstance.numInputs(), 8,
+			"VST3 host reads back the adapted input layout");
+		harness.expectEqual(adaptedArrangementInstance.numOutputs(), 8,
+			"VST3 host reads back the adapted output layout");
+	}
+
+	const wstring optionalFactoryHostContextBundle = prepareBundle(directory,
+		L"FactoryHostContextNotImplementedBundle.vst3", L"FactoryHostContextNotImplemented.vst3");
+	shared_ptr<VSTPluginLibrary> optionalFactoryHostContextLibrary = optionalFactoryHostContextBundle.empty()
+		? nullptr : VSTPluginLibrary::getInstance(optionalFactoryHostContextBundle);
+	const bool optionalFactoryHostContextInitialized = optionalFactoryHostContextLibrary != nullptr
+		&& optionalFactoryHostContextLibrary->initialize() >= 0;
+	harness.expectTrue(optionalFactoryHostContextInitialized,
+		"VST3 factory remains loadable when optional factory host context is not implemented");
+	if (optionalFactoryHostContextInitialized)
+	{
+		VSTPluginInstance optionalFactoryHostContextInstance(optionalFactoryHostContextLibrary, 2);
+		harness.expectTrue(optionalFactoryHostContextInstance.initialize(),
+			"VST3 component remains usable when factory host context is not implemented");
+	}
+
 	const wstring rawVst3Module = directory + L"\\TestVst3RawModule.dll";
 	const wstring stagedVst3Module = directory + L"\\TestVst3PluginModule.vst3";
 	if (CopyFileW(stagedVst3Module.c_str(), rawVst3Module.c_str(), FALSE) != FALSE)

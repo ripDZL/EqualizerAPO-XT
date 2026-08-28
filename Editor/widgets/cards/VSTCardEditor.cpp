@@ -7,6 +7,7 @@
 */
 
 #include "VSTCardEditor.h"
+#include "Editor/helpers/VSTPopupLivePreviewPolicy.h"
 #include "services/registry/RegistryPaths.h"
 
 #include <algorithm>
@@ -19,6 +20,7 @@
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QMenu>
+#include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QRegularExpression>
@@ -33,7 +35,9 @@
 #include "Editor/helpers/GUIHelper.h"
 #include "Editor/helpers/VstChunkScan.h"
 #include "Editor/FilterTable.h"
+#include "Editor/helpers/VSTPreviewEndpoint.h"
 #include "Editor/SkinManager.h"
+#include "Editor/FilterTable.h"
 #include "Editor/skins/ISkin.h"
 #include "Editor/MainWindow.h"
 #include "Editor/guis/VSTPluginFilterGUIDialog.h"
@@ -69,10 +73,11 @@ QString layoutName(VST3BusLayout layout)
 VSTCardEditor::VSTCardEditor(shared_ptr<VSTPluginLibrary> library, const wstring& chunkData,
 	const unordered_map<wstring, float>& paramMap, bool stereoInput,
 	const std::optional<VST3BusContract>& busContract,
-	std::vector<std::wstring> deviceChannelNames, FilterTable* filterTable, QWidget* parent,
+	std::vector<std::wstring> deviceChannelNames, FilterTable* filterTable,
+	const VSTPreviewEndpoint& previewEndpoint, QWidget* parent,
 	std::vector<std::wstring> inputChannels, std::vector<std::wstring> outputChannels)
 	: IFilterGUI(parent), library(library), chunkData(chunkData), paramMap(paramMap),
-	busModel(busContract, stereoInput),
+	busModel(busContract, stereoInput), previewEndpoint(previewEndpoint),
 	inputChannels(std::move(inputChannels)), outputChannels(std::move(outputChannels)),
 	deviceChannelNames(std::move(deviceChannelNames)),
 	filterTable(filterTable)
@@ -97,6 +102,11 @@ VSTCardEditor::VSTCardEditor(shared_ptr<VSTPluginLibrary> library, const wstring
 	selectButton->setObjectName(QStringLiteral("FilterCardIconButton"));
 	selectButton->setIcon(GUIHelper::tintedIcon(QStringLiteral(":/icons/modern/folder-open.svg"), actionColor, 18));
 	connect(selectButton, SIGNAL(clicked()), this, SLOT(selectFile()));
+	selectButton->setPopupMode(QToolButton::MenuButtonPopup);
+	auto* selectMenu = new QMenu(selectButton);
+	QAction* selectVst3Action = selectMenu->addAction(tr("Select VST3 bundle folder..."));
+	connect(selectVst3Action, SIGNAL(triggered()), this, SLOT(selectVST3Bundle()));
+	selectButton->setMenu(selectMenu);
 	view->addActionButton(ReferenceCardView::ActionRole::Browse, selectButton);
 
 	// The remedy for a library the audio service cannot read: copy it into
@@ -141,6 +151,11 @@ VSTCardEditor::VSTCardEditor(shared_ptr<VSTPluginLibrary> library, const wstring
 	removeFillAction->setToolTip(tr("Deletes the saved per-slot channel lists from this line."));
 	removeFillAction->setEnabled(false);
 	connect(removeFillAction, SIGNAL(triggered()), this, SLOT(removeChannelFill()));
+	livePreviewAction = menu->addAction(tr("Live analyzer feed"));
+	livePreviewAction->setCheckable(true);
+	livePreviewAction->setChecked(true);
+	livePreviewAction->setToolTip(tr("Feed endpoint audio into the open plugin panel so analyzer graphs can animate. Bertom Denoiser Classic stays protected in a separate panel to avoid its known crash."));
+	connect(livePreviewAction, SIGNAL(toggled(bool)), this, SLOT(livePreviewToggled(bool)));
 	optionsButton->setMenu(menu);
 	view->addActionButton(ReferenceCardView::ActionRole::Options, optionsButton);
 
@@ -201,6 +216,7 @@ VSTCardEditor::VSTCardEditor(shared_ptr<VSTPluginLibrary> library, const wstring
 
 VSTCardEditor::~VSTCardEditor()
 {
+	livePreview.stop();
 	if (effect != nullptr)
 	{
 		if (embedded)
@@ -266,6 +282,12 @@ void VSTCardEditor::removeBusLayouts()
 	updateFillRails();
 	updateReferenceState();
 	updateModel();
+}
+
+void VSTCardEditor::livePreviewToggled(bool checked)
+{
+	livePreview.setEnabled(checked);
+	updateLivePreview();
 }
 
 void VSTCardEditor::fillSlotPicked(int slot, const QString& value, bool output)
@@ -346,6 +368,7 @@ void VSTCardEditor::updateFillRails()
 void VSTCardEditor::loadPreferences(const QVariantMap& prefs)
 {
 	autoApplyDialog = prefs.value("autoApplyDialog", true).toBool();
+	livePreviewAction->setChecked(prefs.value("liveAnalyzerFeed", true).toBool());
 
 	if (prefs.contains("slotFillCollapsed"))
 	{
@@ -366,6 +389,7 @@ void VSTCardEditor::storePreferences(QVariantMap& prefs)
 {
 	prefs.insert("embed", embedAction->isChecked());
 	prefs.insert("autoApplyDialog", autoApplyDialog);
+	prefs.insert("liveAnalyzerFeed", livePreviewAction->isChecked());
 	// Only a fold the user actually chose is worth remembering; the default
 	// (collapsed while both sides are implicit) re-derives on load.
 	if (fillCollapsedFromPrefs)
@@ -388,22 +412,35 @@ void VSTCardEditor::openPanel()
 	{
 		effect->writeToEffect(chunkData, paramMap);
 
-		// Before the dialog's startEditing: the feed prepares the instance
-		// for the loopback mix format, which must happen while the processor
-		// is still deactivated.
-		previewFeeder.start(effect.get());
+		const auto previewPath = VSTPopupLivePreviewPolicy::selectFeedPath(
+			livePreviewAction != nullptr && livePreviewAction->isChecked(), previewEndpoint.isValid(),
+			false, true, library->getLibPath());
+		// The upstream panel feeder must prepare a VST3 before startEditing.
+		if (previewPath == VSTPopupLivePreviewPolicy::FeedPath::PanelPreview)
+			previewFeeder.start(effect.get());
 
 		VSTPluginFilterGUIDialog dialog(this, effect.get(), autoApplyDialog);
+		if (!dialog.hasPluginPanel())
+		{
+			previewFeeder.stop();
+			QMessageBox::information(this, tr("VST plug-in"),
+				tr("This plug-in does not provide a native editor panel."));
+			return;
+		}
 		connect(dialog.getApplyButton(), SIGNAL(pressed()), SLOT(applyDialog()));
 		connect(dialog.getAutoApplyCheckBox(), SIGNAL(toggled(bool)), SLOT(autoApplyToggled(bool)));
 		connect(QAbstractEventDispatcher::instance(), SIGNAL(aboutToBlock()), SLOT(onIdle()));
 
+		panelDialogOpen = true;
+		updateLivePreview();
 		if (dialog.exec() == QDialog::Accepted)
 		{
 			effect->readFromEffect(chunkData, paramMap);
 			updateModel();
 			updatePermissionWarning();
 		}
+		panelDialogOpen = false;
+		updateLivePreview();
 		disconnect(QAbstractEventDispatcher::instance(), SIGNAL(aboutToBlock()), this, SLOT(onIdle()));
 		previewFeeder.stop();
 	}
@@ -687,6 +724,7 @@ void VSTCardEditor::pathCommitted(const QString& text)
 			oldId = effect->uniqueID();
 			if (embedAction->isChecked())
 				embedToggled(false);
+			livePreview.stop();
 			effect.reset();
 		}
 
@@ -738,6 +776,42 @@ void VSTCardEditor::selectFile()
 	}
 }
 
+void VSTCardEditor::selectVST3Bundle()
+{
+	QDir pluginsDir(QString::fromStdWString(VSTPluginLibrary::getDefaultPluginPath()));
+
+	QSettings settings(QString::fromWCharArray(EDITOR_REGPATH), QSettings::NativeFormat);
+	QString lastDir = settings.value("vst/lastDir", "").toString();
+	if (lastDir == "")
+		lastDir = pluginsDir.absolutePath();
+
+	QFileInfo fileInfo(lastDir);
+	if (!reference->writtenPath().isEmpty())
+		fileInfo.setFile(pluginsDir, reference->writtenPath());
+	const QString initialPath = reference->writtenPath().isEmpty()
+		? lastDir
+		: fileInfo.absolutePath();
+
+	bool invalidBundleSelection = false;
+	const QString absolutePath = reference->chooseExistingVST3Bundle(
+		this, tr("Select VST3 bundle"), initialPath,
+		pluginsDir.absolutePath(),
+		reference->writtenPath().isEmpty() ? QString() : fileInfo.fileName(),
+		&invalidBundleSelection);
+	if (absolutePath.isEmpty())
+	{
+		if (invalidBundleSelection)
+		{
+			QMessageBox::warning(this, tr("Select VST3 bundle"),
+				tr("Select a VST3 bundle folder ending in .vst3."));
+		}
+		return;
+	}
+
+	settings.setValue("vst/lastDir", QDir::toNativeSeparators(QFileInfo(absolutePath).absolutePath()));
+	pathCommitted(reference->writtenPath());
+}
+
 void VSTCardEditor::importToConfig()
 {
 	if (filterTable == nullptr)
@@ -781,22 +855,27 @@ void VSTCardEditor::embedToggled(bool checked)
 
 		if (enable)
 		{
-			// Before embedPlugin()'s startEditing, for the same deactivation
-			// contract as the dialog path.
-			previewFeeder.start(effect.get());
+			const auto previewPath = VSTPopupLivePreviewPolicy::selectFeedPath(
+				livePreviewAction != nullptr && livePreviewAction->isChecked(), previewEndpoint.isValid(),
+				true, false, library->getLibPath());
+			// The upstream panel feeder must prepare a VST3 before startEditing.
+			if (previewPath == VSTPopupLivePreviewPolicy::FeedPath::PanelPreview)
+				previewFeeder.start(effect.get());
 
 			if (embedPlugin())
 			{
 				effect->setSizeWindowFunc([this](int w, int h) { onSizeWindow(w, h); });
 				connect(QAbstractEventDispatcher::instance(), SIGNAL(aboutToBlock()), SLOT(onIdle()));
+				updateLivePreview();
 			}
 			else
 			{
 				previewFeeder.stop();
 				embedded = false;
 				frame->setVisible(false);
+				livePreview.stop();
 
-				initErrorText = tr("Plugin crashed when opening panel.");
+				initErrorText = tr("Plugin could not open a native editor panel.");
 				updateReferenceState();
 			}
 		}
@@ -805,6 +884,7 @@ void VSTCardEditor::embedToggled(bool checked)
 			previewFeeder.stop();
 			if (effect != nullptr)
 			{
+				livePreview.stop();
 				effect->stopEditing();
 				effect->setSizeWindowFunc(nullptr);
 			}
@@ -894,6 +974,17 @@ bool VSTCardEditor::embedPlugin()
 	return result;
 }
 
+void VSTCardEditor::updateLivePreview()
+{
+	const auto previewPath = VSTPopupLivePreviewPolicy::selectFeedPath(
+		livePreviewAction != nullptr && livePreviewAction->isChecked(), previewEndpoint.isValid(),
+		embedded, panelDialogOpen, library->getLibPath());
+	livePreview.update(effect.get(),
+		previewPath == VSTPopupLivePreviewPolicy::FeedPath::SelectedEndpoint, previewEndpoint);
+	if (previewPath != VSTPopupLivePreviewPolicy::FeedPath::PanelPreview)
+		previewFeeder.stop();
+}
+
 // The chunk-referenced-files warning. The library's own readability verdict
 // lives on the reference card's status line (updateReferenceState), where it
 // is computed from the path alone; this one scans the saved plugin state and
@@ -935,6 +1026,8 @@ REGISTER_FILTER_CARD_EDITOR(VSTPlugin, [](FilterTable* filterTable, const QStrin
 	// Parse the line into the engine's VST filter (no plugin DLL is loaded
 	// for configPath == L""), then hand the opaque state to the card editor.
 	// The store()/parse round-trip is verified lossless (--selftest-vst).
+	const VSTPreviewEndpoint previewEndpoint = vstPreviewEndpointForSelectedDevice(
+		filterTable != nullptr ? filterTable->getPreviewDeviceContext() : nullptr);
 	VSTPluginFilterFactory factory;
 	std::wstring commandWStr = L"VSTPlugin";
 	std::wstring paramWStr = parameters.toStdWString();
@@ -946,13 +1039,13 @@ REGISTER_FILTER_CARD_EDITOR(VSTPlugin, [](FilterTable* filterTable, const QStrin
 		editor = new VSTCardEditor(filter->getLibrary(), filter->getChunkData(), filter->getParamMap(),
 			filter->getStereoInput(), filter->getBusContract(),
 			filterTable != nullptr ? filterTable->getChannelNames() : std::vector<std::wstring>(),
-			filterTable, nullptr,
+			filterTable, previewEndpoint, nullptr,
 			filter->getInputChannels(), filter->getOutputChannels());
 	}
 	else
 	{
 		editor = new VSTCardEditor(VSTPluginLibrary::getInstance(L""), L"", std::unordered_map<std::wstring, float>(),
-			false, std::nullopt, std::vector<std::wstring>(), filterTable);
+			false, std::nullopt, std::vector<std::wstring>(), filterTable, previewEndpoint);
 	}
 	return editor;
 })

@@ -25,24 +25,34 @@ $rosterStart = $themeData.IndexOf('const QVector<SkinEntry>& roster()')
 $rosterEnd = $themeData.IndexOf('QStringList ids()', $rosterStart)
 if ($rosterStart -lt 0 -or $rosterEnd -lt 0) {
     Add-Failure 'Could not locate SkinThemeData::roster().'
-    $skinIds = @()
+    $skinEntries = @()
 }
 else {
     $rosterText = $themeData.Substring($rosterStart, $rosterEnd - $rosterStart)
-    $skinIds = @([regex]::Matches(
+    $skinEntries = @([regex]::Matches(
         $rosterText,
-        '\{\s*QStringLiteral\("(?<id>[^"]+)"\),\s*QStringLiteral\("') |
-        ForEach-Object { $_.Groups['id'].Value })
+        '\{\s*QStringLiteral\("(?<id>[^"]+)"\),\s*QStringLiteral\("[^"]+"\),\s*QStringLiteral\("(?<paintBaseId>[^"]+)"\),') |
+        ForEach-Object {
+            [pscustomobject]@{
+                Id = $_.Groups['id'].Value
+                PaintBaseId = $_.Groups['paintBaseId'].Value
+            }
+        })
 }
 
-if ($skinIds.Count -eq 0) {
+if ($skinEntries.Count -eq 0) {
     Add-Failure 'SkinThemeData::roster() did not yield any skin ids.'
 }
+
+$skinIds = @($skinEntries | ForEach-Object Id)
+# A theme can have its own tokens and QSS alias while delegating painting to a
+# shipped base skin. Only those base skins own a source module and .pri file.
+$moduleIds = @($skinEntries | ForEach-Object PaintBaseId | Sort-Object -Unique)
 
 $moduleDirectories = @(Get-ChildItem -LiteralPath $skinRoot -Directory | Where-Object {
     Test-Path -LiteralPath (Join-Path $_.FullName ($_.Name + '.pri'))
 } | ForEach-Object Name | Sort-Object)
-$rosterDirectories = @($skinIds | Sort-Object)
+$rosterDirectories = $moduleIds
 $directoryDiff = @(Compare-Object $rosterDirectories $moduleDirectories)
 if ($directoryDiff.Count -gt 0) {
     Add-Failure ("Skin roster/module folder mismatch: " + (($directoryDiff | ForEach-Object {
@@ -50,7 +60,7 @@ if ($directoryDiff.Count -gt 0) {
     }) -join ', '))
 }
 
-foreach ($id in $skinIds) {
+foreach ($id in $moduleIds) {
     $moduleRoot = Join-Path $skinRoot $id
     $classStem = $id.Substring(0, 1).ToUpperInvariant() + $id.Substring(1) + 'Skin'
     $priPath = Join-Path $moduleRoot ($id + '.pri')
@@ -88,7 +98,7 @@ foreach ($id in $skinIds) {
                 (Get-Content -LiteralPath $file.FullName -Raw),
                 '#\s*include\s*[<"](?<target>[^>"]+)[>"]')) {
             $target = $match.Groups['target'].Value.Replace('\', '/')
-            foreach ($otherId in $skinIds) {
+            foreach ($otherId in $moduleIds) {
                 if ($otherId -ne $id -and $target -match "(^|/)$([regex]::Escape($otherId))/") {
                     Add-Failure "$($file.FullName) directly includes skin '$otherId' via '$target'."
                 }
@@ -120,7 +130,7 @@ if (Test-Path -LiteralPath $sharedRoot) {
                 (Get-Content -LiteralPath $file.FullName -Raw),
                 '#\s*include\s*[<"](?<target>[^>"]+)[>"]')) {
             $target = $match.Groups['target'].Value.Replace('\', '/')
-            foreach ($id in $skinIds) {
+            foreach ($id in $moduleIds) {
                 if ($target -match "(^|/)$([regex]::Escape($id))/") {
                     Add-Failure "$($file.FullName) includes concrete skin '$id'."
                 }
@@ -171,7 +181,7 @@ if (Test-Path -LiteralPath $sharedRoot) {
         }
     }
 }
-foreach ($id in $skinIds) {
+foreach ($id in $moduleIds) {
     $expectedInclude = "include(skins/$id/$id.pri)"
     if ($editorProject -notmatch [regex]::Escape($expectedInclude)) {
         Add-Failure "Editor.pro does not include $expectedInclude."
@@ -208,4 +218,4 @@ if ($failures.Count -gt 0) {
     exit 1
 }
 
-Write-Host "Skin module checks passed for $($skinIds.Count) skins: $($skinIds -join ', ')"
+Write-Host "Skin module checks passed for $($moduleIds.Count) base modules across $($skinIds.Count) themes: $($moduleIds -join ', ')"

@@ -12,6 +12,7 @@
 #include "filters/VSTPluginFilter.h"
 #include "filters/VSTPluginFilterFactory.h"
 #include "guis/VSTPluginFilterGUI.h"
+#include "vst/VSTPluginLibrary.h"
 #include "widgets/cards/VSTCardEditor.h"
 #include "widgets/cards/VSTSlotFillRail.h"
 #include "MainWindow.h"
@@ -30,6 +31,7 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDataStream>
+#include <QDialog>
 #include <QDir>
 #include <QElapsedTimer>
 #include <QEnterEvent>
@@ -48,9 +50,12 @@
 #include <QLineEdit>
 #include <QLocale>
 #include <QMainWindow>
+#include <QMessageBox>
+#include <QMetaObject>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMouseEvent>
+#include <QPalette>
 #include <QPixmap>
 #include <QPointer>
 #include <QRadioButton>
@@ -67,6 +72,7 @@
 #include <QTranslator>
 #include <QTreeView>
 #include <QUrl>
+#include <QVector>
 
 #define WIN32_LEAN_AND_MEAN
 #ifndef NOMINMAX
@@ -77,6 +83,7 @@
 #include "Editor/FilterTable.h"
 #include "Editor/SkinManager.h"
 #include "Editor/guis/CopyFilterGUI.h"
+#include "Editor/guis/PreampFilterGUI.h"
 #include "Editor/helpers/GUIHelper.h"
 #include "Editor/skins/ISkin.h"
 #include "Editor/skins/Skins.h"
@@ -94,6 +101,7 @@
 #include "Editor/widgets/SkinComboBox.h"
 #include "Editor/widgets/TitleBar.h"
 #include "Editor/widgets/UpdateToast.h"
+#include "Editor/widgets/AudioKnob.h"
 #include "Editor/widgets/subwooferrouting/SubwooferRoutingEditorDialog.h"
 #include "Editor/widgets/cards/SubwooferRoutingCardEditor.h"
 #include "Editor/widgets/routing/IRoutingRenderer.h"
@@ -1045,8 +1053,11 @@ int renderSkin(const QDir& outDir, const QString& skinId, const QString& configP
 					QStringLiteral("SubwooferRoutingContentScroll"));
 				QWidget* buttons = dialog.findChild<QWidget*>(
 					QStringLiteral("SubwooferRoutingButtonBox"));
+				// Token variants retain their own selected id but reuse a concrete
+				// painter's layout contract. Studio-derived variants therefore share
+				// Studio's intentionally non-scrolling expanded dialog.
 				const bool needsVerticalScroll =
-					skinId != QStringLiteral("studio");
+					SkinManager::instance()->baseSkinId() != QStringLiteral("studio");
 				if (contentScroll == nullptr
 					|| (needsVerticalScroll
 						&& contentScroll->verticalScrollBar()->maximum() <= 0)
@@ -1623,38 +1634,97 @@ int renderSkin(const QDir& outDir, const QString& skinId, const QString& configP
 	}
 	return failures;
 }
+
+std::unique_ptr<QMessageBox> createHeritageMessageBoxProbe(QWidget* parent = nullptr)
+{
+	auto messageBox = std::make_unique<QMessageBox>(QMessageBox::Question,
+		QStringLiteral("Restart required"),
+		QStringLiteral("Configuration Editor will be restarted to apply the changed settings. Proceed?"),
+		QMessageBox::Yes | QMessageBox::No,
+		parent);
+	messageBox->setObjectName(QStringLiteral("HeritageGalleryMessageBox"));
+	messageBox->resize(qMax(520, messageBox->sizeHint().width()),
+		qMax(120, messageBox->sizeHint().height()));
+	return messageBox;
+}
 }
 
 namespace SkinGallery
 {
-// Heritage (legacy rows) verification: the mode is a single unskinned
-// presentation, so instead of the per-skin per-row matrix it renders two
-// whole-table dumps (active and commented rows) for eyeball regression checks.
-// Triggered by EAPO_GALLERY_LEGACY=1, used by the local runner scripts.
-int renderHeritage(const QDir& outDir, const QString& configPath)
+// Heritage (legacy rows) verification: instead of the per-row card matrix it
+// renders whole-table dumps, one active and one commented, for each requested
+// legacy-safe theme. Triggered by EAPO_GALLERY_LEGACY=1.
+int renderHeritage(const QDir& outDir, const QString& configPath, const QStringList& skinIds)
 {
-	SkinManager::instance()->applyHeritage();
-
 	int failures = 0;
-	for (int commented = 0; commented <= 1; commented++)
+	for (const QString& rawSkinId : skinIds)
 	{
-		QList<QString> lines;
-		for (const GalleryRow& row : galleryRows())
-			lines.append(commented ? QStringLiteral("# ") + row.line : row.line);
-
-		QScrollArea scrollArea;
-		scrollArea.resize(960, 720);
-		buildRows(scrollArea, configPath, lines);
-		scrollArea.show();
-		QCoreApplication::processEvents();
-
-		QPixmap dump = scrollArea.widget()->grab();
-		const QString fileName = outDir.filePath(QStringLiteral("heritage_%1.png")
-				.arg(commented ? QStringLiteral("disabled") : QStringLiteral("normal")));
-		if (dump.isNull() || !dump.save(fileName))
+		const QString skinId = rawSkinId.trimmed();
+		for (int darkIndex = 0; darkIndex < 2; darkIndex++)
 		{
-			qWarning("SkinGallery: could not write %s", qPrintable(fileName));
-			failures++;
+			const bool dark = darkIndex == 0;
+			SkinManager::instance()->applyHeritage(skinId, dark);
+			if (SkinManager::instance()->currentSkinId() != skinId)
+			{
+				// Skins::byId silently falls back to studio for unknown ids; retain
+				// the normal gallery contract in the LegacyRows path as well.
+				qWarning("SkinGallery: unknown heritage skin id '%s'", qPrintable(skinId));
+				failures++;
+				break;
+			}
+
+			for (int commented = 0; commented <= 1; commented++)
+			{
+				QList<QString> lines;
+				for (const GalleryRow& row : galleryRows())
+					lines.append(commented ? QStringLiteral("# ") + row.line : row.line);
+
+				QScrollArea scrollArea;
+				scrollArea.resize(960, 720);
+				buildRows(scrollArea, configPath, lines);
+				scrollArea.show();
+				QCoreApplication::processEvents();
+
+				// High-contrast Legacy Rows must keep the Preamp gain control on
+				// the shared AudioKnob painter. A platform QDial is not enough:
+				// it would lose the explicit travel arc, pointer, and zero detent.
+				if (SkinManager::instance()->tokens().highContrast)
+				{
+					const auto* preamp = scrollArea.findChild<PreampFilterGUI*>();
+					const auto* knob = preamp == nullptr ? nullptr
+						: preamp->findChild<AudioKnob*>(QStringLiteral("dial"));
+					if (knob == nullptr)
+					{
+						qWarning("SkinGallery: high-contrast Legacy Preamp is not using AudioKnob");
+						failures++;
+					}
+				}
+
+				QPixmap dump = scrollArea.widget()->grab();
+				const QString fileName = outDir.filePath(QStringLiteral("heritage_%1_%2_%3.png")
+						.arg(SkinManager::instance()->currentSkinId(),
+							dark ? QStringLiteral("dark") : QStringLiteral("light"),
+							commented ? QStringLiteral("disabled") : QStringLiteral("normal")));
+				if (dump.isNull() || !dump.save(fileName))
+				{
+					qWarning("SkinGallery: could not write %s", qPrintable(fileName));
+					failures++;
+				}
+			}
+
+			std::unique_ptr<QMessageBox> messageBox = createHeritageMessageBoxProbe();
+			messageBox->show();
+			QCoreApplication::processEvents();
+			const QString fileName = outDir.filePath(QStringLiteral("heritage_%1_%2_messagebox.png")
+					.arg(SkinManager::instance()->currentSkinId(),
+						dark ? QStringLiteral("dark") : QStringLiteral("light")));
+			const QPixmap dump = messageBox->grab();
+			if (dump.isNull() || !dump.save(fileName))
+			{
+				qWarning("SkinGallery: could not write %s", qPrintable(fileName));
+				failures++;
+			}
+			messageBox->hide();
 		}
 	}
 	return failures;
@@ -1864,6 +1934,84 @@ int runSwitchTest(const QStringList& arguments)
 	};
 	QApplication::processEvents();
 	failures += checkToolbar(QStringLiteral("baseline (before any switch)"));
+	{
+		SkinManager::instance()->applyHeritage(QStringLiteral("legacy-bronze"), true);
+		SkinManager::instance()->styleMainToolbar(probeToolBar);
+		QApplication::processEvents();
+		const SkinTokens& tokens = SkinManager::instance()->tokens();
+		if (SkinManager::instance()->currentSkinId() != QLatin1String("legacy-bronze")
+			|| !SkinManager::instance()->isDark())
+		{
+			qWarning("SkinSwitchTest: heritage theme did not resolve to legacy-bronze/dark");
+			failures++;
+		}
+		if (SkinManager::instance()->routingRenderer() != nullptr)
+		{
+			qWarning("SkinSwitchTest: heritage theme selected a modern routing renderer");
+			failures++;
+		}
+		if (qApp->palette().color(QPalette::Window) != QColor(tokens.background))
+		{
+			qWarning("SkinSwitchTest: heritage palette did not reach the application window role");
+			failures++;
+		}
+		const QString heritageSheet = qApp->styleSheet();
+		for (const QString& selector : { QStringLiteral("QMainWindow"),
+			QStringLiteral("QWidget#AppTitleBar"), QStringLiteral("QMenuBar"),
+			QStringLiteral("QToolBar"), QStringLiteral("QDockWidget"),
+			QStringLiteral("QGraphicsView"), QStringLiteral("QDialog"),
+			QStringLiteral("QMessageBox"), QStringLiteral("QDialogButtonBox") })
+		{
+			if (!heritageSheet.contains(selector))
+			{
+				qWarning("SkinSwitchTest: heritage stylesheet is missing %s",
+					qPrintable(selector));
+				failures++;
+			}
+		}
+		std::unique_ptr<QMessageBox> messageBox = createHeritageMessageBoxProbe();
+		messageBox->show();
+		QApplication::processEvents();
+		const QImage dialogImage = messageBox->grab().toImage().convertToFormat(QImage::Format_RGB32);
+		const auto colourDistance = [](const QColor& lhs, const QColor& rhs) {
+			return qAbs(lhs.red() - rhs.red())
+				+ qAbs(lhs.green() - rhs.green())
+				+ qAbs(lhs.blue() - rhs.blue());
+		};
+		const QVector<QColor> darkSurfaces = {
+			QColor(tokens.background),
+			QColor(tokens.surface),
+			QColor(tokens.card),
+			QColor(tokens.surfaceSunken)
+		};
+		constexpr int kSampleStridePx = 4;
+		constexpr int kSurfaceDistanceTolerance = 75;
+		constexpr int kMinimumDarkSurfacePercent = 25;
+		int darkLikePixels = 0;
+		int sampledPixels = 0;
+		for (int y = 0; y < dialogImage.height(); y += kSampleStridePx)
+			for (int x = 0; x < dialogImage.width(); x += kSampleStridePx)
+			{
+				const QColor pixel = dialogImage.pixelColor(x, y);
+				for (const QColor& surface : darkSurfaces)
+				{
+					if (surface.isValid() && colourDistance(pixel, surface) < kSurfaceDistanceTolerance)
+					{
+						darkLikePixels++;
+						break;
+					}
+				}
+				sampledPixels++;
+			}
+		messageBox->hide();
+		if (sampledPixels == 0 || darkLikePixels * 100 < sampledPixels * kMinimumDarkSurfacePercent)
+		{
+			qWarning("SkinSwitchTest: heritage QMessageBox body stayed native-light (%d/%d dark-like pixels)",
+				darkLikePixels, sampledPixels);
+			failures++;
+		}
+		failures += checkToolbar(QStringLiteral("heritage legacy-bronze/dark"));
+	}
 	{
 		// LegacyRows still uses CopyFilterGUI. Its QGraphicsView does not own
 		// the scene, so the GUI must parent it explicitly; allWidgets() cannot
@@ -2527,9 +2675,7 @@ int run(const QStringList& arguments)
 	int failures = 0;
 	if (qEnvironmentVariableIsSet("EAPO_GALLERY_LEGACY"))
 	{
-		// Heritage mode is skin-independent; render its two dumps and exit
-		// through the same no-teardown path below.
-		failures += renderHeritage(outDir, configPath);
+		failures += renderHeritage(outDir, configPath, skinIds);
 		const int status = failures == 0 ? 0 : 1;
 		std::fflush(nullptr);
 		std::_Exit(status);
@@ -2628,7 +2774,7 @@ int SkinGallery::runVstRoundTripSelfTest()
 		const std::vector<std::wstring> fillIn0 = f0->getInputChannels();
 		const std::vector<std::wstring> fillOut0 = f0->getOutputChannels();
 
-		VSTPluginFilterGUI gui(f0->getLibrary(), chunk0, map0, stereo0, bus0, fillIn0, fillOut0);
+		VSTPluginFilterGUI gui(f0->getLibrary(), chunk0, map0, stereo0, bus0, {}, fillIn0, fillOut0);
 		QString outCommand, outParams;
 		gui.store(outCommand, outParams);
 
@@ -3057,6 +3203,85 @@ int SkinGallery::runRoutingEditTest()
 	const int status = failures == 0 ? 0 : 1;
 	std::fflush(nullptr);
 	std::_Exit(status);
+}
+
+int SkinGallery::runVst3PanelProbe()
+{
+	const QString pluginPath = qEnvironmentVariable("EAPO_VST3_EDITOR_PANEL_PROBE");
+	if (pluginPath.isEmpty() || !QFileInfo::exists(pluginPath))
+	{
+		fprintf(stderr, "[VST3 panel probe] missing EAPO_VST3_EDITOR_PANEL_PROBE path\n");
+		return 2;
+	}
+
+	fprintf(stderr, "[VST3 panel probe] step=library-create\n");
+	const std::shared_ptr<VSTPluginLibrary> library = VSTPluginLibrary::getInstance(pluginPath.toStdWString());
+	if (library == nullptr || !library->isVST3() || library->initialize() < 0)
+	{
+		fprintf(stderr, "[VST3 panel probe] library initialization failed\n");
+		return 1;
+	}
+
+	// Exercise both real Open-panel actions, not merely their shared dialog.
+	// Each gets the same parent widget, state restore and idle wiring as a user
+	// click while this probe closes its modal dialog deterministically.
+	auto runPanel = [](QWidget& owner, const char* slot, const char* label, int resultBase) {
+		owner.resize(640, 480);
+		owner.show();
+		QApplication::processEvents();
+
+		QEventLoop eventLoop;
+		QPointer<QDialog> panelDialog;
+		bool invoked = false;
+		bool dialogObserved = false;
+		bool dialogAccepted = false;
+		QTimer::singleShot(0, &owner, [&owner, slot, &invoked]() {
+			invoked = QMetaObject::invokeMethod(&owner, slot, Qt::DirectConnection);
+		});
+		QTimer::singleShot(250, &owner, [&panelDialog, &dialogObserved]() {
+			panelDialog = qobject_cast<QDialog*>(QApplication::activeModalWidget());
+			dialogObserved = !panelDialog.isNull();
+		});
+		QTimer::singleShot(1500, &owner, [&panelDialog, &dialogAccepted]() {
+			QDialog* dialog = panelDialog.data();
+			if (dialog == nullptr)
+				dialog = qobject_cast<QDialog*>(QApplication::activeModalWidget());
+			if (dialog != nullptr)
+			{
+				dialogAccepted = true;
+				dialog->accept();
+			}
+		});
+		QTimer::singleShot(2100, &owner, []() {
+			if (QDialog* dialog = qobject_cast<QDialog*>(QApplication::activeModalWidget()))
+				dialog->reject();
+		});
+		QTimer::singleShot(2400, &eventLoop, &QEventLoop::quit);
+		fprintf(stderr, "[VST3 panel probe] step=%s-open-panel\n", label);
+		eventLoop.exec();
+		const bool closed = QApplication::activeModalWidget() == nullptr;
+		fprintf(stderr, "[VST3 panel probe] step=%s-panel-finished invoked=%d observed=%d accepted=%d closed=%d\n",
+			label, invoked ? 1 : 0, dialogObserved ? 1 : 0, dialogAccepted ? 1 : 0, closed ? 1 : 0);
+		owner.hide();
+		QApplication::processEvents();
+		if (!invoked)
+			return resultBase;
+		if (!dialogObserved)
+			return resultBase + 1;
+		if (!dialogAccepted)
+			return resultBase + 2;
+		return closed ? 0 : resultBase + 3;
+	};
+
+	{
+		VSTPluginFilterGUI legacy(library, std::wstring(), std::unordered_map<std::wstring, float>());
+		const int legacyResult = runPanel(legacy, "on_openPanelButton_clicked", "legacy", 10);
+		if (legacyResult != 0)
+			return legacyResult;
+	}
+
+	VSTCardEditor modern(library, std::wstring(), std::unordered_map<std::wstring, float>());
+	return runPanel(modern, "panelButtonClicked", "modern", 20);
 }
 
 int SkinGallery::runScrollBench()

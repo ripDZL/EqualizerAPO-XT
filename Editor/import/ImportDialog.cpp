@@ -50,8 +50,9 @@ void ImportDialog::buildUi()
 
     summaryLabel_ = new QLabel(this);
     summaryLabel_->setWordWrap(true);
-    summaryLabel_->setText(tr("%1 file(s), %2 will be copied into %3.")
+    summaryLabel_->setText(tr("%1 item(s), %2 file(s), %3 will be copied into %4.")
         .arg(manifest_.items.size())
+        .arg(manifest_.totalFiles)
         .arg(formatSize(manifest_.totalBytes))
         .arg(configDir_));
     layout->addWidget(summaryLabel_);
