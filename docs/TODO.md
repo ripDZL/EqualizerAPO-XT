@@ -1,6 +1,7 @@
 # TODO
 
-- [ ] Stage/commit the validated `upstream/main` `v2.47.1` integration in isolated `codex/upstream-2471-integration`; all 18 conflicts are resolved and local native/UI gates pass. Before any beta push, user-test normal VST live preview in Modern + Legacy Rows, Bertom native panel open/close, and readable Clarity/Graphite light/dark. Keep selected endpoint -> fork preview, no endpoint -> upstream panel monitor, Bertom -> neither.
+- [x] User approved beta promotion of the validated `upstream/main` `v2.47.1` integration: `origin/beta` fast-forwarded `0523964a..242a3f86`; all 18 conflicts are resolved. `main`, releases, installer execution, and installed files remain unchanged.
+- [ ] Verify beta CI before any release or `main` promotion. Keep selected endpoint -> fork preview, no endpoint -> upstream panel monitor, Bertom native -> neither; manually recheck live preview/Bertom and Clarity/Graphite modes if CI reveals a regression.
 - [ ] Resolve or restore the missing AudioRegression reference fixtures before treating the optional audio-regression suite as green; do not generate replacement goldens from this candidate. Script Pester tests remain a CI/Pester-5 gate because this host has Pester 3.4.
 - [ ] With explicit approval, build the isolated Win32 Installer Release project only; do not run it, package it, or change any installed runtime.
 
