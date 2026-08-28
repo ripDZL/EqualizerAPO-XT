@@ -480,13 +480,13 @@ jobs:
         & .\.github\scripts\Invoke-EditorOffscreenTest.ps1 `
           -WorkspaceRoot "${{ github.workspace }}" -Gate skin-gallery -Platform "${{ matrix.platform }}"
 
-    - name: Run Clarity Legacy Rows gallery (offscreen)
+    - name: Run readability Legacy Rows gallery (offscreen)
       if: matrix.simd_variant == 'avx2'
       timeout-minutes: 5
       shell: pwsh
       run: |
         & .\.github\scripts\Invoke-EditorOffscreenTest.ps1 `
-          -WorkspaceRoot "${{ github.workspace }}" -Gate clarity-legacy-gallery -Platform "${{ matrix.platform }}"
+          -WorkspaceRoot "${{ github.workspace }}" -Gate readability-legacy-gallery -Platform "${{ matrix.platform }}"
 
     - name: Run skin switch test (offscreen)
       if: matrix.simd_variant == 'avx2'
@@ -527,7 +527,7 @@ jobs:
         name: skin-gallery
         path: |
           skin-gallery/*.png
-          clarity-legacy-gallery/*.png
+          readability-legacy-gallery/*.png
 
     - name: Upload analysis dock layout proof
       if: matrix.simd_variant == 'avx2'

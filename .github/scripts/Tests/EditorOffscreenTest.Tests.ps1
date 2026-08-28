@@ -11,7 +11,7 @@ Describe "Invoke-EditorOffscreenTest.ps1 planning" {
     }
 
     It "copies the velopack SONAME for every gate" {
-        foreach ($gate in @("selftest-vst", "skin-gallery", "clarity-legacy-gallery", "skin-switch", "analysis-layout", "card-move", "card-selection", "power-toggle")) {
+        foreach ($gate in @("selftest-vst", "skin-gallery", "readability-legacy-gallery", "skin-switch", "analysis-layout", "card-move", "card-selection", "power-toggle")) {
             (PlanFor $gate).VelopackDllSource |
                 Should -Be "C:\ws\deps\velopack_libc\lib\velopack_libc_win_x64_msvc.dll"
         }
@@ -28,12 +28,12 @@ Describe "Invoke-EditorOffscreenTest.ps1 planning" {
         $plan.PostChecks | Should -Contain "gallery-not-empty"
     }
 
-    It "runs Clarity through a dedicated Legacy Rows gallery" {
-        $plan = PlanFor "clarity-legacy-gallery"
-        $plan.Arguments | Should -Be @("--skin-gallery", "C:\ws\clarity-legacy-gallery", "--skin-gallery-skins", "clarity")
+    It "runs the readability themes through a dedicated Legacy Rows gallery" {
+        $plan = PlanFor "readability-legacy-gallery"
+        $plan.Arguments | Should -Be @("--skin-gallery", "C:\ws\readability-legacy-gallery", "--skin-gallery-skins", "clarity,graphite")
         $plan.ExtraEnv["EAPO_GALLERY_LEGACY"] | Should -Be "1"
-        $plan.LogPath | Should -Be "C:\ws\clarity-legacy-gallery\clarity-legacy-gallery.log"
-        $plan.PostChecks | Should -Contain "clarity-legacy-shots"
+        $plan.LogPath | Should -Be "C:\ws\readability-legacy-gallery\readability-legacy-gallery.log"
+        $plan.PostChecks | Should -Contain "readability-legacy-shots"
     }
 
     It "keeps the switch and move latency budgets" {
@@ -53,7 +53,7 @@ Describe "Invoke-EditorOffscreenTest.ps1 planning" {
     }
 
     It "captures stderr for the GUI-subsystem gates that log through qWarning" {
-        foreach ($gate in @("skin-gallery", "clarity-legacy-gallery", "skin-switch", "analysis-layout", "card-move", "card-selection", "power-toggle")) {
+        foreach ($gate in @("skin-gallery", "readability-legacy-gallery", "skin-switch", "analysis-layout", "card-move", "card-selection", "power-toggle")) {
             $plan = PlanFor $gate
             $plan.LogPath | Should -Not -BeNullOrEmpty
             $plan.ExtraEnv["QT_FORCE_STDERR_LOGGING"] | Should -Be "1"

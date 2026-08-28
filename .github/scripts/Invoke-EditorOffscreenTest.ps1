@@ -21,7 +21,7 @@
 param(
     [Parameter(Mandatory)] [string] $WorkspaceRoot,
     [Parameter(Mandatory)]
-    [ValidateSet("selftest-vst", "skin-gallery", "clarity-legacy-gallery", "skin-switch", "analysis-layout", "card-move", "card-selection", "power-toggle")]
+    [ValidateSet("selftest-vst", "skin-gallery", "readability-legacy-gallery", "skin-switch", "analysis-layout", "card-move", "card-selection", "power-toggle")]
     [string] $Gate,
     [string] $Platform = "x64",
     [switch] $PlanOnly
@@ -55,16 +55,16 @@ $gates = @{
         LogPath    = Join-Path $WorkspaceRoot "skin-gallery\skin-gallery.log"
         PostChecks = @("gallery-not-empty")
     }
-    "clarity-legacy-gallery" = [pscustomobject]@{
-        # Clarity promises the same no-ambiguity treatment in Legacy Rows as
-        # in modern cards. Keep this narrow so it is a fast, focused gate.
-        Arguments  = @("--skin-gallery", (Join-Path $WorkspaceRoot "clarity-legacy-gallery"), "--skin-gallery-skins", "clarity")
+    "readability-legacy-gallery" = [pscustomobject]@{
+        # The readability themes promise the same no-ambiguity treatment in
+        # Legacy Rows as in modern cards. Keep this narrow and deliberate.
+        Arguments  = @("--skin-gallery", (Join-Path $WorkspaceRoot "readability-legacy-gallery"), "--skin-gallery-skins", "clarity,graphite")
         ExtraEnv   = @{
             QT_FORCE_STDERR_LOGGING = "1"
             EAPO_GALLERY_LEGACY     = "1"
         }
-        LogPath    = Join-Path $WorkspaceRoot "clarity-legacy-gallery\clarity-legacy-gallery.log"
-        PostChecks = @("gallery-not-empty", "clarity-legacy-shots")
+        LogPath    = Join-Path $WorkspaceRoot "readability-legacy-gallery\readability-legacy-gallery.log"
+        PostChecks = @("gallery-not-empty", "readability-legacy-shots")
     }
     "skin-switch" = [pscustomobject]@{
         Arguments  = @("--skin-switch-test")
@@ -197,17 +197,17 @@ foreach ($check in $plan.PostChecks) {
                 throw "Gallery produced no PNGs"
             }
         }
-        "clarity-legacy-shots" {
+        "readability-legacy-shots" {
             $outDir = $plan.Arguments[1]
-            $expected = @(
-                "heritage_clarity_dark_normal.png",
-                "heritage_clarity_dark_disabled.png",
-                "heritage_clarity_light_normal.png",
-                "heritage_clarity_light_disabled.png"
-            )
+            $expected = foreach ($themeId in @("clarity", "graphite")) {
+                foreach ($mode in @("dark", "light")) {
+                    "heritage_${themeId}_${mode}_normal.png"
+                    "heritage_${themeId}_${mode}_disabled.png"
+                }
+            }
             $missing = @($expected | Where-Object { -not (Test-Path (Join-Path $outDir $_)) })
             if ($missing.Count -ne 0) {
-                throw "Clarity Legacy gallery missed expected screenshots: $($missing -join ', ')"
+                throw "Readability Legacy gallery missed expected screenshots: $($missing -join ', ')"
             }
         }
         "analysis-screenshot" {

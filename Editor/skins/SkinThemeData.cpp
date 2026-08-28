@@ -237,7 +237,7 @@ SkinTokens clarityTokens(bool dark)
 		t.surface = QStringLiteral("#0C0C0C");
 		t.card = QStringLiteral("#000000");
 		t.cardHover = QStringLiteral("#151515");
-		t.cardSelected = QStringLiteral("#003D71");
+		t.cardSelected = QStringLiteral("#00233A");
 		t.text = QStringLiteral("#FFFFFF");
 		t.mutedText = QStringLiteral("#D4D4D4");
 		t.border = QStringLiteral("#8D8D8D");
@@ -262,6 +262,67 @@ SkinTokens clarityTokens(bool dark)
 		t.graph = QStringLiteral("#FFFFFF");
 		t.graphGridMinor = QStringLiteral("#C8C8C8");
 		t.accent = QStringLiteral("#005A9E");
+		t.accent2 = QStringLiteral("#5B21B6");
+		t.success = QStringLiteral("#0B6E3C");
+		t.warning = QStringLiteral("#8A4B00");
+		t.danger = QStringLiteral("#B00020");
+	}
+	finishTokens(t);
+	return t;
+}
+
+// Constitution: docs/skins/graphite.md
+SkinTokens graphiteTokens(bool dark)
+{
+	SkinTokens t;
+	t.dark = dark;
+	t.fontFamily = QStringLiteral("Segoe UI");
+	t.monoFontFamily = QStringLiteral("Consolas");
+	// A dense, square instrument panel rather than Clarity in a new colour:
+	// wide rails, wire plates and graduated scope bars carry its hierarchy.
+	t.borderRadius = 0;
+	t.rowHeight = 48;
+	t.toolbarHeight = 42;
+	t.cardPadding = 12;
+	t.cardGap = 6;
+	t.graphRadius = 0;
+	t.channelGroupIndent = 24;
+	t.channelGroupStyle = SkinTokens::GradientBar;
+	t.badgeStyle = SkinTokens::WireframeBorder;
+	t.zebraStripe = false;
+	t.cardRailWidth = 6;
+	t.highContrast = true;
+	if (dark)
+	{
+		t.background = QStringLiteral("#191C20");
+		t.surface = QStringLiteral("#24282E");
+		t.card = QStringLiteral("#1F2329");
+		t.cardHover = QStringLiteral("#1B1F24");
+		t.cardSelected = QStringLiteral("#00233A");
+		t.text = QStringLiteral("#FFFFFF");
+		t.mutedText = QStringLiteral("#D7DBE0");
+		t.border = QStringLiteral("#A6ADB5");
+		t.graph = QStringLiteral("#15171A");
+		t.graphGridMinor = QStringLiteral("#3D434A");
+		t.accent = QStringLiteral("#54B9FF");
+		t.accent2 = QStringLiteral("#D0B0FF");
+		t.success = QStringLiteral("#4CD97B");
+		t.warning = QStringLiteral("#FFD166");
+		t.danger = QStringLiteral("#FF6B6B");
+	}
+	else
+	{
+		t.background = QStringLiteral("#ECEFF2");
+		t.surface = QStringLiteral("#FFFFFF");
+		t.card = QStringLiteral("#F8F9FA");
+		t.cardHover = QStringLiteral("#E1E8EF");
+		t.cardSelected = QStringLiteral("#E5F3FB");
+		t.text = QStringLiteral("#111315");
+		t.mutedText = QStringLiteral("#2D333B");
+		t.border = QStringLiteral("#4B5560");
+		t.graph = QStringLiteral("#FFFFFF");
+		t.graphGridMinor = QStringLiteral("#C7CDD4");
+		t.accent = QStringLiteral("#005F9E");
 		t.accent2 = QStringLiteral("#5B21B6");
 		t.success = QStringLiteral("#0B6E3C");
 		t.warning = QStringLiteral("#8A4B00");
@@ -1130,6 +1191,8 @@ const QVector<SkinEntry>& roster()
 		{ QStringLiteral("legacy-forest"), QStringLiteral("precision"), QStringLiteral("minimal"), &legacyForestTokens },
 		{ QStringLiteral("legacy-bronze"), QStringLiteral("precision"), QStringLiteral("minimal"), &legacyBronzeTokens },
 		{ QStringLiteral("legacy-plum"), QStringLiteral("precision"), QStringLiteral("minimal"), &legacyPlumTokens },
+		// Append new built-ins: Ctrl+Alt+n bindings derive from this display order.
+		{ QStringLiteral("graphite"), QStringLiteral("precision"), QStringLiteral("minimal"), &graphiteTokens },
 	};
 	return entries;
 }

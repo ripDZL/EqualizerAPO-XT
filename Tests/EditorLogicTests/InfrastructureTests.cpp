@@ -35,7 +35,7 @@ void testTheSkinRosterIsTheOneList()
 		QStringLiteral("forge"), QStringLiteral("nebula"), QStringLiteral("noir"),
 		QStringLiteral("legacy-slate"), QStringLiteral("legacy-blue"),
 		QStringLiteral("legacy-forest"), QStringLiteral("legacy-bronze"),
-		QStringLiteral("legacy-plum")
+		QStringLiteral("legacy-plum"), QStringLiteral("graphite")
 	};
 	requireTrue(roster.size() == expectedIds.size(),
 		"the roster carries exactly the base skins and the three scoped variant sets");
@@ -75,6 +75,10 @@ void testTheSkinRosterIsTheOneList()
 		"Clarity High Contrast rides the precision QSS grammar");
 	expectTrue(SkinThemeData::entry(QStringLiteral("clarity")).paintBaseId == QStringLiteral("minimal"),
 		"Clarity High Contrast reuses Precision's layout grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("graphite")).qssBaseName == QStringLiteral("precision"),
+		"Graphite Clarity rides the Precision QSS grammar");
+	expectTrue(SkinThemeData::entry(QStringLiteral("graphite")).paintBaseId == QStringLiteral("minimal"),
+		"Graphite Clarity reuses Precision's layout grammar");
 	expectTrue(SkinThemeData::entry(QStringLiteral("arctic")).qssBaseName == QStringLiteral("soft"),
 		"Arctic Bloom rides the Soft QSS grammar");
 	expectTrue(SkinThemeData::entry(QStringLiteral("arctic")).paintBaseId == QStringLiteral("soft"),
@@ -134,33 +138,52 @@ void testTheSkinRosterIsTheOneList()
 	expectTrue(SkinThemeData::tokens(QStringLiteral("legacy-bronze"), true).accent == QStringLiteral("#C58B48"),
 		"Legacy Bronze carries the requested bronze accent");
 
-	// Clarity is deliberately stronger than the ordinary 4.5:1 floor: labels,
-	// values, focus rings and knob travel must remain unmistakable in both
-	// Modern cards and Legacy Rows, which consume this same token table.
-	for (const SkinTokens& tokens : {
-		SkinThemeData::tokens(QStringLiteral("clarity"), false),
-		SkinThemeData::tokens(QStringLiteral("clarity"), true)
-	})
+	// The readability themes are deliberately stronger than the ordinary 4.5:1
+	// floor: labels, values, focus rings and knob travel must remain unmistakable
+	// in both Modern cards and Legacy Rows, which consume this same token table.
+	for (const QString& themeId : { QStringLiteral("clarity"), QStringLiteral("graphite") })
 	{
-		expectTrue(tokens.highContrast,
-			QStringLiteral("Clarity %1 enables high-visibility control geometry")
-				.arg(tokens.dark ? QStringLiteral("dark") : QStringLiteral("light")));
-		expectTrue(SkinThemeData::contrastRatio(tokens.text, tokens.card) >= 15.0,
-			QStringLiteral("Clarity %1 primary labels exceed 15:1 on cards")
-				.arg(tokens.dark ? QStringLiteral("dark") : QStringLiteral("light")));
-		expectTrue(SkinThemeData::contrastRatio(tokens.mutedText, tokens.card) >= 9.0,
-			QStringLiteral("Clarity %1 secondary labels exceed 9:1 on cards")
-				.arg(tokens.dark ? QStringLiteral("dark") : QStringLiteral("light")));
-		expectTrue(SkinThemeData::contrastRatio(tokens.accent, tokens.card) >= 4.5,
-			QStringLiteral("Clarity %1 control accent stays readable on cards")
-				.arg(tokens.dark ? QStringLiteral("dark") : QStringLiteral("light")));
-		expectTrue(SkinThemeData::contrastRatio(tokens.focusRing, tokens.card) >= 4.5,
-			QStringLiteral("Clarity %1 keyboard focus stays readable on cards")
-				.arg(tokens.dark ? QStringLiteral("dark") : QStringLiteral("light")));
-		expectTrue(tokens.rowHeight >= 40,
-			QStringLiteral("Clarity %1 reserves a readable row height")
-				.arg(tokens.dark ? QStringLiteral("dark") : QStringLiteral("light")));
+		for (const SkinTokens& tokens : {
+			SkinThemeData::tokens(themeId, false),
+			SkinThemeData::tokens(themeId, true)
+		})
+		{
+			const QString mode = tokens.dark ? QStringLiteral("dark") : QStringLiteral("light");
+			const auto expectReadableSurface = [&](const QString& surfaceName, const QString& surface)
+			{
+				expectTrue(SkinThemeData::contrastRatio(tokens.text, surface) >= 15.0,
+					QStringLiteral("%1 %2 primary labels exceed 15:1 on %3")
+						.arg(themeId, mode, surfaceName));
+				expectTrue(SkinThemeData::contrastRatio(tokens.mutedText, surface) >= 9.0,
+					QStringLiteral("%1 %2 secondary labels exceed 9:1 on %3")
+						.arg(themeId, mode, surfaceName));
+			};
+			expectTrue(tokens.highContrast,
+				QStringLiteral("%1 %2 enables high-visibility control geometry").arg(themeId, mode));
+			expectReadableSurface(QStringLiteral("card"), tokens.card);
+			expectReadableSurface(QStringLiteral("card hover"), tokens.cardHover);
+			expectReadableSurface(QStringLiteral("card selection"), tokens.cardSelected);
+			expectTrue(SkinThemeData::contrastRatio(tokens.accent, tokens.card) >= 4.5,
+				QStringLiteral("%1 %2 control accent stays readable on cards").arg(themeId, mode));
+			expectTrue(SkinThemeData::contrastRatio(tokens.focusRing, tokens.card) >= 4.5,
+				QStringLiteral("%1 %2 keyboard focus stays readable on cards").arg(themeId, mode));
+			expectTrue(tokens.rowHeight >= 40,
+				QStringLiteral("%1 %2 reserves a readable row height").arg(themeId, mode));
+		}
 	}
+	expectTrue(SkinThemeData::tokens(QStringLiteral("graphite"), true).background == QStringLiteral("#191C20"),
+		"Graphite Clarity stays charcoal in dark mode instead of collapsing to black");
+	const SkinTokens clarity = SkinThemeData::tokens(QStringLiteral("clarity"), true);
+	const SkinTokens graphite = SkinThemeData::tokens(QStringLiteral("graphite"), true);
+	expectTrue(graphite.borderRadius == 0 && graphite.graphRadius == 0,
+		"Graphite Clarity uses square instrument edges instead of Clarity's rounded cards");
+	expectTrue(graphite.cardRailWidth > clarity.cardRailWidth && graphite.cardGap < clarity.cardGap,
+		"Graphite Clarity uses a heavier signal rail and denser card rhythm");
+	expectTrue(graphite.channelGroupStyle == SkinTokens::GradientBar && graphite.channelGroupIndent > clarity.channelGroupIndent,
+		"Graphite Clarity leads nested rows with a wide signal bar instead of tree lines");
+	expectTrue(graphite.badgeStyle == SkinTokens::WireframeBorder && !graphite.zebraStripe
+			&& graphite.rowHeight > clarity.rowHeight,
+		"Graphite Clarity uses square wire plates and solid taller rows, not Clarity striping");
 
 	// The two stored aliases from earlier releases, which are the only ids that
 	// cannot be derived from the roster.

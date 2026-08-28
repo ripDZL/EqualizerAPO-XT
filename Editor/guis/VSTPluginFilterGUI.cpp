@@ -115,12 +115,16 @@ VSTPluginFilterGUI::VSTPluginFilterGUI(std::shared_ptr<VSTPluginLibrary> library
 	// lists or the selected channels change.
 	QGridLayout* grid = static_cast<QGridLayout*>(layout());
 	inputFillRow = new QWidget(this);
-	new QHBoxLayout(inputFillRow);
-	static_cast<QHBoxLayout*>(inputFillRow->layout())->setContentsMargins(0, 0, 0, 0);
+	QGridLayout* inputFillLayout = new QGridLayout(inputFillRow);
+	inputFillLayout->setContentsMargins(0, 0, 0, 0);
+	inputFillLayout->setHorizontalSpacing(GUIHelper::scale(6.0));
+	inputFillLayout->setVerticalSpacing(GUIHelper::scale(3.0));
 	grid->addWidget(inputFillRow, 3, 0, 1, 4);
 	outputFillRow = new QWidget(this);
-	new QHBoxLayout(outputFillRow);
-	static_cast<QHBoxLayout*>(outputFillRow->layout())->setContentsMargins(0, 0, 0, 0);
+	QGridLayout* outputFillLayout = new QGridLayout(outputFillRow);
+	outputFillLayout->setContentsMargins(0, 0, 0, 0);
+	outputFillLayout->setHorizontalSpacing(GUIHelper::scale(6.0));
+	outputFillLayout->setVerticalSpacing(GUIHelper::scale(3.0));
 	grid->addWidget(outputFillRow, 4, 0, 1, 4);
 	fillCollapsed = this->inputChannels.empty() && this->outputChannels.empty();
 
@@ -253,8 +257,8 @@ void VSTPluginFilterGUI::updateFillRows()
 void VSTPluginFilterGUI::rebuildFillRow(bool output)
 {
 	QWidget* row = output ? outputFillRow : inputFillRow;
-	QHBoxLayout* box = static_cast<QHBoxLayout*>(row->layout());
-	while (QLayoutItem* item = box->takeAt(0))
+	QGridLayout* grid = static_cast<QGridLayout*>(row->layout());
+	while (QLayoutItem* item = grid->takeAt(0))
 	{
 		if (item->widget() != nullptr)
 			item->widget()->deleteLater();
@@ -263,26 +267,35 @@ void VSTPluginFilterGUI::rebuildFillRow(bool output)
 	if (!output)
 		fillToggle = nullptr;
 
+	QWidget* heading = nullptr;
 	if (!output && fillModel.latchPresent())
 	{
 		fillToggle = new QCheckBox(tr("Channel fill"), row);
 		fillToggle->setChecked(!fillCollapsed);
 		fillToggle->setToolTip(tr("Choose which channels occupy the negotiated bus slots."));
 		connect(fillToggle, &QCheckBox::toggled, this, &VSTPluginFilterGUI::fillToggleClicked);
-		box->addWidget(fillToggle);
+		heading = fillToggle;
 	}
 	else
 	{
-		box->addWidget(new QLabel(output ? tr("Output fill") : tr("Input fill"), row));
+		heading = new QLabel(output ? tr("Output fill") : tr("Input fill"), row);
 	}
+	grid->addWidget(heading, 0, 0, Qt::AlignLeft | Qt::AlignTop);
+	grid->setColumnMinimumWidth(0, heading->sizeHint().width() + GUIHelper::scale(8.0));
 
 	if (!fillCollapsed)
 	{
+		constexpr int slotsPerLine = 3;
 		const int count = fillModel.slotCount(output);
 		for (int slot = 0; slot < count; slot++)
 		{
-			box->addWidget(new QLabel(QString::fromStdWString(fillModel.slotRole(output, slot)), row));
-			QComboBox* combo = new QComboBox(row);
+			QWidget* slotEditor = new QWidget(row);
+			slotEditor->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+			QHBoxLayout* slotLayout = new QHBoxLayout(slotEditor);
+			slotLayout->setContentsMargins(0, 0, 0, 0);
+			slotLayout->setSpacing(GUIHelper::scale(3.0));
+			slotLayout->addWidget(new QLabel(QString::fromStdWString(fillModel.slotRole(output, slot)), slotEditor));
+			QComboBox* combo = new QComboBox(slotEditor);
 			combo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
 			for (const std::wstring& name : fillModel.selectedChannels())
 				combo->addItem(QString::fromStdWString(name), QString::fromStdWString(name));
@@ -308,10 +321,11 @@ void VSTPluginFilterGUI::rebuildFillRow(bool output)
 				updateFillRows();
 				updateModel();
 			});
-			box->addWidget(combo);
+			slotLayout->addWidget(combo);
+			grid->addWidget(slotEditor, slot / slotsPerLine, 1 + slot % slotsPerLine);
 		}
 	}
-	box->addStretch(1);
+	grid->setColumnStretch(4, 1);
 }
 
 void VSTPluginFilterGUI::updateBusControls()

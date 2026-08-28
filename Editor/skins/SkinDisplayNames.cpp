@@ -14,6 +14,7 @@ QString displayName(const QString& id)
 	static const QHash<QString, const char*> names = {
 		{ QStringLiteral("studio"), QT_TRANSLATE_NOOP("SkinDisplayNames", "Studio Glass") },
 		{ QStringLiteral("clarity"), QT_TRANSLATE_NOOP("SkinDisplayNames", "Clarity High Contrast") },
+		{ QStringLiteral("graphite"), QT_TRANSLATE_NOOP("SkinDisplayNames", "Graphite Clarity") },
 		{ QStringLiteral("minimal"), QT_TRANSLATE_NOOP("SkinDisplayNames", "Precision Minimal") },
 		{ QStringLiteral("soft"), QT_TRANSLATE_NOOP("SkinDisplayNames", "Soft Lab") },
 		{ QStringLiteral("rack"), QT_TRANSLATE_NOOP("SkinDisplayNames", "Hardware Rack") },

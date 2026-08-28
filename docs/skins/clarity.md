@@ -32,5 +32,5 @@ white.
 - Encode an interactive state only with a colour change.
 - Replace the thick knob arc or pointer with a purely decorative dial.
 - Make values smaller than surrounding labels to save space.
-- Let the Legacy Clarity gallery become optional; it is the regression gate
-  for the active and disabled dark/light rows.
+- Let the Legacy readability gallery become optional; it is the regression
+  gate for the active and disabled dark/light rows of Clarity and Graphite.
