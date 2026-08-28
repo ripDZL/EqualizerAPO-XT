@@ -1,5 +1,6 @@
 # TODO
 
+- [ ] User-test the installed v2.47.1 AVX-512 beta at `C:\Program Files\EqualizerAPO-XT-x64-avx512\current`. Verify normal live VST preview in Modern + Legacy Rows, Bertom panel open/close, and Clarity/Graphite dark/light readability before deciding on release or `main` promotion. Full pre-install backup: `artifacts\install-backups\beta-v2471-avx512-20260828-182654`.
 - [x] User approved beta promotion of the validated `upstream/main` `v2.47.1` integration: `origin/beta` fast-forwarded `0523964a..242a3f86`; all 18 conflicts are resolved. `main`, releases, installer execution, and installed files remain unchanged.
 - [ ] Verify beta CI before any release or `main` promotion. Keep selected endpoint -> fork preview, no endpoint -> upstream panel monitor, Bertom native -> neither; manually recheck live preview/Bertom and Clarity/Graphite modes if CI reveals a regression.
 - [ ] Resolve or restore the missing AudioRegression reference fixtures before treating the optional audio-regression suite as green; do not generate replacement goldens from this candidate. Script Pester tests remain a CI/Pester-5 gate because this host has Pester 3.4.
