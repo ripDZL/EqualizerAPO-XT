@@ -1,6 +1,6 @@
 # TODO
 
-- [ ] If requested, push/build/install the verified local Clarity-menu grouping follow-up from `codex/upstream-2471-integration`; it is not on `beta`, not released, and not installed.
+- [ ] User-test the local Clarity-menu follow-up now installed at `C:\Program Files\EqualizerAPO-XT-x64-avx512\current\Editor.exe`: View > Interface must show Clarity High Contrast directly above Graphite Clarity, and both themes must still apply. It is not on `beta` and not released; push only after explicit approval.
 - [ ] User-test the installed v2.47.1 AVX-512 beta at `C:\Program Files\EqualizerAPO-XT-x64-avx512\current`. Verify normal live VST preview in Modern + Legacy Rows, Bertom panel open/close, and Clarity/Graphite dark/light readability before deciding on release or `main` promotion. Full pre-install backup: `artifacts\install-backups\beta-v2471-avx512-20260828-182654`.
 - [x] User approved beta promotion of the validated `upstream/main` `v2.47.1` integration: `origin/beta` fast-forwarded `0523964a..242a3f86`; all 18 conflicts are resolved. `main`, releases, installer execution, and installed files remain unchanged.
 - [ ] Verify beta CI before any release or `main` promotion. Keep selected endpoint -> fork preview, no endpoint -> upstream panel monitor, Bertom native -> neither; manually recheck live preview/Bertom and Clarity/Graphite modes if CI reveals a regression.

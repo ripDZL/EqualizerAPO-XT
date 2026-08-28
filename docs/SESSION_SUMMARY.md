@@ -1,5 +1,7 @@
 # Session Summary
 
+- 2026-08-28 user-approved Clarity-menu test install: backed up Program Files AVX-512 `Editor.exe` (`1069728D7657A75EF4F4BEB37DAB56D1345B6659CF8FA610E619D330EFFE7147`) at `artifacts\install-backups\clarity-menu-avx512-20260828-185900\Editor.exe`, then installed and hash-verified local `aaca996` Editor (`6A5255E70E0B0485D26869E30A23842E58D4757081220C45ACD61CBA055A2B59`; v2.47.1.0). Only Editor changed; no engine/config/plug-in/audio-service, remote, or release change. Manual test: check the grouped Interface menu and apply both Clarity themes.
+
 - 2026-08-28 local-only Clarity menu: grouped `Clarity High Contrast` and `Graphite Clarity` together in View > Interface, with stable roster shortcut ordinals. EditorLogic 4,572, Release AVX-512 Editor, Clarity/Graphite dark/light menu gallery, and 12-shot Legacy readability gallery pass. No push, release, installer, or installed-runtime change; next is explicit user direction.
 
 - 2026-08-28 beta test install: green beta run `33214676823` tested commit `2d91bd6d` and produced the AVX-512 artifact. With user approval, backed up the 75-file Program Files runtime at `artifacts\install-backups\beta-v2471-avx512-20260828-182654`, paused/restored Windows Audio, overlaid and hash-verified all 64 v2.47.1 files, and opened Editor. `main` and releases remain unchanged. Next gate: user runtime testing.
