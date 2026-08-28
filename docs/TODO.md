@@ -1,6 +1,6 @@
 # TODO
 
-- [ ] User-test the prepared Clarity/Graphite AVX-512 Editor candidate (`B528D825C13789A781ECE675AE7B642A6D1758765CCF4487919DE2828948165D`). It is not installed; the current Clarity-only Editor remains in Program Files. After explicit approval, overlay only `Editor.exe`, then verify both themes in Modern and Legacy Rows, each in Dark and Light modes: labels, focus, disabled state, knob position/value, and VST rows (including wrapped VST3 channel fills) must be unambiguous before beta push.
+- [ ] User-test the installed Clarity/Graphite AVX-512 Editor candidate (`B528D825C13789A781ECE675AE7B642A6D1758765CCF4487919DE2828948165D`) at `C:\Program Files\EqualizerAPO-XT-x64-avx512\current\Editor.exe`. The prior Clarity-only Editor (`D28EEB7F098A2C16A66E6FF5383484E6C6AF9CFD83641D9B40DC771AE7FFD287`) is backed up at `artifacts\install-backups\graphite-clarity-avx512-20260827-232558\Editor.exe`; only `Editor.exe` changed. Verify both themes in Modern and Legacy Rows, each in Dark and Light modes: labels, focus, disabled state, knob position/value, and VST rows (including wrapped VST3 channel fills) must be unambiguous before beta push.
 
 - [x] Fast-forwarded `beta` to the v2.42.5 mainline. Future policy: work/test through `beta`, then only user-approved promotion to `main` starts a stable release. The durable guide is `docs/BranchWorkflow.md`, linked from the README.
 
