@@ -2,6 +2,7 @@
 
 - [ ] Stage/commit the validated `upstream/main` `v2.47.1` integration in isolated `codex/upstream-2471-integration`; all 18 conflicts are resolved and local native/UI gates pass. Before any beta push, user-test normal VST live preview in Modern + Legacy Rows, Bertom native panel open/close, and readable Clarity/Graphite light/dark. Keep selected endpoint -> fork preview, no endpoint -> upstream panel monitor, Bertom -> neither.
 - [ ] Resolve or restore the missing AudioRegression reference fixtures before treating the optional audio-regression suite as green; do not generate replacement goldens from this candidate. Script Pester tests remain a CI/Pester-5 gate because this host has Pester 3.4.
+- [ ] With explicit approval, build the isolated Win32 Installer Release project only; do not run it, package it, or change any installed runtime.
 
 - [ ] Complete the release-acceptance test for the installed Clarity/Graphite AVX-512 Editor candidate (`B528D825C13789A781ECE675AE7B642A6D1758765CCF4487919DE2828948165D`) at `C:\Program Files\EqualizerAPO-XT-x64-avx512\current\Editor.exe`. The user reports it seems to work; verify both themes in Modern and Legacy Rows, each in Dark and Light modes: labels, focus, disabled state, knob position/value, and VST rows (including wrapped VST3 channel fills) must remain unambiguous. The beta update is prepared locally; push its fast-forward only after explicit approval.
 
