@@ -53,10 +53,11 @@ jobs:
     outputs:
       bumped_sha: ${{ steps.commit.outputs.sha }}
       base_version: ${{ steps.commit.outputs.base_version }}
-      # 'true' when this push raised version.h. When it stays 'false' the push
-      # cannot produce a new release (the tag already exists), so the build
-      # matrix and release jobs are skipped entirely. Use workflow_dispatch to
-      # force a full-matrix build of such a push when needed.
+      # 'true' when this push raises version.h or promotes an untagged beta
+      # base to its matching stable tag. When it stays 'false' the push cannot
+      # produce a new release, so the build matrix and release jobs are skipped
+      # entirely. Use workflow_dispatch to force a full-matrix build of such a
+      # push when needed.
       bumped: ${{ steps.commit.outputs.bumped }}
     steps:
     - name: Checkout repository
@@ -70,6 +71,7 @@ jobs:
         persist-credentials: true
 
     - name: Bump version
+      id: version-decision
       shell: pwsh
       run: .\.github\scripts\Bump-Version.ps1
 
@@ -89,6 +91,7 @@ jobs:
         $minor = Get-VersionPart "MINOR"
         $revision = Get-VersionPart "REVISION"
         $baseVersion = "$major.$minor.$revision"
+        $releaseRequired = "${{ steps.version-decision.outputs.release_required }}" -eq "true"
 
         git diff --quiet -- version.h
         $diffExit = $LASTEXITCODE
@@ -111,6 +114,13 @@ jobs:
           git commit -m "chore(version): bump version [skip ci]"
           git push
           "bumped=true" >> $env:GITHUB_OUTPUT
+        }
+        elseif ($releaseRequired) {
+          # The beta already set version.h to the stable base, so there is no
+          # file diff to commit. It still needs the full matrix and release
+          # jobs exactly once while the matching stable tag is absent.
+          "bumped=true" >> $env:GITHUB_OUTPUT
+          Write-Host "::notice::Prerelease promotion requires a stable build and release."
         }
         else {
           "bumped=false" >> $env:GITHUB_OUTPUT

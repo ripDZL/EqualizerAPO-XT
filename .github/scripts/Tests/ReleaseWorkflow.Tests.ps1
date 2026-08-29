@@ -21,4 +21,11 @@ Describe "release workflow target commit" {
         $condition = "(?s)if:\s*always\(\)\s*&&\s*github\.event_name\s*==\s*'push'\s*&&\s*github\.ref\s*==\s*'refs/heads/main'\s*&&\s*needs\.build\.result\s*==\s*'success'"
         [regex]::IsMatch($releaseBlock.Value, $condition) | Should -BeTrue
     }
+
+    It "builds a same-version prerelease promotion even when version.h is unchanged" {
+        $workflow | Should -Match "id:\s*version-decision"
+        $workflow | Should -Match "steps\.version-decision\.outputs\.release_required"
+        $promotionBranch = '(?s)elseif\s*\(\s*\$releaseRequired\s*\)\s*\{.*?"bumped=true"\s*>>\s*\$env:GITHUB_OUTPUT'
+        [regex]::IsMatch($workflow, $promotionBranch) | Should -BeTrue
+    }
 }

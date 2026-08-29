@@ -1,5 +1,7 @@
 # Session Summary
 
+- 2026-08-29: Main run `33230056711` passed its early gates but skipped build/release because `v2.47.1-beta.1` shares the `2.47.1` header base. Repaired the release-required signal for that beta-to-stable state, with 25 focused Pester 5 passes and an origin-only dry-run proof. Next: fast-forward the repair through beta/main and wait for the replacement full main run; do not manually create a stable release.
+
 - 2026-08-29: Published user-approved `v2.47.1-beta.1` prerelease from `4ce8efdf` after green run `33220187263`. All six channel packages, universal Setup, source archive, checksums, and generated notes are present (32 assets); `Publish-Release.ps1` reports complete. `main` remains untouched. Next: beta feedback only unless the user explicitly approves promotion.
 
 - 2026-08-28 user-approved beta push: `origin/beta` fast-forwarded `e9fadd7a..f5f0ebde` after the user reports the installed Clarity-menu build looks good. It includes the theme grouping, gallery/test coverage, and install record. `main`, releases, installers, engine, and audio services are unchanged. Await beta CI before a release or stable promotion.

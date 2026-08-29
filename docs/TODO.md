@@ -1,5 +1,8 @@
 # TODO
 
+- [x] Repaired the same-version beta-to-stable release gate: Pester 5 has 25 focused passes and the origin-only `v2.47.1-beta.1` dry run emits `release_required=true`.
+- [ ] Push the repaired release gate through `beta` and `main`; publish only after the new full main workflow is green.
+
 - [x] Published user-approved beta prerelease `v2.47.1-beta.1` from `4ce8efdf` after green run `33220187263`; all six channel packages, universal Setup, source, checksums, and notes pass the release completeness plan.
 - [ ] Collect beta feedback; do not promote to `main` or publish a stable release without explicit approval.
 

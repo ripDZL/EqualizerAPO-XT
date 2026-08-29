@@ -55,15 +55,24 @@ BeforeAll {
     }
 
     function Invoke-Bump {
-        param([string]$Repo, [switch]$Check)
+        param([string]$Repo, [switch]$Check, [string]$GitHubOutput)
         $bumpArgs = @('-NoProfile', '-NonInteractive', '-File', $script:ScriptPath)
         if ($Check) { $bumpArgs += '-Check' }
+        $previousGitHubOutput = $env:GITHUB_OUTPUT
+        if ($PSBoundParameters.ContainsKey('GitHubOutput')) {
+            $env:GITHUB_OUTPUT = $GitHubOutput
+        }
         Push-Location $Repo
         try {
             $out = & $script:PwshExe @bumpArgs 2>&1 | Out-String
             $code = $LASTEXITCODE
         } finally {
             Pop-Location
+            if ($null -eq $previousGitHubOutput) {
+                Remove-Item Env:GITHUB_OUTPUT -ErrorAction SilentlyContinue
+            } else {
+                $env:GITHUB_OUTPUT = $previousGitHubOutput
+            }
         }
         return [pscustomobject]@{ ExitCode = $code; Output = $out }
     }
@@ -231,6 +240,21 @@ Describe "Bump-Version.ps1" {
     }
 
     Context "prerelease promotion" {
+        It "promotes a same-version prerelease base when its stable tag is absent" {
+            $repo = New-FixtureRepo
+            Set-FixtureVersion -Repo $repo -Major 1 -Minor 2 -Revision 4
+            Add-FixtureCommit -Repo $repo -Subject "feat: prepare the beta candidate"
+            Add-FixtureTag -Repo $repo -Tag "v1.2.4-beta.1"
+            Add-FixtureCommit -Repo $repo -Subject "docs: approve the beta"
+            $githubOutput = Join-Path $repo "github-output.txt"
+            $r = Invoke-Bump -Repo $repo -GitHubOutput $githubOutput
+            $r.ExitCode | Should -Be 0
+            $r.Output | Should -Match "Promoted prerelease v1.2.4-beta.1 to stable version 1.2.4"
+            Get-FixtureVersion -Repo $repo | Should -Be "1.2.4"
+            Test-Path -LiteralPath $githubOutput | Should -BeTrue
+            Get-Content -LiteralPath $githubOutput | Should -Contain "release_required=true"
+        }
+
         It "promotes a newer prerelease base when only docs commits follow it" {
             $repo = New-FixtureRepo
             Set-FixtureVersion -Repo $repo -Major 1 -Minor 2 -Revision 3

@@ -53,6 +53,20 @@ function Get-BumpKind {
   return "none"
 }
 
+function Set-ReleaseRequiredOutput {
+  param([bool]$ReleaseRequired)
+
+  # The release workflow needs to distinguish a normal no-op from a beta whose
+  # numeric version is already in version.h but still lacks its stable tag.
+  # Local invocations and Pester fixtures do not define GITHUB_OUTPUT.
+  if ([string]::IsNullOrWhiteSpace($env:GITHUB_OUTPUT)) {
+    return
+  }
+
+  $value = if ($ReleaseRequired) { "true" } else { "false" }
+  Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value "release_required=$value"
+}
+
 if (-not (Test-Path $VersionHeader)) {
   throw "Version header not found: $VersionHeader"
 }
@@ -77,15 +91,28 @@ if ($lastTag -match '^v(?<tagMajor>\d+)\.(?<tagMinor>\d+)\.(?<tagRevision>\d+)-[
   $tagMinor = [int]$Matches.tagMinor
   $tagRevision = [int]$Matches.tagRevision
   $tagIsNewer = ($tagMajor -gt $major) -or (($tagMajor -eq $major) -and (($tagMinor -gt $minor) -or (($tagMinor -eq $minor) -and ($tagRevision -gt $revision))))
-  if ($tagIsNewer) {
-    $major = $tagMajor
-    $minor = $tagMinor
-    $revision = $tagRevision
+  $tagMatchesHeader = $tagMajor -eq $major -and $tagMinor -eq $minor -and $tagRevision -eq $revision
+  $stableTag = "v$tagMajor.$tagMinor.$tagRevision"
+  $null = & Invoke-Git rev-parse --quiet --verify "refs/tags/$stableTag" 2>$null
+  $stableTagExists = $LASTEXITCODE -eq 0
+  $global:LASTEXITCODE = 0
+
+  # CI normally sees a prerelease whose base is newer than version.h. A beta
+  # can also be cut after version.h already carries that base (v2.47.1-beta.1
+  # with version.h at 2.47.1). In that valid case, release the same numeric
+  # version once when its stable tag is absent; never re-cut it once present.
+  if ($tagIsNewer -or ($tagMatchesHeader -and -not $stableTagExists)) {
+    if ($tagIsNewer) {
+      $major = $tagMajor
+      $minor = $tagMinor
+      $revision = $tagRevision
+    }
     $promotingPrerelease = $true
   }
 }
 
 if ($bumpKind -eq "none" -and -not $promotingPrerelease) {
+  Set-ReleaseRequiredOutput $false
   if ($Check) {
     Write-Host "No version-affecting commits since the last release; version stays at $currentVersion"
     exit 0
@@ -123,6 +150,7 @@ $nextLines = foreach ($line in $lines) {
 
 $nextVersion = "$major.$minor.$revision"
 if ($Check) {
+  Set-ReleaseRequiredOutput $true
   if ($promotingPrerelease -and $bumpKind -eq "none") {
     Write-Host "Next prerelease promotion version would be $nextVersion"
   } else {
@@ -131,6 +159,7 @@ if ($Check) {
   exit 0
 }
 
+Set-ReleaseRequiredOutput $true
 Set-Content -Path $VersionHeader -Value $nextLines -Encoding ASCII
 if ($promotingPrerelease -and $bumpKind -eq "none") {
   Write-Host "Promoted prerelease $lastTag to stable version $nextVersion"

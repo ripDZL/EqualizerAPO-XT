@@ -1,5 +1,7 @@
 # Progress
 
+- [x] 2026-08-29 repaired the main stable-release gate: run `33230056711` was green but skipped build/release because a same-version beta left `version.h` unchanged. `Bump-Version.ps1` now emits a release-required decision for that exact state and the workflow builds/releases it once; Pester 5 (25 focused checks) plus an origin-only dry run pass. No release was manually created.
+
 - [x] 2026-08-29 published user-approved `v2.47.1-beta.1` prerelease from beta commit `4ce8efdf` after green Actions run `33220187263`. The 32 assets cover every channel plus universal Setup, source, checksums, and generated notes; the repository release-completeness plan is green. `main` was not touched.
 
 - [x] 2026-08-28 user-approved beta push: fast-forwarded `origin/beta` `e9fadd7a..f5f0ebde` with the user-tested Clarity-menu grouping, its regression gallery, and installation record. `main`, releases, installers, engine, and audio services are unchanged; await beta CI before promotion.

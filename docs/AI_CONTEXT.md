@@ -1,5 +1,7 @@
 # AI Context
 
+- 2026-08-29 stable-release gate repair: main run `33230056711` was green but skipped build/release because `v2.47.1-beta.1` and `version.h` share `2.47.1`. The gate now emits `release_required=true` for that untagged same-version prerelease case; workflow logic builds/releases without rewriting `version.h`. Pester 5 (25 focused checks) and an origin-only dry run pass. Next: beta/main fast-forward, then require a green full main run before stable release.
+
 - 2026-08-29 user-approved beta prerelease: published `v2.47.1-beta.1` from green beta commit `4ce8efdf` / Actions run `33220187263`. The complete 32-asset prerelease includes all six channel packages, universal Setup, source snapshot, checksums, and generated notes; workflow-equivalent completeness is green. `main` remains untouched. Next: collect beta feedback; promote only with explicit approval.
 
 - 2026-08-28 user-approved beta push: fast-forwarded `origin/beta` `e9fadd7a..f5f0ebde` with `fc894cee` (group Clarity themes), `aaca996` (menu/gallery regression), and the test-install handoff. The user reports the installed candidate looks good. `main`, releases, installers, engine, and audio services remain unchanged. Next: beta CI before any release or `main` promotion.
