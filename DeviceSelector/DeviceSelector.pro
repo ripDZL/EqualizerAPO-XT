@@ -17,6 +17,10 @@ DEFINES += MUP_USE_WIDE_STRING
 DEFINES += NOMINMAX
 QMAKE_CXXFLAGS_RELEASE += /O2
 
+# The skin resource bundle is too large for one generated C++ translation
+# unit on some MSVC hosts. Let Qt embed it in the supported two-step mode.
+CONFIG += resources_big
+
 PRECOMPILED_HEADER = stdafx.h
 
 SOURCES += \

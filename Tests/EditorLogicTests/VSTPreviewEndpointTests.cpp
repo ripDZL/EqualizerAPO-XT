@@ -37,7 +37,6 @@ public:
 	bool isInstalled() const override { return true; }
 	bool canBeUpgraded() const override { return false; }
 	bool hasChanges() const override { return false; }
-	bool isExperimental() const override { return false; }
 	bool isEnhancementsDisabled() const override { return false; }
 	bool isDefaultDevice() const override { return false; }
 	bool isDisabled() const override { return false; }

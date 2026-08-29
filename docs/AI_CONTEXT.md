@@ -1,5 +1,7 @@
 # AI Context
 
+- 2026-08-29 v2.49.0 integration candidate: `codex/upstream-2490-integration` merges upstream `4acab38b` (released `v2.49.0`) as `b6a58e0b`. Local repairs keep large Editor/DeviceSelector Qt resource bundles in two-step mode and include every shared skin-QSS icon in DeviceSelector. Local validation is green: Pester 126/126; EditorLogic 4,572; HybridConv 1,635; EngineOrchestration 1,292; Asio 385; AudioRegression 31/31; VST self-test; ASIO fake probe 8/8; Theme Lab 44/0; skin/routing/card-move and 225-shot DeviceSelector galleries. Candidate is ready only for a normal beta fast-forward; `main`, releases, installer, active runtime, and audio services remain untouched.
+
 - 2026-08-29 stable `v2.47.1` is published from `eee86aa516e325431600d759e7218e73db2050fa` after green Actions run `33230775759`. It is public (not draft/prerelease) with 33 assets: all six channel Setup/MSI/feed sets, universal Setup, source archive, SHA256SUMS, and generated notes. `Publish-Release.ps1` reports complete with no missing channels or follow-up assets. Keep `beta` as a non-force fast-forward of post-release `main`.
 
 - 2026-08-29 stable-release gate repair: main run `33230056711` was green but skipped build/release because `v2.47.1-beta.1` and `version.h` share `2.47.1`. The gate now emits `release_required=true` for that untagged same-version prerelease case; workflow logic builds/releases without rewriting `version.h`. Pester 5 (25 focused checks) and an origin-only dry run pass. Replacement main run `33230775759` is green and published stable `v2.47.1`.

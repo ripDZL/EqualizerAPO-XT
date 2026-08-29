@@ -24,6 +24,11 @@ TEMPLATE = app
 # renaming that pair away removed the accidental trigger, so declare it.
 CONFIG += object_parallel_to_source no_batch
 
+# Qt's generated resource source includes the bundled fonts and audio.  Use
+# its two-step resource mode so normal MSVC builds do not have to compile that
+# very large generated C++ array in one translation unit.
+CONFIG += resources_big
+
 PRECOMPILED_HEADER = stable.h
 QMAKE_CXXFLAGS_WARN_ON -= -w34100
 QMAKE_LFLAGS += /STACK:32000000

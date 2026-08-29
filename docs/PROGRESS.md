@@ -1,5 +1,7 @@
 # Progress
 
+- [x] 2026-08-29 upstream `v2.49.0` candidate `b6a58e0b` is locally validated. Qt large-resource build reliability and DeviceSelector shared-skin icons are repaired; all targeted native, script, UI, ASIO, and audio-regression gates pass. Next: ordinary `beta` fast-forward and Actions.
+
 - [x] 2026-08-29 published stable `v2.47.1` from `eee86aa516e325431600d759e7218e73db2050fa` after green main run `33230775759`. The public non-draft release has 33 assets: six complete channel sets, universal Setup, source, SHA256SUMS, and generated notes. `Publish-Release.ps1` reports `Complete=True` with no missing channels or required follow-up assets.
 
 - [x] 2026-08-29 repaired the main stable-release gate: run `33230056711` was green but skipped build/release because a same-version beta left `version.h` unchanged. `Bump-Version.ps1` now emits a release-required decision for that exact state and the workflow builds/releases it once; Pester 5 (25 focused checks) plus an origin-only dry run pass. No release was manually created.

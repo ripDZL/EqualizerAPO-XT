@@ -166,11 +166,16 @@ Describe "extracted build script decisions" {
             "EqualizerAPO\x64\Release\EqualizerAPO.dll",
             "Benchmark\x64\Release\Benchmark.exe",
             "VoicemeeterClient\x64\Release\VoicemeeterClient.exe",
+            "EqualizerAPOAsio\x64\Release\EqualizerAPOAsio.dll",
+            "EqualizerAPOHost\x64\Release\EqualizerAPOHost.exe",
+            "EqualizerAPOAsio\Release\EqualizerAPOAsio.dll",
             "deps\fftw\Release\libfftw3.dll",
             "deps\libsndfile\build\Release\sndfile.dll",
             "deps\velopack_libc\lib\velopack_libc_win_x64_msvc.dll",
             "VST3\SubwooferRouting\x64\Release\EapoXtSubwooferRouting.vst3",
-            "VST3\SubwooferRouting\LICENSE"
+            "VST3\SubwooferRouting\LICENSE",
+            "License.txt",
+            "License-gpl-3.0.txt"
         )
         foreach ($relative in $required) {
             $target = Join-Path $repo $relative
@@ -198,6 +203,10 @@ Describe "extracted build script decisions" {
             Should -BeFalse -Because "reruns must not keep deleted files"
         Test-Path -LiteralPath (Join-Path $artifact "Editor.exe") | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $artifact "platforms\qwindows.dll") | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $artifact "x86\EqualizerAPOAsio.dll") |
+            Should -BeTrue -Because "the x64 channel ships its Win32 ASIO wrapper"
+        Test-Path -LiteralPath (Join-Path $artifact "License-gpl-3.0.txt") |
+            Should -BeTrue -Because "the ASIO wrapper is distributed under GPLv3"
         Test-Path -LiteralPath (Join-Path $artifact "VST3\EapoXtSubwooferRouting.vst3\Contents\x86_64-win\EapoXtSubwooferRouting.vst3") |
             Should -BeTrue
         Test-Path -LiteralPath (Join-Path $artifact "moc_Editor.cpp") |

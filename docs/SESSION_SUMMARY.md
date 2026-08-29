@@ -1,5 +1,7 @@
 # Session Summary
 
+- 2026-08-29 upstream v2.49.0 continuation: merged upstream as `b6a58e0b` on `codex/upstream-2490-integration`; no remote branch, release, installer, runtime, or audio service changed. Fixed local MSVC large-QRC compilation with `resources_big` and completed DeviceSelector shared-QSS icon resources. Green proof: Pester 126/126; EditorLogic 4,572; HybridConv 1,635; Engine 1,292; Asio 385; AudioRegression 31/31; ASIO fake probe 8/8; VST self-test; Theme Lab 44/0; 132-theme switch, routing/card-move, Legacy readability, and 225-shot DeviceSelector gallery (zero icon warnings). Next: commit these repairs/docs, fast-forward only `beta`, await CI, then user test; do not touch `main` or release.
+
 - 2026-08-29: Stable `v2.47.1` is public from `eee86aa516e325431600d759e7218e73db2050fa` after green run `33230775759`. It is neither draft nor prerelease and has 33 complete assets: every channel Setup/MSI/feed, universal Setup, source archive, SHA256SUMS, and release notes. `Publish-Release.ps1` reports `Complete=True`; do not duplicate the release. Keep beta as a normal fast-forward of post-release main.
 
 - 2026-08-29: Main run `33230056711` passed its early gates but skipped build/release because `v2.47.1-beta.1` shares the `2.47.1` header base. Repaired the release-required signal for that beta-to-stable state, with 25 focused Pester 5 passes and an origin-only dry-run proof. Replacement main run `33230775759` is green and published stable `v2.47.1`; no duplicate release was created.
