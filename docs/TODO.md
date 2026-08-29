@@ -1,5 +1,8 @@
 # TODO
 
+- [x] Published user-approved beta prerelease `v2.47.1-beta.1` from `4ce8efdf` after green run `33220187263`; all six channel packages, universal Setup, source, checksums, and notes pass the release completeness plan.
+- [ ] Collect beta feedback; do not promote to `main` or publish a stable release without explicit approval.
+
 - [x] User verified the installed Clarity-menu follow-up; `origin/beta` is fast-forwarded to `f5f0ebde` with the grouped Interface entries.
 - [ ] Verify beta CI for `f5f0ebde` before any release or `main` promotion. Do not create a release from this push without explicit approval.
 - [ ] User-test the installed v2.47.1 AVX-512 beta at `C:\Program Files\EqualizerAPO-XT-x64-avx512\current`. Verify normal live VST preview in Modern + Legacy Rows, Bertom panel open/close, and Clarity/Graphite dark/light readability before deciding on release or `main` promotion. Full pre-install backup: `artifacts\install-backups\beta-v2471-avx512-20260828-182654`.

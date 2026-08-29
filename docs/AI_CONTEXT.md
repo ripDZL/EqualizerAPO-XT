@@ -1,5 +1,7 @@
 # AI Context
 
+- 2026-08-29 user-approved beta prerelease: published `v2.47.1-beta.1` from green beta commit `4ce8efdf` / Actions run `33220187263`. The complete 32-asset prerelease includes all six channel packages, universal Setup, source snapshot, checksums, and generated notes; workflow-equivalent completeness is green. `main` remains untouched. Next: collect beta feedback; promote only with explicit approval.
+
 - 2026-08-28 user-approved beta push: fast-forwarded `origin/beta` `e9fadd7a..f5f0ebde` with `fc894cee` (group Clarity themes), `aaca996` (menu/gallery regression), and the test-install handoff. The user reports the installed candidate looks good. `main`, releases, installers, engine, and audio services remain unchanged. Next: beta CI before any release or `main` promotion.
 
 - 2026-08-28 user-approved Clarity-menu test install: overlaid only `C:\Program Files\EqualizerAPO-XT-x64-avx512\current\Editor.exe` from local `aaca996` (v2.47.1.0). Prior `1069728D7657A75EF4F4BEB37DAB56D1345B6659CF8FA610E619D330EFFE7147` is backed up at `artifacts\install-backups\clarity-menu-avx512-20260828-185900\Editor.exe`; installed `6A5255E70E0B0485D26869E30A23842E58D4757081220C45ACD61CBA055A2B59` matches the candidate. Engine, configuration, plug-ins, and audio services are unchanged. Manual gate: View > Interface shows Clarity High Contrast directly above Graphite Clarity and both still apply. No remote or release changed.

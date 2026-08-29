@@ -1,5 +1,7 @@
 # Progress
 
+- [x] 2026-08-29 published user-approved `v2.47.1-beta.1` prerelease from beta commit `4ce8efdf` after green Actions run `33220187263`. The 32 assets cover every channel plus universal Setup, source, checksums, and generated notes; the repository release-completeness plan is green. `main` was not touched.
+
 - [x] 2026-08-28 user-approved beta push: fast-forwarded `origin/beta` `e9fadd7a..f5f0ebde` with the user-tested Clarity-menu grouping, its regression gallery, and installation record. `main`, releases, installers, engine, and audio services are unchanged; await beta CI before promotion.
 
 - [x] 2026-08-28 user-approved Clarity-menu test install: replaced only the Program Files AVX-512 `Editor.exe` with local `aaca996` (v2.47.1.0), verified installed SHA-256 `6A5255E70E0B0485D26869E30A23842E58D4757081220C45ACD61CBA055A2B59`, and backed up prior `1069728D7657A75EF4F4BEB37DAB56D1345B6659CF8FA610E619D330EFFE7147` at `artifacts\install-backups\clarity-menu-avx512-20260828-185900\Editor.exe`. Engine, configuration, plug-ins, and audio services remain untouched; no remote or release changed.
