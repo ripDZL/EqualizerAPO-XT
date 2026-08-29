@@ -1,10 +1,10 @@
 # TODO
 
 - [x] Repaired the same-version beta-to-stable release gate: Pester 5 has 25 focused passes and the origin-only `v2.47.1-beta.1` dry run emits `release_required=true`.
-- [ ] Push the repaired release gate through `beta` and `main`; publish only after the new full main workflow is green.
+- [x] Published stable `v2.47.1` from `eee86aa5` after green main run `33230775759`; release verification confirms all six channel sets, universal Setup, source, SHA256SUMS, and notes (33 assets). Keep `beta` fast-forward-aligned with `main`; do not force-push either release branch.
 
 - [x] Published user-approved beta prerelease `v2.47.1-beta.1` from `4ce8efdf` after green run `33220187263`; all six channel packages, universal Setup, source, checksums, and notes pass the release completeness plan.
-- [ ] Collect beta feedback; do not promote to `main` or publish a stable release without explicit approval.
+- [x] User-approved `beta` promotion and stable release are complete; post-release changes return to the normal beta-first workflow.
 
 - [x] User verified the installed Clarity-menu follow-up; `origin/beta` is fast-forwarded to `f5f0ebde` with the grouped Interface entries.
 - [ ] Verify beta CI for `f5f0ebde` before any release or `main` promotion. Do not create a release from this push without explicit approval.
