@@ -38,7 +38,6 @@ public:
 	virtual bool isInstalled() const = 0;
 	virtual bool canBeUpgraded() const = 0;
 	virtual bool hasChanges() const = 0;
-	virtual bool isExperimental() const = 0;
 	virtual bool isEnhancementsDisabled() const = 0;
 	virtual bool isDefaultDevice() const = 0;
 	virtual bool isDisabled() const = 0;
@@ -46,6 +45,15 @@ public:
 	virtual void install() = 0;
 	virtual void uninstall() = 0;
 	virtual void reinstall() = 0;
+
+	// A short word the device lists append to the state text when the
+	// device is reached through something other than a Windows endpoint
+	// ("ASIO"). Empty for endpoints. The one marker such devices get: they
+	// sit in the same playback/capture groups as everything else.
+	virtual std::wstring getTransportLabel() const
+	{
+		return std::wstring();
+	}
 
 	// What the last install, uninstall or reinstall on this object did. The
 	// caller needs this whether the operation succeeded or threw, so it is a

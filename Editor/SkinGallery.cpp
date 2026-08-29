@@ -1,3 +1,9 @@
+/*
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
+*/
+
 #include "SkinGallery.h"
 // For the two gates moved out of main.cpp (audit #275 B7): the VST
 // round-trip self test and the analysis layout probe.
@@ -346,11 +352,6 @@ public:
 	}
 
 	bool hasChanges() const override
-	{
-		return false;
-	}
-
-	bool isExperimental() const override
 	{
 		return false;
 	}

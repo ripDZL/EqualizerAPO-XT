@@ -1,5 +1,11 @@
 /*
 	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
+*/
+
+/*
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
 
 	See InstallDiagnostics.h. The section order follows the order a reader needs:
 	what is installed, whether the audio engine can reach it, and what it is

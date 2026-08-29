@@ -1,5 +1,11 @@
 /*
 	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
+*/
+
+/*
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
 
 	The COM class-registration tree, extracted from the APO DLL's
 	DllRegisterServer (audit #250 A3/F002): the CLSID writes were the last
@@ -31,4 +37,10 @@ void registerClsidTree(IRegistry& registry, const std::wstring& clsidString,
 
 // Deletes the InprocServer32 subkey, then the class key.
 void unregisterClsidTree(IRegistry& registry, const std::wstring& clsidString);
+
+// The same tree under an explicit CLSID root (no trailing backslash), for
+// the WOW6432Node view a 32-bit host reads: the registry port always opens
+// the 64-bit view, where that view is an ordinary key.
+void registerClsidTreeAt(IRegistry& registry, const std::wstring& clsidRootPath, const std::wstring& clsidString,
+	const std::wstring& className, const std::wstring& dllPath);
 }

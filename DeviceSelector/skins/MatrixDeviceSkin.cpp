@@ -1,5 +1,11 @@
 /*
 	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
+*/
+
+/*
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
 
 	Signal Matrix device selector: the operator's target-acquisition board.
 	Constitution (colour rationing, crisp-rule/AA law, corner language):
@@ -488,11 +494,6 @@ private:
 		{
 			tagRight = paintTagCell(painter, tagRight, namesMidY, QStringLiteral("OFFLINE"),
 				withAlpha(mutedInk, 190), withAlpha(mutedInk, 150), Qt::NoBrush, Qt::DashLine, tokens.monoFontFamily);
-		}
-		if (state.experimental)
-		{
-			tagRight = paintTagCell(painter, tagRight, namesMidY, QStringLiteral("EXP"),
-				QColor(tokens.warning), QColor(tokens.warning), Qt::NoBrush, Qt::SolidLine, tokens.monoFontFamily);
 		}
 		if (state.defaultDevice)
 		{

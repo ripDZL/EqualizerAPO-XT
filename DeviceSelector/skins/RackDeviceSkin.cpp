@@ -1,5 +1,11 @@
 /*
 	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
+*/
+
+/*
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
 
 	Hardware Rack device selector: a patch bay. Constitution (the rack
 	grammar and its laws): docs/skins/rack.md. Element mapping: the APO bus
@@ -760,17 +766,12 @@ private:
 		engrave(painter, QRectF(textLeft, blockTop, textWidth, nfm.height()),
 			Qt::AlignLeft | Qt::AlignVCenter, elidedNames, nameInk, dark);
 
-		// Wireframe stamps after the name: printed outlines, not colour
-		// pills (DEFAULT for the default endpoint, EXP for experimental).
-		qreal stampX = textLeft + nfm.horizontalAdvance(elidedNames) + 10;
+		// The wireframe stamp after the name: a printed outline, not a colour
+		// pill (DEFAULT for the default endpoint).
+		const qreal stampX = textLeft + nfm.horizontalAdvance(elidedNames) + 10;
 		const qreal stampY = blockTop + (nfm.height() - 11) / 2.0;
 		if (s.defaultDevice && stampX + 52 < textRight)
-		{
 			paintStamp(painter, QPointF(stampX, stampY), QStringLiteral("DEFAULT"), QColor(t.mutedText), dark);
-			stampX += QFontMetricsF(painter.font()).horizontalAdvance(QStringLiteral("DEFAULT")) + 20;
-		}
-		if (s.experimental && stampX + 30 < textRight)
-			paintStamp(painter, QPointF(stampX, stampY), QStringLiteral("EXP"), QColor(t.mutedText), dark);
 
 		QColor statusInk = s.unavailable ? withAlpha(QColor(t.mutedText), 150) : QColor(t.mutedText);
 		if (pending && !s.unavailable)

@@ -1,5 +1,7 @@
 /*
-	This file is part of EqualizerAPO-XT.
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
 
 	ResponseCurveBuilder: magnitude equivalence with the path it replaces, the
 	range fit, the axis captions, and the segmentation that lets a curve break

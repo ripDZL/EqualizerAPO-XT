@@ -1,5 +1,11 @@
 /*
 	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
+*/
+
+/*
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
 
 	"Add filter" picker for the minimal skin (Precision Minimal): a numbered
 	terminal index - a bare ">" query line, a mono index list and a key

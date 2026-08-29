@@ -1,5 +1,7 @@
 /*
-	This file is part of EqualizerAPO-XT.
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
 
 	FilterConfiguration sample-I/O tests: the fused format conversions
 	(float/double x interleaved/planar) between the APO-facing buffers and the

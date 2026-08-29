@@ -1,5 +1,7 @@
 /*
-	This file is part of EqualizerAPO-XT.
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
 
 	Self-contained runtime test for the VST2 hosting path of the engine's VST
 	host classes - VSTPluginLibrary (LoadLibrary + GetProcAddress(VSTPluginMain))

@@ -1,5 +1,7 @@
 /*
-	This file is part of EqualizerAPO-XT.
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
 
 	Engine orchestration tests. Exercises the parts of FilterEngine that the
 	audio regression suite cannot localize: channel-name resolution into
@@ -1161,6 +1163,7 @@ void runRegistryTransactionTests(test::Harness& harness);
 void runInstallDiagnosticsTests(test::Harness& harness);
 void runApoRegistrationTests(test::Harness& harness);
 void runChannelInheritanceTests(test::Harness& harness);
+void runCaptureEngineTests(test::Harness& harness);
 
 int runEngineOrchestrationTests()
 {
@@ -1203,6 +1206,7 @@ int runEngineOrchestrationTests()
 	runInstallDiagnosticsTests(harness);
 	runApoRegistrationTests(harness);
 	runChannelInheritanceTests(harness);
+	runCaptureEngineTests(harness);
 	testProcessWithoutConfigurationDoesNotCrash(harness);
 	testInitialLoadUsesPublicationChannel(harness);
 	testConfigSwapChannelPermitRoundTrip(harness);

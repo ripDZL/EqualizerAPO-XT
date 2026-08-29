@@ -1,5 +1,11 @@
 /*
 	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
+*/
+
+/*
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
 
 	Modern card body for VSTPlugin rows. It ports the plugin-lifecycle
 	logic from the legacy VSTPluginFilterGUI (initialise, open panel, embed,

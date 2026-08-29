@@ -1,5 +1,11 @@
 /*
 	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
+*/
+
+/*
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
 */
 
 #include "DeviceListDelegate.h"
@@ -31,7 +37,6 @@ DeviceRowState rowStateFor(const QModelIndex& index, const QStyleOptionViewItem&
 	s.state = index.data(DeviceListDelegate::StateTextRole).toString();
 	s.checked = index.data(Qt::CheckStateRole).toInt() == Qt::Checked;
 	s.installed = index.data(DeviceListDelegate::InstalledRole).toBool();
-	s.experimental = index.data(DeviceListDelegate::ExperimentalRole).toBool();
 	s.defaultDevice = index.data(DeviceListDelegate::DefaultDeviceRole).toBool();
 	s.unavailable = index.data(DeviceListDelegate::UnavailableRole).toBool();
 	s.input = index.data(DeviceListDelegate::InputSideRole).toBool();

@@ -106,11 +106,6 @@
     </message>
     <message>
         <location line="+2"/>
-        <source>APO can be installed (experimental)</source>
-        <translation>APO peut être installé (expérimental)</translation>
-    </message>
-    <message>
-        <location line="+2"/>
         <source>APO can be installed</source>
         <translation>APO peut être installé</translation>
     </message>
@@ -207,6 +202,50 @@ ATTENTION: Certains pilotes de carte son peuvent produire des sons indésirables
         <location line="+5"/>
         <source>Allow silent buffer modification</source>
         <translation>Autoriser la modification silencieuse du tampon</translation>
+    </message>
+    <message>
+        <source>Remove the buffer</source>
+        <translation>Supprimer le tampon</translation>
+    </message>
+    <message>
+        <source>Wait time:</source>
+        <translation>Temps d'attente :</translation>
+    </message>
+    <message>
+        <source>Sets how long to wait for processing once the buffer is removed. The longer the wait, the less sound without the EQ, but the more latency.</source>
+        <translation>Définit combien de temps attendre le traitement une fois le tampon supprimé. Plus l'attente est longue, moins il y a de son sans EQ, mais plus la latence augmente.</translation>
+    </message>
+    <message>
+        <source>Up to a quarter of the buffer</source>
+        <translation>Jusqu'à un quart du tampon</translation>
+    </message>
+    <message>
+        <source>Up to half of the buffer</source>
+        <translation>Jusqu'à la moitié du tampon</translation>
+    </message>
+    <message>
+        <source>Up to three quarters of the buffer</source>
+        <translation>Jusqu'aux trois quarts du tampon</translation>
+    </message>
+    <message>
+        <source>Removing the buffer reduces latency. But when processing occasionally does not finish in time, sound without the EQ applied may come out for a moment. Applies to both input and output.</source>
+        <translation>Supprimer le tampon réduit la latence. Mais si le traitement ne se termine parfois pas à temps, un son sans EQ peut être émis un instant. S'applique à l'entrée et à la sortie.</translation>
+    </message>
+    <message>
+        <source>Start the engine host automatically at boot</source>
+        <translation>Démarrer automatiquement l'hôte du moteur au démarrage du système</translation>
+    </message>
+    <message>
+        <source>Unchecked, the first application that opens the driver starts the host, and it leaves a minute after the last one closes it.</source>
+        <translation>Désactivé, la première application qui ouvre le pilote lance l'hôte, qui se ferme une minute après que la dernière l'a refermé.</translation>
+    </message>
+    <message>
+        <source>32-bit host support</source>
+        <translation>Prise en charge des hôtes 32 bits</translation>
+    </message>
+    <message>
+        <source>Also registers the driver entry where 32-bit applications look for it. Unavailable when this build ships no 32-bit wrapper.</source>
+        <translation>Enregistre aussi l'entrée du pilote là où les applications 32 bits la cherchent. Indisponible quand cette version ne fournit pas de wrapper 32 bits.</translation>
     </message>
     <message>
         <source>Connector</source>

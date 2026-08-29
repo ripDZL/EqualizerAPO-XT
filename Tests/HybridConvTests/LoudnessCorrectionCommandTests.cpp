@@ -1,5 +1,7 @@
 /*
-	This file is part of EqualizerAPO-XT.
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
 
 	Round-trip tests for the shared "LoudnessCorrection:" config-line codec
 	(filters/loudnessCorrection/LoudnessCorrectionCommand.{h,cpp}), which the

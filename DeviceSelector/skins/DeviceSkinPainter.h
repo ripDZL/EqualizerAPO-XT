@@ -1,5 +1,11 @@
 /*
 	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
+*/
+
+/*
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
 
 	Form layer of the Device Selector's skin identity. The dialog's device
 	list, buttons and the troubleshooting disclosure delegate every pixel to
@@ -34,7 +40,6 @@ struct DeviceRowState
 	bool input = false;    // capture side (sections and their devices)
 	bool checked = false;  // APO selected for install
 	bool installed = false;
-	bool experimental = false;
 	bool defaultDevice = false;
 	bool unavailable = false; // disabled or unplugged endpoint
 	bool selected = false;    // list selection (troubleshooting target)

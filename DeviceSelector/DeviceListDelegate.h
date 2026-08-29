@@ -1,5 +1,11 @@
 /*
 	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
+*/
+
+/*
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
 
 	Renders the device tree through the active skin's DeviceSkinPainter and
 	owns the list's feel: per-row hover progress (interruptible 150ms in /
@@ -29,7 +35,6 @@ public:
 		DeviceNameRole = Qt::UserRole + 1,
 		StateTextRole,
 		InstalledRole,
-		ExperimentalRole,
 		DefaultDeviceRole,
 		UnavailableRole,
 		InputSideRole

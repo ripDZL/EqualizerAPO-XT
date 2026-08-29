@@ -1,5 +1,7 @@
 /*
-	This file is part of EqualizerAPO-XT.
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
 
 	The auto-detect installer's decision logic, split out of the wWinMain
 	translation unit (audit #250 F056) so a test suite can compile it: which

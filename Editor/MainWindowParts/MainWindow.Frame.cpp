@@ -1,4 +1,11 @@
 /*
+	This file is part of EqualizerAPO-XT, a system-wide equalizer forked from Equalizer APO.
+	Copyright (C) 2014 Jonas Thedering (Equalizer APO)
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
+*/
+
+/*
 	This file is part of EqualizerAPO-XT, a system-wide equalizer.
 
 	Custom window chrome: the native Windows caption is removed (the window

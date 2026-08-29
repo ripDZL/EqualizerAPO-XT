@@ -26,6 +26,8 @@
 #include <platform/windows/Win32Resource.h>
 #include <QDir>
 #include <QPropertyAnimation>
+#include <QScreen>
+#include <devices/AsioAPOInfo.h>
 #include <devices/VoicemeeterAPOInfo.h>
 #include "DeviceTestDialog.h"
 #include "../version.h"
@@ -33,6 +35,21 @@
 #include "DisclosureHeader.h"
 #include "SkinButton.h"
 #include "DeviceSelector.h"
+
+namespace
+{
+	// The wait-time combo's rows against the share of the buffer period
+	// the record stores (25, 50, 75).
+	unsigned deadlinePercentForIndex(int index)
+	{
+		return index == 1 ? 50u : (index == 2 ? 75u : 25u);
+	}
+
+	int deadlineIndexForPercent(unsigned percent)
+	{
+		return percent == 50 ? 1 : (percent == 75 ? 2 : 0);
+	}
+}
 
 DeviceSelector::DeviceSelector(QWidget* parent)
 	: QDialog(parent)
@@ -154,6 +171,10 @@ void DeviceSelector::finishSetup()
 	connect(ui.installModeComboBox, QOverload<int>::of(&QComboBox::activated), this, &DeviceSelector::onTroubleShootingOptionChanged);
 	connect(ui.allowSilentBufferCheckBox, &QCheckBox::clicked, this, &DeviceSelector::onTroubleShootingOptionChanged);
 	connect(ui.autoCheckBox, &QCheckBox::clicked, this, &DeviceSelector::onTroubleShootingOptionChanged);
+	connect(ui.asioSyncCheckBox, &QCheckBox::clicked, this, &DeviceSelector::onTroubleShootingOptionChanged);
+	connect(ui.asioDeadlineComboBox, QOverload<int>::of(&QComboBox::activated), this, &DeviceSelector::onTroubleShootingOptionChanged);
+	connect(ui.asioAutoStartCheckBox, &QCheckBox::clicked, this, &DeviceSelector::onTroubleShootingOptionChanged);
+	connect(ui.asioHost32CheckBox, &QCheckBox::clicked, this, &DeviceSelector::onTroubleShootingOptionChanged);
 
 	updateButtons();
 
@@ -161,6 +182,15 @@ void DeviceSelector::finishSetup()
 	// hide the panel directly instead of replaying the slide.
 	ui.stackedWidget->setVisible(false);
 	adjustSize();
+
+	// adjustSize() settles on the tree's minimum, which opens the dialog too
+	// narrow to read the device names at a glance (reported after a clean
+	// install, where nothing has been resized yet). Open at a size the list
+	// reads comfortably at, as far as the screen allows.
+	QSize wanted = size().expandedTo(QSize(760, 640));
+	if (const QScreen* onScreen = screen())
+		wanted = wanted.boundedTo(onScreen->availableGeometry().size() - QSize(40, 80));
+	resize(wanted);
 
 	// workaround for Qt 6 to not initially have scrollbars despite correct dialog size
 	ui.deviceTreeWidget->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -188,7 +218,6 @@ void DeviceSelector::addDevices(const std::vector<std::shared_ptr<AbstractAPOInf
 		item->setData(0, DeviceListDelegate::DeviceNameRole, QString::fromStdWString(apoInfo->getDeviceName()));
 		item->setData(0, DeviceListDelegate::StateTextRole, getStateText(apoInfo, checked));
 		item->setData(0, DeviceListDelegate::InstalledRole, apoInfo->isInstalled());
-		item->setData(0, DeviceListDelegate::ExperimentalRole, apoInfo->isExperimental());
 		item->setData(0, DeviceListDelegate::DefaultDeviceRole, apoInfo->isDefaultDevice());
 		item->setData(0, DeviceListDelegate::UnavailableRole, apoInfo->isDisabled() || apoInfo->isUnplugged());
 		item->setData(0, DeviceListDelegate::InputSideRole, apoInfo->isInput());
@@ -220,6 +249,21 @@ void DeviceSelector::previewCheckDevice(int sectionRow, int deviceRow)
 	if (section == nullptr || deviceRow >= section->childCount())
 		return;
 	section->child(deviceRow)->setCheckState(0, Qt::Checked);
+}
+
+void DeviceSelector::previewRemoveBuffer()
+{
+	// The preview roster has no wrapper record behind its ASIO rows, so a
+	// click would be undone by the selection refresh that follows it. Pin
+	// the view state the way a real record's click leaves it.
+	ui.asioSyncCheckBox->setChecked(true);
+	showAsioWaitTime(true);
+}
+
+void DeviceSelector::showAsioWaitTime(bool shown)
+{
+	ui.asioWaitLabel->setVisible(shown);
+	ui.asioDeadlineComboBox->setVisible(shown);
 }
 
 void DeviceSelector::previewOpenTroubleshooting()
@@ -460,6 +504,22 @@ void DeviceSelector::onTroubleShootingOptionChanged()
 			else if (sender == ui.autoCheckBox)
 				deviceInfo->getSelectedInstallState().autoAdjust = ui.autoCheckBox->isChecked();
 		}
+		AsioAPOInfo* asioInfo = dynamic_cast<AsioAPOInfo*>(info.get());
+		if (asioInfo != nullptr)
+		{
+			const QObject* const source = QObject::sender();
+			if (source == ui.asioSyncCheckBox)
+				asioInfo->setSynchronous(ui.asioSyncCheckBox->isChecked());
+			else if (source == ui.asioDeadlineComboBox)
+				asioInfo->setDeadlinePercent(deadlinePercentForIndex(ui.asioDeadlineComboBox->currentIndex()));
+			else if (source == ui.asioAutoStartCheckBox)
+				asioInfo->setAutoStart(ui.asioAutoStartCheckBox->isChecked());
+			else if (source == ui.asioHost32CheckBox)
+				asioInfo->setHost32(ui.asioHost32CheckBox->isChecked());
+		}
+		// The wait time is the buffer removal's own detail: it unfolds beside
+		// the checkbox while the buffer is removed and is gone otherwise.
+		showAsioWaitTime(ui.asioSyncCheckBox->isEnabled() && ui.asioSyncCheckBox->isChecked());
 
 		updateList(item);
 	}
@@ -507,6 +567,12 @@ void DeviceSelector::updateButtons()
 	bool isInput = false;
 	bool hasOriginalAPOPreMix = true;
 	bool hasOriginalAPOPostMix = true;
+	bool asioSelected = false;
+	bool asioSynchronous = false;
+	unsigned asioDeadlinePercent = 25;
+	bool asioAutoStart = false;
+	bool asioHost32 = false;
+	bool asioCanHost32 = true;   // the preview roster has the 32-bit wrapper
 	DeviceAPOInfo::InstallState installState;
 	if (noGroupsSelected && list.size() == 1)
 	{
@@ -522,6 +588,18 @@ void DeviceSelector::updateButtons()
 			hasOriginalAPOPostMix = deviceApoInfo->getOriginalAPOPostMix() != L"";
 			installState = deviceApoInfo->getSelectedInstallState();
 		}
+		// Keyed on the transport label, not the class, so the preview roster
+		// (plain preview records marked ASIO) shows the page in the gallery.
+		asioSelected = apoInfo->getTransportLabel() == L"ASIO";
+		const AsioAPOInfo* asioInfo = dynamic_cast<const AsioAPOInfo*>(apoInfo.get());
+		if (asioInfo != nullptr)
+		{
+			asioSynchronous = asioInfo->isSynchronous();
+			asioDeadlinePercent = asioInfo->getDeadlinePercent();
+			asioAutoStart = asioInfo->isAutoStart();
+			asioHost32 = asioInfo->isHost32();
+			asioCanHost32 = asioInfo->canHost32();
+		}
 	}
 
 	ui.preMixLabel->setEnabled(enable);
@@ -532,7 +610,18 @@ void DeviceSelector::updateButtons()
 	ui.useOriginalAPOPostMixCheckBox->setEnabled(enable && !isInput && hasOriginalAPOPostMix && installState.installPostMix);
 	ui.installModeComboBox->setEnabled(enable);
 	ui.allowSilentBufferCheckBox->setEnabled(enable);
-	ui.stackedWidget->setCurrentIndex(enable ? 1 : 0);
+	// Page 0: nothing to say. Page 1: an endpoint's APO chain. Page 2: an
+	// ASIO target's options.
+	ui.stackedWidget->setCurrentIndex(!enable ? 0 : (asioSelected ? 2 : 1));
+	const bool asioEnabled = enable && asioSelected;
+	ui.asioSyncCheckBox->setEnabled(asioEnabled);
+	ui.asioSyncCheckBox->setChecked(asioSynchronous);
+	ui.asioDeadlineComboBox->setCurrentIndex(deadlineIndexForPercent(asioDeadlinePercent));
+	showAsioWaitTime(asioEnabled && asioSynchronous);
+	ui.asioAutoStartCheckBox->setEnabled(asioEnabled);
+	ui.asioAutoStartCheckBox->setChecked(asioAutoStart);
+	ui.asioHost32CheckBox->setEnabled(asioEnabled && asioCanHost32);
+	ui.asioHost32CheckBox->setChecked(asioHost32 && asioCanHost32);
 
 	ui.installPreMixCheckBox->setChecked(installState.installPreMix);
 	ui.installPostMixCheckBox->setChecked(installState.installPostMix);
@@ -629,8 +718,6 @@ QString DeviceSelector::getStateText(const std::shared_ptr<AbstractAPOInfo>& apo
 		state = tr("Audio enhancements will be enabled");
 	else if (apoInfo->isInstalled())
 		state = tr("APO is already installed");
-	else if (apoInfo->isExperimental())
-		state = tr("APO can be installed (experimental)");
 	else
 		state = tr("APO can be installed");
 
@@ -639,6 +726,9 @@ QString DeviceSelector::getStateText(const std::shared_ptr<AbstractAPOInfo>& apo
 		state += ", " + tr("Voicemeeter was uninstalled");
 	else if (apoInfo->isDefaultDevice())
 		state += ", " + tr("Default device");
+
+	// The transport (ASIO) is the row's leading word already, the way an
+	// endpoint's connection is; the state line does not say it again.
 
 	if (apoInfo->isDisabled())
 		state += ", " + tr("Disabled");

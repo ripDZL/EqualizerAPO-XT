@@ -1,4 +1,10 @@
 /*
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
+*/
+
+/*
     This file is part of EqualizerAPO-XT, a system-wide equalizer.
 
     Host-side VST3 utility objects shared by the factory host context

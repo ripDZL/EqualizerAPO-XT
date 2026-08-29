@@ -65,11 +65,6 @@
     </message>
     <message>
         <location line="+2"/>
-        <source>APO can be installed (experimental)</source>
-        <translation>APO kann installiert werden (experimentell)</translation>
-    </message>
-    <message>
-        <location line="+2"/>
         <source>APO can be installed</source>
         <translation>APO kann installiert werden</translation>
     </message>
@@ -214,6 +209,50 @@ ACHTUNG: Einige Soundkartentreiber erzeugen unerwünschte Geräusche, wenn diese
         <location line="+5"/>
         <source>Allow silent buffer modification</source>
         <translation>Erlaube Modifikation stiller Puffer</translation>
+    </message>
+    <message>
+        <source>Remove the buffer</source>
+        <translation>Puffer entfernen</translation>
+    </message>
+    <message>
+        <source>Wait time:</source>
+        <translation>Wartezeit:</translation>
+    </message>
+    <message>
+        <source>Sets how long to wait for processing once the buffer is removed. The longer the wait, the less sound without the EQ, but the more latency.</source>
+        <translation>Legt fest, wie lange nach dem Entfernen des Puffers auf die Verarbeitung gewartet wird. Je länger gewartet wird, desto seltener kommt Ton ohne EQ, aber desto höher die Latenz.</translation>
+    </message>
+    <message>
+        <source>Up to a quarter of the buffer</source>
+        <translation>Bis zu einem Viertel des Puffers</translation>
+    </message>
+    <message>
+        <source>Up to half of the buffer</source>
+        <translation>Bis zur Hälfte des Puffers</translation>
+    </message>
+    <message>
+        <source>Up to three quarters of the buffer</source>
+        <translation>Bis zu drei Vierteln des Puffers</translation>
+    </message>
+    <message>
+        <source>Removing the buffer reduces latency. But when processing occasionally does not finish in time, sound without the EQ applied may come out for a moment. Applies to both input and output.</source>
+        <translation>Ohne den Puffer sinkt die Latenz. Wird die Verarbeitung aber gelegentlich nicht rechtzeitig fertig, kann kurzzeitig Ton ohne EQ ausgegeben werden. Gilt für Eingang und Ausgang.</translation>
+    </message>
+    <message>
+        <source>Start the engine host automatically at boot</source>
+        <translation>Engine-Host beim Systemstart automatisch starten</translation>
+    </message>
+    <message>
+        <source>Unchecked, the first application that opens the driver starts the host, and it leaves a minute after the last one closes it.</source>
+        <translation>Deaktiviert startet die erste Anwendung, die den Treiber öffnet, den Host; eine Minute nachdem die letzte ihn geschlossen hat, beendet er sich.</translation>
+    </message>
+    <message>
+        <source>32-bit host support</source>
+        <translation>Unterstützung für 32-Bit-Hosts</translation>
+    </message>
+    <message>
+        <source>Also registers the driver entry where 32-bit applications look for it. Unavailable when this build ships no 32-bit wrapper.</source>
+        <translation>Registriert den Treibereintrag auch dort, wo 32-Bit-Anwendungen ihn suchen. Nicht verfügbar, wenn dieser Build keinen 32-Bit-Wrapper enthält.</translation>
     </message>
     <message>
         <location line="+47"/>

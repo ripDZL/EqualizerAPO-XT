@@ -1,5 +1,7 @@
 /*
-	This file is part of EqualizerAPO-XT.
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
 
 	Round-trip tests for the shared If/ElseIf/Else/EndIf config-line codec
 	(filters/IfCommand.{h,cpp}), which the engine factory consumes.

@@ -1,4 +1,10 @@
-﻿#include "stdafx.h"
+﻿/*
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
+*/
+
+#include "stdafx.h"
 
 #include <filesystem>
 #include "text/WideString.h"

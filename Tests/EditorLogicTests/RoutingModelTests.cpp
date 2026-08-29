@@ -1,5 +1,7 @@
 /*
-	This file is part of EqualizerAPO-XT.
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
 
 	Routing view models: the MultiConvolution mapping adapter, the Light
 	Trace StudioRoutingModel, and the RoutingFold target-channel fold the

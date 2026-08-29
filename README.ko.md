@@ -35,11 +35,31 @@ EqualizerAPO-XT는 Windows용 시스템 전체 이퀄라이저인 [Equalizer APO
 5. 프로그래밍 계열 설정 명령(`If:`/`ElseIf:`/`Else:`/`EndIf:`/`Eval:`) 전용 에디터 — 완료. 다섯 스킨이 분석 판정으로 블록을 각자의 계기로 표현하고, 픽커가 이 명령들을 삽입하며, 계수 직접 입력 IIR 줄과 백틱 인라인 식이 든 줄도 각자의 카드를 유지합니다([#178](https://github.com/115dkk/EqualizerAPO-XT/pull/178), [#182](https://github.com/115dkk/EqualizerAPO-XT/pull/182), [#183](https://github.com/115dkk/EqualizerAPO-XT/pull/183), [#184](https://github.com/115dkk/EqualizerAPO-XT/pull/184)).
 6. 서브우퍼 라우팅([#246](https://github.com/115dkk/EqualizerAPO-XT/issues/246)) — 핵심 기능은 완료됐습니다. `SubwooferRouting:` 명령, MIT SubwooferRoutingCore DSP 라이브러리, 독립 실행형 VST3 플러그인, 4.1 호스트 협상 수정, 다섯 스킨 각각의 카드 계기, 그리고 두 라우팅 행렬과 응답 뷰를 갖춘 전체 편집기까지 들어갔습니다. 남은 후속 작업은 연결된 프로필 파일로의 변경 사항 되쓰기(현재는 행을 인라인 상태로 전환), audition/solo 오버라이드, 새 문자열의 한국어 번역, 전용 VST3 편집기 화면(현재는 호스트의 일반 파라미터 화면)입니다.
 7. VST3 버스 레이아웃 명시([#216](https://github.com/115dkk/EqualizerAPO-XT/issues/216)) — 비대칭 입출력, 4.1, 엄격한 실패 처리, VST2에서의 조용한 무시를 포함한 백엔드 `VSTPlugin:` `Input`/`Output` 문법과 결정적 호스트 테스트를 마쳤습니다. Qt Editor에도 플러그인 이름 옆에 Input/Output 선택기가 들어갔습니다. 다섯 스킨이 각자의 시각 언어로 그리고, 판정 램프가 실제 체결된 버스를 알려 주며, VST2 잠금·잔존 키 제거와 구형 `StereoInput` 이전까지 처리합니다([#265](https://github.com/115dkk/EqualizerAPO-XT/pull/265)). 이번 라운드에서는 협상된 슬롯에 임의 설정 채널을 넣는 슬롯별 채널 채우기(`InputChannels`/`OutputChannels`, 지정하지 않은 채널은 그대로 통과)와 레거시 행의 Input/Output 드롭다운이 들어갔고([#290](https://github.com/115dkk/EqualizerAPO-XT/pull/290)), 채우기 목록의 편집기가 모든 스킨에 들어갔습니다. 카드 안의 레일 두 줄이 슬롯별 채널 드롭다운을 들고 라인의 `Channel:`/`Copy:` 흐름을 따르며, 양쪽 레일이 있으면 접기 스위치가 붙고, 레거시 표시에는 콤보 행이 들어갑니다([#292](https://github.com/115dkk/EqualizerAPO-XT/pull/292)).
+8. ASIO([#310](https://github.com/115dkk/EqualizerAPO-XT/issues/310)) —
+   머지됐습니다([#314](https://github.com/115dkk/EqualizerAPO-XT/pull/314)). 래퍼
+   드라이버, 엔진 호스트 프로세스, 둘 사이의 링, 장치 기록, 장치 선택기 옵션, CI
+   게이트가 들어갔고, CI의 가짜 드라이버와 Topping USB Audio Device(장치 선택기로
+   항목을 등록한 뒤 DAW가 여는 방식 그대로 열어서)로 검증했습니다. 남은 것은
+   더 많은 DAW에서의 구동과 ARM64 기기에서 x64 DAW가 읽을 x64 항목입니다.
+9. 녹음 장치([#321](https://github.com/115dkk/EqualizerAPO-XT/pull/321)) —
+   마이크에 EQ도 VST도 적용되지 않는다는 제보가 출발점입니다. 이제 이 경로는
+   빌드마다 측정됩니다. CI 게이트가 가상 케이블 드라이버를 설치하고, 장치
+   선택기로 녹음 쪽에 APO를 등록한 뒤, 녹음 앱이 설정한 프리앰프를 듣는지
+   확인합니다. 그 과정에서 고친 것은 장치 선택기가 채우는 슬롯을 그 방향의 모든
+   처리 모드에 올리는 일이라, 모드를 인식하는 드라이버의 음성 채팅 스트림에도
+   EQ가 닿습니다. "(실험적)" 표기는 없앴습니다. 남은 것은 제보자의 환경을 모른다는
+   점이며, 그 환경에서 돌려 볼 프로브는
+   [docs/features/capture.md](docs/features/capture.md)에 있습니다.
 
 ## 주요 기능
 
 - 오디오를 내부에서 double 정밀도로 처리해 복잡한 필터 체인에서도 정밀도를 잃지 않습니다.
 - Convolution, GraphicEQ, 파라메트릭 EQ, VST2/VST3와 기존 Equalizer APO 필터를 지원합니다.
+- ASIO: 모든 ASIO 드라이버가 장치 선택기의 재생·녹음 목록에 나타나고, 체크하면
+  DAW 등 ASIO 호스트가 고를 수 있는 `<드라이버> (EQ APO XT)` 항목이 등록되어
+  같은 `config.txt`가 적용됩니다. 엔진은 필요할 때 뜨는 별도 호스트
+  프로세스에서 돌고, 애플리케이션 안에는 얇은 래퍼만 들어갑니다
+  ([docs/features/asio.md](docs/features/asio.md)).
 - 트루 스테레오와 BRIR(Binaural Room Impulse Response) 재생을 위한 MultiConvolution 필터가 있습니다. `MultiConvolution: L=0+1 R=2+3 brir.wav`처럼 각 채널 자신의 신호를 매핑된 파일 채널들과 컨볼루션해 합산하며, Channel 명령과 무관하게 동작합니다. 제자리 처리만 하는 기존 Convolution 필터가 표현하지 못하는 분기·합산 패턴이 한 줄로 끝나고, 파일 채널마다 Copy와 같은 문법으로 배율을 붙일 수 있습니다(`L=0.5*0+1`, `-1`은 역위상, `-6dB`도 가능). Editor에서는 스킨마다 다른 라우팅 화면으로 매핑을 편집합니다.
 - 1025탭 선형 위상 힐베르트 변환이 내장되어 있습니다.
   `Hilbert: Shift=SL,SR Align=L,R Direction=-90`처럼 위상을 ±90° 바꿀
@@ -130,6 +150,18 @@ Qt 도구는 CI에서도, 문서화된 로컬 설정에서도 qmake로 빌드합
 ## 테스트
 
 `Tests/`에는 프로젝트 일곱 개가 있습니다. `EditorLogicTests`와 `HybridConvTests`(단위 테스트), `EngineOrchestrationTests`(엔진 라우팅과 설정 교체 동작), `AudioRegressionTests`(엔진 출력을 커밋된 참조 데이터와 비교하며, CI에서는 SIMD 변형별로도 실행), `TestVst2Plugin`/`TestVst3Plugin`(VST2·VST3 호스트를 런타임에 시험하기 위한 자체 빌드 플러그인), 그리고 `VstPreviewProbe`(플러그인 패널의 라이브 오디오 프리뷰 전제를 실제 엔드포인트에서 검증하는 `vst3-preview-probe` 워크플로우용 수동 콘솔 하니스)입니다. 변형별 테스트 정책은 [docs/SimdBuildMatrix.md](docs/SimdBuildMatrix.md)에 함께 있습니다.
+
+## 라이선스
+
+Equalizer APO와 EqualizerAPO-XT 자체 코드는 GNU General Public License
+버전 2 또는 (선택에 따라) 그 이후 버전입니다([License.txt](License.txt)).
+ASIO 래퍼는 Steinberg ASIO SDK를 SDK의 GPL 버전 3 선택지로 빌드하므로, 그것을
+포함한 바이너리(`EqualizerAPOAsio.dll`과 이를 담은 설치 파일)는 GPL 버전 3으로
+배포합니다([License-gpl-3.0.txt](License-gpl-3.0.txt)). 두 전문은 프로그램
+옆에 함께 설치됩니다. 서브우퍼 라우팅 DSP 코어와 VST3 플러그인은 MIT
+라이선스입니다([SubwooferRoutingCore/LICENSE](SubwooferRoutingCore/LICENSE)).
+
+ASIO is a trademark and software of Steinberg Media Technologies GmbH.
 
 ## Special Thanks
 

@@ -1,5 +1,7 @@
 /*
-	This file is part of EqualizerAPO-XT.
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
 
 	Round-trip tests for the shared Copy config-line parser/serializer
 	(parseCopyAssignments + serializeCopyAssignments in filters/CopyFilter.cpp).

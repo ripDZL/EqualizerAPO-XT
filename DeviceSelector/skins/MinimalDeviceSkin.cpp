@@ -1,5 +1,11 @@
 /*
 	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
+*/
+
+/*
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
 
 	Precision Minimal device selector: a terminal's device-selection menu.
 	Constitution (reverse-video cursor, type ladder): docs/skins/minimal.md.
@@ -207,8 +213,6 @@ public:
 		QStringList tags;
 		if (state.defaultDevice)
 			tags << QStringLiteral("DEF");
-		if (state.experimental)
-			tags << QStringLiteral("EXP");
 		if (state.input)
 			tags << QStringLiteral("REC");
 

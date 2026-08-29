@@ -65,11 +65,6 @@
     </message>
     <message>
         <location line="+2"/>
-        <source>APO can be installed (experimental)</source>
-        <translation>可以安装 APO（实验性）</translation>
-    </message>
-    <message>
-        <location line="+2"/>
         <source>APO can be installed</source>
         <translation>可以安装 APO</translation>
     </message>
@@ -214,6 +209,50 @@ CAUTION: Some sound card drivers can produce unwanted sounds when this is enable
         <location line="+5"/>
         <source>Allow silent buffer modification</source>
         <translation>允许静默缓冲区修改</translation>
+    </message>
+    <message>
+        <source>Remove the buffer</source>
+        <translation>移除缓冲区</translation>
+    </message>
+    <message>
+        <source>Wait time:</source>
+        <translation>等待时间：</translation>
+    </message>
+    <message>
+        <source>Sets how long to wait for processing once the buffer is removed. The longer the wait, the less sound without the EQ, but the more latency.</source>
+        <translation>设置移除缓冲区后等待处理的时长。等待越久，未应用 EQ 的声音越少，但延迟也随之增加。</translation>
+    </message>
+    <message>
+        <source>Up to a quarter of the buffer</source>
+        <translation>最多缓冲区的四分之一</translation>
+    </message>
+    <message>
+        <source>Up to half of the buffer</source>
+        <translation>最多缓冲区的一半</translation>
+    </message>
+    <message>
+        <source>Up to three quarters of the buffer</source>
+        <translation>最多缓冲区的四分之三</translation>
+    </message>
+    <message>
+        <source>Removing the buffer reduces latency. But when processing occasionally does not finish in time, sound without the EQ applied may come out for a moment. Applies to both input and output.</source>
+        <translation>移除缓冲区可降低延迟。但如果处理偶尔未能及时完成，可能会瞬间输出未应用 EQ 的声音。对输入和输出都生效。</translation>
+    </message>
+    <message>
+        <source>Start the engine host automatically at boot</source>
+        <translation>开机时自动启动引擎主机</translation>
+    </message>
+    <message>
+        <source>Unchecked, the first application that opens the driver starts the host, and it leaves a minute after the last one closes it.</source>
+        <translation>关闭时，由第一个打开驱动的应用程序启动主机；最后一个应用程序关闭驱动一分钟后主机退出。</translation>
+    </message>
+    <message>
+        <source>32-bit host support</source>
+        <translation>32 位主机支持</translation>
+    </message>
+    <message>
+        <source>Also registers the driver entry where 32-bit applications look for it. Unavailable when this build ships no 32-bit wrapper.</source>
+        <translation>同时在 32 位应用程序查找的位置注册驱动条目。此版本不附带 32 位包装器时不可用。</translation>
     </message>
     <message>
         <location line="+47"/>

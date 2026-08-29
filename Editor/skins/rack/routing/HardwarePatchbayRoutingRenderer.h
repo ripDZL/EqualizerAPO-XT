@@ -1,5 +1,11 @@
 /*
 	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
+*/
+
+/*
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
 
 	Rack skin's Copy renderer: a hardware ROUTING MATRIX button field. The
 	same crosspoint grid as the Signal Matrix, but each crosspoint is a small

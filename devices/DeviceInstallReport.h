@@ -1,5 +1,11 @@
 /*
 	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
+*/
+
+/*
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
 
 	What one install, uninstall or repair of a device actually did.
 
@@ -73,7 +79,8 @@ struct DeviceInstallReport
 	// --- What was found before anything was written.
 
 	// False means the audio driver never published an FxProperties key, so
-	// installing has to create one - the case the Editor calls experimental.
+	// installing has to create one - the common case for microphones and
+	// virtual cables.
 	bool fxPropertiesExisted = false;
 	// One entry per slot the driver had filled, as "SFX = {guid}". Empty when the
 	// endpoint had no APOs of its own, which is the common case for generic

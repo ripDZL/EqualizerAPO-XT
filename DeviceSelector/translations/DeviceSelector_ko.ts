@@ -105,11 +105,6 @@
         <translation>APO가 이미 설치되어 있습니다</translation>
     </message>
     <message>
-        <location filename="../DeviceSelector.cpp" line="607"/>
-        <source>APO can be installed (experimental)</source>
-        <translation>APO를 설치할 수 있습니다 (실험적)</translation>
-    </message>
-    <message>
         <location filename="../DeviceSelector.cpp" line="609"/>
         <source>APO can be installed</source>
         <translation>APO를 설치할 수 있습니다</translation>
@@ -207,6 +202,50 @@ CAUTION: Some sound card drivers can produce unwanted sounds when this is enable
         <location filename="../DeviceSelector.ui" line="166"/>
         <source>Allow silent buffer modification</source>
         <translation>무음 버퍼 수정 허용</translation>
+    </message>
+    <message>
+        <source>Remove the buffer</source>
+        <translation>버퍼 제거</translation>
+    </message>
+    <message>
+        <source>Wait time:</source>
+        <translation>대기 시간:</translation>
+    </message>
+    <message>
+        <source>Sets how long to wait for processing once the buffer is removed. The longer the wait, the less sound without the EQ, but the more latency.</source>
+        <translation>버퍼를 제거했을 때, 처리를 얼마나 기다릴지 정합니다. 길게 기다릴수록 EQ 없는 소리가 줄어들지만, 그만큼 지연이 늘어납니다.</translation>
+    </message>
+    <message>
+        <source>Up to a quarter of the buffer</source>
+        <translation>버퍼의 1/4까지</translation>
+    </message>
+    <message>
+        <source>Up to half of the buffer</source>
+        <translation>버퍼의 절반까지</translation>
+    </message>
+    <message>
+        <source>Up to three quarters of the buffer</source>
+        <translation>버퍼의 3/4까지</translation>
+    </message>
+    <message>
+        <source>Removing the buffer reduces latency. But when processing occasionally does not finish in time, sound without the EQ applied may come out for a moment. Applies to both input and output.</source>
+        <translation>버퍼를 제거하면 지연이 줄어듭니다. 그러나 때때로 처리가 제때 끝나지 못하면, 순간적으로 EQ가 미적용된 소리가 출력될 수 있습니다. 입출력에 모두 적용됩니다.</translation>
+    </message>
+    <message>
+        <source>Start the engine host automatically at boot</source>
+        <translation>부팅 시 자동 시작</translation>
+    </message>
+    <message>
+        <source>Unchecked, the first application that opens the driver starts the host, and it leaves a minute after the last one closes it.</source>
+        <translation>끄면 드라이버를 처음 여는 애플리케이션이 엔진 호스트를 띄우고, 마지막 애플리케이션이 드라이버를 닫은 뒤 1분이 지나면 호스트가 종료됩니다.</translation>
+    </message>
+    <message>
+        <source>32-bit host support</source>
+        <translation>32비트 호스트 지원</translation>
+    </message>
+    <message>
+        <source>Also registers the driver entry where 32-bit applications look for it. Unavailable when this build ships no 32-bit wrapper.</source>
+        <translation>32비트 애플리케이션이 찾는 자리에도 드라이버 항목을 등록합니다. 32비트 래퍼가 없는 빌드에서는 쓸 수 없습니다.</translation>
     </message>
     <message>
         <source>Connector</source>

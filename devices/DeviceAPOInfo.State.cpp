@@ -1,3 +1,10 @@
+/*
+	This file is part of EqualizerAPO-XT, a system-wide equalizer forked from Equalizer APO.
+	Copyright (C) 2014 Jonas Thedering (Equalizer APO)
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
+*/
+
 #include "stdafx.h"
 #include <mmdeviceapi.h>
 #include <audioclient.h>
@@ -28,9 +35,9 @@ bool DeviceAPOInfo::hasChanges() const
 	return installed && selectedInstallState != currentInstallState;
 }
 
-bool DeviceAPOInfo::isExperimental() const
+bool DeviceAPOInfo::hasDriverEffectChain() const
 {
-	return !installed && originalApoGuids[0] == APOGUID_NOKEY;
+	return originalApoGuids[0] != APOGUID_NOKEY;
 }
 
 wstring DeviceAPOInfo::getOriginalAPOPreMix()

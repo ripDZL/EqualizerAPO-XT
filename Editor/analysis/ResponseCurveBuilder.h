@@ -1,5 +1,7 @@
 /*
-	This file is part of EqualizerAPO-XT.
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
 
 	Turns an AnalysisResponse into everything the graph needs to draw one
 	metric: a value per pixel column, the fitted range, the value-axis ticks

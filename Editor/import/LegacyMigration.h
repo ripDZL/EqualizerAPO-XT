@@ -1,5 +1,7 @@
 /*
-    This file is part of EqualizerAPO-XT.
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
 
     Side-effecting orchestrator of the legacy-install config migration. The
     elevated Velopack install/update hook calls runElevatedHookStep() after

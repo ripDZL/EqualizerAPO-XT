@@ -1,5 +1,7 @@
 /*
-    This file is part of EqualizerAPO-XT.
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
 
     Walks an external EqualizerAPO config file (the one the user is
     about to import) and collects every file it references through

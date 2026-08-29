@@ -41,11 +41,34 @@ Current work areas:
 5. Editors for the programmatic config commands (`If:`/`ElseIf:`/`Else:`/`EndIf:`/`Eval:`) — complete. Each skin presents blocks with its own instrument driven by the analysis run, the picker inserts the vocabulary, custom-coefficient IIR lines have their own card, and lines with inline `` `expression` `` parameters keep their card in a dynamic mode ([#178](https://github.com/115dkk/EqualizerAPO-XT/pull/178), [#182](https://github.com/115dkk/EqualizerAPO-XT/pull/182), [#183](https://github.com/115dkk/EqualizerAPO-XT/pull/183), [#184](https://github.com/115dkk/EqualizerAPO-XT/pull/184)).
 6. Subwoofer routing ([#246](https://github.com/115dkk/EqualizerAPO-XT/issues/246)) — the core feature set is complete: the `SubwooferRouting:` command, the MIT SubwooferRoutingCore DSP library, the standalone VST3 plugin, the 4.1 host-negotiation fix, the Editor card with a per-skin instrument in every skin, and the full editor dialog with both routing matrices and a response view. Remaining follow-ups: writing changes back to a linked profile file (the dialog currently converts the row to inline state), audition/solo overrides, Korean translations for the new strings, and a custom VST3 editor view (hosts show their generic parameter panel).
 7. Explicit VST3 bus layouts ([#216](https://github.com/115dkk/EqualizerAPO-XT/issues/216)) — the backend `VSTPlugin:` `Input`/`Output` syntax and deterministic host tests are complete, including asymmetric layouts, 4.1, strict failure passthrough, and quiet VST2 ignore semantics. The Qt Editor now carries Input/Output selectors beside the plugin name in every skin's own visual language, with a verdict lamp for the actually negotiated bus, VST2 lock/repair handling, and the legacy `StereoInput` migration ([#265](https://github.com/115dkk/EqualizerAPO-XT/pull/265)). The current round adds per-slot channel fill (`InputChannels`/`OutputChannels` place arbitrary config channels into the negotiated slots, untouched channels pass through) and plain Input/Output dropdowns in the legacy row ([#290](https://github.com/115dkk/EqualizerAPO-XT/pull/290)). The fill lists now have their editor in every skin: two rails inside the card with per-slot channel dropdowns that follow the line's `Channel:`/`Copy:` flow, a fold switch when both rails exist, and combo rows in the legacy presentation ([#292](https://github.com/115dkk/EqualizerAPO-XT/pull/292)).
+8. ASIO ([#310](https://github.com/115dkk/EqualizerAPO-XT/issues/310)) —
+   merged ([#314](https://github.com/115dkk/EqualizerAPO-XT/pull/314)): the
+   wrapper driver, the engine host process, the ring between them, the device
+   records, the Device Selector options and the CI gate. Verified with a fake
+   driver on CI and, on a Topping USB Audio Device, by registering the entry
+   through the Device Selector and opening it the way a DAW does. Remaining:
+   runs under more DAWs, and the x64 entry for x64 DAWs on ARM64 machines.
+9. Recording devices ([#321](https://github.com/115dkk/EqualizerAPO-XT/pull/321)) -
+   a field report of a microphone with neither the EQ nor a VST applied.
+   The path is now measured on every build: a CI gate installs a virtual
+   cable driver, registers the APO on its recording side through the
+   Device Selector and checks that a recording app hears the configured
+   preamp. Fixed along the way: a slot the Device Selector fills is
+   registered for every processing mode of its direction, so voice-chat
+   streams on mode-aware drivers get the EQ too. The "(experimental)" label
+   is gone. Remaining: the report's own environment is unknown; the probes
+   in [docs/features/capture.md](docs/features/capture.md) are what to run
+   on it.
 
 ## Features
 
 - Double-precision internal audio processing for complex filter chains.
 - Convolution, GraphicEQ, parametric EQ, VST2/VST3, and standard Equalizer APO filter support.
+- ASIO: every ASIO driver appears in the Device Selector's playback and
+  capture lists; ticking one registers a `<driver> (EQ APO XT)` entry that
+  DAWs and other ASIO hosts pick, and the same `config.txt` applies. The
+  engine runs in a separate host process started on demand, so nothing but a
+  thin wrapper enters the application ([docs/features/asio.md](docs/features/asio.md)).
 - MultiConvolution filter for true-stereo and BRIR (Binaural Room Impulse Response) playback: `MultiConvolution: L=0+1 R=2+3 brir.wav` convolves each channel's own signal with its mapped channels of one multichannel impulse response and sums them back, independent of the Channel command - the fan-out/sum pattern the in-place Convolution filter cannot express, in one line. Each mapped channel takes an optional factor with Copy's grammar (`L=0.5*0+1`; `-1` inverts the phase, `-6dB` works too). The Editor edits the mapping in every skin's routing view.
 - A built-in 1025-tap linear-phase Hilbert transform with explicit phase-shift
   and latency-alignment roles. For example,
@@ -143,6 +166,19 @@ Qt tools are built through qmake in CI and in the documented local setup. A full
 ## Tests
 
 `Tests/` holds seven projects: `EditorLogicTests` and `HybridConvTests` (unit tests), `EngineOrchestrationTests` (engine routing and config-swap behavior), `AudioRegressionTests` (engine output compared against committed references, also run across SIMD variants in CI), `TestVst2Plugin` / `TestVst3Plugin` (self-built plug-ins used to test the VST2 and VST3 hosts at runtime), and `VstPreviewProbe` (a manual console harness behind the `vst3-preview-probe` workflow that validates the plugin panel's live-audio preview premises on a real endpoint). Test policy per variant is part of [docs/SimdBuildMatrix.md](docs/SimdBuildMatrix.md).
+
+## License
+
+Equalizer APO and EqualizerAPO-XT's own code are licensed under the GNU
+General Public License, version 2 or (at your option) any later version
+([License.txt](License.txt)). The ASIO wrapper is built against the Steinberg
+ASIO SDK under the SDK's GPL version 3 option, so the binaries that include it
+(`EqualizerAPOAsio.dll` and the installers that ship it) are distributed under
+GPL version 3 ([License-gpl-3.0.txt](License-gpl-3.0.txt)). Both texts are
+installed next to the program. The Subwoofer Routing DSP core and its VST3
+plugin are MIT-licensed ([SubwooferRoutingCore/LICENSE](SubwooferRoutingCore/LICENSE)).
+
+ASIO is a trademark and software of Steinberg Media Technologies GmbH.
 
 ## Special Thanks
 

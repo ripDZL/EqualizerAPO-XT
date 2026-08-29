@@ -21,6 +21,89 @@ tags are clean `vX.Y.Z` names. Installers for every version are on the
   maximum contrast.
 - **Legacy VST3 channel-fill controls wrap cleanly.** Long channel layouts no
   longer overlap their labels or controls.
+## v2.49.0 — 2026-08-29
+
+- **The EQ reaches voice-chat microphone streams on drivers that declare
+  processing modes.** A device the Device Selector registered in the stream
+  slot was listed for the Default processing mode only. On drivers that
+  declare modes (Realtek, Intel SST and the like) a microphone stream tagged
+  Communications - Discord, Teams, every voice-chat app - or Speech went past
+  the APO untouched while a plain recorder heard the EQ, and the same held
+  for playback streams in the Media, Movie and Communications modes. A slot
+  Equalizer APO populates is now listed for every mode of its direction
+  (Default, Communications, Speech for recording; Default, Media, Movie,
+  Communications, Notification for playback; a list the driver wrote stays).
+  An existing installation takes the new list after an uninstall and
+  reinstall from the Device Selector (untick, OK, tick, OK).
+- **Recording devices are no longer marked "(experimental)".** The label
+  marked devices whose driver publishes no effect chain - most microphones
+  and every virtual cable - because installing has to create the registry
+  key the driver never made. That path is now proven on every build: a CI
+  gate installs a real virtual cable driver, registers the APO on its
+  recording side through the product's own Device Selector, and measures
+  that a recording app hears the configured preamp, in the default and the
+  communications mode, and unity again after the uninstall. The gate also
+  showed why such devices are registered in the legacy pre-mix slot: a
+  driver that declares no modes is fed through the legacy slots only, and
+  the same APO in the stream slot is never loaded
+  ([docs/features/capture.md](docs/features/capture.md)).
+- **Device Selector from the command line.** `DeviceSelector
+  --install-endpoint {endpoint-guid}` and `--uninstall-endpoint` do what the
+  dialog's OK does for one endpoint, run the same device test, and exit 0
+  when the APO reported itself alive from inside the audio engine;
+  `--install-mode lfx-gfx|sfx-mfx|sfx-efx` pins a slot pair. For support
+  sessions over a terminal and for the CI gate. Elevation is required, as
+  for the dialog; every line also goes to `DeviceSelector.log`.
+
+## v2.48.1 — 2026-08-29
+
+- **Installers are back to about a quarter of their size.** From v2.38.0 to
+  v2.48.0 every installer was about 250 MB because the release packaging
+  copied the Qt build's precompiled headers and generated sources (about
+  1 GB unpacked) next to the program; nothing used them. They are excluded
+  again, the packaging step now fails if any such file gets in, and the
+  installation folder shrinks accordingly on the next update.
+
+## v2.48.0 — 2026-08-29
+
+- **The Device Selector opens at a readable size.** It used to open at the
+  smallest size its list allowed, which on a fresh install (nothing resized
+  yet) left the device names cramped. It now opens at 760 by 640 or the
+  screen's room, whichever is smaller, and can still be resized.
+- **The license texts are installed with the program.** `License.txt`
+  (GPL version 2 or later, the program's license) and `License-gpl-3.0.txt`
+  (GPL version 3, which the ASIO wrapper built on the Steinberg ASIO SDK is
+  distributed under) now sit in the installation folder; before this the
+  installer shipped neither. Fork-authored source files carry an
+  `SPDX-License-Identifier: GPL-2.0-or-later` notice, and the README states
+  which license covers what.
+- **ASIO applications get the same config.txt.** Every ASIO driver on the
+  machine now appears in the Device Selector's playback and capture lists,
+  marked `ASIO`; ticking it registers a `<driver> (EQ APO XT)` entry that a
+  DAW, foobar2000 or any ASIO host can pick instead of the driver itself. The
+  wrapper stays thin inside the application: it hands each buffer to
+  `EqualizerAPOHost.exe`, a separate process that runs the engine (so FFTW,
+  VST hosting and the rest never enter the DAW, and 32-bit hosts get the
+  64-bit engine), starts on demand, loads the configuration before the device
+  opens so the first buffer is already processed, and leaves a minute after
+  the last stream. `Device: ASIO <name> {CLSID}` selects a stream; without a
+  `Device:` line filters apply to ASIO and endpoints alike; `Stage: capture`
+  covers the input direction. The default hands out the previous buffer (one
+  buffer of latency, reported to the host), which on a Topping USB Audio
+  Device at 64 frames processed every one of 450,005 buffers in ten minutes,
+  all but three round trips under 100 us and the worst 2.5 ms outlier
+  absorbed by that buffer; a synchronous mode without the extra buffer is the
+  **Remove the buffer** checkbox in the Device Selector's troubleshooting panel, with how long a
+  buffer waits for the host (a quarter of the buffer, half, three quarters).
+  The same panel has two options that are off by default: start the engine
+  host at boot, and 32-bit host support (the entry for 32-bit applications,
+  no longer registered unasked). Verified on CI by a fake ASIO driver and a probe
+  that hashes what reached the "hardware" against the engine's direct output,
+  through the real host process and the real DLLs, plus 500 unit checks on
+  the wrapper, the ring and the device records ([#310](https://github.com/115dkk/EqualizerAPO-XT/issues/310),
+  [#311](https://github.com/115dkk/EqualizerAPO-XT/pull/311), [#312](https://github.com/115dkk/EqualizerAPO-XT/pull/312),
+  [docs/features/asio.md](docs/features/asio.md)). Built against the Steinberg
+  ASIO SDK 2.3.4 under its GPLv3 option; the combined work is GPLv3.
 
 ## v2.47.1 — 2026-08-28
 

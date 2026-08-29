@@ -1,5 +1,7 @@
 /*
-	This file is part of EqualizerAPO-XT.
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
 
 	The installer's window: a fixed-size, dark, Direct2D/DirectWrite-drawn
 	surface that renders the InstallerUi::Model as a four-step timeline with

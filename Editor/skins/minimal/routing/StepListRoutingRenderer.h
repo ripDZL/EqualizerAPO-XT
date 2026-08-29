@@ -1,5 +1,11 @@
 /*
 	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
+*/
+
+/*
+	This file is part of EqualizerAPO-XT, a system-wide equalizer.
 
 	Minimal skin's Copy renderer: a monospace, terminal-like sequential step
 	list. Each output is one row "# │ Dest ← Sources" with explicit + / − signs,

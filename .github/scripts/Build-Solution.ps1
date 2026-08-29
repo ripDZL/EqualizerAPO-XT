@@ -23,7 +23,24 @@ $projects = @(
     "VoicemeeterClient\VoicemeeterClient.vcxproj",
     # Built (not run) on every leg so the probe cannot rot; the
     # vst3-preview-probe workflow is what actually executes it.
-    "Tests\VstPreviewProbe\VstPreviewProbe.vcxproj"
+    "Tests\VstPreviewProbe\VstPreviewProbe.vcxproj",
+    # ASIO (docs/architecture/asio-host-study.md): the wrapper DLL a DAW
+    # loads, the fake driver the probe wraps, the unit suite over the fake,
+    # and the probe that compares the wrapped stream with the engine's direct
+    # output. The probe is executed by build.yml's "ASIO probe" step on the
+    # legs that can run the variant.
+    "EqualizerAPOAsio\EqualizerAPOAsio.vcxproj",
+    "EqualizerAPOHost\EqualizerAPOHost.vcxproj",
+    "Tests\FakeAsioDriver\FakeAsioDriver.vcxproj",
+    "Tests\AsioTests\AsioTests.vcxproj",
+    "Tests\AsioProbe\AsioProbe.vcxproj",
+    # Capture (docs/features/capture.md): the probe that hosts the APO DLL
+    # for one endpoint without the audio service, and the WASAPI probe that
+    # measures a capture endpoint the way a recording app hears it. Built
+    # on every leg; the capture gate job executes them on a runner with a
+    # virtual cable.
+    "Tests\ApoHostProbe\ApoHostProbe.vcxproj",
+    "Tests\CaptureProbe\CaptureProbe.vcxproj"
 )
 $platformToolset = if ($Platform -eq "ARM64") { "v143" } else { "v145" }
 $toolArchitecture = if ($Platform -eq "ARM64") { "ARM64" } else { "x64" }
@@ -34,7 +51,7 @@ $toolArchitecture = if ($Platform -eq "ARM64") { "ARM64" } else { "x64" }
 # main. On a runner that cannot execute AVX-512 that is an illegal-instruction
 # fault at static init, so it belongs behind the same gate as the others.
 $runtimeTests = @()
-if ($CanExecute) { $runtimeTests += @("EditorLogicTests", "HybridConvTests", "EngineOrchestrationTests") }
+if ($CanExecute) { $runtimeTests += @("EditorLogicTests", "HybridConvTests", "EngineOrchestrationTests", "AsioTests") }
 # The auto-detect installer is a Win32-only, CPU-baseline binary: it must run
 # on machines with no AVX at all, so it takes no arch flag, and one build
 # covers every variant. The avx2 leg builds it so a PR that breaks it fails
@@ -84,7 +101,8 @@ $buildParams = @(
     "/p:FFTW_INCLUDE=$env:FFTW_INCLUDE", "/p:FFTW_LIB=$env:FFTW_LIB",
     "/p:MUPARSERX_INCLUDE=$env:MUPARSERX_INCLUDE", "/p:MUPARSERX_LIB=$env:MUPARSERX_LIB",
     "/p:TCLAP_ROOT=$env:TCLAP_ROOT", "/p:VST3_SDK=$env:VST3_SDK",
-    "/p:HIGHWAY_INCLUDE=$env:HIGHWAY_INCLUDE", "/p:PlatformToolset=$platformToolset",
+    "/p:HIGHWAY_INCLUDE=$env:HIGHWAY_INCLUDE", "/p:ASIO_SDK=$env:ASIO_SDK",
+    "/p:PlatformToolset=$platformToolset",
     "/p:PreferredToolArchitecture=$toolArchitecture", "/p:QT_ROOT=$qtRoot"
 )
 if ($Platform -eq "x64") { $buildParams += "/p:EnableEnhancedInstructionSet=$ArchFlag" }
