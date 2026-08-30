@@ -133,6 +133,14 @@
 <context>
     <name>DeviceSelectorClass</name>
     <message>
+        <source>Use in ASIO apps</source>
+        <translation>Utiliser dans les applications ASIO</translation>
+    </message>
+    <message>
+        <source>Adds `&lt;device&gt; - &lt;endpoint&gt; (EQ APO XT)` to the ASIO driver list. An application that picks it opens this device in WASAPI exclusive mode with the EQ applied.</source>
+        <translation>Ajoute `&lt;périphérique&gt; - &lt;point de terminaison&gt; (EQ APO XT)` à la liste des pilotes ASIO. Une application qui la choisit ouvre ce périphérique en mode exclusif WASAPI avec l’égaliseur appliqué.</translation>
+    </message>
+    <message>
         <location line="-496"/>
         <source>Troubleshooting options (only use in case of problems)</source>
         <translation>Options de dépannage (à utiliser uniquement en cas de problèmes)</translation>

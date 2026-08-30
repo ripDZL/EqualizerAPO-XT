@@ -170,6 +170,7 @@ void DeviceSelector::finishSetup()
 	connect(ui.useOriginalAPOPostMixCheckBox, &QCheckBox::clicked, this, &DeviceSelector::onTroubleShootingOptionChanged);
 	connect(ui.installModeComboBox, QOverload<int>::of(&QComboBox::activated), this, &DeviceSelector::onTroubleShootingOptionChanged);
 	connect(ui.allowSilentBufferCheckBox, &QCheckBox::clicked, this, &DeviceSelector::onTroubleShootingOptionChanged);
+	connect(ui.exclusiveModeEqCheckBox, &QCheckBox::clicked, this, &DeviceSelector::onTroubleShootingOptionChanged);
 	connect(ui.autoCheckBox, &QCheckBox::clicked, this, &DeviceSelector::onTroubleShootingOptionChanged);
 	connect(ui.asioSyncCheckBox, &QCheckBox::clicked, this, &DeviceSelector::onTroubleShootingOptionChanged);
 	connect(ui.asioDeadlineComboBox, QOverload<int>::of(&QComboBox::activated), this, &DeviceSelector::onTroubleShootingOptionChanged);
@@ -503,6 +504,8 @@ void DeviceSelector::onTroubleShootingOptionChanged()
 				deviceInfo->getSelectedInstallState().allowSilentBufferModification = ui.allowSilentBufferCheckBox->isChecked();
 			else if (sender == ui.autoCheckBox)
 				deviceInfo->getSelectedInstallState().autoAdjust = ui.autoCheckBox->isChecked();
+			else if (sender == ui.exclusiveModeEqCheckBox)
+				deviceInfo->getSelectedInstallState().exclusiveModeEq = ui.exclusiveModeEqCheckBox->isChecked();
 		}
 		AsioAPOInfo* asioInfo = dynamic_cast<AsioAPOInfo*>(info.get());
 		if (asioInfo != nullptr)
@@ -610,6 +613,7 @@ void DeviceSelector::updateButtons()
 	ui.useOriginalAPOPostMixCheckBox->setEnabled(enable && !isInput && hasOriginalAPOPostMix && installState.installPostMix);
 	ui.installModeComboBox->setEnabled(enable);
 	ui.allowSilentBufferCheckBox->setEnabled(enable);
+	ui.exclusiveModeEqCheckBox->setEnabled(enable);
 	// Page 0: nothing to say. Page 1: an endpoint's APO chain. Page 2: an
 	// ASIO target's options.
 	ui.stackedWidget->setCurrentIndex(!enable ? 0 : (asioSelected ? 2 : 1));
@@ -632,6 +636,7 @@ void DeviceSelector::updateButtons()
 		ui.installModeComboBox->setCurrentIndex(installState.installMode);
 
 	ui.allowSilentBufferCheckBox->setChecked(installState.allowSilentBufferModification);
+	ui.exclusiveModeEqCheckBox->setChecked(installState.exclusiveModeEq);
 	ui.autoCheckBox->setChecked(installState.autoAdjust);
 }
 

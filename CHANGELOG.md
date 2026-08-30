@@ -21,6 +21,59 @@ tags are clean `vX.Y.Z` names. Installers for every version are on the
   maximum contrast.
 - **Legacy VST3 channel-fill controls wrap cleanly.** Long channel layouts no
   longer overlap their labels or controls.
+
+## v2.50.2 — 2026-08-30
+
+- **A switched-off row no longer shows a live "Locate..." button.** When an
+  Include, Convolution or VST row whose file is missing was switched off,
+  its Locate button kept the lit look of the running row (rack, studio and
+  matrix) even though the whole body was disabled, so it invited a click
+  that did nothing. Every skin now draws the card's action buttons in its
+  own disabled grammar (rack: powered-down cap, studio: unlit glass,
+  matrix: dashed cancelled cell, soft: dashed sleeping pill, minimal: the
+  sheet's button sleep), and a pointer resting on one cannot relight it.
+
+## v2.50.1 — 2026-08-30
+
+- **The ASIO entry keeps a small buffer on drivers that cannot.** Some
+  drivers accept a small exclusive-mode period and then signal at their own
+  coarser cycle (a virtual cable: every 10 ms against a 5.8 ms period), so
+  most of each cycle went unplayed and the stream sounded gapped and thin at
+  small buffers. The entry now asks Windows for a 1 ms timer while it
+  streams, as DAWs do, and watches a stream's first signals: a driver that
+  signals slower than the period gets its device buffer widened to the
+  smallest multiple of the application's buffer that covers its cycle, with
+  that many buffers served per signal, so the application keeps its buffer
+  size and every sample plays; the added latency is reported to the
+  application. `AsioProbe` prints the driver's signal spacing and the bridge
+  it settled on.
+
+## v2.50.0 — 2026-08-30
+
+- **Any playback or recording endpoint can be offered to ASIO applications.**
+  An application in WASAPI exclusive mode never passes the audio engine, so
+  no APO can reach it. The ASIO wrapper now has a second kind of target:
+  tick **Use in ASIO apps** on an endpoint's options page in the Device
+  Selector, and `<device> - <endpoint> (EQ APO XT)`
+  appears in the ASIO driver list. An application that picks it opens the
+  endpoint in exclusive mode - no mixing, no resampling, the device's
+  smallest period, the rate the application asks for - and the EQ runs on
+  the way, as it does for a real ASIO driver. For onboard audio, HDMI, USB
+  DACs and headsets that came without an ASIO driver, and virtual cables.
+  A playback endpoint gives an output device, a recording endpoint an input
+  device; the entry goes with the APO installation
+  ([docs/features/asio.md](docs/features/asio.md)). CI opens the entry the
+  way a DAW does on a virtual cable and hears the preamp on the far side.
+- **Which streams reach the EQ, written down and gated.** Shared streams
+  and low-latency shared streams (an application asking the engine for a
+  small buffer) pass through; raw streams pass the post-mix stage only;
+  exclusive-mode and ASIO streams pass nothing, which the entry above and
+  the wrapper are for. The wiki's troubleshooting section says so. The
+  capture gate now also measures the playback side at the engine's smallest
+  period, fresh and after a running graph switches, with a convolution in
+  the configuration; the maintainer's cable answered -20 dB in every case
+  at 96 and 128 frames.
+
 ## v2.49.0 — 2026-08-29
 
 - **The EQ reaches voice-chat microphone streams on drivers that declare

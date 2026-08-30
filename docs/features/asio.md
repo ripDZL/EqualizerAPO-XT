@@ -25,6 +25,69 @@ starts, loads `config.txt`, and only then does the device open: the first
 buffer that reaches the hardware is already processed. The host leaves a
 minute after the last stream ends.
 
+## Endpoints without an ASIO driver
+
+Any Windows playback or recording endpoint can appear in the ASIO driver
+list too: onboard audio, HDMI, a USB DAC or headset that came without an
+ASIO driver, a virtual cable. Select the endpoint in the Device Selector,
+open the troubleshooting options and tick **Use in ASIO apps**; the entry
+is `<device> - <endpoint> (EQ APO XT)`. An
+application that picks it opens the endpoint in WASAPI exclusive mode: no
+audio engine, no mixing or resampling, the device's own smallest period,
+the sample rate the application asks for. The engine host processes the
+stream on the way, exactly as for a real ASIO driver, and `config.txt`
+sees the stream as the endpoint itself, so `Device: {endpoint GUID}`
+matches both the APO and the entry.
+
+This is how a listener who uses exclusive mode keeps the EQ. An APO cannot
+reach an exclusive stream (the audio engine is not in its path;
+[docs/architecture/wasapi-exclusive-study.md](../architecture/wasapi-exclusive-study.md)),
+but a player with an ASIO output can be pointed at the entry instead. A
+playback endpoint gives an output-only device, a recording endpoint an
+input-only one. The entry belongs to the endpoint's installation: it is
+written with the APO and removed with it, and the install report names it.
+`DeviceSelector --install-endpoint {guid} --exclusive-mode-eq` does the same from
+a terminal.
+
+What the entry offers: buffer sizes in powers of two from the smallest
+exclusive period the driver declares (a virtual cable at 48 kHz: 128
+frames; a USB DAC with a 3 ms minimum: 256), the sample rates the device
+accepts in exclusive mode, and the sample type the device takes there.
+Most hardware takes 32-, 24- or 16-bit integers rather than float; the
+entry tries the endpoint's own device format first and the wrapper converts
+at its edge. The reported latency is two buffers plus the driver's own on
+output and one buffer plus the driver's on input. `AsioProbe --target
+wasapi:{playback guid}[,{recording guid}]` opens the same target without
+any registration, for support sessions and for CI.
+
+The buffer size an application picks is the period the endpoint is asked
+for. Two things stand between a small period and a driver keeping it.
+The system timer: at its default 15.6 ms resolution a virtual cable
+accepted a 5.8 ms period and signalled every 15.9 ms, so the entry asks
+Windows for a 1 ms timer while it streams, as DAWs and ASIO drivers do,
+and releases it when the stream stops. And the driver's own cycle: some
+drivers accept a small period and then signal at their own coarser one
+(the same cable: every 10 ms), consuming a whole cycle's worth per
+signal, which would leave the rest of each cycle unplayed. The entry
+watches the first dozen signals of a stream; when they come well over
+the period, it reopens the device side at the smallest multiple of the
+application's buffer that covers the cycle and serves that many buffers
+per signal, back to back. The application keeps its buffer size, the
+audio keeps every sample, and the added latency is reported through
+`kAsioLatenciesChanged`. `AsioProbe --target wasapi:{guid} --frames <n>`
+shows what a driver did: `event-interval` is its real signal spacing,
+`slow-events` how many came late, `bridge` how many buffers each signal
+ended up serving (1 on a driver that honours its period).
+
+Measured on the maintainer's VB-CABLE: 128 frames at 48 kHz, 2,256 buffers
+in six seconds, none late or missed, and a recording app on the far side
+heard the preamp and the peak filter of the test configuration; duplex
+(both sides of the cable in one device) and recording-only ran the same
+way through the wrapper DLL and the real host. On CI the capture gate
+installs the cable's playback endpoint with the entry, activates the
+entry's CLSID through COM the way a DAW does, and hears the preamp on the
+far side. The 32-bit host option does not apply to these entries yet.
+
 ## What the config sees
 
 An ASIO stream is a device like any other for `Device:` lines. Its string is
@@ -104,6 +167,11 @@ The record behind an entry lives under
   shared, so one entry cannot serve both architectures without an ARM64X
   binary, which this build does not produce).
 - DSD streams are not supported; the device refuses to open in a DSD mode.
+- An endpoint entry refuses to open with a driver error: another
+  application holds the endpoint in exclusive mode, or Windows' exclusive
+  mode permission for the device is off (Sound settings, Advanced), or the
+  device accepts no exclusive-mode format at the requested rate. The
+  message names which; `EqualizerAPOAsio.log` has the HRESULT.
 
 ## License
 

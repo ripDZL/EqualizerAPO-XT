@@ -98,6 +98,17 @@ $lowLatencyMeasurements = @(
     [pscustomobject]@{ Name = "ll-min-switch";      Category = "default"; Raw = $false; Period = "min";     HoldDefault = $true;  ExpectGainDb = $PreampDb; ToleranceDb = 3.0;          Required = $true; Note = "the engine switches a running default-period graph to the small period" }
     [pscustomobject]@{ Name = "ll-after-uninstall"; Category = "default"; Raw = $false; Period = "";        HoldDefault = $false; ExpectGainDb = 0.0;       ToleranceDb = 1.5;          Required = $true; Note = "the cable at unity after the playback-side uninstall" }
 )
+# The ASIO entry round: the playback endpoint installed with its entry in
+# the ASIO driver list (DeviceSelector --exclusive-mode-eq), then that entry opened
+# the way a DAW opens it (COM activation of the registered wrapper CLSID,
+# AsioProbe as the host) while a recording app listens on the cable's far
+# side. The wrapper runs a WASAPI exclusive target and the engine host; the
+# preamp arriving on the far side is the whole path working. The uninstall
+# must take the entry and its record away again.
+$asioEntryMeasurement = [pscustomobject]@{ Name = "asio-entry"; ExpectGainDb = $PreampDb; ToleranceDb = $ToleranceDb; Required = $true; Note = "a DAW opening the endpoint's ASIO entry hears the preamp on the far side" }
+# The first size is the gated one; the rest are recorded. Small first: the
+# entry has to hold a small buffer, the point of exclusive mode.
+$asioEntryFrames = @(256, 1024, 2048)
 
 $plan = [pscustomobject]@{
     VbCableUrl = $VbCableUrl
@@ -108,6 +119,8 @@ $plan = [pscustomobject]@{
     Measurements = $measurements
     InstallModes = $installModes
     LowLatency = $lowLatencyMeasurements
+    AsioEntry = $asioEntryMeasurement
+    AsioEntryFrames = $asioEntryFrames
     StageRoot = $StageRoot
 }
 if ($PlanOnly) { return $plan }
@@ -131,6 +144,7 @@ $summary = [ordered]@{
     apoHost = $null
     rounds = @()
     lowLatency = $null
+    asioEntry = $null
     measurements = @()
     failures = @()
 }
@@ -284,9 +298,13 @@ function Copy-Logs([string] $phase) {
 }
 
 function Measure-Cable($measurement, [string] $round = "") {
-    $arguments = @("--render", $renderConnection, "--capture", $captureConnection, "--json",
+    $noRender = $measurement.PSObject.Properties["NoRender"] -and $measurement.NoRender
+    $arguments = @("--capture", $captureConnection, "--json",
         "--expect-gain-db", $measurement.ExpectGainDb.ToString([cultureinfo]::InvariantCulture),
         "--tolerance-db", $measurement.ToleranceDb.ToString([cultureinfo]::InvariantCulture))
+    # Something else plays into the cable (the ASIO probe): listen only, and
+    # give it a moment to be up before the window opens.
+    if ($noRender) { $arguments += @("--no-render", "--settle", "3.5", "--seconds", "2") } else { $arguments += @("--render", $renderConnection) }
     if ($measurement.Category -ne "default") { $arguments += @("--category", $measurement.Category) }
     if ($measurement.Raw) { $arguments += "--raw" }
     $period = if ($measurement.PSObject.Properties["Period"]) { [string]$measurement.Period } else { "" }
@@ -588,6 +606,101 @@ Measure-Cable $lowLatencyMeasurements[3] "low-latency" | Out-Null
 Copy-Logs "80-low-latency-uninstalled"
 [System.IO.File]::WriteAllText($configFile, $config, (New-Object System.Text.UTF8Encoding($false)))
 $summary.lowLatency = [pscustomobject]$lowLatency
+
+# ---------------------------------------------------------------------------
+Write-Phase "asio-entry: the playback endpoint offered to ASIO applications"
+$asioProbe = Join-Path $ProbeDirectory "AsioProbe.exe"
+$asioRoot = "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\ASIO"
+$asioEntry = [ordered]@{ install = $null; entryName = $null; wrapperClsid = $null; probes = @(); uninstall = $null; entryLeft = $null; recordLeft = $null }
+function Get-EqApoAsioEntries {
+    if (-not (Test-Path $asioRoot)) { return @() }
+    return @(Get-ChildItem $asioRoot -ErrorAction SilentlyContinue | Where-Object { $_.PSChildName -like "* (EQ APO XT)" })
+}
+if (-not (Test-Path -LiteralPath $asioProbe)) {
+    Add-Failure "asio-entry: AsioProbe.exe is not in the probe directory"
+} else {
+    $install = Invoke-Program (Join-Path $current "DeviceSelector.exe") @("--install-endpoint", $endpoints.Render, "--exclusive-mode-eq") 300 $current
+    $asioEntry.install = [ordered]@{ exitCode = $install.ExitCode; timedOut = $install.TimedOut }
+    if ($install.ExitCode -ne 0) { Add-Failure "asio-entry/install: DeviceSelector --install-endpoint --exclusive-mode-eq exited with $($install.ExitCode)" }
+    & reg export "HKLM\SOFTWARE\ASIO" (Join-Path $SnapshotDirectory "90-asio-entry-installed-asio.reg") /y 2>$null | Out-Null
+    & reg export "HKLM\SOFTWARE\EqualizerAPO\ASIO" (Join-Path $SnapshotDirectory "90-asio-entry-installed-records.reg") /y 2>$null | Out-Null
+    $global:LASTEXITCODE = 0
+    $entries = @(Get-EqApoAsioEntries)
+    if ($entries.Count -ne 1) {
+        Add-Failure "asio-entry/install: expected one '(EQ APO XT)' entry under HKLM\SOFTWARE\ASIO, found $($entries.Count)"
+    } else {
+        $asioEntry.entryName = $entries[0].PSChildName
+        $asioEntry.wrapperClsid = (Get-ItemProperty -Path $entries[0].PSPath).CLSID
+        Write-Host "ASIO entry: $($asioEntry.entryName) -> $($asioEntry.wrapperClsid)"
+        # The probe stands in for the DAW: it activates the registered CLSID
+        # through COM, which loads the wrapper DLL from the class tree, which
+        # reads its record, opens the cable in exclusive mode and starts the
+        # engine host. A sine at -6 dBFS for fourteen seconds; the far side is
+        # measured once the stream has been running (the engine host starts
+        # cold, config load included, before the device opens).
+        #
+        # Three buffer sizes, the small one gated. The runner's cable used to
+        # signal every 15.9 ms against a 5.8 ms period: the system timer's
+        # default 15.6 ms resolution, which nothing on a hosted runner raises.
+        # The target asks for 1 ms while it streams, as DAWs do; the larger
+        # sizes are recorded as evidence of how this driver behaves.
+        # The probe asks for the cable's own rate, the one the recording side
+        # runs at; the entry's default is the endpoint's device format.
+        $env:PATH = "$current;$env:PATH"
+        $asioEntry.probes = @()
+        foreach ($frames in $asioEntryFrames) {
+            $required = $frames -eq $asioEntryFrames[0]
+            $name = if ($required) { $asioEntryMeasurement.Name } else { "$($asioEntryMeasurement.Name)-$frames" }
+            Write-Host "-- $frames frames"
+            $probeOut = [System.IO.Path]::GetTempFileName()
+            $probeErr = [System.IO.Path]::GetTempFileName()
+            $probeProcess = Start-Process -FilePath $asioProbe -ArgumentList @("--target", "clsid:$($asioEntry.wrapperClsid)", "--wrapper", "static", "--processor", "passthrough", "--seconds", "25", "--sine", "1000", "--rate", "$impulseRate", "--frames", "$frames") -PassThru -NoNewWindow -RedirectStandardOutput $probeOut -RedirectStandardError $probeErr -WorkingDirectory $current
+            # Measure only once the stream runs: the probe prints its latency
+            # line after createBuffers and start succeeded. The first probe
+            # starts the engine host cold, which on a busy runner took long
+            # enough for a fixed wait to open the window before the tone
+            # (-23.6 dB read once for that reason, 2405 switches all the same).
+            $deadline = (Get-Date).AddSeconds(40)
+            $streaming = $false
+            while ((Get-Date) -lt $deadline -and -not $probeProcess.HasExited) {
+                $soFar = Get-Content -LiteralPath $probeOut -Raw -ErrorAction SilentlyContinue
+                if ($soFar -and $soFar -match "latency input=") { $streaming = $true; break }
+                Start-Sleep -Milliseconds 250
+            }
+            if (-not $streaming) { Write-Host "the probe did not report a running stream within 40 s" }
+            # The bridge calibration (a dozen events) and its reopen, then settle.
+            Start-Sleep -Seconds 2
+            $record = Measure-Cable ([pscustomobject]@{ Name = $name; Category = "default"; Raw = $false; ExpectGainDb = $asioEntryMeasurement.ExpectGainDb; ToleranceDb = $asioEntryMeasurement.ToleranceDb; Required = $required; Note = "$($asioEntryMeasurement.Note) ($frames frames)"; NoRender = $true }) "asio-entry"
+            $probeProcess.WaitForExit(45000) | Out-Null
+            if (-not $probeProcess.HasExited) { try { $probeProcess.Kill() } catch {} }
+            $probeText = (Get-Content -LiteralPath $probeOut -Raw -ErrorAction SilentlyContinue) + (Get-Content -LiteralPath $probeErr -Raw -ErrorAction SilentlyContinue)
+            Remove-Item -LiteralPath $probeOut, $probeErr -Force -ErrorAction SilentlyContinue
+            if ($probeText) { Write-Host ($probeText.TrimEnd()) }
+            $asioEntry.probes += [pscustomobject]@{ frames = $frames; exitCode = $probeProcess.ExitCode; output = $probeText }
+            if ($probeProcess.ExitCode -ne 0 -and $required) { Add-Failure "asio-entry/probe: AsioProbe over the registered entry exited with $($probeProcess.ExitCode) at $frames frames" }
+        }
+        # Diagnosis: the same target opened directly (no registration, no
+        # engine), which prints the driver's real event interval and how
+        # long each period took to serve. Recorded, never gated.
+        foreach ($frames in $asioEntryFrames) {
+            Write-Host "-- direct target, $frames frames (diagnosis)"
+            $diag = Invoke-Program $asioProbe @("--target", "wasapi:$($endpoints.Render)", "--wrapper", "static", "--processor", "passthrough", "--seconds", "6", "--sine", "1000", "--rate", "$impulseRate", "--frames", "$frames") 40 $current
+            $asioEntry.probes += [pscustomobject]@{ frames = $frames; direct = $true; exitCode = $diag.ExitCode; output = ($diag.StdOut + $diag.StdErr) }
+        }
+    }
+    Copy-Logs "90-asio-entry-measured"
+
+    $uninstall = Invoke-Program (Join-Path $current "DeviceSelector.exe") @("--uninstall-endpoint", $endpoints.Render) 180 $current
+    $asioEntry.uninstall = [ordered]@{ exitCode = $uninstall.ExitCode }
+    if ($uninstall.ExitCode -ne 0) { Add-Failure "asio-entry/uninstall: DeviceSelector --uninstall-endpoint exited with $($uninstall.ExitCode)" }
+    $asioEntry.entryLeft = @(Get-EqApoAsioEntries).Count
+    $recordRoot = "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\EqualizerAPO\ASIO"
+    $asioEntry.recordLeft = if (Test-Path $recordRoot) { @(Get-ChildItem $recordRoot -ErrorAction SilentlyContinue).Count } else { 0 }
+    if ($asioEntry.entryLeft -ne 0) { Add-Failure "asio-entry/uninstall: $($asioEntry.entryLeft) '(EQ APO XT)' entries remain under HKLM\SOFTWARE\ASIO" }
+    if ($asioEntry.recordLeft -ne 0) { Add-Failure "asio-entry/uninstall: $($asioEntry.recordLeft) wrapper records remain" }
+    Copy-Logs "95-asio-entry-uninstalled"
+}
+$summary.asioEntry = [pscustomobject]$asioEntry
 
 # ---------------------------------------------------------------------------
 Write-Phase "summary"

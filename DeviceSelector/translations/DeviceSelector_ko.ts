@@ -133,6 +133,14 @@
 <context>
     <name>DeviceSelectorClass</name>
     <message>
+        <source>Use in ASIO apps</source>
+        <translation>ASIO 앱에서 사용</translation>
+    </message>
+    <message>
+        <source>Adds `&lt;device&gt; - &lt;endpoint&gt; (EQ APO XT)` to the ASIO driver list. An application that picks it opens this device in WASAPI exclusive mode with the EQ applied.</source>
+        <translation>ASIO 드라이버 목록에 `&lt;장치&gt; - &lt;엔드포인트&gt; (EQ APO XT)` 항목을 만듭니다. ASIO를 지원하는 앱에서 그 항목을 고르면 이 장치를 WASAPI 독점 모드로 열면서 EQ까지 적용합니다.</translation>
+    </message>
+    <message>
         <location filename="../DeviceSelector.cpp" line="124"/>
         <source>Troubleshooting options (only use in case of problems)</source>
         <translation>문제 해결 옵션 (문제가 있을 때만 사용)</translation>
