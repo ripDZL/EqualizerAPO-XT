@@ -1,5 +1,8 @@
 # TODO
 
+- [x] Integrate upstream `v2.50.2` as `d59705d4` and repair the x64 endpoint-ASIO Win32 registration gap in `320a9e84`.
+- [ ] After normal beta promotion, verify beta Actions and manually install-test v2.50.2 before any explicit `main` promotion or release. Do not alter `main`, a release, or the installed runtime beforehand.
+
 - [x] Integrate upstream `v2.49.0` locally and complete CI-equivalent validation.
 - [x] Fast-forwarded the validated candidate to `beta`; green Actions run `33280780780` published complete prerelease `v2.49.0-beta.1` from `bd92a2de`.
 - [ ] Manually install-test the released beta before any explicit `main` promotion or stable release.

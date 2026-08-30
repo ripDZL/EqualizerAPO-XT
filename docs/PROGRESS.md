@@ -1,5 +1,7 @@
 # Progress
 
+- [x] 2026-08-30 upstream `v2.50.2` is integrated on `codex/upstream-2502-integration`: merge `d59705d4` plus ASIO endpoint Win32-registration repair `320a9e84`. Local native/UI/script checks are green; the candidate is a normal fast-forward of `origin/beta`. Next: beta Actions and manual beta test only; no `main`, release, installer, or runtime change yet.
+
 - [x] 2026-08-29 published `v2.49.0-beta.1` from green beta run `33280780780` / commit `bd92a2de`. The public prerelease is complete (33 assets: six channel sets, beta-pinned universal Setup, source, SHA256SUMS, and generated notes); `main` is unchanged.
 
 - [x] 2026-08-29 upstream `v2.49.0` candidate `b6a58e0b` is locally validated. Qt large-resource build reliability and DeviceSelector shared-skin icons are repaired; all targeted native, script, UI, ASIO, and audio-regression gates pass. Next: ordinary `beta` fast-forward and Actions.
