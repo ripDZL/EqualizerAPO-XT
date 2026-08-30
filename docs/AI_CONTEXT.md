@@ -1,5 +1,7 @@
 # AI Context
 
+- 2026-08-29 user-approved beta prerelease: `v2.49.0-beta.1` is public from `bd92a2de` after green Actions run `33280780780`. It is a published prerelease (not draft/stable) with 33 assets: six complete channel package sets, the beta-pinned universal Setup, exact source archive, SHA256SUMS, and generated notes. `Publish-Release.ps1` reports complete; `main` remains unchanged.
+
 - 2026-08-29 v2.49.0 integration candidate: `codex/upstream-2490-integration` merges upstream `4acab38b` (released `v2.49.0`) as `b6a58e0b`. Local repairs keep large Editor/DeviceSelector Qt resource bundles in two-step mode and include every shared skin-QSS icon in DeviceSelector. Local validation is green: Pester 126/126; EditorLogic 4,572; HybridConv 1,635; EngineOrchestration 1,292; Asio 385; AudioRegression 31/31; VST self-test; ASIO fake probe 8/8; Theme Lab 44/0; skin/routing/card-move and 225-shot DeviceSelector galleries. Candidate is ready only for a normal beta fast-forward; `main`, releases, installer, active runtime, and audio services remain untouched.
 
 - 2026-08-29 stable `v2.47.1` is published from `eee86aa516e325431600d759e7218e73db2050fa` after green Actions run `33230775759`. It is public (not draft/prerelease) with 33 assets: all six channel Setup/MSI/feed sets, universal Setup, source archive, SHA256SUMS, and generated notes. `Publish-Release.ps1` reports complete with no missing channels or follow-up assets. Keep `beta` as a non-force fast-forward of post-release `main`.

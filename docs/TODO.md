@@ -1,7 +1,8 @@
 # TODO
 
 - [x] Integrate upstream `v2.49.0` locally and complete CI-equivalent validation.
-- [ ] Fast-forward the validated candidate to `beta`, await Actions, then obtain a fresh manual test result before any `main` promotion or release.
+- [x] Fast-forwarded the validated candidate to `beta`; green Actions run `33280780780` published complete prerelease `v2.49.0-beta.1` from `bd92a2de`.
+- [ ] Manually install-test the released beta before any explicit `main` promotion or stable release.
 
 - [x] Repaired the same-version beta-to-stable release gate: Pester 5 has 25 focused passes and the origin-only `v2.47.1-beta.1` dry run emits `release_required=true`.
 - [x] Published stable `v2.47.1` from `eee86aa5` after green main run `33230775759`; release verification confirms all six channel sets, universal Setup, source, SHA256SUMS, and notes (33 assets). Keep `beta` fast-forward-aligned with `main`; do not force-push either release branch.

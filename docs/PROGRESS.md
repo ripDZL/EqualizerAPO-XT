@@ -1,5 +1,7 @@
 # Progress
 
+- [x] 2026-08-29 published `v2.49.0-beta.1` from green beta run `33280780780` / commit `bd92a2de`. The public prerelease is complete (33 assets: six channel sets, beta-pinned universal Setup, source, SHA256SUMS, and generated notes); `main` is unchanged.
+
 - [x] 2026-08-29 upstream `v2.49.0` candidate `b6a58e0b` is locally validated. Qt large-resource build reliability and DeviceSelector shared-skin icons are repaired; all targeted native, script, UI, ASIO, and audio-regression gates pass. Next: ordinary `beta` fast-forward and Actions.
 
 - [x] 2026-08-29 published stable `v2.47.1` from `eee86aa516e325431600d759e7218e73db2050fa` after green main run `33230775759`. The public non-draft release has 33 assets: six complete channel sets, universal Setup, source, SHA256SUMS, and generated notes. `Publish-Release.ps1` reports `Complete=True` with no missing channels or required follow-up assets.
