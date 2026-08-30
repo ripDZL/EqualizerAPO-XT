@@ -472,6 +472,14 @@ void testInstallWithTheAsioEntryRegistersTheWrapperAndUninstallRemovesIt(test::H
 	harness.expect(registry.readValue(entryKey, L"CLSID") == wrapperClsid, "and names the wrapper CLSID");
 	harness.expect(registry.readValue(eapo::asio::AsioRegistration::classesClsidRoot(false) + L"\\" + wrapperClsid + L"\\InprocServer32", L"") == L"C:\\eapo\\EqualizerAPOAsio.dll",
 		"whose class tree points at the wrapper DLL beside the product");
+	const std::wstring entryKey32 = eapo::asio::AsioRegistration::asioRoot(true) + L"\\" + eapo::asio::AsioRegistration::entryNameFor(entryBase);
+#if defined(_M_ARM64) || !defined(_WIN64)
+	harness.expectFalse(registry.keyExists(entryKey32), "a build without the shipped x86 wrapper keeps endpoint entries in the native registry view");
+#else
+	harness.require(registry.keyExists(entryKey32), "the driver-list entry also exists for 32-bit ASIO hosts");
+	harness.expect(registry.readValue(eapo::asio::AsioRegistration::classesClsidRoot(true) + L"\\" + wrapperClsid + L"\\InprocServer32", L"") == L"C:\\eapo\\x86\\EqualizerAPOAsio.dll",
+		"whose 32-bit class tree points at the shipped x86 wrapper DLL");
+#endif
 	harness.expect(info.getLastOperationReport().asioEntry == eapo::asio::AsioRegistration::entryNameFor(entryBase), "the report names the entry");
 
 	DeviceAPOInfo reloaded(registry);
@@ -481,6 +489,9 @@ void testInstallWithTheAsioEntryRegistersTheWrapperAndUninstallRemovesIt(test::H
 	reloaded.uninstall();
 	harness.expectFalse(registry.keyExists(recordKey), "the uninstall removes the record");
 	harness.expectFalse(registry.keyExists(entryKey), "and the driver-list entry");
+#if !defined(_M_ARM64) && defined(_WIN64)
+	harness.expectFalse(registry.keyExists(entryKey32), "including its 32-bit driver-list entry");
+#endif
 	harness.expect(reloaded.getLastOperationReport().asioEntry.empty(), "and the report names no entry");
 
 	// The tick without the APO means nothing: the entry belongs to the installation.

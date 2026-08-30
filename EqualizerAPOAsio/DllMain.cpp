@@ -24,7 +24,6 @@
 #include "asio/AsioWrapper.h"
 #include "asio/DaemonProcessor.h"
 #include "asio/WasapiExclusiveTarget.h"
-#include "asio/WasapiExclusiveTarget.h"
 #include "asio/Win32HostLink.h"
 #include "asio/WrapperRecord.h"
 #include "platform/windows/GuidText.h"

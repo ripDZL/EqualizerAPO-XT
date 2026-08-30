@@ -153,6 +153,17 @@ void DeviceAPOInfo::failReport(RegistryTransaction& plan, const wstring& failure
 
 namespace
 {
+wstring endpointWrapper32Path(const wstring& installPath)
+{
+// Every x64 package carries the Win32 wrapper. ARM64 and non-64-bit builds do
+// not, so their endpoint entries must remain in the native registry view.
+#if defined(_M_ARM64) || !defined(_WIN64)
+	return wstring();
+#else
+	return installPath + L"\\x86\\EqualizerAPOAsio.dll";
+#endif
+}
+
 std::vector<wstring> processingModesFor(bool input)
 {
 	if (input)
@@ -185,7 +196,7 @@ void DeviceAPOInfo::applyAsioEntry(RegistryTransaction& plan)
 	record.options.processOutput = !input;
 	record.options.processInput = input;
 	eapo::asio::WrapperRecords::write(plan, record);
-	eapo::asio::AsioRegistration::registerWrapper(plan, target, installPath + L"\\EqualizerAPOAsio.dll", L"");
+	eapo::asio::AsioRegistration::registerWrapper(plan, target, installPath + L"\\EqualizerAPOAsio.dll", endpointWrapper32Path(installPath));
 	lastOperationReport.asioEntry = eapo::asio::AsioRegistration::entryNameFor(target.name);
 }
 

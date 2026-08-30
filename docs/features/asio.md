@@ -86,7 +86,8 @@ heard the preamp and the peak filter of the test configuration; duplex
 way through the wrapper DLL and the real host. On CI the capture gate
 installs the cable's playback endpoint with the entry, activates the
 entry's CLSID through COM the way a DAW does, and hears the preamp on the
-far side. The 32-bit host option does not apply to these entries yet.
+far side. On x64 builds, endpoint entries are registered for 32-bit hosts as
+well; ARM64 ships no 32-bit wrapper.
 
 ## What the config sees
 
@@ -159,10 +160,10 @@ The record behind an entry lives under
 - The host crashes mid-stream: buffers pass through unprocessed for the rest
   of that session; reopening the device starts a fresh host. The DAW is not
   affected beyond that.
-- 32-bit applications see the entry only with **32-bit host support** ticked
-  for the driver; x64 builds ship the 32-bit wrapper, which talks to the
-  same 64-bit host. The ARM64 build has no 32-bit
-  wrapper, and its wrapper is ARM64-native: an x64 application running under
+-  32-bit applications see a hardware-driver entry only with **32-bit host
+  support** ticked. Endpoint entries register the shipped x86 wrapper
+  automatically on x64. Both wrappers talk to the same 64-bit host. The ARM64
+  build has no 32-bit wrapper, and its wrapper is ARM64-native: an x64 application running under
   emulation on an ARM64 machine cannot load it (the 64-bit registry view is
   shared, so one entry cannot serve both architectures without an ARM64X
   binary, which this build does not produce).
