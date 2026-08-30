@@ -1,5 +1,7 @@
 # Progress
 
+- [x] 2026-08-30 published `v2.50.2-beta.1` from green beta run `33327886701` / `2ea7bcbd`. It is public prerelease-only with 33 assets, six complete channels, universal Setup, source, SHA256SUMS, and notes; all 13 installer checksums match GitHub asset digests and the completeness plan is green. AVX-512 CI payload is installed hash-verified in Program Files; `main` is unchanged at `5c49de19`.
+
 - [x] 2026-08-30 upstream `v2.50.2` is integrated on `codex/upstream-2502-integration`: merge `d59705d4` plus ASIO endpoint Win32-registration repair `320a9e84`. Local native/UI/script checks are green; the candidate is a normal fast-forward of `origin/beta`. Next: beta Actions and manual beta test only; no `main`, release, installer, or runtime change yet.
 
 - [x] 2026-08-29 published `v2.49.0-beta.1` from green beta run `33280780780` / commit `bd92a2de`. The public prerelease is complete (33 assets: six channel sets, beta-pinned universal Setup, source, SHA256SUMS, and generated notes); `main` is unchanged.
