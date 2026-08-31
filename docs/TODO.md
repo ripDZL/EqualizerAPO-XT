@@ -1,5 +1,9 @@
 # TODO
 
+- [x] Integrate upstream `v2.50.6` / `40fb6ccf` as local candidate `b45db4d6` and complete local native, Qt, VST, ASIO, and UI-gallery validation.
+- [ ] With explicit approval, fast-forward only `beta` to the verified candidate and wait for the full beta Actions run. Do not push `main`, release, install, or alter the runtime.
+- [ ] After a green beta build and explicit approval, install-test the beta payload before any main promotion or stable release.
+
 - [x] Integrate upstream `v2.50.2` as `d59705d4` and repair the x64 endpoint-ASIO Win32 registration gap in `320a9e84`.
 - [x] Fast-forwarded beta to `2ea7bcbd`, verified green Actions run `33327886701`, installed the AVX-512 CI payload with hashes verified, and published prerelease `v2.50.2-beta.1` (33 assets; release-completeness plan green).
 - [ ] User-test the installed v2.50.2 AVX-512 beta before any explicit `main` promotion or stable release. Keep `main` unchanged; do not force-push.

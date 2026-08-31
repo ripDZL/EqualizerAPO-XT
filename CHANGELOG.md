@@ -85,7 +85,7 @@ tags are clean `vX.Y.Z` names. Installers for every version are on the
   that race a stream teardown are fenced per slot, so a stalled callback
   can no longer reach freed memory or another stream's wrapper, and the
   engine host now owns and joins its serving threads on exit instead of
-    leaving them detached.
+  leaving them detached.
 
 ## v2.50.2 — 2026-08-30
 
