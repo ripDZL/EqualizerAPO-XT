@@ -1,5 +1,7 @@
 # Progress
 
+- [x] 2026-08-31 installed the hash-verified 69-file local AVX-512 v2.50.6 payload into `C:\Program Files\EqualizerAPO-XT-x64-avx512\current`; backup `artifacts\install-backups\upstream-v2506-local-avx512-20260831-100454`. `config`, updater metadata, and docs shortcuts are retained; Windows Audio was restored; no reboot, remote, beta/main, or release change. Await user testing before beta push.
+
 - [x] 2026-08-31 merged upstream `v2.50.6` (`40fb6ccf`) into isolated candidate `b45db4d6` based on `origin/beta` `44ac01d7`. The fork VST/UI/installer resolutions are retained. Local static, full x64 native, Qt, VST/VST3 panel, Theme Lab, ASIO 8-run, and UI/gallery checks pass. `beta`, `main`, releases, installed files, and audio services are unchanged; await explicit beta-push approval.
 
 - [x] 2026-08-30 published `v2.50.2-beta.1` from green beta run `33327886701` / `2ea7bcbd`. It is public prerelease-only with 33 assets, six complete channels, universal Setup, source, SHA256SUMS, and notes; all 13 installer checksums match GitHub asset digests and the completeness plan is green. AVX-512 CI payload is installed hash-verified in Program Files; `main` is unchanged at `5c49de19`.
