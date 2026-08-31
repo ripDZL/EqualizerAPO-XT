@@ -22,6 +22,71 @@ tags are clean `vX.Y.Z` names. Installers for every version are on the
 - **Legacy VST3 channel-fill controls wrap cleanly.** Long channel layouts no
   longer overlap their labels or controls.
 
+## v2.50.6 — 2026-08-31
+
+- **The ASIO engine host validates stream geometry before trusting it.**
+  The shared audio ring's sizes were computed in 32-bit arithmetic with no
+  channel or frame bounds, and the host accepted whatever geometry the
+  connecting wrapper announced, so a corrupted or hostile wrapper process
+  could make the host write past its mapping. Both sides now enforce
+  explicit bounds (64 channels, 65536 frames), recompute sizes in 64-bit,
+  and reject a session whose header disagrees, before any audio moves.
+
+## v2.50.5 — 2026-08-31
+
+- **Checking for updates can no longer hang forever on a silent server.**
+  The update check armed its 10-second timer but never started it and set
+  no transfer timeout, so a server that accepted the connection and never
+  answered left an invisible background process waiting indefinitely. Both
+  bounds are live now.
+- **The Editor family no longer loads GUI plugins from a
+  working-directory "qt" folder.** When the executable path could not be
+  resolved, the apps fell back to a path relative to whatever directory
+  they were started from; they now rely on Qt's default search alone, and
+  the five duplicated executable-path lookups were consolidated into one
+  shared helper with consistent failure handling.
+- **Crash reports capture the last action more reliably.** The note the
+  crash reporter records was read without synchronization while the UI
+  thread could still be rewriting it; it is now published atomically, so
+  the report cannot scan past the end of a half-written note.
+
+## v2.50.4 — 2026-08-31
+
+- **A configuration file locked by another program can no longer freeze the
+  audio engine or the Editor forever.** The shared-file retry loop had no
+  bound, so a config held exclusively (editor, backup, antivirus) could hang
+  audiodg's teardown or the Editor UI indefinitely. The retry now stops
+  after 10 seconds and the engine's copy also stops the moment the engine
+  shuts down.
+- **Closing the device test dialog no longer kills its worker mid-write.**
+  The test thread was terminated forcibly, which could leak a stuck pipe
+  thread, skip its registry cleanup and abandon COM state. It is now asked
+  to stop, given time to unwind, and detached with a log line in the worst
+  case.
+- **The analysis panel no longer draws a superseded configuration's
+  curve.** A result computed for an outdated request is discarded instead
+  of flashing on screen for one refresh before the current one replaces it.
+
+## v2.50.3 — 2026-08-31
+
+- **Opening an ASIO stream no longer fails at random right after launch.**
+  The wrapper announced its shared audio ring only after asking the engine
+  host to attach, so a fast host could inspect the still-empty ring first
+  and reject the stream. The host now waits for the announcement (bounded,
+  watching the wrapper process) before validating.
+- **The default (pipelined) ASIO mode no longer stalls the driver callback
+  when the engine host hangs.** The callback used to wait at least 20 ms
+  (eight periods) inside the driver's buffer switch before giving up on a
+  stalled host. It now checks for the previous block without any kernel
+  wait (a pure spin of at most 10% of one period, capped at 0.5 ms),
+  passes unprocessed audio through, and writes the stream off only after
+  about eight unanswered periods in a row.
+- **ASIO teardown and host shutdown are more robust.** Driver callbacks
+  that race a stream teardown are fenced per slot, so a stalled callback
+  can no longer reach freed memory or another stream's wrapper, and the
+  engine host now owns and joins its serving threads on exit instead of
+    leaving them detached.
+
 ## v2.50.2 — 2026-08-30
 
 - **A switched-off row no longer shows a live "Locate..." button.** When an

@@ -59,14 +59,26 @@ namespace eapo::asio
 		OpenReport report;
 		teardown();
 		profile_ = HandoffProfile();
+		if (!eapo::ipc::RingGeometry::validFormat(format))
+		{
+			report.status = OpenReport::Status::Rejected;
+			copyMessage(report.message, "EQ APO XT cannot serve this channel count or buffer size");
+			return report;
+		}
 
 		format_ = format;
 		mode_ = options.mode;
 		const double periodUs = format.sampleRate > 0.0 ? static_cast<double>(format.frames) * 1000000.0 / format.sampleRate : 0.0;
 		deadlineUs_ = syncDeadlineUs(format, options);
-		hangBoundUs_ = static_cast<uint32_t>(periodUs * 8.0);
-		if (hangBoundUs_ < 20000)
-			hangBoundUs_ = 20000;
+		pipelineSpinUs_ = static_cast<uint32_t>(periodUs * 0.1);
+		if (pipelineSpinUs_ > 500)
+			pipelineSpinUs_ = 500;
+		uint32_t hangBoundUs = static_cast<uint32_t>(periodUs * 8.0);
+		if (hangBoundUs < 20000)
+			hangBoundUs = 20000;
+		hangLateCount_ = periodUs > 0.0 ? static_cast<uint32_t>(static_cast<double>(hangBoundUs) / periodUs) : 8;
+		if (periodUs > 0.0 && periodUs * hangLateCount_ < hangBoundUs)
+			hangLateCount_++;
 
 		for (unsigned slot = 0; slot < directionCount; slot++)
 		{
@@ -74,6 +86,7 @@ namespace eapo::asio
 			const uint32_t channels = format.channels[slot];
 			lane.samples = static_cast<size_t>(channels) * format.frames;
 			lane.sequence = 0;
+			lane.consecutiveLate = 0;
 			lane.gone = false;
 			lane.staging.assign(lane.samples, 0.0f);
 			lane.planes.resize(channels);
@@ -130,7 +143,19 @@ namespace eapo::asio
 
 		const uint32_t seq = lane.sequence + 1;
 		if (!producer_->canPublish(direction, seq))
+		{
+			if (producer_->peerGone() || producer_->state() != RingState::Ready)
+			{
+				lane.gone = true;
+				return Outcome::Gone;
+			}
+			if (mode_ == Mode::Pipelined && ++lane.consecutiveLate >= hangLateCount_)
+			{
+				lane.gone = true;
+				return Outcome::Gone;
+			}
 			return Outcome::Late;      // the host is two blocks behind; drop this one
+		}
 		lane.sequence = seq;
 		std::memcpy(producer_->slot(direction, seq), lane.staging.data(), lane.samples * sizeof(float));
 		producer_->publish(direction, seq);
@@ -158,9 +183,10 @@ namespace eapo::asio
 			std::memset(lane.staging.data(), 0, lane.samples * sizeof(float));
 			return Outcome::Processed;
 		}
-		const RingWait waited = producer_->wait(direction, seq - 1, hangBoundUs_);
+		const RingWait waited = producer_->poll(direction, seq - 1, pipelineSpinUs_);
 		if (waited == RingWait::Done)
 		{
+			lane.consecutiveLate = 0;
 			record(direction);
 			std::memcpy(lane.staging.data(), producer_->slot(direction, seq - 1), lane.samples * sizeof(float));
 			return Outcome::Processed;
@@ -170,10 +196,12 @@ namespace eapo::asio
 			lane.gone = true;
 			return Outcome::Gone;
 		}
-		// A live host that has not answered for eight periods is as good as
-		// gone for this stream.
-		lane.gone = true;
-		return Outcome::Gone;
+		if (++lane.consecutiveLate >= hangLateCount_)
+		{
+			lane.gone = true;
+			return Outcome::Gone;
+		}
+		return Outcome::Late;
 	}
 
 	void DaemonProcessor::close(const StreamStats& stats) noexcept
@@ -198,6 +226,7 @@ namespace eapo::asio
 			lane.planes.clear();
 			lane.samples = 0;
 			lane.sequence = 0;
+			lane.consecutiveLate = 0;
 			lane.gone = false;
 		}
 		open_ = false;

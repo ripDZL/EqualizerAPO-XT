@@ -117,20 +117,21 @@ namespace eapo::asio
 				return true;
 			lane.planes.resize(channels);
 			lane.engine = std::make_unique<FilterEngine>();
-			EngineSetup setup;
-			setup.sampleRate = static_cast<float>(format.sampleRate);
-			setup.inputChannelCount = channels;
-			setup.realChannelCount = channels;
-			setup.outputChannelCount = channels;
-			setup.channelMask = 0;
-			setup.maxFrameCount = format.frames;
-			setup.customPath = options.configPath;
-			setup.preMix = false;
-			setup.capture = direction == Direction::Input;
-			setup.postMixInstalled = true;
-			setup.deviceName = format.deviceName;
-			setup.connectionName = L"ASIO";
-			setup.deviceGuid = format.deviceGuid;
+			EngineSetup setup{
+				.sampleRate = static_cast<float>(format.sampleRate),
+				.inputChannelCount = channels,
+				.realChannelCount = channels,
+				.outputChannelCount = channels,
+				.channelMask = 0,
+				.maxFrameCount = format.frames,
+				.customPath = options.configPath,
+				.preMix = false,
+				.capture = direction == Direction::Input,
+				.postMixInstalled = true,
+				.deviceName = format.deviceName,
+				.connectionName = L"ASIO",
+				.deviceGuid = format.deviceGuid
+			};
 			lane.engine->initialize(setup);
 			return true;
 		}
@@ -183,6 +184,11 @@ namespace eapo::asio
 			RingConsumer::Acquired acquired;
 			for (;;)
 			{
+				if (options.abandon != nullptr && options.abandon->load())
+				{
+					report.peerGone = false;
+					return report;
+				}
 				if (!consumer.acquire(acquired, options.idleWaitMs, spinUs))
 				{
 					if (consumer.state() == RingState::Closing || consumer.peerGone())

@@ -22,9 +22,9 @@
 	    lane's work event.
 	  * wait(seq, budget) returns Done when `completed >= seq`, Late when the
 	    budget passes first, Gone when the peer handle signals or the state
-	    leaves Ready. A late block is still processed by the consumer in
-	    order (filter state stays continuous); only the producer stops
-	    waiting for it.
+	    leaves Ready. poll(seq, budget) returns the same results without a
+	    kernel wait. A late block is still processed by the consumer in order
+	    (filter state stays continuous); only the producer stops waiting for it.
 	  * The consumer takes every published sequence in order, never skips.
 
 	Readiness: the producer formats the header (state Announced) and waits on
@@ -40,6 +40,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <type_traits>
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -57,6 +58,10 @@ namespace eapo::ipc
 	constexpr uint32_t ringLayoutVersion = 1;
 	constexpr size_t ringHeaderBytes = 512;
 	constexpr size_t ringAlignment = 64;
+	// ASIO hardware stays far below these bounds. They keep the complete ring
+	// under 128 MiB, so its uint32_t wire geometry cannot wrap.
+	constexpr uint32_t maxRingChannels = 64;
+	constexpr uint32_t maxRingFrames = 65536;
 
 	enum class RingState : uint32_t
 	{
@@ -109,7 +114,11 @@ namespace eapo::ipc
 		uint8_t reserved[ringHeaderBytes - (16 + sizeof(eapo::asio::StreamFormat) + 16 + 2 * sizeof(RingLane) + 48 + 4)];
 	};
 
+	static_assert(std::is_standard_layout_v<RingLane> && std::is_trivially_copyable_v<RingLane>,
+		"RingLane must remain a plain wire type");
 	static_assert(sizeof(RingLane) == 20, "RingLane must stay fixed-width");
+	static_assert(std::is_standard_layout_v<RingHeader> && std::is_trivially_copyable_v<RingHeader>,
+		"RingHeader must remain a plain wire type");
 	static_assert(sizeof(RingHeader) == ringHeaderBytes, "RingHeader must be exactly 512 bytes");
 	static_assert(offsetof(RingHeader, format) == 16, "StreamFormat sits at offset 16");
 	static_assert(offsetof(RingHeader, lanes) == 16 + sizeof(eapo::asio::StreamFormat) + 16, "lanes follow the state words");
@@ -117,6 +126,7 @@ namespace eapo::ipc
 	// Sizes both sides derive from the format alone.
 	namespace RingGeometry
 	{
+		bool validFormat(const eapo::asio::StreamFormat& format) noexcept;
 		uint32_t slotBytes(const eapo::asio::StreamFormat& format, eapo::asio::Direction direction) noexcept;
 		uint32_t totalBytes(const eapo::asio::StreamFormat& format) noexcept;
 	}
@@ -161,7 +171,10 @@ namespace eapo::ipc
 		void publish(eapo::asio::Direction direction, uint32_t seq) noexcept;
 		// budgetUs == 0 answers immediately (Done only if already completed).
 		RingWait wait(eapo::asio::Direction direction, uint32_t seq, uint32_t budgetUs) noexcept;
+		// Polls with pauses only; never enters a kernel wait.
+		RingWait poll(eapo::asio::Direction direction, uint32_t seq, uint32_t budgetUs) noexcept;
 		bool completed(eapo::asio::Direction direction, uint32_t seq) const noexcept;
+		bool peerGone() const noexcept;
 
 		void close() noexcept;
 		RingState state() const noexcept;

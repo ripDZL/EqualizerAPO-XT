@@ -67,6 +67,7 @@
 #include "services/install/ApoRegistration.h"
 #include "services/registry/WindowsRegistry.h"
 #include "platform/windows/Win32Resource.h"
+#include "platform/windows/WindowsPath.h"
 #include "services/security/AudioEngineAccess.h"
 #include "services/diagnostics/InstallDiagnostics.h"
 #include "services/update/UpdateSession.h"
@@ -85,19 +86,6 @@ namespace
 {
 // The VST round-trip self test lives with the other offscreen gates in
 // SkinGallery.cpp (audit #275 B7).
-
-std::wstring executableDirectory()
-{
-	wchar_t buffer[MAX_PATH];
-	DWORD length = GetModuleFileNameW(nullptr, buffer, MAX_PATH);
-	if (length == 0)
-		return std::wstring();
-	std::wstring path(buffer, length);
-	size_t slash = path.find_last_of(L"\\/");
-	if (slash == std::wstring::npos)
-		return path;
-	return path.substr(0, slash);
-}
 
 bool matchesHook(const char* arg, const char* name)
 {
@@ -174,9 +162,8 @@ std::wstring buildArgumentLine(int argc, char* argv[])
 // hook, so this per-hook fallback is not reached during that flow.
 int relaunchElevatedAndWait(int argc, char* argv[])
 {
-	wchar_t exePathBuffer[MAX_PATH];
-	DWORD length = GetModuleFileNameW(nullptr, exePathBuffer, MAX_PATH);
-	if (length == 0)
+	std::wstring exePath = pathutil::exePath();
+	if (exePath.empty())
 	{
 		LogFStatic(L"[Editor] GetModuleFileName failed (gle=%lu)", GetLastError());
 		return 1;
@@ -189,7 +176,7 @@ int relaunchElevatedAndWait(int argc, char* argv[])
 	info.cbSize = sizeof(info);
 	info.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC;
 	info.lpVerb = L"runas";
-	info.lpFile = exePathBuffer;
+	info.lpFile = exePath.c_str();
 	info.lpParameters = parameters.c_str();
 	info.nShow = SW_HIDE;
 
@@ -234,7 +221,7 @@ int handleVelopackHook(int argc, char* argv[])
 		if (arg == nullptr || arg[0] != '-')
 			continue;
 
-		std::wstring exeDir = executableDirectory();
+		std::wstring exeDir = pathutil::exeDirectory();
 		if (matchesHook(arg, "--veloapp-install"))
 		{
 			auto rc = ApoRegistration::install(exeDir);
@@ -566,7 +553,7 @@ int main(int argc, char* argv[])
 		else if (parser.isSet(stormOption))
 			SkinSwitchStorm::run(w);  // storm sessions skip doChecks: its modal warnings would stall the timer
 		else if (firstRun)
-			launchDeviceSelector(executableDirectory());
+			launchDeviceSelector(pathutil::exeDirectory());
 		else
 			w.doChecks();
 

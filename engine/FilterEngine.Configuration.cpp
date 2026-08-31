@@ -19,7 +19,6 @@
 
 #include "stdafx.h"
 #include "text/WideString.h"
-#define _USE_MATH_DEFINES
 #include <cmath>
 #include <sstream>
 #include <fstream>
@@ -141,7 +140,7 @@ void FilterEngine::loadConfigFile(const wstring& path)
 {
 	TraceF(L"Loading configuration from %s", path.c_str());
 
-	stringstream inputStream = ConfigurationFileReader::readWithRetry(path);
+	stringstream inputStream = ConfigurationFileReader::readWithRetry(path, configChannel.shutdownHandle());
 	if (!inputStream.good())
 		return;
 
