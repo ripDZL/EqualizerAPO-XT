@@ -1,5 +1,8 @@
 # TODO
 
+- [x] Integrate upstream `v2.50.7` (`56c10764` / `c56a0484`) as a local candidate and complete targeted native, ASIO, Qt Editor, VST, VST3-panel, static, and audio-regression validation.
+- [ ] Fast-forward the validated v2.50.7 candidate to `beta`, await Actions, then install-test before any explicit `main` promotion or stable release. Keep `main` unchanged; do not force-push.
+
 - [x] Integrate upstream `v2.50.6` / `40fb6ccf` as local candidate `b45db4d6` and complete local native, Qt, VST, ASIO, and UI-gallery validation.
 - [x] Install the 69-file local AVX-512 test payload with hashes verified; preserve `config`, updater metadata, and documentation shortcuts. Backup: `artifacts\install-backups\upstream-v2506-local-avx512-20260831-100454`.
 - [x] User accepted the v2.50.6 local test and authorized only a normal `beta` fast-forward.

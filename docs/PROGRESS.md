@@ -1,5 +1,7 @@
 # Progress
 
+- [x] 2026-09-01 integrated upstream `v2.50.7` (`56c10764` / `c56a0484`) in isolated candidate `codex/upstream-2507-integration`, preserving fork update routing and theme notes. Local green: static checks, x64 native, EditorLogic 4,574, HybridConv 1,635, Engine 1,320, Asio 447, AudioRegression 31/31, ASIO probe 9/9, Qt Editor, VST, and VST3 panel. Theme Lab's offscreen command exceeded a 120-second local bound; no theme code changed and EditorLogic covers its logic. `beta`, `main`, releases, installed files, and audio services remain unchanged pending the beta fast-forward.
+
 - [x] 2026-08-31 published `v2.50.6-beta.1` from green beta run `33404008513` / `43926271`. It is public prerelease-only with 33 complete assets (six channels, universal Setup, source, SHA256SUMS, notes); all 13 installer hashes match GitHub digests, the release plan is complete, and `--detect-only` selects the beta-pinned AVX-512 MSI. `main` remains `5c49de19`; next gate is beta install-testing.
 
 - [x] 2026-08-31 installed the hash-verified 69-file local AVX-512 v2.50.6 payload into `C:\Program Files\EqualizerAPO-XT-x64-avx512\current`; backup `artifacts\install-backups\upstream-v2506-local-avx512-20260831-100454`. `config`, updater metadata, and docs shortcuts are retained; Windows Audio was restored; no reboot occurred. The user accepted the test and authorized only a normal beta fast-forward; await beta Actions before a release or main promotion.
