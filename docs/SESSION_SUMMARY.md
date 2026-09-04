@@ -1,5 +1,7 @@
 # Session Summary
 
+- 2026-09-04 retry checkpoint: the sole AVX2 skin-switch failure from run `33916441078` is not locally reproducible. Exact 132-switch/198-row runs under the CI `2500/5000 ms` budget passed on AVX-512 (worst 929 ms; Legacy Bronze light 838 ms) and a fresh isolated `/arch:AVX2`, `x64-avx2` Editor (worst 905 ms; Legacy Bronze light 823 ms). Beta head `310b990e` differs from tested `e8b18ce1` only in docs; no source change or limit relaxation is justified. Retry attempt 2 is in progress at `e8b18ce1`; the existing beta-only monitor may publish only a fully complete prerelease and must not touch `main`.
+
 - 2026-09-04: Beta build `33916441078` for `e8b18ce1` failed. The blocker is x64 AVX2 `--skin-switch-test`: `legacy-bronze/light` took `10899 ms`, over its `5000 ms` hard limit. Pester, cppcheck, memcheck, AVX10.1, SSE2, AVX, AVX512, and ARM64 passed. No prerelease was published; `main` unchanged. Next: reproduce/repair the skin-switch performance failure and rerun beta CI.
 
 - 2026-09-04: User-approved local AVX-512 v2.51.0 install is complete. Backed up 82 active Program Files runtime files at `artifacts\install-backups\v2510-avx512-preinstall-20260904-161712`, overlaid 70 staged candidate files from `8cb9fa01`, and verified `2.50.7.0 -> 2.51.0.0`, deployed hashes, preserved config/updater/docs, installed VST self-test, and Legacy/Modern VST3-panel probe. Windows Audio is running. Manual test is next; beta/main/release remain unchanged.

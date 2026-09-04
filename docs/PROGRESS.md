@@ -1,5 +1,7 @@
 # Progress
 
+- [x] 2026-09-04 diagnosed the AVX2 skin-switch CI failure without relaxing its contract: full 132-switch/198-row runs passed under the exact `2500/5000 ms` CI settings on AVX-512 (worst 929 ms; Legacy Bronze light 838 ms) and an isolated `/arch:AVX2` `x64-avx2` Editor (worst 905 ms; Legacy Bronze light 823 ms). The beta head differs from the tested commit only in handoff docs. Retried Actions run `33916441078` as attempt 2; beta-only publication remains conditional on green CI and `main` remains untouched.
+
 - [ ] 2026-09-04 beta CI blocker: run `33916441078` on `e8b18ce1` failed only in x64 AVX2 skin-switch because `legacy-bronze/light` took `10899 ms` against the `5000 ms` hard limit. The other five native variants, Pester, cppcheck, and memcheck passed. No prerelease; `main` unchanged. Reproduce/repair the performance regression, then rerun beta CI.
 
 - [x] 2026-09-04 user-approved local AVX-512 candidate install: backed up the 82-file active Program Files runtime at `artifacts\install-backups\v2510-avx512-preinstall-20260904-161712`, overlaid 70 staged files from `8cb9fa01`, and verified `2.50.7.0 -> 2.51.0.0`, deployed hashes, and preserved config/updater/docs. Windows Audio is restored; installed VST and Legacy/Modern VST3-panel self-tests pass. User manual acceptance remains the gate; beta/main/release unchanged.
