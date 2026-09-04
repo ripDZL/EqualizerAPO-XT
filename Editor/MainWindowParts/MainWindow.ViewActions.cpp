@@ -153,6 +153,9 @@ void MainWindow::applySkinAndRebuild()
 		darkThemeAction->setChecked(skinDark);
 		darkThemeAction->blockSignals(signalsBlocked);
 	}
+	// The new sheet re-polished the analysis bar; re-pin the dock floor so a
+	// graph parked at the floor keeps its size across the switch.
+	updateAnalysisDockFloor();
 	// Modern cards rebuild because routing renderers and card chrome are chosen
 	// at construction time. Legacy rows rebuild to re-polish the old widgets
 	// under the heritage palette without changing their factory behavior.

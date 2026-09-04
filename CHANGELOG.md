@@ -22,6 +22,40 @@ tags are clean `vX.Y.Z` names. Installers for every version are on the
 - **Legacy VST3 channel-fill controls wrap cleanly.** Long channel layouts no
   longer overlap their labels or controls.
 
+## v2.51.0 — 2026-09-03
+
+- **The minimal skin's knob is a register drum, rolled by dragging up and
+  down.** The hairline arc read badly as a knob (issue #338). The knob is now
+  seen edge-on like an adding machine's register: hairlines spaced as a
+  cylinder's surface roll with the value, the figure sits in a two-rule
+  window, index ticks against the rims are the reading line, and a travel
+  rule on the right shows the position in range (folded when a crowded row
+  squeezes the knob, so the figure keeps its size). Because a drum is rolled
+  rather than turned, dragging it is vertical: press to grab it where it is,
+  drag up to raise the value (200px for the whole range, Shift for a tenth
+  of the rate), and the surface moves with the pointer one to one. The
+  other skins keep their rotary knobs
+  ([#340](https://github.com/115dkk/EqualizerAPO-XT/pull/340)).
+
+## v2.50.8 — 2026-09-02
+
+- **Korean text in the skins stays on the bundled typeface even when a
+  same-named font is installed system-wide.** The Editor ships DM Sans, DM
+  Mono, Pretendard and Sarasa Mono K, but registered them under their public
+  family names, so a Pretendard (or a variable DM Sans) installed on the
+  machine merged into the same family and took over its faces: on such a
+  machine the studio, soft and matrix skins drew menus, labels and the title
+  bar in a Thin Noto Sans KR or in Malgun Gothic while rack looked right. The
+  bundled fonts now carry private family names (`EAPO Sans`, `EAPO Mono`,
+  `EAPO Sans KR`, `EAPO Mono K`), every skin sheet names the bundled Korean
+  fallbacks explicitly, and minimal's Korean text finally lands on the
+  monospace Sarasa face it has bundled since v2.2.1.
+- **The analysis graph keeps its size across skin switches.** The dock's
+  minimum size was whatever the active skin's control bar and title added
+  up to, and the skins differed by up to 20px, so a graph dragged down to
+  its smallest size grew when switching from rack to minimal (or to any
+  other skin). All five skins now share one floor.
+
 ## v2.50.7 — 2026-09-01
 
 - **An ASIO entry offers honest buffer sizes after a sample-rate change.**

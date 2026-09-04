@@ -3725,3 +3725,380 @@ bool SkinGallery::armVstPanelFeedProbe(MainWindow& window, const QString& durati
 	});
 	return true;
 }
+
+// ---------------------------------------------------------------------------
+// --skin-metrics-probe (diagnostic): shrink the analysis dock, then walk the
+// five skins on the live MainWindow and report the dock's size/minimums and
+// which physical font face serves Korean text in the chrome. Not a gate.
+// ---------------------------------------------------------------------------
+
+#include <QFontDatabase>
+#include <QFontInfo>
+#include <QRawFont>
+#include <QAction>
+
+namespace
+{
+QAction* findSkinAction(const MainWindow& window, const QString& skinId)
+{
+	for (QAction* action : window.findChildren<QAction*>())
+		if (action->isCheckable() && action->data().toString() == skinId)
+			return action;
+	return nullptr;
+}
+
+void reportFontDatabase()
+{
+	for (const QString& family : { QStringLiteral("Pretendard"), QStringLiteral("Pretendard Variable"),
+		QStringLiteral("EAPO Sans KR"), QStringLiteral("EAPO Sans"), QStringLiteral("EAPO Mono"), QStringLiteral("EAPO Mono K"), QStringLiteral("Malgun Gothic"),
+		QStringLiteral("Noto Sans KR"), QStringLiteral("Noto Sans") })
+	{
+		fprintf(stderr, "  family %s: has=%d private=%d korean=%d styles=",
+			qPrintable(family), QFontDatabase::hasFamily(family) ? 1 : 0,
+			QFontDatabase::isPrivateFamily(family) ? 1 : 0,
+			QFontDatabase::writingSystems(family).contains(QFontDatabase::Korean) ? 1 : 0);
+		for (const QString& style : QFontDatabase::styles(family))
+			fprintf(stderr, "[%s w%d] ", qPrintable(style), QFontDatabase::weight(family, style));
+		fprintf(stderr, "\n");
+	}
+}
+
+void reportFontMatrix()
+{
+	const QList<QStringList> lists = {
+		{ QStringLiteral("Pretendard") },
+		{ QStringLiteral("EAPO Sans KR") },
+		{ QStringLiteral("EAPO Sans"), QStringLiteral("EAPO Sans KR") },
+		{ QStringLiteral("EAPO Mono"), QStringLiteral("EAPO Mono K"), QStringLiteral("EAPO Sans KR") },
+		{ QStringLiteral("EAPO Sans"), QStringLiteral("EAPO Sans KR"), QStringLiteral("Noto Sans KR"),
+			QStringLiteral("Noto Sans"), QStringLiteral("Malgun Gothic"), QStringLiteral("Microsoft YaHei"),
+			QStringLiteral("sans-serif") }
+	};
+	for (const QStringList& list : lists)
+	{
+		for (int weight : { 400, 500, 600, 700 })
+		{
+			fprintf(stderr, "  matrix [%s] w=%d:", qPrintable(list.join(QLatin1Char(','))), weight);
+			for (double pt : { 9.0, 10.0, 10.5, 11.0, 12.0, 14.0 })
+			{
+				QFont font;
+				font.setFamilies(list);
+				font.setWeight(QFont::Weight(weight));
+				font.setPointSizeF(pt);
+				const QRawFont korean = QRawFont::fromFont(font, QFontDatabase::Korean);
+				fprintf(stderr, " %.1f=%s/%s", pt, qPrintable(korean.familyName()), qPrintable(korean.styleName()));
+			}
+			fprintf(stderr, "\n");
+		}
+	}
+}
+
+void reportFace(const char* label, const QWidget* widget)
+{
+	if (widget == nullptr)
+	{
+		fprintf(stderr, "    %s: (missing)\n", label);
+		return;
+	}
+	const QFont font = widget->font();
+	const QFontInfo info(font);
+	const QRawFont latin = QRawFont::fromFont(font, QFontDatabase::Latin);
+	const QRawFont korean = QRawFont::fromFont(font, QFontDatabase::Korean);
+	fprintf(stderr, "    %s: request=[%s] w=%d pt=%.1f | info=%s w=%d | latin=%s/%s w=%d | korean=%s/%s w=%d\n",
+		label, qPrintable(font.families().join(QLatin1Char(','))), int(font.weight()), font.pointSizeF(),
+		qPrintable(info.family()), int(info.weight()),
+		qPrintable(latin.familyName()), qPrintable(latin.styleName()), int(latin.weight()),
+		qPrintable(korean.familyName()), qPrintable(korean.styleName()), int(korean.weight()));
+}
+
+void reportFonts(const MainWindow& window)
+{
+	reportFace("titlebar", window.findChild<QLabel*>(QStringLiteral("TitleBarText")));
+	reportFace("menubar", window.findChild<QMenuBar*>());
+	reportFace("cardtitle", window.findChild<QLabel*>(QStringLiteral("FilterCardTitle")));
+	reportFace("formlabel", window.findChild<QLabel*>(QStringLiteral("AnalysisFormLabel")));
+	QLabel probe(QStringLiteral("probe"));
+	probe.ensurePolished();
+	reportFace("plainlabel", &probe);
+}
+
+void reportDockMetrics(const MainWindow& window, const QDockWidget* dock)
+{
+	const QWidget* contents = dock->widget();
+	const QWidget* controls = window.findChild<QWidget*>(QStringLiteral("analysisControlBar"));
+	const QWidget* graph = window.findChild<QWidget*>(QStringLiteral("ModernAnalysisGraph"));
+	const auto sz = [](const QSize& s) { return QStringLiteral("%1x%2").arg(s.width()).arg(s.height()); };
+	fprintf(stderr, "    dock: size=%s minHint=%s min=%s hint=%s\n",
+		qPrintable(sz(dock->size())), qPrintable(sz(dock->minimumSizeHint())),
+		qPrintable(sz(dock->minimumSize())), qPrintable(sz(dock->sizeHint())));
+	if (contents != nullptr)
+		fprintf(stderr, "    contents: size=%s minHint=%s min=%s\n",
+			qPrintable(sz(contents->size())), qPrintable(sz(contents->minimumSizeHint())),
+			qPrintable(sz(contents->minimumSize())));
+	if (controls != nullptr)
+	{
+		fprintf(stderr, "    controls: size=%s minHint=%s hint=%s\n",
+			qPrintable(sz(controls->size())), qPrintable(sz(controls->minimumSizeHint())),
+			qPrintable(sz(controls->sizeHint())));
+		for (const QWidget* child : controls->findChildren<QWidget*>(QString(), Qt::FindDirectChildrenOnly))
+		{
+			if (!child->isVisibleTo(controls))
+				continue;
+			fprintf(stderr, "      %s(%s): size=%s minHint=%s hint=%s\n",
+				qPrintable(child->objectName()), child->metaObject()->className(),
+				qPrintable(sz(child->size())), qPrintable(sz(child->minimumSizeHint())),
+				qPrintable(sz(child->sizeHint())));
+		}
+	}
+	if (graph != nullptr)
+		fprintf(stderr, "    graph: size=%s minHint=%s min=%s hint=%s\n",
+			qPrintable(sz(graph->size())), qPrintable(sz(graph->minimumSizeHint())),
+			qPrintable(sz(graph->minimumSize())), qPrintable(sz(graph->sizeHint())));
+}
+
+void settle()
+{
+	for (int i = 0; i < 4; i++)
+	{
+		QCoreApplication::sendPostedEvents();
+		QApplication::processEvents(QEventLoop::AllEvents, 50);
+	}
+}
+}
+
+bool SkinGallery::armSkinMetricsProbe(MainWindow& window)
+{
+	QDockWidget* dock = window.findChild<QDockWidget*>(QStringLiteral("analysisDockWidget"));
+	if (dock == nullptr)
+	{
+		fprintf(stderr, "Skin metrics probe: required dock is missing\n");
+		return false;
+	}
+	window.showNormal();
+	window.resize(1024, 768);
+	dock->show();
+	QTimer::singleShot(750, &window, [&window, dock]() {
+		const QString originalSkin = SkinManager::instance()->currentSkinId();
+		const Qt::DockWidgetArea area = window.dockWidgetArea(dock);
+		fprintf(stderr, "Skin metrics probe: platform=%s skin=%s dark=%d area=%d appfont=[%s] w=%d\n",
+			qPrintable(QGuiApplication::platformName()), qPrintable(originalSkin),
+			SkinManager::instance()->isDark() ? 1 : 0, int(area),
+			qPrintable(QApplication::font().families().join(QLatin1Char(','))), int(QApplication::font().weight()));
+		reportFontDatabase();
+		reportFontMatrix();
+		const bool vertical = area == Qt::TopDockWidgetArea || area == Qt::BottomDockWidgetArea;
+		window.resizeDocks({ dock }, { vertical ? 170 : 330 }, vertical ? Qt::Vertical : Qt::Horizontal);
+		settle();
+		fprintf(stderr, "  after shrink: dock=%dx%d\n", dock->width(), dock->height());
+		for (const QString& skinId : { QStringLiteral("studio"), QStringLiteral("minimal"),
+			QStringLiteral("soft"), QStringLiteral("rack"), QStringLiteral("matrix"), QStringLiteral("studio") })
+		{
+			QAction* action = findSkinAction(window, skinId);
+			if (action == nullptr)
+			{
+				fprintf(stderr, "  skin %s: no menu action\n", qPrintable(skinId));
+				continue;
+			}
+			action->trigger();
+			settle();
+			fprintf(stderr, "  skin %s (active=%s):\n", qPrintable(skinId),
+				qPrintable(SkinManager::instance()->currentSkinId()));
+			reportDockMetrics(window, dock);
+			reportFonts(window);
+		}
+		// Second pass with the dock on the right, where the minimum WIDTH is
+		// what a shrunken dock runs into.
+		const QComboBox* positionCombo = window.findChild<QComboBox*>(QStringLiteral("graphPositionComboBox"));
+		const int originalPosition = positionCombo != nullptr ? positionCombo->currentIndex() : -1;
+		QMetaObject::invokeMethod(&window, "on_graphPositionComboBox_currentIndexChanged",
+			Qt::DirectConnection, Q_ARG(int, 2));
+		settle();
+		window.resizeDocks({ dock }, { 330 }, Qt::Horizontal);
+		settle();
+		fprintf(stderr, "  right dock after shrink: dock=%dx%d area=%d\n", dock->width(), dock->height(),
+			int(window.dockWidgetArea(dock)));
+		for (const QString& skinId : { QStringLiteral("studio"), QStringLiteral("minimal"),
+			QStringLiteral("soft"), QStringLiteral("rack"), QStringLiteral("matrix"), QStringLiteral("studio") })
+		{
+			QAction* action = findSkinAction(window, skinId);
+			if (action == nullptr)
+				continue;
+			action->trigger();
+			settle();
+			fprintf(stderr, "  right skin %s:\n", qPrintable(skinId));
+			reportDockMetrics(window, dock);
+		}
+		if (originalPosition >= 0)
+		{
+			QMetaObject::invokeMethod(&window, "on_graphPositionComboBox_currentIndexChanged",
+				Qt::DirectConnection, Q_ARG(int, originalPosition));
+			settle();
+		}
+		if (QAction* original = findSkinAction(window, originalSkin))
+		{
+			original->trigger();
+			settle();
+		}
+		QCoreApplication::exit(0);
+	});
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// --knob-specimen <outDir> [--knob-specimen-skins id,id,...] (diagnostic):
+// paints a skin's knob straight through ISkin::paintKnob for a fixed set of
+// states - card knobs with a figure and row dials without one; hovered,
+// dragged, focused, disabled; and squeezed to the 50px a crowded row leaves
+// them - at 3x and 1x, dark and light. No widgets are involved, so the
+// states can be staged exactly: the gallery cannot stage a drag, and it
+// only ever shows the BiQuad dials folded. Judging material for knob rework
+// (the minimal drum, issue #338), not a gate. Defaults to minimal.
+// ---------------------------------------------------------------------------
+
+#include <QImage>
+
+namespace
+{
+struct KnobSpecimenCell
+{
+	QString label;
+	KnobState state;
+	QSize size;
+};
+
+KnobState knobSpecimenState(double ratio, bool bipolar, const QString& text)
+{
+	KnobState state;
+	state.minimum = 0;
+	state.maximum = 1000;
+	state.value = qRound(ratio * 1000.0);
+	state.ratio = ratio;
+	state.bipolar = bipolar;
+	state.valueText = text;
+	return state;
+}
+
+void appendKnobSpecimenStates(QList<KnobSpecimenCell>& cells, const KnobState& base, const QSize& size)
+{
+	KnobState hovered = base;
+	hovered.hovered = true;
+	cells.append({ QStringLiteral("hover"), hovered, size });
+	KnobState dragging = hovered;
+	dragging.dragging = true;
+	cells.append({ QStringLiteral("drag"), dragging, size });
+	KnobState focused = base;
+	focused.focused = true;
+	cells.append({ QStringLiteral("focus"), focused, size });
+	KnobState disabled = base;
+	disabled.enabled = false;
+	cells.append({ QStringLiteral("disabled"), disabled, size });
+}
+
+QList<KnobSpecimenCell> knobSpecimenCells(bool dials)
+{
+	QList<KnobSpecimenCell> cells;
+	if (!dials)
+	{
+		const QSize size(74, 74);
+		const QSize narrow(50, 74);
+		const KnobState preamp = knobSpecimenState(0.35, true, QStringLiteral("-6.0"));
+		cells.append({ QStringLiteral("preamp -6"), preamp, size });
+		cells.append({ QStringLiteral("gain 0 detent"), knobSpecimenState(0.5, true, QStringLiteral("0.0")), size });
+		cells.append({ QStringLiteral("delay 0"), knobSpecimenState(0.0, false, QStringLiteral("0.00")), size });
+		cells.append({ QStringLiteral("bw 1.000"), knobSpecimenState(0.5, false, QStringLiteral("1.000")), size });
+		cells.append({ QStringLiteral("long -100.0"), knobSpecimenState(0.0, true, QStringLiteral("-100.0")), size });
+		cells.append({ QStringLiteral("narrow 1.000"), knobSpecimenState(0.5, false, QStringLiteral("1.000")), narrow });
+		cells.append({ QStringLiteral("narrow 20000"), knobSpecimenState(1.0, false, QStringLiteral("20000")), narrow });
+		appendKnobSpecimenStates(cells, preamp, size);
+		return cells;
+	}
+	const QSize size(84, 66);
+	const QSize narrow(50, 66);
+	const KnobState frequency = knobSpecimenState(0.566, false, QString());
+	cells.append({ QStringLiteral("freq 1 kHz"), frequency, size });
+	cells.append({ QStringLiteral("gain +6"), knobSpecimenState(0.65, true, QString()), size });
+	cells.append({ QStringLiteral("gain 0"), knobSpecimenState(0.5, true, QString()), size });
+	cells.append({ QStringLiteral("q 0.71"), knobSpecimenState(0.38, false, QString()), size });
+	cells.append({ QStringLiteral("narrow freq"), frequency, narrow });
+	appendKnobSpecimenStates(cells, knobSpecimenState(0.65, true, QString()), size);
+	return cells;
+}
+
+bool renderKnobSpecimen(const QDir& outDir, const QString& skinId, bool dark, bool dials, int scale)
+{
+	const QList<KnobSpecimenCell> cells = knobSpecimenCells(dials);
+	const SkinTokens& tokens = SkinManager::instance()->tokens();
+	const int headerHeight = 26;
+	const int gap = 10;
+	int cellWidth = 0;
+	int cellHeight = 0;
+	for (const KnobSpecimenCell& cell : cells)
+	{
+		cellWidth = qMax(cellWidth, cell.size.width() * scale);
+		cellHeight = qMax(cellHeight, cell.size.height() * scale);
+	}
+	QImage image(gap + cells.size() * (cellWidth + gap), headerHeight + cellHeight + gap,
+		QImage::Format_ARGB32_Premultiplied);
+	image.fill(QColor(tokens.background));
+	QPainter painter(&image);
+	QFont labelFont(tokens.monoFontFamily);
+	labelFont.setPointSizeF(9.0);
+	painter.setFont(labelFont);
+	for (int c = 0; c < cells.size(); c++)
+	{
+		const int left = gap + c * (cellWidth + gap);
+		painter.setPen(QColor(tokens.mutedText));
+		painter.drawText(QRect(left, 0, cellWidth, headerHeight), Qt::AlignCenter, cells[c].label);
+		painter.save();
+		painter.translate(left, headerHeight);
+		painter.fillRect(QRect(0, 0, cells[c].size.width() * scale, cells[c].size.height() * scale), QColor(tokens.card));
+		painter.scale(scale, scale);
+		SkinManager::instance()->paintKnob(painter, QRect(QPoint(0, 0), cells[c].size), cells[c].state);
+		painter.restore();
+	}
+	painter.end();
+	const QString name = QStringLiteral("specimen_%1_%2_%3_x%4.png")
+		.arg(skinId, dark ? QStringLiteral("dark") : QStringLiteral("light"),
+			dials ? QStringLiteral("dials") : QStringLiteral("scalar"))
+		.arg(scale);
+	if (!image.save(outDir.filePath(name)))
+	{
+		qWarning("KnobSpecimen: cannot save %s", qPrintable(outDir.filePath(name)));
+		return false;
+	}
+	return true;
+}
+}
+
+int SkinGallery::runKnobSpecimen(const QStringList& arguments)
+{
+	const int flagIndex = arguments.indexOf(QStringLiteral("--knob-specimen"));
+	if (flagIndex < 0 || flagIndex + 1 >= arguments.size())
+	{
+		qWarning("Usage: Editor --knob-specimen <outDir> [--knob-specimen-skins id,id,...]");
+		return 2;
+	}
+	QDir outDir(arguments.at(flagIndex + 1));
+	if (!outDir.mkpath(QStringLiteral(".")))
+	{
+		qWarning("KnobSpecimen: cannot create output directory %s", qPrintable(outDir.absolutePath()));
+		return 2;
+	}
+	QStringList skins = { QStringLiteral("minimal") };
+	const int skinsIndex = arguments.indexOf(QStringLiteral("--knob-specimen-skins"));
+	if (skinsIndex >= 0 && skinsIndex + 1 < arguments.size())
+		skins = arguments.at(skinsIndex + 1).split(QLatin1Char(','), Qt::SkipEmptyParts);
+	int failures = 0;
+	for (const QString& skinId : skins)
+	{
+		for (bool dark : { true, false })
+		{
+			SkinManager::instance()->applySkin(skinId, dark);
+			for (bool dials : { false, true })
+				for (int scale : { 3, 1 })
+					failures += renderKnobSpecimen(outDir, skinId, dark, dials, scale) ? 0 : 1;
+		}
+	}
+	qWarning("KnobSpecimen: %d failures", failures);
+	return failures == 0 ? 0 : 1;
+}
