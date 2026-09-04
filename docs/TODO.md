@@ -2,7 +2,7 @@
 
 - [x] Integrate tagged upstream `v2.51.0` (`3e595dc8`) and its version/changelog stamp (`4c28c2cf`) into isolated beta candidate `codex/upstream-2510-integration`, excluding unreleased `74fd96ec`, and complete local preflight.
 - [ ] User-manual-test the installed isolated v2.51.0 AVX-512 candidate: VST/VST3 panels and live preview, Minimal register-drum vertical drag, and theme readability. Do not touch beta/main/release before user acceptance.
-- [ ] After accepted install-test, normal-fast-forward `beta` only, await green Actions, then decide separately on any beta prerelease. Do not force-push or touch `main`.
+- [ ] Repair/reproduce beta run `33916441078` x64 AVX2 skin-switch regression: `legacy-bronze/light` took `10899 ms` versus the `5000 ms` hard limit. No beta prerelease before a green rerun; do not force-push or touch `main`.
 
 - [x] Integrate upstream `v2.50.7` (`56c10764` / `c56a0484`) as a local candidate and complete targeted native, ASIO, Qt Editor, VST, VST3-panel, static, and audio-regression validation.
 - [ ] Fast-forward the validated v2.50.7 candidate to `beta`, await Actions, then install-test before any explicit `main` promotion or stable release. Keep `main` unchanged; do not force-push.

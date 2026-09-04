@@ -1,5 +1,7 @@
 # Session Summary
 
+- 2026-09-04: Beta build `33916441078` for `e8b18ce1` failed. The blocker is x64 AVX2 `--skin-switch-test`: `legacy-bronze/light` took `10899 ms`, over its `5000 ms` hard limit. Pester, cppcheck, memcheck, AVX10.1, SSE2, AVX, AVX512, and ARM64 passed. No prerelease was published; `main` unchanged. Next: reproduce/repair the skin-switch performance failure and rerun beta CI.
+
 - 2026-09-04: User-approved local AVX-512 v2.51.0 install is complete. Backed up 82 active Program Files runtime files at `artifacts\install-backups\v2510-avx512-preinstall-20260904-161712`, overlaid 70 staged candidate files from `8cb9fa01`, and verified `2.50.7.0 -> 2.51.0.0`, deployed hashes, preserved config/updater/docs, installed VST self-test, and Legacy/Modern VST3-panel probe. Windows Audio is running. Manual test is next; beta/main/release remain unchanged.
 
 - 2026-09-04: Rebuilt and revalidated the exact v2.51.0-stamped candidate locally: Editor and universal Setup file versions are `2.51.0.0`; core tests, VST, synthetic VST3-panel, and fake-ASIO 9/9 pass. v143 is preflight only; do not call it v145 CI. No beta/main/release/install/audio-service change. Next: explicit candidate install-test approval.

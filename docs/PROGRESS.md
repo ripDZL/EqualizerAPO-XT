@@ -1,5 +1,7 @@
 # Progress
 
+- [ ] 2026-09-04 beta CI blocker: run `33916441078` on `e8b18ce1` failed only in x64 AVX2 skin-switch because `legacy-bronze/light` took `10899 ms` against the `5000 ms` hard limit. The other five native variants, Pester, cppcheck, and memcheck passed. No prerelease; `main` unchanged. Reproduce/repair the performance regression, then rerun beta CI.
+
 - [x] 2026-09-04 user-approved local AVX-512 candidate install: backed up the 82-file active Program Files runtime at `artifacts\install-backups\v2510-avx512-preinstall-20260904-161712`, overlaid 70 staged files from `8cb9fa01`, and verified `2.50.7.0 -> 2.51.0.0`, deployed hashes, and preserved config/updater/docs. Windows Audio is restored; installed VST and Legacy/Modern VST3-panel self-tests pass. User manual acceptance remains the gate; beta/main/release unchanged.
 
 - [x] 2026-09-04 rebuilt the exact 2.51.0-stamped candidate locally with v143: Editor and universal Setup report `2.51.0.0`; core tests, VST/VST3-panel self-tests, and the 9-run fake-ASIO gate pass. v145 CI, AudioRegression reference verification, Theme Lab, and user install testing are still separate gates.

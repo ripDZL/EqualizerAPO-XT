@@ -1,5 +1,7 @@
 # AI Context
 
+- 2026-09-04 beta build blocker: manual beta run `33916441078` for exact candidate `e8b18ce1` failed only in `windows-x64-avx2` skin-switch. `legacy-bronze/light` took `10899 ms`, exceeding the `5000 ms` hard limit; the other five native variants plus Pester, cppcheck, and memcheck passed. No beta prerelease was published and `main` is untouched. Next: reproduce/repair or intentionally recalibrate the performance gate, then run beta CI again.
+
 - 2026-09-04 user-approved v2.51.0 local AVX-512 test install: backed up the active 82-file `C:\Program Files\EqualizerAPO-XT-x64-avx512\current` runtime to `artifacts\install-backups\v2510-avx512-preinstall-20260904-161712`, then overlaid 70 staged candidate files from `8cb9fa01`. The runtime reports `2.51.0.0` (from `2.50.7.0`); deployed hashes and preserved config/updater/doc hashes pass; stale top-level Qt compatibility folders were moved into the backup, not deleted. Windows Audio was paused/restored; installed VST and Legacy/Modern VST3-panel self-tests pass. No beta/main/release change. Next: user manual test before any beta fast-forward.
 
 - 2026-09-04 v2.51.0 stamp revalidation: local v143 rebuild stamps both Editor and universal Setup `2.51.0.0`; workflow Pester remains 126/126, VST and synthetic VST3-panel self-tests pass, core tests remain EditorLogic 4,585 / HybridConv 1,635 / Engine 1,320 / Asio 447, and fake-ASIO gate passes 9/9. This is local preflight only; exact v145 CI, missing AudioRegression reference fixtures, Theme Lab, and user install testing remain separate gates.
