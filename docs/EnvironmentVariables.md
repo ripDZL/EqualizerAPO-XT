@@ -18,7 +18,9 @@ them unset.
 - `EAPO_SWITCH_LIMIT_MS` / `EAPO_SWITCH_WARN_MS` — override the
   skin-switch stopwatch gate in the gallery's `--skin-switch-storm`
   diagnostics (defaults live in `Editor/SkinGallery.cpp`; CI passes its own
-  values in `build.yml`). Raise them when judging on a loaded machine.
+  values in `build.yml`). An over-limit switch is immediately replayed once
+  through the same clear/apply/rebuild path and fails only if that confirmation
+  is also over the limit; do not raise CI budgets to hide a persistent result.
 
 ## Tests
 

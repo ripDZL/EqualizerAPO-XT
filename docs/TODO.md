@@ -2,8 +2,9 @@
 
 - [x] Integrate tagged upstream `v2.51.0` (`3e595dc8`) and its version/changelog stamp (`4c28c2cf`) into isolated beta candidate `codex/upstream-2510-integration`, excluding unreleased `74fd96ec`, and complete local preflight.
 - [ ] User-manual-test the installed isolated v2.51.0 AVX-512 candidate: VST/VST3 panels and live preview, Minimal register-drum vertical drag, and theme readability. Do not touch beta/main/release before user acceptance.
-- [x] Diagnose beta run `33916441078` x64 AVX2 skin-switch outlier: both exact local AVX-512 and isolated `/arch:AVX2` runs pass all 132 switches under the `5000 ms` limit, including Legacy Bronze light. No product change or threshold relaxation.
-- [ ] Await attempt 2 of beta run `33916441078` at `e8b18ce1`; publish only a complete `v2.51.0-beta.N` prerelease if green. Do not force-push or touch `main`.
+- [x] Diagnose both beta run `33916441078` AVX2 timing outliers and retain the `5000 ms` hard limit: failures shifted from Bronze light to Forest dark and did not repeat locally or in adjacent CI rounds.
+- [x] Require an immediate exact replay before an over-limit switch fails; local AVX2 compile, persistent-slow probe, and normal 132-switch gate pass.
+- [ ] Commit/push the timing-gate fix to `beta`, dispatch fresh CI, and publish only a complete `v2.51.0-beta.N` prerelease if green. Do not force-push or touch `main`.
 
 - [x] Integrate upstream `v2.50.7` (`56c10764` / `c56a0484`) as a local candidate and complete targeted native, ASIO, Qt Editor, VST, VST3-panel, static, and audio-regression validation.
 - [ ] Fast-forward the validated v2.50.7 candidate to `beta`, await Actions, then install-test before any explicit `main` promotion or stable release. Keep `main` unchanged; do not force-push.
