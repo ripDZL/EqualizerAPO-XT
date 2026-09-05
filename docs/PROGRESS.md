@@ -1,8 +1,10 @@
 # Progress
 
+- [x] 2026-09-05 published beta `v2.51.0-beta.1` from green Actions run `33931747211` / exact commit `e32b129d`. It is public prerelease-only with 33 complete assets: six channel Setup/MSI/feed/full/delta sets, beta-pinned universal Setup, exact source, SHA256SUMS, and generated notes. `Publish-Release.ps1` is complete and all 13 installer checksums match GitHub asset digests. `main` remains unchanged.
+
 - [x] 2026-09-04 repaired the AVX2 skin-switch timing gate after both retries of `33916441078` showed non-repeating card-row stalls: 10,899 ms at Bronze light then 9,687 ms at Forest dark, whose other rounds were 2,109/1,765 ms. Kept the `2500/5000 ms` CI budget; an over-limit result now must also fail one exact immediate replay. Local AVX2 compile, deliberate persistent-slow probe, and full normal 132-switch/198-row gate pass (worst 1,314 ms; zero confirmations/failures). Pester 5 remains CI-only on this host.
 
-- [ ] Commit/push the beta-only timing-gate fix, dispatch a fresh full beta CI run, and publish `v2.51.0-beta.N` only if every required job/artifact is green and complete. Keep `main` unchanged.
+- [x] Commit/push the beta-only timing-gate fix, pass fresh full beta CI, and publish complete `v2.51.0-beta.1`. Keep `main` unchanged.
 
 - [x] 2026-09-04 user-approved local AVX-512 candidate install: backed up the 82-file active Program Files runtime at `artifacts\install-backups\v2510-avx512-preinstall-20260904-161712`, overlaid 70 staged files from `8cb9fa01`, and verified `2.50.7.0 -> 2.51.0.0`, deployed hashes, and preserved config/updater/docs. Windows Audio is restored; installed VST and Legacy/Modern VST3-panel self-tests pass. User manual acceptance remains the gate; beta/main/release unchanged.
 
