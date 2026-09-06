@@ -1,7 +1,8 @@
 # TODO
 
 - [x] Reproduce and repair VST3 path-alias lifetime, explicit processing rejection, and optional startup-notification bugs; 170 host checks and real RNNoise/FabFilter/Clear OSS synthetic mono tests pass.
-- [ ] Finish local per-machine AVX-512 test package; full beta CI, then complete beta prerelease. Main stays unchanged.
+- [x] Finish local per-machine AVX-512 test MSI and packaged Editor/panel checks; fix `26b23931` pushed to beta, no install.
+- [ ] Full beta CI `34061852125`, then complete beta prerelease from exact green `26b23931`. Main stays unchanged.
 - [ ] User-test actual microphone recording/chat continuity; synthetic tests do not establish the reported cutout's root cause. See `docs/VST-Audio-Recovery-2510.md`.
 
 - [x] Integrate tagged upstream `v2.51.0` (`3e595dc8`) and its version/changelog stamp (`4c28c2cf`) into isolated beta candidate `codex/upstream-2510-integration`, excluding unreleased `74fd96ec`, and complete local preflight.

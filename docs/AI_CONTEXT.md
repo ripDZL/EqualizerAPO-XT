@@ -1,5 +1,7 @@
 # AI Context
 
+- 2026-09-06 delivery: beta fix `26b23931` is pushed; CI `34061852125` running. Local unsigned per-machine AVX-512 MSI `artifacts/v2510-vst-audio-test-20260906/release/EqualizerAPO-XT-x64-avx512-x64-avx512.msi` is ready in the primary checkout, not installed. Public prerelease must wait for exact-commit green CI; actual microphone continuity still needs user testing. Main remains `fe0b2b37`.
+
 - 2026-09-06: beta-based VST recovery candidate fixes reproduced module-path alias lifetime conflicts, rejected-processing stale audio, and optional startup-notification compatibility. Local native/Editor tests and nine real-plugin synthetic mono cases pass; live recording/chat cutout remains unconfirmed. No install/config/audio-service/main changes. See `docs/VST-Audio-Recovery-2510.md`; full beta CI and complete prerelease are next.
 
 - 2026-09-05 published public prerelease `v2.51.0-beta.1` from exact beta commit `e32b129d895d9d23a9c76943746c395c0834ed8c` after green Actions run `33931747211`. It has all 33 expected assets (six Setup/MSI/feed/full/delta sets, beta-pinned universal Setup, exact source, SHA256SUMS, generated notes); all 13 installer hashes match GitHub digests and `Publish-Release.ps1` reports complete. The safe universal-installer probe resolves the beta-pinned AVX-512 MSI URL. `main` is unchanged. Manual beta release publishing must explicitly mark the tag prerelease because `vpk upload` initially exposed this beta tag as a normal public release.

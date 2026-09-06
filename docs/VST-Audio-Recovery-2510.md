@@ -25,8 +25,13 @@
 
 ## Delivery and next gates
 
+- Fix commit `26b2393136dfbb4672d04b0826550498176151f5` pushed normally to beta; full [Actions run 34061852125](https://github.com/ripDZL/EqualizerAPO-XT/actions/runs/34061852125) is in progress. Pester/cppcheck pass; no public prerelease yet. Release from this exact green commit, not a later docs-only tip.
+- Local MSI complete: `release/EqualizerAPO-XT-x64-avx512-x64-avx512.msi` under the staging root below; version `2.51.0-beta.2`, unsigned. SHA-256 `076CCFCA745C0C07CAF5C7F6950160E0ABB270692C12D9F02518C63C5B4E7685`.
+- Verified MSI `ALLUSERS=1`; install using `VELOPACK_INSTALLDIR="C:\Program Files\EqualizerAPO-XT-x64-avx512"` to preserve the established runtime path. Earlier `installer/` output is superseded scratch, not the handoff.
+- Final package Editor/engine/ASIO host/Voicemeeter payload hashes match the tested binaries; source ZIP is exact `26b23931`. Packaged Legacy and Modern VST3 panel checks pass.
+
 - Local test staging: `C:\Users\Admin\Documents\EAPOVST364bit\artifacts\v2510-vst-audio-test-20260906`.
-- Build a per-machine AVX-512 MSI; do not use the per-user channel Setup executable for installation.
+- Per-machine AVX-512 MSI is ready, not installed; do not use the per-user channel Setup executable for installation.
 - No installation, audio-service restart, active-config edit, stable release, or main promotion is authorized by this candidate preparation.
 - Run complete beta CI before publishing the next unused `v2.51.0-beta.N` prerelease with all six channels, universal Setup, source, checksums, and notes.
 - Manual acceptance: RNNoise effect responds; record speech through the normal microphone chain with panel closed/open and repeated stop/start. Confirm no voice loss in the actual recording/chat app.

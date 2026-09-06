@@ -1,5 +1,7 @@
 # Progress
 
+- [x] 2026-09-06 test delivery: unsigned AVX-512 `2.51.0-beta.2` MSI complete with per-machine scope and verified payload; packaged Legacy/Modern VST3 panel checks pass. Beta push `26b23931`; full CI `34061852125` running (Pester/cppcheck green). Public prerelease and live microphone acceptance pending; not installed, main unchanged.
+
 - [x] 2026-09-06: VST3 recovery regression red/green (12 failures initially; optional startup 3 failures; final 170 host checks pass). HybridConv 1635, Engine 1320, EditorLogic 4585 pass; packaged Editor VST self-test and real RNNoise/FabFilter/Clear OSS synthetic mono processing pass. Test package/CI/public prerelease pending; no live-audio recovery claim or installation.
 
 - [x] 2026-09-05 published beta `v2.51.0-beta.1` from green Actions run `33931747211` / exact commit `e32b129d`. It is public prerelease-only with 33 complete assets: six channel Setup/MSI/feed/full/delta sets, beta-pinned universal Setup, exact source, SHA256SUMS, and generated notes. `Publish-Release.ps1` is complete and all 13 installer checksums match GitHub asset digests. `main` remains unchanged.
