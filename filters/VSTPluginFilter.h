@@ -43,6 +43,7 @@ public:
 	std::vector<std::wstring> initialize(float sampleRate, unsigned maxFrameCount, std::vector<std::wstring> channelNames) override;
 	void prepareForProcessing(float sampleRate, unsigned maxFrameCount);
 	void process(double** output, double** input, unsigned frameCount) override;
+	bool isProcessingBypassed() const { return skipProcessing; }
 
 	std::shared_ptr<VSTPluginLibrary> getLibrary() const;
 	const std::wstring& getChunkData() const;
@@ -82,6 +83,7 @@ private:
 
 	bool skipProcessing = false;
 	bool reportCrash = true;
+	bool reportProcessingFailure = false;
 	bool forceStereoInput = false;
 	std::optional<VST3BusContract> busContract;
 	std::vector<std::wstring> inputChannels;

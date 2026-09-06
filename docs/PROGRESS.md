@@ -1,5 +1,7 @@
 # Progress
 
+- [x] 2026-09-06: VST3 recovery regression red/green (12 failures initially; optional startup 3 failures; final 170 host checks pass). HybridConv 1635, Engine 1320, EditorLogic 4585 pass; packaged Editor VST self-test and real RNNoise/FabFilter/Clear OSS synthetic mono processing pass. Test package/CI/public prerelease pending; no live-audio recovery claim or installation.
+
 - [x] 2026-09-05 published beta `v2.51.0-beta.1` from green Actions run `33931747211` / exact commit `e32b129d`. It is public prerelease-only with 33 complete assets: six channel Setup/MSI/feed/full/delta sets, beta-pinned universal Setup, exact source, SHA256SUMS, and generated notes. `Publish-Release.ps1` is complete and all 13 installer checksums match GitHub asset digests. `main` remains unchanged.
 
 - [x] 2026-09-04 repaired the AVX2 skin-switch timing gate after both retries of `33916441078` showed non-repeating card-row stalls: 10,899 ms at Bronze light then 9,687 ms at Forest dark, whose other rounds were 2,109/1,765 ms. Kept the `2500/5000 ms` CI budget; an over-limit result now must also fail one exact immediate replay. Local AVX2 compile, deliberate persistent-slow probe, and full normal 132-switch/198-row gate pass (worst 1,314 ms; zero confirmations/failures). Pester 5 remains CI-only on this host.

@@ -1,5 +1,9 @@
 # TODO
 
+- [x] Reproduce and repair VST3 path-alias lifetime, explicit processing rejection, and optional startup-notification bugs; 170 host checks and real RNNoise/FabFilter/Clear OSS synthetic mono tests pass.
+- [ ] Finish local per-machine AVX-512 test package; full beta CI, then complete beta prerelease. Main stays unchanged.
+- [ ] User-test actual microphone recording/chat continuity; synthetic tests do not establish the reported cutout's root cause. See `docs/VST-Audio-Recovery-2510.md`.
+
 - [x] Integrate tagged upstream `v2.51.0` (`3e595dc8`) and its version/changelog stamp (`4c28c2cf`) into isolated beta candidate `codex/upstream-2510-integration`, excluding unreleased `74fd96ec`, and complete local preflight.
 - [x] User-manual-test the installed isolated v2.51.0 AVX-512 candidate: VST/VST3 panels and live preview, Minimal register-drum vertical drag, and theme readability.
 - [x] Diagnose both beta run `33916441078` AVX2 timing outliers and retain the `5000 ms` hard limit: failures shifted from Bronze light to Forest dark and did not repeat locally or in adjacent CI rounds.

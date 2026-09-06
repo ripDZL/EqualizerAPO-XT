@@ -129,6 +129,87 @@ void runVst3HostTests()
 	harness.expectTrue(library->initialize() >= 0, "Windows VST3 module lifecycle initializes before factory access");
 	harness.expectTrue(library->getFactory() != nullptr, "VST3 factory is available after module initialization");
 
+	// A saved config may name the inner module while the picker names its bundle.
+	// Releasing either spelling must not shut down the other one's live module.
+	const wstring aliasBundle = prepareBundle(directory, L"AliasBundle.vst3", L"Alias.vst3");
+	auto aliasLibrary = VSTPluginLibrary::getInstance(aliasBundle);
+	harness.expectTrue(aliasLibrary->initialize() >= 0, "alias lifecycle module loads");
+	{
+		auto innerLibrary = VSTPluginLibrary::getInstance(bundleModulePath(aliasBundle, L"Alias.vst3"));
+		harness.expectTrue(innerLibrary == aliasLibrary, "bundle and inner module share one lifecycle owner");
+		harness.expectTrue(innerLibrary->initialize() >= 0, "inner module alias loads");
+	}
+	VSTPluginInstance afterAliasRelease(aliasLibrary, 2);
+	harness.expectTrue(afterAliasRelease.initialize(), "releasing a path alias keeps the remaining module usable");
+	wstring caseAlias = bundleModulePath(aliasBundle, L"Alias.vst3");
+	CharUpperBuffW(caseAlias.data(), static_cast<DWORD>(caseAlias.size()));
+	harness.expectTrue(VSTPluginLibrary::getInstance(caseAlias) == aliasLibrary,
+		"case aliases share one module lifecycle owner");
+	harness.expectTrue(VSTPluginLibrary::getInstance(aliasBundle + L"\\Contents\\..") == aliasLibrary,
+		"directory traversal spelling resolves to the same bundle owner");
+
+	for (const wchar_t* failureName : {L"RejectSetup.vst3", L"RejectStart.vst3", L"RejectProcess.vst3"})
+	{
+		const wstring failureBundle = prepareBundle(directory, (wstring(failureName) + L".bundle.vst3").c_str(), failureName);
+		auto failureLibrary = VSTPluginLibrary::getInstance(failureBundle);
+		harness.expectTrue(failureLibrary->initialize() >= 0, "failure fixture module loads");
+		// Exercise split double, combined double, and split float processors.
+		for (int scenario = 0; scenario < 3; ++scenario)
+		{
+			PluginState failureState;
+			failureState.gain = 0.5;
+			VSTPluginFilter failureFilter(failureLibrary, encodeState(failureState), std::unordered_map<wstring, float>());
+			failureFilter.initialize(48000.0f, 4, {L"C"});
+			double inputData[] = {0.25, -0.5, 0.75, -1.0};
+			double outputData[4] = {};
+			double* inputs[] = {inputData};
+			double* outputs[] = {outputData};
+			for (int block = 0; block < 3; ++block)
+			{
+				std::fill_n(outputData, 4, -99.0);
+				failureFilter.process(outputs, inputs, 4);
+				if (wstring(failureName) == L"RejectProcess.vst3" && block == 0)
+					harness.expectTrue(closeEnough(outputData[2], inputData[2] * 0.5),
+						"effect processes normally before the intermittent rejection");
+				else
+					harness.expectTrue(std::equal(inputData, inputData + 4, outputData),
+						"VST3 setup/start/process rejection preserves microphone audio on every block");
+			}
+		}
+	}
+
+	const wstring optionalProcessingBundle = prepareBundle(directory, L"OptionalProcessingBundle.vst3", L"OptionalProcessing.vst3");
+	auto optionalProcessingLibrary = VSTPluginLibrary::getInstance(optionalProcessingBundle);
+	harness.expectTrue(optionalProcessingLibrary->initialize() >= 0, "optional processing notification module loads");
+	for (double gain : {0.5, 0.0, 0.25})
+	{
+		PluginState state;
+		state.gain = gain;
+		VSTPluginFilter filter(optionalProcessingLibrary, encodeState(state), {});
+		filter.initialize(48000.0f, 4, {L"C"});
+		double input[] = {0.25, -0.5, 0.75, -1.0};
+		double output[4] = {};
+		double* inputs[] = {input};
+		double* outputs[] = {output};
+		filter.process(outputs, inputs, 4);
+		harness.expectFalse(filter.isProcessingBypassed(), "optional notification does not bypass a working effect");
+		harness.expectTrue(closeEnough(output[2], input[2] * gain),
+			"optional setProcessing notification keeps the effect active, including intentional silence");
+	}
+	{
+		VSTPluginInstance optionalEditor(optionalProcessingLibrary, 2);
+		harness.expectTrue(optionalEditor.initialize(), "optional notification editor instance initializes");
+		HWND parent = CreateWindowExW(0, L"STATIC", L"optional VST3 notification", WS_OVERLAPPED,
+			0, 0, 640, 480, nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
+		short width = 0, height = 0;
+		harness.expectTrue(parent != nullptr && optionalEditor.startEditing(parent, &width, &height),
+			"optional notification editor opens");
+		harness.expectTrue(optionalEditor.vst3EditorSessionActive(),
+			"optional notification keeps native-panel processing available");
+		optionalEditor.stopEditing();
+		DestroyWindow(parent);
+	}
+
 	const wstring sidechainBusBundle = prepareBundle(directory, L"SidechainBusBundle.vst3", L"SidechainBus.vst3");
 	shared_ptr<VSTPluginLibrary> sidechainBusLibrary = VSTPluginLibrary::getInstance(sidechainBusBundle);
 	harness.expectTrue(!sidechainBusBundle.empty() && sidechainBusLibrary != nullptr

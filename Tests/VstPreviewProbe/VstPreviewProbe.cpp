@@ -61,6 +61,7 @@
 #include "platform/windows/ComPtr.h"
 #include "vst/VSTPluginInstance.h"
 #include "vst/VSTPluginLibrary.h"
+#include "filters/VSTPluginFilter.h"
 
 using winutil::ComApartment;
 using winutil::ComPtr;
@@ -115,7 +116,8 @@ bool processDoubleGuarded(VSTPluginInstance* instance, double** input, double** 
 	}
 }
 
-int runPluginProbe(const std::wstring& pluginPath, double seconds, float sampleRate, bool expectNonsilent)
+int runPluginProbe(const std::wstring& pluginPath, double seconds, float sampleRate, bool expectNonsilent,
+	int channels, int blockFrames, const std::wstring& state, bool engine)
 {
 	std::shared_ptr<VSTPluginLibrary> library = VSTPluginLibrary::getInstance(pluginPath);
 	const int libraryResult = library->initialize();
@@ -133,9 +135,9 @@ int runPluginProbe(const std::wstring& pluginPath, double seconds, float sampleR
 	}
 	wprintf(L"INFO: loaded '%s' (%hs)\n", instance.getName().c_str(), instance.isVST3() ? "VST3" : "VST2");
 
-	instance.negotiateChannelCount(2);
-	const int inputChannelCount = instance.numInputs();
-	const int outputChannelCount = instance.numOutputs();
+	instance.negotiateChannelCount(channels);
+	const int inputChannelCount = engine ? channels : instance.numInputs();
+	const int outputChannelCount = engine ? channels : instance.numOutputs();
 	wprintf(L"INFO: negotiated %d in / %d out\n", inputChannelCount, outputChannelCount);
 	if (inputChannelCount <= 0 || outputChannelCount <= 0)
 	{
@@ -146,11 +148,27 @@ int runPluginProbe(const std::wstring& pluginPath, double seconds, float sampleR
 	// The same width rule as the Editor's preview feed: a double-capable
 	// processor was set up with kSample64 by prepareForProcessing and must
 	// be fed doubles.
-	const bool useDouble = instance.canDoubleReplacing();
+	const bool useDouble = engine || instance.canDoubleReplacing();
 	wprintf(L"INFO: processing width %hs\n", useDouble ? "double64" : "float32");
 
-	instance.prepareForProcessing(sampleRate, blockFrames);
-	instance.startProcessing();
+	std::unique_ptr<VSTPluginFilter> filter;
+	if (engine)
+	{
+		filter = std::make_unique<VSTPluginFilter>(library, state, std::unordered_map<std::wstring, float>());
+		filter->initialize(sampleRate, blockFrames, channels == 1
+			? std::vector<std::wstring>{L"C"} : std::vector<std::wstring>{L"L", L"R"});
+		if (filter->isProcessingBypassed())
+		{
+			wprintf(L"FAIL: engine bypassed plugin initialization/setup\n");
+			return 2;
+		}
+	}
+	else
+	{
+		instance.prepareForProcessing(sampleRate, blockFrames);
+		instance.writeToEffect(state, {});
+		instance.startProcessing();
+	}
 
 	std::vector<std::vector<double>> inputDouble(inputChannelCount, std::vector<double>(blockFrames));
 	std::vector<std::vector<double>> outputDouble(outputChannelCount, std::vector<double>(blockFrames));
@@ -186,9 +204,16 @@ int runPluginProbe(const std::wstring& pluginPath, double seconds, float sampleR
 			}
 		}
 
-		const bool survived = useDouble
+		if (filter)
+			filter->process(outputDoublePointers.data(), inputDoublePointers.data(), blockFrames);
+		const bool survived = filter ? true : useDouble
 			? processDoubleGuarded(&instance, inputDoublePointers.data(), outputDoublePointers.data(), blockFrames)
 			: processFloatGuarded(&instance, inputFloatPointers.data(), outputFloatPointers.data(), blockFrames);
+		if (instance.hasProcessingFailure() || (filter && filter->isProcessingBypassed()))
+		{
+			wprintf(L"FAIL: plugin rejected processing; pass-through is not plugin success\n");
+			return 3;
+		}
 		if (!survived)
 		{
 			wprintf(L"FAIL: plugin crashed inside process\n");
@@ -629,10 +654,15 @@ int wmain(int argc, wchar_t* argv[])
 	bool expectLive = true;
 	bool captureOnly = false;
 	bool expectAudio = true;
+	int channels = 2;
+	int pluginBlockFrames = blockFrames;
+	std::wstring state;
+	bool engine = false;
 
 	const wchar_t* usage =
 		L"Usage: VstPreviewProbe [--plugin <path.vst3|path.dll>] [--seconds N] [--rate N]\n"
 		L"                       [--expect-nonsilent] [--loopback]\n"
+		L"                       [--channels 1|2] [--block-frames N] [--state <base64>] [--engine]\n"
 		L"                       [--monitor <path.vst3|path.dll>] [--expect-live | --expect-static]\n"
 		L"                       [--capture-only] [--expect-audio | --expect-silence]\n";
 
@@ -647,6 +677,14 @@ int wmain(int argc, wchar_t* argv[])
 			seconds = _wtof(argv[++i]);
 		else if (argument == L"--rate" && i + 1 < argc)
 			sampleRate = static_cast<float>(_wtof(argv[++i]));
+		else if (argument == L"--channels" && i + 1 < argc)
+			channels = _wtoi(argv[++i]);
+		else if (argument == L"--block-frames" && i + 1 < argc)
+			pluginBlockFrames = _wtoi(argv[++i]);
+		else if (argument == L"--state" && i + 1 < argc)
+			state = argv[++i];
+		else if (argument == L"--engine")
+			engine = true;
 		else if (argument == L"--expect-nonsilent")
 			expectNonsilent = true;
 		else if (argument == L"--expect-live")
@@ -667,7 +705,10 @@ int wmain(int argc, wchar_t* argv[])
 			return 1;
 		}
 	}
-	if (pluginPath.empty() && monitorPluginPath.empty() && !loopback && !captureOnly)
+	if ((channels != 1 && channels != 2) || pluginBlockFrames < 1 || pluginBlockFrames > 65536
+		|| !std::isfinite(seconds) || seconds <= 0 || seconds > 3600
+		|| !std::isfinite(sampleRate) || sampleRate < 8000 || sampleRate > 384000
+		|| (pluginPath.empty() && monitorPluginPath.empty() && !loopback && !captureOnly))
 	{
 		wprintf(L"%s", usage);
 		return 1;
@@ -682,7 +723,8 @@ int wmain(int argc, wchar_t* argv[])
 
 	if (!pluginPath.empty())
 	{
-		const int result = runPluginProbe(pluginPath, seconds, sampleRate, expectNonsilent);
+		const int result = runPluginProbe(pluginPath, seconds, sampleRate, expectNonsilent,
+			channels, pluginBlockFrames, state, engine);
 		if (result != 0)
 			return result;
 	}

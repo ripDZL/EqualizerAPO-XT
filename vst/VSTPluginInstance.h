@@ -105,6 +105,9 @@ public:
 	int getInitialDelay() const;
 
 	void prepareForProcessing(float sampleRate, int blockSize);
+	// Latched VST3 setup/start/process rejection; reset by a new preparation.
+	// A valid silent output (for example a denoiser gate) is not a failure.
+	bool hasProcessingFailure() const { return vst3ProcessingFailed.load(std::memory_order_relaxed); }
 	void writeToEffect(const std::wstring& chunkData, const std::unordered_map<std::wstring, float>& paramMap);
 	void readFromEffect(std::wstring& chunkData, std::unordered_map<std::wstring, float>& paramMap) const;
 
@@ -236,6 +239,7 @@ private:
 	// setActive/setProcessing cycling. Guarded by vst3LifecycleMutex.
 	bool vst3EditorSession = false;
 	std::atomic<bool> vst3Processing{ false };
+	std::atomic<bool> vst3ProcessingFailed{ false };
 	Steinberg::Vst::ProcessContext vst3ProcessContext = {};
 	Steinberg::Vst::TSamples vst3SamplePosition = 0;
 	std::function<void()> automateFunc;

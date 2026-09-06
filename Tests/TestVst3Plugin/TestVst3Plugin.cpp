@@ -59,6 +59,10 @@ bool factoryHostContextNotImplementedMode = false;
 bool sidechainBusMode = false;
 bool adaptingArrangementMode = false;
 bool toneGeneratorMode = false;
+bool rejectSetupMode = false;
+bool rejectStartMode = false;
+bool rejectProcessMode = false;
+bool optionalProcessingMode = false;
 std::atomic<int> upmixerComponentCount{0};
 std::atomic<int> upmixerProcessCount{0};
 std::atomic<unsigned long long> surround41AcceptedOutputArrangement{
@@ -476,9 +480,15 @@ public:
 		return size == kSample32 || (supportsDouble && size == kSample64) ? kResultOk : kResultFalse;
 	}
 	uint32 PLUGIN_API getLatencySamples() override { return 0; }
-	tresult PLUGIN_API setupProcessing(ProcessSetup& newSetup) override { setup = newSetup; return kResultOk; }
+	tresult PLUGIN_API setupProcessing(ProcessSetup& newSetup) override
+	{
+		if (rejectSetupMode) return kResultFalse;
+		setup = newSetup;
+		return kResultOk;
+	}
 	tresult PLUGIN_API setProcessing(TBool state) override
 	{
+		if (state != 0 && rejectStartMode) return kResultFalse;
 		if (state != 0 && zeroSampleFlushInProgress.load())
 		{
 			HANDLE violation = OpenEventW(EVENT_MODIFY_STATE, FALSE, testvst3::concurrentProcessingEvent);
@@ -489,10 +499,12 @@ public:
 			}
 		}
 		processing.store(state != 0);
+		if (optionalProcessingMode) return kNotImplemented;
 		return active.load() ? kResultOk : kResultFalse;
 	}
 	tresult PLUGIN_API process(ProcessData& data) override
 	{
+		if (rejectProcessMode && processedBlocks++ > 0) return kResultFalse;
 		if (!processing.load() || data.symbolicSampleSize != setup.symbolicSampleSize)
 			return kResultFalse;
 		if (data.inputParameterChanges != nullptr)
@@ -613,6 +625,7 @@ private:
 	bool initialized = false;
 	std::atomic<bool> active{false};
 	std::atomic<bool> processing{false};
+	int processedBlocks = 0;
 	ProcessSetup setup{};
 	PluginState state{};
 	long long tonePosition = 0;
@@ -1254,6 +1267,10 @@ extern "C" __declspec(dllexport) bool InitDll()
 	surround41CineOnlyMode = wcsstr(modulePath, L"Surround41CineOnly.vst3") != nullptr;
 	surround41Mode = wcsstr(modulePath, L"Surround41.vst3") != nullptr || surround41CineOnlyMode;
 	toneGeneratorMode = wcsstr(modulePath, L"ToneGenerator.vst3") != nullptr;
+	rejectSetupMode = wcsstr(modulePath, L"RejectSetup.vst3") != nullptr;
+	rejectStartMode = wcsstr(modulePath, L"RejectStart.vst3") != nullptr;
+	rejectProcessMode = wcsstr(modulePath, L"RejectProcess.vst3") != nullptr;
+	optionalProcessingMode = wcsstr(modulePath, L"OptionalProcessing.vst3") != nullptr;
 	upmixerProcessCount.store(0);
 	surround41AcceptedOutputArrangement.store(
 		static_cast<unsigned long long>(SpeakerArr::kStereo));

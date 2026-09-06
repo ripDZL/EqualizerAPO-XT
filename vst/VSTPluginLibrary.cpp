@@ -97,11 +97,24 @@ static std::mutex& instanceMapMutex()
 
 std::shared_ptr<VSTPluginLibrary> VSTPluginLibrary::getInstance(const wstring& libPath)
 {
+	// The picker returns a bundle, but saved configurations may point at the
+	// inner module. Windows loads both as one DLL: they must share InitDll,
+	// the factory host context, and ExitDll too. Keep the original display path.
+	wstring key = resolveVST3ModulePath(libPath);
+	DWORD length = GetFullPathNameW(key.c_str(), 0, nullptr, nullptr);
+	if (length > 0)
+	{
+		vector<wchar_t> absolute(length);
+		DWORD written = GetFullPathNameW(key.c_str(), length, absolute.data(), nullptr);
+		if (written > 0 && written < length)
+			key.assign(absolute.data(), written);
+	}
+	CharLowerBuffW(key.data(), static_cast<DWORD>(key.size()));
 	lock_guard<mutex> lock(instanceMapMutex());
 
 	shared_ptr<VSTPluginLibrary> ptr;
 
-	auto it = instanceMap.find(libPath);
+	auto it = instanceMap.find(key);
 	if (it != instanceMap.end())
 	{
 		weak_ptr<VSTPluginLibrary> instance = it->second;
@@ -111,7 +124,7 @@ std::shared_ptr<VSTPluginLibrary> VSTPluginLibrary::getInstance(const wstring& l
 	if (ptr == NULL)
 	{
 		ptr = shared_ptr<VSTPluginLibrary>(new VSTPluginLibrary(libPath));
-		instanceMap[libPath] = ptr;
+		instanceMap[key] = ptr;
 	}
 
 	return ptr;

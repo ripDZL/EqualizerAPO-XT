@@ -506,8 +506,20 @@ void VSTPluginFilter::prepareForProcessing(float sampleRate, unsigned maxFrameCo
 			else
 				effect->setUsedChannelCount(effectChannelCount);
 			effect->prepareForProcessing(sampleRate, maxFrameCount);
+			if (effect->hasProcessingFailure())
+			{
+				LogF(L"The VST plugin %s rejected processing setup; passing audio through.", libPath.c_str());
+				skipProcessing = true;
+				return;
+			}
 			effect->writeToEffect(chunkData, paramMap);
 			effect->startProcessing();
+			if (effect->hasProcessingFailure())
+			{
+				LogF(L"The VST plugin %s rejected processing startup; passing audio through.", libPath.c_str());
+				skipProcessing = true;
+				return;
+			}
 		}
 	}
 	__except (EXCEPTION_EXECUTE_HANDLER)
@@ -602,10 +614,22 @@ void VSTPluginFilter::process(double** output, double** input, unsigned frameCou
 				}
 
 				// Convert output from float** back to double** into the final destination
-				for (unsigned j = 0; j < effectOutputCount; j++)
+				for (unsigned j = 0; !effect->hasProcessingFailure() && j < effectOutputCount; j++)
 				{
 					sampleconv::promote(outputArray[j], floatOutputs[j], frameCount);
 				}
+			}
+
+			if (effect->hasProcessingFailure())
+			{
+				// Never consume unwritten/stale plugin buffers or re-enter a failed
+				// processor. Restore the entire device block, including earlier
+				// instances, without logging/allocating on the audio thread.
+				skipProcessing = true;
+				reportProcessingFailure = true;
+				for (unsigned channel = 0; channel < channelCount; ++channel)
+					std::copy_n(input[channel], frameCount, output[channel]);
+				return;
 			}
 
 			if (!inputFill && !outputFill && effectOutputCount < effectInputCount)
@@ -738,6 +762,11 @@ const std::vector<std::wstring>& VSTPluginFilter::getOutputChannels() const
 
 void VSTPluginFilter::cleanup()
 {
+	if (reportProcessingFailure)
+	{
+		LogF(L"The VST plugin %s rejected an audio block; passing audio through until reinitialized.", libPath.c_str());
+		reportProcessingFailure = false;
+	}
 	// Deferred crash report from process(): the audio thread only clears the flag
 	// (see the __except handler). Re-arm it so a re-initialized instance can report
 	// a fresh fault; cleanup() runs at the start of initialize() and at teardown.

@@ -48,6 +48,21 @@ using namespace Steinberg::Vst;
 
 namespace
 {
+bool acceptsProcessingNotification(tresult result)
+{
+	// Steinberg AudioEffect's default setProcessing is a no-op returning
+	// kNotImplemented. This notification is not setupProcessing or process:
+	// those must still succeed before any output is consumed.
+	return result == kResultOk || result == kNotImplemented;
+}
+
+template<typename SampleType>
+void clearPluginOutput(SampleType** outputs, int channels, int frames)
+{
+	for (int channel = 0; channel < channels; ++channel)
+		std::fill_n(outputs[channel], frames, SampleType{});
+}
+
 // Clears the parameter-flush guard on scope exit. Was defined inline three
 // times at its use sites (audit #275 TD-25/C4 stage 1).
 struct FlushFlagReset
@@ -315,7 +330,7 @@ void VSTPluginInstance::flushVST3ParameterChanges()
 			activatedForFlush = true;
 		}
 
-		if (vst3Processor->setProcessing(true) != kResultOk)
+		if (!acceptsProcessingNotification(vst3Processor->setProcessing(true)))
 		{
 			if (activatedForFlush)
 			{
@@ -390,7 +405,7 @@ void VSTPluginInstance::beginVST3EditorSession()
 	if (vst3Component->setActive(true) != kResultOk)
 		return;
 	vst3Active = true;
-	if (vst3Processor->setProcessing(true) != kResultOk)
+	if (!acceptsProcessingNotification(vst3Processor->setProcessing(true)))
 	{
 		vst3Component->setActive(false);
 		vst3Active = false;
@@ -593,6 +608,7 @@ void VSTPluginInstance::prepareForProcessing(float sampleRate, int blockSize)
 {
 	if (library->isVST3())
 	{
+		vst3ProcessingFailed.store(true, memory_order_relaxed);
 		if (vst3Processor == NULL || vst3Component == NULL)
 			return;
 
@@ -608,7 +624,7 @@ void VSTPluginInstance::prepareForProcessing(float sampleRate, int blockSize)
 		setup.symbolicSampleSize = vst3SupportsDouble ? kSample64 : kSample32;
 		setup.maxSamplesPerBlock = blockSize;
 		setup.sampleRate = sampleRate;
-		vst3Processor->setupProcessing(setup);
+		vst3ProcessingFailed.store(vst3Processor->setupProcessing(setup) != kResultOk, memory_order_relaxed);
 		vst3SamplePosition = 0;
 		return;
 	}
@@ -631,6 +647,8 @@ void VSTPluginInstance::startProcessing()
 		lock_guard<mutex> lifecycleLock(vst3LifecycleMutex);
 		if (vst3Component == NULL || vst3Processor == NULL || vst3Processing.load(memory_order_acquire))
 			return;
+		if (hasProcessingFailure())
+			return;
 
 		// Publish the transition before calling into the plug-in. A plug-in
 		// may synchronously call the component handler from
@@ -639,8 +657,9 @@ void VSTPluginInstance::startProcessing()
 		vst3Processing.store(true, memory_order_release);
 		if (!vst3Active)
 			vst3Active = vst3Component->setActive(true) == kResultOk;
-		if (!vst3Active || vst3Processor->setProcessing(true) != kResultOk)
+		if (!vst3Active || !acceptsProcessingNotification(vst3Processor->setProcessing(true)))
 		{
+			vst3ProcessingFailed.store(true, memory_order_relaxed);
 			if (vst3Active)
 			{
 				vst3Component->setActive(false);
@@ -684,8 +703,13 @@ struct Vst3SampleTraits<double>
 template<typename SampleType>
 void VSTPluginInstance::processVst3Replacing(SampleType** inputArray, SampleType** outputArray, int frameCount)
 {
-	if (vst3Processor == NULL)
+	if (vst3Processor == NULL || hasProcessingFailure())
+	{
+		// Direct preview callers do not have VSTPluginFilter's dry fallback.
+		// Do not replay the previous output block after a rejected call.
+		clearPluginOutput(outputArray, numOutputs(), frameCount);
 		return;
+	}
 	AudioBusBuffers inputBuffers;
 	inputBuffers.numChannels = numInputs();
 	Vst3SampleTraits<SampleType>::attach(inputBuffers, inputArray);
@@ -709,6 +733,11 @@ void VSTPluginInstance::processVst3Replacing(SampleType** inputArray, SampleType
 	vst3ProcessContext.continousTimeSamples = vst3SamplePosition;
 	if (vst3Processor->process(data) == kResultOk)
 		vst3SamplePosition += frameCount;
+	else
+	{
+		vst3ProcessingFailed.store(true, memory_order_relaxed);
+		clearPluginOutput(outputArray, numOutputs(), frameCount);
+	}
 }
 
 void VSTPluginInstance::processReplacing(float** inputArray, float** outputArray, int frameCount)
