@@ -6,6 +6,7 @@
 
 #include "runtime/ipc/StreamRing.h"
 
+#include <cmath>
 #include <cstring>
 
 namespace eapo::ipc
@@ -43,6 +44,19 @@ namespace eapo::ipc
 		{
 			return static_cast<uint32_t>(ReadAcquire(&header->state));
 		}
+
+		// A string the engine and the log may read with wcslen: a NUL
+		// somewhere inside the fixed-width field.
+		template<size_t capacity>
+		bool terminated(const wchar_t (&text)[capacity]) noexcept
+		{
+			for (size_t i = 0; i < capacity; i++)
+			{
+				if (text[i] == L'\0')
+					return true;
+			}
+			return false;
+		}
 	}
 
 	namespace RingGeometry
@@ -51,7 +65,10 @@ namespace eapo::ipc
 		{
 			return format.frames >= 1 && format.frames <= maxRingFrames
 				&& format.channels[0] <= maxRingChannels && format.channels[1] <= maxRingChannels
-				&& (format.channels[0] != 0 || format.channels[1] != 0);
+				&& (format.channels[0] != 0 || format.channels[1] != 0)
+				&& std::isfinite(format.sampleRate)
+				&& format.sampleRate >= minRingSampleRate && format.sampleRate <= maxRingSampleRate
+				&& terminated(format.deviceName) && terminated(format.deviceGuid);
 		}
 
 		uint32_t slotBytes(const eapo::asio::StreamFormat& format, Direction direction) noexcept
@@ -270,18 +287,30 @@ namespace eapo::ipc
 			return;
 		if (header_->magic != ringMagic || header_->layoutVersion != ringLayoutVersion)
 			return;
-		if (!RingGeometry::validFormat(header_->format))
+		// Everything below reads the producer's words once, into locals; the
+		// shared header is only compared against, never trusted afterwards.
+		std::memcpy(&format_, &header_->format, sizeof(format_));
+		if (!RingGeometry::validFormat(format_))
 			return;
-		const uint64_t expectedBytes = RingGeometry::totalBytes(header_->format);
-		if (expectedBytes != header_->totalBytes || expectedBytes > bytes)
+		const uint32_t wireTotal = header_->totalBytes;
+		const uint64_t expectedBytes = RingGeometry::totalBytes(format_);
+		if (expectedBytes != wireTotal || expectedBytes > bytes)
 			return;
+		// The layout RingProducer writes: both slots of the output lane, then
+		// both of the input lane, packed after the header.
+		uint32_t offset = static_cast<uint32_t>(ringHeaderBytes);
 		for (unsigned lane = 0; lane < directionCount; lane++)
 		{
+			const uint32_t slotBytes = RingGeometry::slotBytes(format_, static_cast<Direction>(lane));
 			const RingLane& entry = header_->lanes[lane];
+			if (entry.slotBytes != slotBytes)
+				return;
 			for (unsigned slot = 0; slot < 2; slot++)
 			{
-				if (static_cast<size_t>(entry.slotOffset[slot]) + entry.slotBytes > header_->totalBytes)
+				if (entry.slotOffset[slot] != offset)
 					return;
+				slotOffset_[lane][slot] = offset;
+				offset += slotBytes;
 			}
 		}
 		valid_ = true;
@@ -323,12 +352,14 @@ namespace eapo::ipc
 		const uint32_t next = done + 1;
 		out.direction = direction;
 		out.sequence = next;
-		out.slot = reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(header_) + lane.slotOffset[next & 1]);
+		out.slot = reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(header_) + slotOffset_[laneOf(direction)][next & 1]);
+		out.publishTick = header_->publishTick[laneOf(direction)];
+		out.behind = published - next;
 		header_->acquireTick[laneOf(direction)] = static_cast<LONGLONG>(tickNow());
 		return true;
 	}
 
-	bool RingConsumer::acquire(Acquired& out, uint32_t timeoutMs, uint32_t spinUs) noexcept
+	bool RingConsumer::acquire(Acquired& out, uint32_t timeoutMs) noexcept
 	{
 		HANDLE handles[3] = {sync_.work[0], sync_.work[1], sync_.peer};
 		const DWORD count = sync_.peer != nullptr ? 3 : 2;
@@ -340,20 +371,6 @@ namespace eapo::ipc
 				return true;
 			if (peerGone_)
 				return false;
-			if (spinUs != 0)
-			{
-				const uint64_t deadline = tickNow() + static_cast<uint64_t>(spinUs * ticksPerMicro_);
-				while (tickNow() < deadline)
-				{
-					if (pending(Direction::Output, out) || pending(Direction::Input, out))
-						return true;
-					if (readState(header_) == static_cast<uint32_t>(RingState::Closing))
-						return false;
-					YieldProcessor();
-				}
-				// Events set while spinning stay set (auto-reset, unconsumed),
-				// so the kernel wait below returns at once in that case.
-			}
 			const DWORD result = WaitForMultipleObjects(count, handles, FALSE, timeoutMs);
 			if (result == WAIT_OBJECT_0 + 2)
 			{

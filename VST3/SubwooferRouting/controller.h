@@ -5,7 +5,9 @@
 #include <atomic>
 #include <mutex>
 
+#include "SubwooferRouting/Compiler.h"
 #include "SubwooferRouting/State.h"
+#include "parameter_table.h"
 #include "pluginterfaces/vst/ivsteditcontroller.h"
 #include "pluginterfaces/vst/ivsthostapplication.h"
 #include "pluginterfaces/vst/ivstmessage.h"
@@ -68,12 +70,12 @@ public:
 private:
 	~SubwooferRoutingController();
 
-	static bool readFramedState(Steinberg::IBStream* stream, std::string& json);
 	void updateValuesFromState(const subroute::SubwooferRoutingState& state);
+	void updateTrimFromState(const subroute::SubwooferRoutingState& state);
 	bool sendParameter(
 		Steinberg::Vst::ParamID id,
 		Steinberg::Vst::ParamValue value);
-	int parameterIndex(Steinberg::Vst::ParamID id) const;
+	static int parameterIndex(Steinberg::Vst::ParamID id);
 
 	std::atomic<Steinberg::uint32> refCount_{1};
 	bool initialized_ = false;
@@ -82,9 +84,13 @@ private:
 	Steinberg::Vst::IComponentHandler* handler_ = nullptr;
 	Steinberg::Vst::IConnectionPoint* peer_ = nullptr;
 	subroute::SubwooferRoutingState state_;
-	Steinberg::Vst::ParamValue values_[6] = {};
-	Steinberg::Vst::ParamValue defaults_[6] = {};
+	Steinberg::Vst::ParamValue values_[kParameterCount] = {};
+	Steinberg::Vst::ParamValue defaults_[kParameterCount] = {};
 	double automaticTrimDb_ = 0.0;
+	// The rate the processor last reported (kSampleRateMessageId); the
+	// headroom preview compiles at it. Until the first report arrives the
+	// controller cannot know the host's rate and uses the preview fallback.
+	double previewSampleRate_ = subroute::kPreviewFallbackSampleRate;
 };
 
 Steinberg::FUnknown* createSubwooferRoutingController();

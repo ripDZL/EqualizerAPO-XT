@@ -6,15 +6,20 @@
 
 #include "LegacyMigration.h"
 #include "services/registry/RegistryPaths.h"
+#include "services/settings/EditorSettings.h"
 #include "LegacyMigrationPolicy.h"
 #include "ConfigDependencyScanner.h"
 #include "ImportExecutor.h"
 
+#include "CallerProfileCheck.h"
+#include "services/security/AudioEngineAccess.h"
 #include "services/install/ApoRegistration.h"
 #include "services/logging/Logging.h"
 #include "services/registry/WindowsRegistry.h"
 
 #include <cstdio>
+#include <climits>
+#include <optional>
 
 #include <QDateTime>
 #include <QDir>
@@ -31,23 +36,29 @@ namespace EqAPO::Import
 namespace
 {
 
-QString readRegistryString(const IRegistry& registry, const wchar_t* name)
+// An empty string when the value is absent; nullopt when it is there but could
+// not be read, which is logged here. The two used to be one answer, so a
+// ConfigPath the hook failed to read looked unset and was overwritten with the
+// stable root (audit #348 TD-49).
+std::optional<QString> readRegistryString(const IRegistry& registry, const wchar_t* name)
 {
     try
     {
-        if (registry.valueExists(APP_REGPATH, name))
+        if (registry.keyExists(APP_REGPATH) && registry.valueExists(APP_REGPATH, name))
             return QString::fromStdWString(registry.readValue(APP_REGPATH, name));
+        return QString();
     }
-    catch (const RegistryError&)
+    catch (const RegistryError& e)
     {
+        LogFStatic(L"Migration: could not read %s: %s", name, e.getMessage().c_str());
+        return std::nullopt;
     }
-    return QString();
 }
 
 // Copy every file below sourceDir into targetDir, keeping the relative
 // layout and overwriting what is already there. Used to rescue a config
 // tree out of a Velopack current\ dir, where the source is authoritative.
-int copyTreeOverwriting(const QString& sourceDir, const QString& targetDir)
+int copyTreeOverwriting(const QString& sourceDir, const QString& targetDir, bool* complete = nullptr)
 {
     int copied = 0;
     QDir source(sourceDir);
@@ -63,15 +74,20 @@ int copyTreeOverwriting(const QString& sourceDir, const QString& targetDir)
         if (QFile::copy(sourceFile, targetFile))
             copied++;
         else
+        {
+            if (complete)
+                *complete = false;
             LogFStatic(L"Migration: failed to copy %s", reinterpret_cast<const wchar_t*>(sourceFile.utf16()));
+        }
     }
     return copied;
 }
 
 // Ship the sample configs into the root without ever touching a file the
 // user (or the migration) already put there.
-void seedMissingSamples(const QString& shippedConfigDir, const QString& targetDir)
+bool seedMissingSamples(const QString& shippedConfigDir, const QString& targetDir)
 {
+    bool complete = true;
     QDirIterator it(shippedConfigDir, QDir::Files, QDirIterator::Subdirectories);
     QDir shipped(shippedConfigDir);
     while (it.hasNext())
@@ -82,8 +98,10 @@ void seedMissingSamples(const QString& shippedConfigDir, const QString& targetDi
         if (QFile::exists(targetFile))
             continue;
         QDir().mkpath(QFileInfo(targetFile).absolutePath());
-        QFile::copy(sourceFile, targetFile);
+        if (!QFile::copy(sourceFile, targetFile))
+            complete = false;
     }
+    return complete;
 }
 
 void writeMigrationBreadcrumbs(IRegistry& registry, const QString& from, int filesCopied)
@@ -98,8 +116,28 @@ void writeMigrationBreadcrumbs(IRegistry& registry, const QString& from, int fil
 
 QString LegacyMigration::stableConfigRoot()
 {
-    return LegacyMigrationPolicy::stableConfigRoot(
-        QString::fromLocal8Bit(qgetenv("LOCALAPPDATA")));
+    return LegacyMigrationPolicy::stableConfigRoot(qEnvironmentVariable("LOCALAPPDATA"));
+}
+
+QString LegacyMigration::configRoot(const IRegistry& registry)
+{
+    try
+    {
+        if (registry.keyExists(APP_REGPATH) && registry.valueExists(APP_REGPATH, L"ConfigPath"))
+        {
+            const QString configured = QString::fromStdWString(registry.readValue(APP_REGPATH, L"ConfigPath"));
+            if (!configured.isEmpty())
+                return configured;
+        }
+    }
+    catch (const RegistryError& e)
+    {
+        LogFStatic(L"Could not read ConfigPath, using the stable config root: %s", e.getMessage().c_str());
+    }
+    const QString stableRoot = stableConfigRoot();
+    if (!stableRoot.isEmpty() && QDir(stableRoot).exists())
+        return stableRoot;
+    return QDir::currentPath();
 }
 
 bool LegacyMigration::looksLikeLegacyApoConfigDir(const QString& configDir)
@@ -133,7 +171,15 @@ void LegacyMigration::runElevatedHookStep(const std::wstring& exeDir, IRegistry&
         return;
     }
 
-    const QString existing = readRegistryString(registry, L"ConfigPath");
+    const std::optional<QString> configured = readRegistryString(registry, L"ConfigPath");
+    if (!configured)
+    {
+        // Whatever the value is, it may be a folder the user chose; the policy
+        // leaves such a folder alone (RespectCustom), and so does a failed read.
+        LogFStatic(L"Migration: ConfigPath could not be read, leaving it alone");
+        return;
+    }
+    const QString existing = *configured;
     const LegacyMigrationPolicy::Action action = LegacyMigrationPolicy::classify(
         existing, stableRoot,
         looksLikeLegacyApoConfigDir(existing),
@@ -225,14 +271,213 @@ void LegacyMigration::runElevatedHookStep(const std::wstring& exeDir, IRegistry&
         stableRoot);
 }
 
+std::wstring LegacyMigration::prepareHookStep(const std::wstring& exeDir, Handoff* details)
+{
+    return prepareHookStep(exeDir, systemRegistry(), details);
+}
+
+std::wstring LegacyMigration::prepareHookStep(const std::wstring& exeDir, const IRegistry& registry,
+    Handoff* details)
+{
+    if (details)
+        *details = {};
+    if (AudioEngineAccess::isElevated())
+        return L"failed";
+    // Install permissions are independent of config migration: even a custom
+    // ConfigPath needs the packaged DLL and Editor to be readable/executable.
+    const QString packagedConfig = QDir(QString::fromStdWString(exeDir)).absoluteFilePath(QStringLiteral("config"));
+    const bool installGranted = AudioEngineAccess::grantOwnedEngineAccess(exeDir) == AudioEngineAccess::Grant::Applied
+        && QDir().mkpath(packagedConfig)
+        && AudioEngineAccess::grantOwnedConfigAccess(QDir::toNativeSeparators(packagedConfig).toStdWString())
+            == AudioEngineAccess::Grant::Applied;
+    if (details)
+        details->installGrantsPrepared = installGranted;
+    if (!installGranted)
+        LogFStatic(L"Migration prepare: install grants failed; no prepared-install flag will be sent");
+    const QString root = stableConfigRoot();
+    const auto configured = readRegistryString(registry, L"ConfigPath");
+    if (root.isEmpty() || !configured)
+        return L"failed";
+    const auto action = LegacyMigrationPolicy::classify(*configured, root,
+        looksLikeLegacyApoConfigDir(*configured), LegacyMigrationPolicy::isVolatileXtConfigDir(*configured));
+    if (action == LegacyMigrationPolicy::Action::RespectCustom)
+        return L"respect-custom";
+    if (!QDir().mkpath(root)
+        || AudioEngineAccess::grantOwnedConfigAccess(QDir::toNativeSeparators(root).toStdWString())
+            != AudioEngineAccess::Grant::Applied)
+        return L"failed";
+
+    int copied = 0;
+    std::wstring outcome = L"adopt";
+    if (action == LegacyMigrationPolicy::Action::AlreadyOurs)
+        outcome = L"already-ours";
+    else if (action == LegacyMigrationPolicy::Action::MigrateVolatileXt)
+    {
+        bool complete = true;
+        copied = copyTreeOverwriting(*configured, root, &complete);
+        if (!complete)
+            return L"failed";
+        outcome = L"volatile";
+    }
+    else if (action == LegacyMigrationPolicy::Action::MigrateLegacy)
+    {
+        const QString config = QDir(*configured).absoluteFilePath(QStringLiteral("config.txt"));
+        if (QFile::exists(config))
+        {
+            const auto manifest = ConfigDependencyScanner::scan(config, root, DestLayout::SourceFolderIsRoot);
+            const auto result = ImportExecutor::execute(manifest, root);
+            for (const QString& error : result.errors)
+                LogFStatic(L"Migration prepare: %s", reinterpret_cast<const wchar_t*>(error.utf16()));
+            if (!result.errors.isEmpty())
+                return L"failed";
+            copied = result.filesCopied;
+        }
+        outcome = L"legacy";
+    }
+    if (!seedMissingSamples(QDir(QString::fromStdWString(exeDir)).absoluteFilePath(QStringLiteral("config")), root))
+        return L"failed";
+    if (details && (outcome == L"legacy" || outcome == L"volatile"))
+    {
+        details->migratedFrom = configured->toStdWString();
+        details->migratedFiles = std::to_wstring(copied);
+    }
+    return outcome;
+}
+
+LegacyMigration::Handoff LegacyMigration::parseHandoff(const std::vector<std::wstring>& arguments)
+{
+    Handoff result;
+    for (size_t i = 0; i < arguments.size(); ++i)
+    {
+        if (arguments[i] == L"--caller-localappdata")
+            result.localAppData = i + 1 < arguments.size() ? arguments[++i] : L"";
+        else if (arguments[i] == L"--caller-migration-outcome")
+            result.outcome = i + 1 < arguments.size() ? arguments[++i] : L"failed";
+        else if (arguments[i] == L"--caller-migrated-from")
+            result.migratedFrom = i + 1 < arguments.size() ? arguments[++i] : L"";
+        else if (arguments[i] == L"--caller-migrated-files")
+            result.migratedFiles = i + 1 < arguments.size() ? arguments[++i] : L"";
+        else if (arguments[i] == L"--caller-install-grants-prepared")
+            result.installGrantsPrepared = i + 1 < arguments.size() && arguments[++i] == L"1";
+    }
+    return result;
+}
+
+namespace
+{
+bool validBreadcrumbText(const std::wstring& value, size_t limit)
+{
+    if (value.size() > limit)
+        return false;
+    for (const wchar_t character : value)
+    {
+        if (character < 0x20 || (character >= 0x7f && character <= 0x9f))
+            return false;
+    }
+    return true;
+}
+
+std::optional<int> breadcrumbCount(const std::wstring& value)
+{
+    // The original migration counts with int; cap before multiplication.
+    if (value.empty() || value.size() > 10)
+        return std::nullopt;
+    int result = 0;
+    for (const wchar_t digit : value)
+    {
+        if (digit < L'0' || digit > L'9' || result > (INT_MAX - (digit - L'0')) / 10)
+            return std::nullopt;
+        result = result * 10 + (digit - L'0');
+    }
+    return result;
+}
+}
+
+bool LegacyMigration::recordPreparedHookStep(const Handoff& handoff, IRegistry& registry,
+    const CallerProfileCheck::FileSystem* fileSystem)
+{
+    if (!handoff.localAppData)
+        return false;
+    std::wstring reason;
+    const auto local = fileSystem
+        ? CallerProfileCheck::verify(*handoff.localAppData, reason, *fileSystem)
+        : CallerProfileCheck::verify(*handoff.localAppData, reason);
+    if (!local)
+    {
+        LogFStatic(L"Migration record: caller rejected: %s", reason.c_str());
+        return false;
+    }
+    if (!validBreadcrumbText(handoff.outcome, 32)
+        || !validBreadcrumbText(handoff.migratedFrom, 4096)
+        || !validBreadcrumbText(handoff.migratedFiles, 10))
+    {
+        LogFStatic(L"Migration record: invalid breadcrumb text; leaving registry unchanged");
+        return true;
+    }
+    // Hints are not authority. Failed preparation never requests elevated
+    // file work, and RespectCustom never requests a ConfigPath write.
+    if (handoff.outcome == L"failed" || handoff.outcome == L"respect-custom")
+        return true;
+    const QString root = LegacyMigrationPolicy::stableConfigRoot(QString::fromStdWString(*local));
+    const std::wstring native = QDir::toNativeSeparators(root).toStdWString();
+    if (!CallerProfileCheck::verifyPreparedRoot(native, reason))
+    {
+        LogFStatic(L"Migration record: prepared root rejected: %s", reason.c_str());
+        return true;
+    }
+    const auto configured = readRegistryString(registry, L"ConfigPath");
+    if (!configured)
+        return true;
+    // Always re-derive from HKLM, including for unknown/missing outcomes.
+    // A caller-supplied action cannot overwrite a concurrently chosen path.
+    const auto action = LegacyMigrationPolicy::classify(*configured, root,
+        looksLikeLegacyApoConfigDir(*configured), LegacyMigrationPolicy::isVolatileXtConfigDir(*configured));
+    if (action == LegacyMigrationPolicy::Action::RespectCustom
+        || action == LegacyMigrationPolicy::Action::AlreadyOurs)
+        return true;
+    const bool migrated = (action == LegacyMigrationPolicy::Action::MigrateLegacy && handoff.outcome == L"legacy")
+        || (action == LegacyMigrationPolicy::Action::MigrateVolatileXt && handoff.outcome == L"volatile");
+    const auto files = breadcrumbCount(handoff.migratedFiles);
+    if (migrated && (handoff.migratedFrom.empty() || !files
+        || QString::compare(QString::fromStdWString(handoff.migratedFrom), *configured, Qt::CaseInsensitive) != 0))
+    {
+        LogFStatic(L"Migration record: invalid or stale migration metadata; leaving registry unchanged");
+        return true;
+    }
+    try
+    {
+        registry.writeValue(APP_REGPATH, L"ConfigPath", native);
+        // Display metadata only in this elevated step: never pass the supplied
+        // source to a file API. The stamp is generated here, just as in fallback.
+        if (migrated)
+            writeMigrationBreadcrumbs(registry, QString::fromStdWString(handoff.migratedFrom), *files);
+    }
+    catch (const RegistryError& e)
+    {
+        LogFStatic(L"Migration record: ConfigPath write failed: %s", e.getMessage().c_str());
+    }
+    return true;
+}
+
+void LegacyMigration::runElevatedHookStep(const std::wstring& exeDir, const Handoff& handoff)
+{
+    if (recordPreparedHookStep(handoff, systemRegistry()))
+        return;
+    LogFStatic(L"Migration: no valid caller profile; using the elevated process profile");
+    runElevatedHookStep(exeDir);
+}
+
 int LegacyMigration::dryRun()
 {
 	const QString stableRoot = stableConfigRoot();
-	const QString existing = readRegistryString(systemRegistry(), L"ConfigPath");
+	const std::optional<QString> configured = readRegistryString(systemRegistry(), L"ConfigPath");
+	const QString existing = configured.value_or(QString());
 	const bool legacyMarkers = looksLikeLegacyApoConfigDir(existing);
 	const bool volatileXt = LegacyMigrationPolicy::isVolatileXtConfigDir(existing);
-	const LegacyMigrationPolicy::Action action = LegacyMigrationPolicy::classify(
-		existing, stableRoot, legacyMarkers, volatileXt);
+	// The hook leaves a ConfigPath it cannot read alone; report the same.
+	const LegacyMigrationPolicy::Action action = configured
+		? LegacyMigrationPolicy::classify(existing, stableRoot, legacyMarkers, volatileXt)
+		: LegacyMigrationPolicy::Action::RespectCustom;
 
 	const char* actionName = "?";
 	switch (action)
@@ -245,7 +490,8 @@ int LegacyMigration::dryRun()
 	}
 
 	fwprintf(stderr, L"[migration dry-run] ConfigPath: %s\n",
-		existing.isEmpty() ? L"(absent)" : reinterpret_cast<const wchar_t*>(existing.utf16()));
+		!configured ? L"(could not be read)"
+		: existing.isEmpty() ? L"(absent)" : reinterpret_cast<const wchar_t*>(existing.utf16()));
 	fwprintf(stderr, L"[migration dry-run] stable root: %s\n",
 		reinterpret_cast<const wchar_t*>(stableRoot.utf16()));
 	fwprintf(stderr, L"[migration dry-run] legacy markers: %d, volatile XT dir: %d\n",
@@ -279,7 +525,7 @@ int LegacyMigration::dryRun()
 
 QString LegacyMigration::adoptMigratedFile(const QString& path)
 {
-	const QString migratedFrom = readRegistryString(systemRegistry(), L"MigratedFrom");
+	const QString migratedFrom = readRegistryString(systemRegistry(), L"MigratedFrom").value_or(QString());
 	if (migratedFrom.isEmpty())
 		return path;
 
@@ -302,11 +548,10 @@ QString LegacyMigration::adoptMigratedFile(const QString& path)
 
 	// Row prefs and scroll offsets are keyed by the absolute path; port them
 	// so the remapped tab keeps its per-file state. Never overwrite prefs the
-	// new path already accumulated. The key mirrors EDITOR_PER_FILE_REGPATH
-	// (MainWindow.h) without pulling the whole MainWindow header in here.
-	QSettings settings(QString::fromWCharArray(EDITOR_REGPATH L"\\file-specific"), QSettings::NativeFormat);
-	const QString oldGroup = QDir::toNativeSeparators(path).replace(QLatin1Char('\\'), QLatin1Char('|'));
-	const QString newGroup = QDir::toNativeSeparators(remapped).replace(QLatin1Char('\\'), QLatin1Char('|'));
+	// new path already accumulated.
+	QSettings settings(QString::fromWCharArray(EDITOR_PER_FILE_REGPATH), QSettings::NativeFormat);
+	const QString oldGroup = EditorSettings::perFileGroup(path);
+	const QString newGroup = EditorSettings::perFileGroup(remapped);
 	settings.beginGroup(newGroup);
 	const bool newGroupEmpty = settings.allKeys().isEmpty();
 	settings.endGroup();
@@ -329,7 +574,7 @@ QString LegacyMigration::adoptMigratedFile(const QString& path)
 
 void LegacyMigration::maybeShowStartupNotice(QWidget* parent)
 {
-    const QString stamp = readRegistryString(systemRegistry(), L"MigrationStamp");
+    const QString stamp = readRegistryString(systemRegistry(), L"MigrationStamp").value_or(QString());
     if (stamp.isEmpty())
         return;
 
@@ -337,7 +582,7 @@ void LegacyMigration::maybeShowStartupNotice(QWidget* parent)
     if (settings.value(QStringLiteral("interface/migrationNoticeShown")).toString() == stamp)
         return;
 
-    const QString from = readRegistryString(systemRegistry(), L"MigratedFrom");
+    const QString from = readRegistryString(systemRegistry(), L"MigratedFrom").value_or(QString());
     const QString root = stableConfigRoot();
     QMessageBox::information(parent, QObject::tr("Configuration folder moved"),
         QObject::tr("Your Equalizer APO configuration was imported into the EqualizerAPO-XT "

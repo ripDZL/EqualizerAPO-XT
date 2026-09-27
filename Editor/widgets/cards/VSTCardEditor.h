@@ -5,13 +5,12 @@
 */
 
 /*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-
-	Modern card body for VSTPlugin rows. It ports the plugin-lifecycle
-	logic from the legacy VSTPluginFilterGUI (initialise, open panel, embed,
-	store) into a card-native layout, holding the opaque plugin state and options
-	(chunkData / paramMap / bus contract) and reproducing them on store(). The
-	--selftest-vst round-trip test pins that this state survives
+	Modern card body for VSTPlugin rows. The plugin lifecycle (initialise,
+	open panel, embed, state read-back) is VSTPluginSession's and the row's
+	document state (bus contract, channel fill) is VSTRowDocument's; both are
+	shared with the legacy VSTPluginFilterGUI. This card builds its
+	card-native controls around them and reproduces the line on store(). The
+	--selftest-vst round-trip test pins that the state survives
 	parse -> store -> parse without loss.
 
 	The plugin is presented as a named device, not a file with a path. The
@@ -29,16 +28,10 @@
 #include <unordered_map>
 #include <vector>
 
-#include <QElapsedTimer>
-
 #include "Editor/IFilterGUI.h"
-#include "Editor/helpers/PanelPreviewFeeder.h"
-#include "Editor/helpers/VSTPluginLivePreview.h"
-#include "Editor/helpers/VSTPreviewEndpoint.h"
 #include "Editor/widgets/cards/ReferenceCardView.h"
-#include "Editor/widgets/cards/VSTBusModel.h"
-#include "Editor/widgets/cards/VSTSlotFillModel.h"
-#include "vst/VSTPluginInstance.h"
+#include "Editor/widgets/cards/VSTPluginSession.h"
+#include "Editor/widgets/cards/VSTRowDocument.h"
 #include "vst/VSTPluginLibrary.h"
 
 class QToolButton;
@@ -68,57 +61,35 @@ public:
 	~VSTCardEditor() override;
 
 	void store(QString& command, QString& parameters) override;
-	void configureSelectedChannels(std::vector<std::wstring>& selectedChannels) override;
+	void setChannelFlow(const ChannelFlowAtLine& flow) override;
 	void loadPreferences(const QVariantMap& prefs) override;
 	void storePreferences(QVariantMap& prefs) override;
 
 private slots:
 	void openPanel();
 	void panelButtonClicked();
-	void applyDialog();
-	void autoApplyToggled(bool checked);
+	void pluginStateChanged();
 	void pathCommitted(const QString& text);
 	void selectFile();
-	void selectVST3Bundle();
 	void importToConfig();
 	void embedToggled(bool checked);
 	void busLayoutsPicked(VST3BusLayout input, VST3BusLayout output);
 	void removeBusLayouts();
-	void livePreviewToggled(bool checked);
 	void fillSlotPicked(int slot, const QString& value, bool output);
 	void fillLatchToggled();
 	void removeChannelFill();
-	void onIdle();
 
 private:
-	void initPlugin();
-	bool embedPlugin();
-	void updateLivePreview();
 	void updateReferenceState();
 	void updateBusControls();
 	void updateFillRails();
 	void updatePermissionWarning();
-	void onAutomate();
-	void onSizeWindow(int w, int h);
 
-	std::shared_ptr<VSTPluginLibrary> library;
-	std::unique_ptr<VSTPluginInstance> effect;
-	std::wstring chunkData;
-	std::unordered_map<std::wstring, float> paramMap;
-	bool embedded = false;
-	bool panelDialogOpen = false;
-	bool autoApplyDialog = true;
-	VSTBusModel busModel;
-	// Per-slot channel fill for the forced layouts. The card has no editor
-	// for these yet; it preserves them losslessly and only drops a side's
-	// list when that side's layout changes, because the slot count no longer
-	// matches.
-	std::vector<std::wstring> inputChannels;
-	std::vector<std::wstring> outputChannels;
-	// The fill rails' document-side state; kept in sync with busModel and
-	// the two lists above, plus the selection configureSelectedChannels
-	// delivers.
-	VSTSlotFillModel fillModel;
+	// The bus contract and the per-slot channel fill, edited through the
+	// bus strip and the two fill rails, against the selection
+	// setChannelFlow delivers.
+	VSTRowDocument document;
+	std::unique_ptr<VSTPluginSession> session;
 	// The fold state of the two rails (only meaningful while both exist).
 	// Persisted per row; defaults to collapsed while both sides are still
 	// implicit so untouched contract cards keep their height.
@@ -132,16 +103,11 @@ private:
 	// updateBusControls, consumed by updateReferenceState.
 	QString busStatusText;
 	ReferenceCardState::Severity busStatusSeverity = ReferenceCardState::Severity::None;
-	VSTPreviewEndpoint previewEndpoint;
-	VSTPluginLivePreview livePreview;
-	QElapsedTimer lastReadTimer;
 
 	FileReferenceController* reference = nullptr;
 	// The filter table owning this row; nullptr in contexts without one
 	// (tests, previews), which merely hides the import affordance.
 	FilterTable* filterTable = nullptr;
-	QString initErrorText;
-	bool libraryMissing = false;
 
 	ReferenceCardView* view = nullptr;
 	QToolButton* selectButton = nullptr;
@@ -149,15 +115,12 @@ private:
 	QPushButton* openPanelButton = nullptr;
 	QToolButton* optionsButton = nullptr;
 	QAction* embedAction = nullptr;
+	QAction* liveAnalyzerFeedAction = nullptr;
 	QAction* removeBusAction = nullptr;
 	QAction* removeFillAction = nullptr;
 	VSTBusStrip* busStrip = nullptr;
-	QAction* livePreviewAction = nullptr;
 	VSTSlotFillRail* inputRail = nullptr;
 	VSTSlotFillRail* outputRail = nullptr;
 	QFrame* frame = nullptr;
 	QPlainTextEdit* warningTextEdit = nullptr;
-	// Declared after effect on purpose: reverse member destruction stops the
-	// pump before the instance it feeds goes away.
-	PanelPreviewFeeder previewFeeder;
 };

@@ -21,13 +21,15 @@
 #include <devices/DeviceAPOInfo.h>
 #include <services/logging/Logging.h>
 #include <services/registry/WindowsRegistry.h>
-#include <platform/windows/WindowsVersion.h>
 #include <services/windows/WindowsService.h>
 #include <platform/windows/Win32Resource.h>
 #include <QDir>
 #include <QPropertyAnimation>
 #include <QScreen>
+#include <QStyle>
+#include <QStyleOptionButton>
 #include <devices/AsioAPOInfo.h>
+#include <devices/DevicePlan.h>
 #include <devices/VoicemeeterAPOInfo.h>
 #include "DeviceTestDialog.h"
 #include "../version.h"
@@ -74,11 +76,8 @@ DeviceSelector::DeviceSelector(QWidget* parent)
 		QMessageBox::critical(this, tr("Error while accessing the registry"), QString::fromStdWString(e.getMessage()));
 	}
 
-	if (!WindowsVersion::isAtLeast(6, 3)) // Windows 8.1
-	{
-		ui.installModeComboBox->removeItem(2);
-		ui.installModeComboBox->removeItem(1);
-	}
+	// Every install mode is offered: the minimum supported Windows is 10 1809,
+	// the oldest Qt 6.10 runs on, and SFX/MFX/EFX exist from Windows 8.1 on.
 
 	finishSetup();
 
@@ -170,7 +169,7 @@ void DeviceSelector::finishSetup()
 	connect(ui.useOriginalAPOPostMixCheckBox, &QCheckBox::clicked, this, &DeviceSelector::onTroubleShootingOptionChanged);
 	connect(ui.installModeComboBox, QOverload<int>::of(&QComboBox::activated), this, &DeviceSelector::onTroubleShootingOptionChanged);
 	connect(ui.allowSilentBufferCheckBox, &QCheckBox::clicked, this, &DeviceSelector::onTroubleShootingOptionChanged);
-	connect(ui.exclusiveModeEqCheckBox, &QCheckBox::clicked, this, &DeviceSelector::onTroubleShootingOptionChanged);
+	connect(ui.asioEntryCheckBox, &QCheckBox::clicked, this, &DeviceSelector::onTroubleShootingOptionChanged);
 	connect(ui.autoCheckBox, &QCheckBox::clicked, this, &DeviceSelector::onTroubleShootingOptionChanged);
 	connect(ui.asioSyncCheckBox, &QCheckBox::clicked, this, &DeviceSelector::onTroubleShootingOptionChanged);
 	connect(ui.asioDeadlineComboBox, QOverload<int>::of(&QComboBox::activated), this, &DeviceSelector::onTroubleShootingOptionChanged);
@@ -261,10 +260,62 @@ void DeviceSelector::previewRemoveBuffer()
 	showAsioWaitTime(true);
 }
 
+void DeviceSelector::previewAsioEntry()
+{
+	// The preview roster's endpoints carry no install state, so pin what a
+	// real endpoint shows once "Use in ASIO apps" is ticked: the entry's
+	// options unfolded under it.
+	ui.asioEntryCheckBox->setChecked(true);
+	placeAsioOptions(true);
+	ui.asioOptionsBox->setVisible(true);
+	for (QWidget* control : {static_cast<QWidget*>(ui.asioSyncCheckBox), static_cast<QWidget*>(ui.asioAutoStartCheckBox),
+		static_cast<QWidget*>(ui.asioHost32CheckBox)})
+		control->setEnabled(true);
+}
+
 void DeviceSelector::showAsioWaitTime(bool shown)
 {
 	ui.asioWaitLabel->setVisible(shown);
 	ui.asioDeadlineComboBox->setVisible(shown);
+}
+
+void DeviceSelector::placeAsioOptions(bool underAsioEntry)
+{
+	// One set of controls serves an ASIO driver's page and an endpoint's
+	// ASIO entry, so the wording, the handlers and the skins' styling are the
+	// same in both places. Under the endpoint's checkbox the box is indented
+	// to the checkbox text, which marks the options as that entry's details.
+	QWidget* box = ui.asioOptionsBox;
+	int indent = 0;
+	if (underAsioEntry)
+	{
+		if (box->parentWidget() != ui.page_2)
+			ui.gridLayout_3->addWidget(box, 3, 1, 1, 5);
+		QStyleOptionButton option;
+		option.initFrom(ui.asioEntryCheckBox);
+		option.text = ui.asioEntryCheckBox->text();
+		indent = ui.asioEntryCheckBox->style()->subElementRect(QStyle::SE_CheckBoxContents, &option, ui.asioEntryCheckBox).left();
+	}
+	else if (box->parentWidget() != ui.asioPage)
+	{
+		ui.asioLayout->insertWidget(0, box);
+	}
+	box->layout()->setContentsMargins(indent, 0, 0, 0);
+}
+
+bool DeviceSelector::readAsioOption(const QObject* sender, eapo::asio::EntryOptions& options) const
+{
+	if (sender == ui.asioSyncCheckBox)
+		options.synchronous = ui.asioSyncCheckBox->isChecked();
+	else if (sender == ui.asioDeadlineComboBox)
+		options.deadlinePercent = deadlinePercentForIndex(ui.asioDeadlineComboBox->currentIndex());
+	else if (sender == ui.asioAutoStartCheckBox)
+		options.autoStart = ui.asioAutoStartCheckBox->isChecked();
+	else if (sender == ui.asioHost32CheckBox)
+		options.host32 = ui.asioHost32CheckBox->isChecked();
+	else
+		return false;
+	return true;
 }
 
 void DeviceSelector::previewOpenTroubleshooting()
@@ -308,36 +359,13 @@ void DeviceSelector::onDialogAccepted()
 			std::shared_ptr<AbstractAPOInfo> info = item->data(0, Qt::UserRole).value<std::shared_ptr<AbstractAPOInfo>>();
 			bool checked = item->checkState(0) == Qt::Checked;
 
-			try
-			{
-				const DeviceAPOInfo* deviceInfo = dynamic_cast<DeviceAPOInfo*>(info.get());
-				if (checked && !info->isInstalled())
-				{
-					info->install();
-					if (deviceInfo != nullptr)
-						deviceUpdated = true;
-				}
-				else if (!checked && info->isInstalled())
-				{
-					info->uninstall();
-					if (deviceInfo != nullptr)
-						deviceUpdated = true;
-				}
-				else if (checked && (info->canBeUpgraded() || info->hasChanges() || info->isEnhancementsDisabled()))
-				{
-					info->reinstall();
-					if (deviceInfo != nullptr)
-						deviceUpdated = true;
-				}
-			}
-			catch (const RegistryError& e)
-			{
-				// The operation put the endpoint back before throwing, and its
-				// report is already in DeviceSelector.log. Two things are added
-				// here: where to find that log, and the one case where the
-				// endpoint was *not* put back, which the user has to know about
-				// before they try again.
-				QString message = QString::fromStdWString(e.getMessage());
+			// The operation put the endpoint back before throwing, and its
+			// report is already in DeviceSelector.log. Two things are added
+			// here: where to find that log, and the one case where the
+			// endpoint was *not* put back, which the user has to know about
+			// before they try again.
+			auto reportFailure = [&](const std::wstring& error) {
+				QString message = QString::fromStdWString(error);
 				const DeviceInstallReport& report = info->getLastOperationReport();
 				if (report.leftInconsistent())
 				{
@@ -351,11 +379,47 @@ void DeviceSelector::onDialogAccepted()
 				message += QLatin1String("\n\n") + tr("Details are in %1.")
 					.arg(QDir::toNativeSeparators(QString::fromStdWString(Logging::currentPath())));
 				QMessageBox::critical(this, tr("Error while accessing the registry"), message);
+			};
+
+			try
+			{
+				const DevicePlan plan = planFor(checked, deviceFactsOf(*info));
+				switch (plan.action)
+				{
+				case DeviceAction::Install:
+					info->install();
+					break;
+				case DeviceAction::Uninstall:
+					info->uninstall();
+					break;
+				case DeviceAction::Reinstall:
+					info->reinstall();
+					break;
+				case DeviceAction::None:
+					break;
+				}
+				if (plan.changesSomething())
+					deviceUpdated = deviceUpdated || info->changesNeedAudioRestart();
+			}
+			catch (const WideError& e)
+			{
+				// Every adapter operation throws WideError only
+				// (AbstractAPOInfo.h). An escaping exception here used to end
+				// the elevated process mid-install (audit #348 TD-06).
+				reportFailure(e.getMessage());
 			}
 		}
 	}
 
-	VoicemeeterAPOInfo::ensureVoicemeeterClientRunning();
+	// Process enumeration behind this throws std::runtime_error.
+	try
+	{
+		VoicemeeterAPOInfo::ensureVoicemeeterClientRunning();
+	}
+	catch (const std::exception& e)
+	{
+		LogFStatic(L"Could not start the Voicemeeter client: %S", e.what());
+	}
 
 	finish(deviceUpdated);
 }
@@ -504,21 +568,26 @@ void DeviceSelector::onTroubleShootingOptionChanged()
 				deviceInfo->getSelectedInstallState().allowSilentBufferModification = ui.allowSilentBufferCheckBox->isChecked();
 			else if (sender == ui.autoCheckBox)
 				deviceInfo->getSelectedInstallState().autoAdjust = ui.autoCheckBox->isChecked();
-			else if (sender == ui.exclusiveModeEqCheckBox)
-				deviceInfo->getSelectedInstallState().exclusiveModeEq = ui.exclusiveModeEqCheckBox->isChecked();
+			else if (sender == ui.asioEntryCheckBox)
+			{
+				DeviceAPOInfo::InstallState& state = deviceInfo->getSelectedInstallState();
+				state.asioEntry = ui.asioEntryCheckBox->isChecked();
+				// Folding the entry away drops what was picked under it, so an
+				// entry ticked, edited and unticked again is no pending change.
+				if (!state.asioEntry)
+					state.asioEntryOptions = deviceInfo->getCurrentInstallState().asioEntryOptions;
+			}
+			else
+			{
+				readAsioOption(sender, deviceInfo->getSelectedInstallState().asioEntryOptions);
+			}
 		}
 		AsioAPOInfo* asioInfo = dynamic_cast<AsioAPOInfo*>(info.get());
 		if (asioInfo != nullptr)
 		{
-			const QObject* const source = QObject::sender();
-			if (source == ui.asioSyncCheckBox)
-				asioInfo->setSynchronous(ui.asioSyncCheckBox->isChecked());
-			else if (source == ui.asioDeadlineComboBox)
-				asioInfo->setDeadlinePercent(deadlinePercentForIndex(ui.asioDeadlineComboBox->currentIndex()));
-			else if (source == ui.asioAutoStartCheckBox)
-				asioInfo->setAutoStart(ui.asioAutoStartCheckBox->isChecked());
-			else if (source == ui.asioHost32CheckBox)
-				asioInfo->setHost32(ui.asioHost32CheckBox->isChecked());
+			eapo::asio::EntryOptions options = asioInfo->getEntryOptions();
+			if (readAsioOption(QObject::sender(), options))
+				asioInfo->setEntryOptions(options);
 		}
 		// The wait time is the buffer removal's own detail: it unfolds beside
 		// the checkbox while the buffer is removed and is gone otherwise.
@@ -571,10 +640,7 @@ void DeviceSelector::updateButtons()
 	bool hasOriginalAPOPreMix = true;
 	bool hasOriginalAPOPostMix = true;
 	bool asioSelected = false;
-	bool asioSynchronous = false;
-	unsigned asioDeadlinePercent = 25;
-	bool asioAutoStart = false;
-	bool asioHost32 = false;
+	eapo::asio::EntryOptions asioOptions;
 	bool asioCanHost32 = true;   // the preview roster has the 32-bit wrapper
 	DeviceAPOInfo::InstallState installState;
 	if (noGroupsSelected && list.size() == 1)
@@ -590,6 +656,8 @@ void DeviceSelector::updateButtons()
 			hasOriginalAPOPreMix = deviceApoInfo->getOriginalAPOPreMix() != L"";
 			hasOriginalAPOPostMix = deviceApoInfo->getOriginalAPOPostMix() != L"";
 			installState = deviceApoInfo->getSelectedInstallState();
+			asioOptions = installState.asioEntryOptions;
+			asioCanHost32 = deviceApoInfo->canHostAsio32();
 		}
 		// Keyed on the transport label, not the class, so the preview roster
 		// (plain preview records marked ASIO) shows the page in the gallery.
@@ -597,10 +665,7 @@ void DeviceSelector::updateButtons()
 		const AsioAPOInfo* asioInfo = dynamic_cast<const AsioAPOInfo*>(apoInfo.get());
 		if (asioInfo != nullptr)
 		{
-			asioSynchronous = asioInfo->isSynchronous();
-			asioDeadlinePercent = asioInfo->getDeadlinePercent();
-			asioAutoStart = asioInfo->isAutoStart();
-			asioHost32 = asioInfo->isHost32();
+			asioOptions = asioInfo->getEntryOptions();
 			asioCanHost32 = asioInfo->canHost32();
 		}
 	}
@@ -613,30 +678,34 @@ void DeviceSelector::updateButtons()
 	ui.useOriginalAPOPostMixCheckBox->setEnabled(enable && !isInput && hasOriginalAPOPostMix && installState.installPostMix);
 	ui.installModeComboBox->setEnabled(enable);
 	ui.allowSilentBufferCheckBox->setEnabled(enable);
-	ui.exclusiveModeEqCheckBox->setEnabled(enable);
+	ui.asioEntryCheckBox->setEnabled(enable);
 	// Page 0: nothing to say. Page 1: an endpoint's APO chain. Page 2: an
 	// ASIO target's options.
 	ui.stackedWidget->setCurrentIndex(!enable ? 0 : (asioSelected ? 2 : 1));
-	const bool asioEnabled = enable && asioSelected;
+	// The ASIO options belong to the ASIO target's page, or to an endpoint's
+	// "Use in ASIO apps", under which they unfold while the entry is ticked.
+	const bool underAsioEntry = enable && !asioSelected;
+	placeAsioOptions(underAsioEntry);
+	ui.asioOptionsBox->setVisible(!underAsioEntry || installState.asioEntry);
+	const bool asioEnabled = enable && (asioSelected || installState.asioEntry);
 	ui.asioSyncCheckBox->setEnabled(asioEnabled);
-	ui.asioSyncCheckBox->setChecked(asioSynchronous);
-	ui.asioDeadlineComboBox->setCurrentIndex(deadlineIndexForPercent(asioDeadlinePercent));
-	showAsioWaitTime(asioEnabled && asioSynchronous);
+	ui.asioSyncCheckBox->setChecked(asioOptions.synchronous);
+	ui.asioDeadlineComboBox->setCurrentIndex(deadlineIndexForPercent(asioOptions.deadlinePercent));
+	showAsioWaitTime(asioEnabled && asioOptions.synchronous);
 	ui.asioAutoStartCheckBox->setEnabled(asioEnabled);
-	ui.asioAutoStartCheckBox->setChecked(asioAutoStart);
+	ui.asioAutoStartCheckBox->setChecked(asioOptions.autoStart);
 	ui.asioHost32CheckBox->setEnabled(asioEnabled && asioCanHost32);
-	ui.asioHost32CheckBox->setChecked(asioHost32 && asioCanHost32);
+	ui.asioHost32CheckBox->setChecked(asioOptions.host32 && asioCanHost32);
 
 	ui.installPreMixCheckBox->setChecked(installState.installPreMix);
 	ui.installPostMixCheckBox->setChecked(installState.installPostMix);
 	ui.useOriginalAPOPreMixCheckBox->setChecked(installState.useOriginalAPOPreMix && hasOriginalAPOPreMix);
 	ui.useOriginalAPOPostMixCheckBox->setChecked(installState.useOriginalAPOPostMix && hasOriginalAPOPostMix);
 
-	if (WindowsVersion::isAtLeast(6, 3)) // Windows 8.1
-		ui.installModeComboBox->setCurrentIndex(installState.installMode);
+	ui.installModeComboBox->setCurrentIndex(installState.installMode);
 
 	ui.allowSilentBufferCheckBox->setChecked(installState.allowSilentBufferModification);
-	ui.exclusiveModeEqCheckBox->setChecked(installState.exclusiveModeEq);
+	ui.asioEntryCheckBox->setChecked(installState.asioEntry);
 	ui.autoCheckBox->setChecked(installState.autoAdjust);
 }
 
@@ -673,8 +742,7 @@ bool DeviceSelector::isChanged()
 			QTreeWidgetItem* item = topItem->child(i);
 			std::shared_ptr<AbstractAPOInfo> apoInfo = item->data(0, Qt::UserRole).value<std::shared_ptr<AbstractAPOInfo>>();
 			bool checked = item->checkState(0) == Qt::Checked;
-			if (checked != apoInfo->isInstalled()
-				|| checked && apoInfo->isInstalled() && (apoInfo->canBeUpgraded() || apoInfo->hasChanges() || apoInfo->isEnhancementsDisabled()))
+			if (planFor(checked, deviceFactsOf(*apoInfo)).changesSomething())
 			{
 				changed = true;
 				break;
@@ -697,7 +765,7 @@ bool DeviceSelector::hasUpgrades()
 			QTreeWidgetItem* item = topItem->child(i);
 			std::shared_ptr<AbstractAPOInfo> apoInfo = item->data(0, Qt::UserRole).value<std::shared_ptr<AbstractAPOInfo>>();
 			bool checked = item->checkState(0) == Qt::Checked;
-			if (checked && apoInfo->isInstalled() && (apoInfo->canBeUpgraded() || apoInfo->isEnhancementsDisabled()))
+			if (planFor(checked, deviceFactsOf(*apoInfo)).isUpgrade())
 			{
 				hasUpgrades = true;
 				break;
@@ -711,20 +779,27 @@ bool DeviceSelector::hasUpgrades()
 QString DeviceSelector::getStateText(const std::shared_ptr<AbstractAPOInfo>& apoInfo, bool checked)
 {
 	QString state;
-	if (checked && !apoInfo->isInstalled())
+	const DevicePlan plan = planFor(checked, deviceFactsOf(*apoInfo));
+	switch (plan.action)
+	{
+	case DeviceAction::Install:
 		state = tr("APO will be installed");
-	else if (!checked && apoInfo->isInstalled())
+		break;
+	case DeviceAction::Uninstall:
 		state = tr("APO will be uninstalled");
-	else if (apoInfo->isInstalled() && apoInfo->canBeUpgraded())
-		state = tr("APO will be upgraded");
-	else if (apoInfo->isInstalled() && apoInfo->hasChanges())
-		state = tr("APO installation will be changed");
-	else if (apoInfo->isInstalled() && apoInfo->isEnhancementsDisabled())
-		state = tr("Audio enhancements will be enabled");
-	else if (apoInfo->isInstalled())
-		state = tr("APO is already installed");
-	else
-		state = tr("APO can be installed");
+		break;
+	case DeviceAction::Reinstall:
+		if (plan.reason == DevicePlan::Reason::Upgrade)
+			state = tr("APO will be upgraded");
+		else if (plan.reason == DevicePlan::Reason::Changes)
+			state = tr("APO installation will be changed");
+		else
+			state = tr("Audio enhancements will be enabled");
+		break;
+	case DeviceAction::None:
+		state = apoInfo->isInstalled() ? tr("APO is already installed") : tr("APO can be installed");
+		break;
+	}
 
 	VoicemeeterAPOInfo* voicemeeterInfo = dynamic_cast<VoicemeeterAPOInfo*>(apoInfo.get());
 	if (voicemeeterInfo != nullptr && !voicemeeterInfo->isVoicemeeterInstalled())

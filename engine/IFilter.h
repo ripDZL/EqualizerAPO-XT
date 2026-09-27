@@ -19,6 +19,11 @@
 
 #pragma once
 
+// Also compiled as C++17: Tests/EngineOrchestrationTests/SampleIoTests.cpp
+// includes this header and is pinned to /std:c++17 in its project file, the
+// standard its throughput bars were calibrated under (audit #348 TD-74). Keep
+// it free of C++20-only language and library features.
+
 #include <memory>
 #include <string>
 #include <utility>
@@ -44,6 +49,14 @@ public:
 	// request that the channelNames returned by initialize become the new selection
 	virtual bool getSelectChannels() {return false;}
 	// return value is the channelNames vector, which may contain additional or fewer channel names
+	//
+	// Call contract (audit #348): the engine calls initialize() exactly once
+	// per filter object, before the first process(); a configuration reload
+	// builds new filter objects instead of re-initializing the old ones. A
+	// filter may support a second call (Convolution, MultiConvolution,
+	// VSTPlugin and LoudnessCorrection clean up and start over), but callers
+	// must not rely on it: a filter that is only ever initialized once is
+	// correct.
 	virtual std::vector<std::wstring> initialize(float sampleRate, unsigned maxFrameCount, std::vector<std::wstring> channelNames) = 0;
 	virtual void process(double** output, double** input, unsigned frameCount) = 0;
 

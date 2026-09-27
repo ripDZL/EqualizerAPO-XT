@@ -40,6 +40,16 @@ void AudioKnob::setBipolar(bool value)
 	update();
 }
 
+void AudioKnob::setConventionalPresentation(bool value)
+{
+	if (conventionalPresentation == value)
+		return;
+	conventionalPresentation = value;
+	if (!isSliderDown())
+		syncGestureCursor();
+	update();
+}
+
 QSize AudioKnob::sizeHint() const
 {
 	return QSize(74, 74);
@@ -59,6 +69,7 @@ void AudioKnob::paintEvent(QPaintEvent*)
 	state.ratio = maximum() == minimum() ? 0.0 : (value() - minimum()) / static_cast<double>(maximum() - minimum());
 	state.bipolar = bipolar;
 	state.valueText = text;
+	state.conventionalPresentation = conventionalPresentation;
 	state.enabled = isEnabled();
 	state.hovered = underMouse();
 	state.dragging = isSliderDown();
@@ -67,13 +78,18 @@ void AudioKnob::paintEvent(QPaintEvent*)
 	SkinManager::instance()->paintKnob(painter, rect(), state);
 }
 
+KnobGesture AudioKnob::effectiveGesture() const
+{
+	return conventionalPresentation ? KnobGesture::Rotary : SkinManager::instance()->knobGesture();
+}
+
 void AudioKnob::syncGestureCursor()
 {
 	// The resting cursor announces the gesture before the first press: a
 	// hand for a knob that is grabbed and turned, a vertical arrow for a
 	// drum that is rolled up and down. The rotary hand closes while dragging;
 	// the arrow stays, because it already says which way the drum moves.
-	setCursor(SkinManager::instance()->knobGesture() == KnobGesture::VerticalDrag
+	setCursor(effectiveGesture() == KnobGesture::VerticalDrag
 		? Qt::SizeVerCursor : Qt::OpenHandCursor);
 }
 
@@ -117,7 +133,7 @@ void AudioKnob::mousePressEvent(QMouseEvent* event)
 		// We deliberately do not call QDial's handlers; QDial maps the cursor
 		// with a different angle convention than our paintEvent, which made the
 		// indicator drift and lurched the value when the button was released.
-		gesture = SkinManager::instance()->knobGesture();
+		gesture = effectiveGesture();
 		setSliderDown(true);
 		if (gesture == KnobGesture::VerticalDrag)
 		{

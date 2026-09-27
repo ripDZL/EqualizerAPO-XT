@@ -50,6 +50,25 @@ namespace
 	};
 }
 
+ChannelLayout::AnalysisLayout ChannelLayout::analysisLayout(unsigned deviceChannelCount,
+	unsigned deviceChannelMask, int selectedMask)
+{
+	AnalysisLayout layout{deviceChannelCount, selectedMask};
+	if (selectedMask != 0 && static_cast<unsigned>(selectedMask) != deviceChannelMask)
+	{
+		layout.channelCount = 0;
+		for (int i = 0; i < 31; i++)
+			if (selectedMask & (1 << i))
+				layout.channelCount++;
+	}
+	if (layout.channelCount == 0)
+	{
+		layout.channelCount = 8;
+		layout.channelMask = KSAUDIO_SPEAKER_7POINT1_SURROUND;
+	}
+	return layout;
+}
+
 int ChannelLayout::getDefaultChannelMask(int channelCount)
 {
 	int channelMask;
@@ -115,7 +134,8 @@ int ChannelLayout::getChannelIndex(std::wstring word, const std::vector<std::wst
 
 		if (channelIndex < 0 || channelIndex >= static_cast<int>(channelNames.size()))
 		{
-			LogFStatic(L"Channel number %s out of range (1 - %u)", word.c_str(), static_cast<unsigned>(channelNames.size()));
+			if (!allowAdditional)
+				LogFStatic(L"Channel number %s out of range (1 - %u)", word.c_str(), static_cast<unsigned>(channelNames.size()));
 			channelIndex = -1;
 		}
 	}
@@ -145,4 +165,17 @@ int ChannelLayout::getChannelIndex(std::wstring word, const std::vector<std::wst
 	}
 
 	return channelIndex;
+}
+
+ChannelLayout::Target ChannelLayout::resolveTarget(const std::wstring& word, const std::vector<std::wstring>& channelNames)
+{
+	const int index = getChannelIndex(word, channelNames, true);
+	return {index != -1 ? channelNames[static_cast<size_t>(index)] : word, index};
+}
+
+void ChannelLayout::declare(std::vector<std::wstring>& channelNames, const std::wstring& word)
+{
+	const Target target = resolveTarget(word, channelNames);
+	if (find(channelNames.begin(), channelNames.end(), target.name) == channelNames.end())
+		channelNames.push_back(target.name);
 }

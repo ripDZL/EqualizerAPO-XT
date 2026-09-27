@@ -26,6 +26,7 @@
 #include "../engine/FilterEngine.h"
 #include "../platform/windows/Win32Resource.h"
 #include "../runtime/concurrency/SynchronizedState.h"
+#include "../runtime/errors/WideError.h"
 #include "VoicemeeterRemote.h"
 
 class VoicemeeterClient
@@ -52,6 +53,11 @@ private:
 		std::vector<int> idleSampleCounts;
 	};
 
+	// Sets every strip's engine up for the stream format, which a strip's
+	// device identity does not carry. Nothing happens before Voicemeeter has
+	// said what the format is (both values still zero).
+	static void initializeEngines(EngineState& state, float sampleRate, unsigned maxFrameCount);
+
 	std::vector<std::wstring> outputs;
 	unsigned long mainThreadId;
 	winutil::UniqueModule module;
@@ -65,19 +71,11 @@ private:
 	SynchronizedState<EngineState> engineState;
 };
 
-class InitError
+class InitError : public WideError
 {
 public:
 	InitError(const std::wstring& message)
-		: message(message)
+		: WideError(message)
 	{
 	}
-
-	const std::wstring& getMessage() const
-	{
-		return message;
-	}
-
-private:
-	std::wstring message;
 };

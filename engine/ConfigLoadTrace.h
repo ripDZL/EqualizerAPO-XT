@@ -5,8 +5,6 @@
 */
 
 /*
-    This file is part of EqualizerAPO-XT, a system-wide equalizer.
-
     Per-line facts collected while FilterEngine loads a configuration, so a UI
     (the Editor) can echo evaluation results next to the config rows: which If
     branch ran, what an Eval computed, which lines a false branch swallowed.
@@ -50,6 +48,11 @@ struct ConfigLoadTraceEntry
 		// valid no-op path silently became a false warning until somebody added it
 		// to the list.
 		ParseError,
+		// A line whose filter was built but threw while being set up
+		// (IFilter::initialize). The whole configuration was then not applied:
+		// the load rolls back and the previous configuration keeps running
+		// (audit #348 TD-18). text carries the reason and error is always set.
+		SetupError,
 	};
 
 	// How a Condition line's expression fared. NotEvaluated marks an ElseIf

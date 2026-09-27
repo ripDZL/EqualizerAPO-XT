@@ -49,14 +49,6 @@ subroute::CompileResult compilePreset(
 	return subroute::compile(*preset.state, spec);
 }
 
-bool approximatelyEqual(
-	double actual,
-	double expected,
-	double tolerance)
-{
-	return std::abs(actual - expected) <= tolerance;
-}
-
 const subroute::Path* findPath(
 	const subroute::SubwooferRoutingState& state,
 	const std::string& id)
@@ -134,7 +126,7 @@ void testLfeOnlyImpulse()
 	}
 
 	subroute::Processor processor;
-	processor.prepare(spec, *compiled.graph);
+	processor.prepare(*compiled.graph);
 
 	constexpr std::size_t frameCount = 64;
 	std::vector<std::vector<double>> input(
@@ -172,23 +164,20 @@ void testLfeOnlyImpulse()
 	harness.expectTrue(
 		trim > 0.0,
 		"Compiled headroom trim should be positive linear gain");
-	harness.expectTrue(
-		approximatelyEqual(
-			output[0][0] / trim,
-			expectedFrontBeforeTrim,
-			1.0e-11),
+	harness.expectNear(
+		output[0][0] / trim,
+		expectedFrontBeforeTrim,
+		1.0e-11,
 		"L should contain the +10 dB SourceLFE impulse before common trim");
-	harness.expectTrue(
-		approximatelyEqual(
-			output[1][0] / trim,
-			expectedFrontBeforeTrim,
-			1.0e-11),
+	harness.expectNear(
+		output[1][0] / trim,
+		expectedFrontBeforeTrim,
+		1.0e-11,
 		"R should contain the +10 dB SourceLFE impulse before common trim");
-	harness.expectTrue(
-		approximatelyEqual(
-			output[2][0] / trim,
-			expectedLfeBeforeTrim,
-			1.0e-11),
+	harness.expectNear(
+		output[2][0] / trim,
+		expectedLfeBeforeTrim,
+		1.0e-11,
 		"LFE should contain SourceLFE at +10 dB followed by -14 dB");
 	harness.expectTrue(
 		std::all_of(
@@ -228,7 +217,7 @@ void testUntouchedChannelBitExactness()
 
 	{
 		subroute::Processor processor;
-		processor.prepare(spec, *compiled.graph);
+		processor.prepare(*compiled.graph);
 
 		std::vector<std::vector<float>> input(
 			spec.channelLayout.size(),
@@ -272,7 +261,7 @@ void testUntouchedChannelBitExactness()
 
 	{
 		subroute::Processor processor;
-		processor.prepare(spec, *compiled.graph);
+		processor.prepare(*compiled.graph);
 
 		std::vector<std::vector<double>> input(
 			spec.channelLayout.size(),
@@ -358,7 +347,7 @@ void testBlockSplitContinuity()
 	}
 
 	subroute::Processor wholeProcessor;
-	wholeProcessor.prepare(spec, *compiled.graph);
+	wholeProcessor.prepare(*compiled.graph);
 
 	std::vector<const double*> wholeInputPlanes;
 	std::vector<double*> wholeOutputPlanes;
@@ -379,7 +368,7 @@ void testBlockSplitContinuity()
 	wholeProcessor.process(wholeBlock);
 
 	subroute::Processor splitProcessor;
-	splitProcessor.prepare(spec, *compiled.graph);
+	splitProcessor.prepare(*compiled.graph);
 
 	for (std::size_t offset = 0;
 		offset < frameCount;
@@ -435,7 +424,7 @@ void testFrontBassPolarity()
 	}
 
 	subroute::Processor processor;
-	processor.prepare(spec, *compiled.graph);
+	processor.prepare(*compiled.graph);
 
 	std::vector<std::vector<double>> input(
 		spec.channelLayout.size(),
@@ -519,7 +508,7 @@ void testInPlaceAliasing()
 
 	{
 		subroute::Processor processor;
-		processor.prepare(spec, *compiled.graph);
+		processor.prepare(*compiled.graph);
 
 		std::vector<const double*> inputPlanes;
 		std::vector<double*> outputPlanes;
@@ -542,7 +531,7 @@ void testInPlaceAliasing()
 
 	{
 		subroute::Processor processor;
-		processor.prepare(spec, *compiled.graph);
+		processor.prepare(*compiled.graph);
 
 		std::vector<const double*> inputPlanes;
 		std::vector<double*> outputPlanes;
@@ -592,7 +581,7 @@ void testResetReproducesImpulse()
 	}
 
 	subroute::Processor processor;
-	processor.prepare(spec, *compiled.graph);
+	processor.prepare(*compiled.graph);
 
 	std::vector<std::vector<double>> input(
 		spec.channelLayout.size(),

@@ -60,12 +60,20 @@ param(
     [string] $VbCableSha256 = "66FD0A4D9F4896FF41632B7E3D53892C085C4561F53E8AE8D0F0BC10EEDD1CDD",
     [double] $PreampDb = -20.0,
     [double] $ToleranceDb = 1.0,
+    # Seconds to wait after an --uninstall-endpoint before measuring.
+    [int] $GraphSettleSeconds = 3,
+    # Exit code for "the gate could not run" (the driver download), kept apart
+    # from 1 = "the product failed the gate".
+    [int] $InfrastructureExitCode = 3,
     [switch] $SkipDriverInstall,
     [switch] $PlanOnly
 )
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+# The FxProperties vocabulary (slots, EQ CLSIDs, registry root) comes from the
+# shared module rather than copies here (audit #348 F23).
+Import-Module (Join-Path $PSScriptRoot "ApoEndpointHarness.psm1") -Force
 
 $renderConnection = "CABLE Input"
 $captureConnection = "CABLE Output"
@@ -99,7 +107,7 @@ $lowLatencyMeasurements = @(
     [pscustomobject]@{ Name = "ll-after-uninstall"; Category = "default"; Raw = $false; Period = "";        HoldDefault = $false; ExpectGainDb = 0.0;       ToleranceDb = 1.5;          Required = $true; Note = "the cable at unity after the playback-side uninstall" }
 )
 # The ASIO entry round: the playback endpoint installed with its entry in
-# the ASIO driver list (DeviceSelector --exclusive-mode-eq), then that entry opened
+# the ASIO driver list (DeviceSelector --asio-entry), then that entry opened
 # the way a DAW opens it (COM activation of the registered wrapper CLSID,
 # AsioProbe as the host) while a recording app listens on the cable's far
 # side. The wrapper runs a WASAPI exclusive target and the engine host; the
@@ -259,23 +267,11 @@ function Write-ImpulseWav([string] $path, [int] $rate, [int] $frames) {
 
 # The effect chain an endpoint's FxProperties names, as "LFX=... GFX=...".
 function Get-EffectChain([string] $flow, [string] $endpointGuid) {
-    $fx = Get-ItemProperty -Path "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\$flow\$endpointGuid\FxProperties" -ErrorAction SilentlyContinue
-    if (-not $fx) { return $null }
-    $slots = @()
-    foreach ($slot in @(@("LFX", "1"), @("GFX", "2"), @("SFX", "5"), @("MFX", "6"), @("EFX", "7"))) {
-        $property = $fx.PSObject.Properties["{d04e05a6-594b-4fb6-a80d-01af5eed7d1d},$($slot[1])"]
-        if ($property -and $property.Value) { $slots += "$($slot[0])=$($property.Value)" }
-    }
-    return ($slots -join " ")
+    return Format-ApoEffectChain -FxProperties (Get-ApoFxProperties -Flow $flow -EndpointGuid $endpointGuid)
 }
 
 function Test-EqClsidLeft([string] $flow, [string] $endpointGuid) {
-    $fx = Get-ItemProperty -Path "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\$flow\$endpointGuid\FxProperties" -ErrorAction SilentlyContinue
-    if (-not $fx) { return $false }
-    foreach ($property in $fx.PSObject.Properties) {
-        if ("$($property.Value)" -match "EACD2258-FCAC-4FF4-B36D-419E924A6D79|EC1CC9CE-FAED-4822-828A-82A81A6F018F") { return $true }
-    }
-    return $false
+    return Test-ApoEqClsid -FxProperties (Get-ApoFxProperties -Flow $flow -EndpointGuid $endpointGuid)
 }
 
 function Get-JsonField($json, [string] $name) {
@@ -295,6 +291,16 @@ function Copy-Logs([string] $phase) {
             Copy-Item -LiteralPath $log.FullName -Destination (Join-Path $SnapshotDirectory "$phase-$($log.Name)") -Force
         }
     }
+}
+
+# After --uninstall-endpoint the audio engine rebuilds the endpoint's graph
+# while the measurement starts. On 2026-09-18 (run 35300200485, a docs-only
+# PR) ll-after-uninstall read -5.68 dB with a normal rmsDb and only the 1 kHz
+# bin low: a discontinuity inside the capture window, not a gain change. The
+# re-run passed at -0.01 dB. A short settle keeps that race out of a gate that
+# now blocks the release.
+function Wait-GraphSettle {
+    Start-Sleep -Seconds $GraphSettleSeconds
 }
 
 function Measure-Cable($measurement, [string] $round = "") {
@@ -410,7 +416,14 @@ if ($endpoints) {
             Invoke-WebRequest -Uri $VbCableUrl -OutFile $zip -UseBasicParsing -TimeoutSec 120
             break
         } catch {
-            if ($attempt -ge 3) { throw }
+            if ($attempt -ge 3) {
+                # This gate blocks the release, so an unreachable download
+                # site must not read like a product regression: it gets its
+                # own annotation and exit code, and re-running the failed job
+                # is the remedy (a re-run also re-runs create-release).
+                Write-Host "::error title=capture-gate infrastructure::VB-CABLE could not be downloaded after $attempt attempts ($($_.Exception.Message)). This is not a product failure; re-run the failed job."
+                exit $InfrastructureExitCode
+            }
             Write-Warning "download attempt $attempt failed: $($_.Exception.Message)"
             Start-Sleep -Seconds 15
         }
@@ -512,16 +525,8 @@ foreach ($mode in $installModes) {
     $install = Invoke-Program (Join-Path $current "DeviceSelector.exe") (@("--install-endpoint", $endpoints.Capture) + $mode.Arguments) 300 $current
     $roundRecord.install = [ordered]@{ exitCode = $install.ExitCode; timedOut = $install.TimedOut }
     Save-EndpointSnapshot $endpoints.Capture "30-$round-installed"
-    $fxNow = Get-ItemProperty -Path "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Capture\$($endpoints.Capture)\FxProperties" -ErrorAction SilentlyContinue
-    if ($fxNow) {
-        $slots = @()
-        foreach ($slot in @(@("LFX", "1"), @("GFX", "2"), @("SFX", "5"), @("MFX", "6"), @("EFX", "7"))) {
-            $property = $fxNow.PSObject.Properties["{d04e05a6-594b-4fb6-a80d-01af5eed7d1d},$($slot[1])"]
-            if ($property -and $property.Value) { $slots += "$($slot[0])=$($property.Value)" }
-        }
-        $roundRecord.installMode = ($slots -join " ")
-        Write-Host "effect chain now: $($roundRecord.installMode)"
-    }
+    $roundRecord.installMode = Get-EffectChain "Capture" $endpoints.Capture
+    if ($null -ne $roundRecord.installMode) { Write-Host "effect chain now: $($roundRecord.installMode)" }
     if ($install.ExitCode -ne 0 -and $roundRequired) {
         Add-Failure "$round/install: DeviceSelector --install-endpoint exited with $($install.ExitCode) (the device test did not see the APO come up)"
     }
@@ -535,17 +540,12 @@ foreach ($mode in $installModes) {
 
     Write-Phase "uninstall ($round)"
     $uninstall = Invoke-Program (Join-Path $current "DeviceSelector.exe") @("--uninstall-endpoint", $endpoints.Capture) 180 $current
-    $fxAfter = Get-ItemProperty -Path "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Capture\$($endpoints.Capture)\FxProperties" -ErrorAction SilentlyContinue
-    $eqLeft = $false
-    if ($fxAfter) {
-        foreach ($property in $fxAfter.PSObject.Properties) {
-            if ("$($property.Value)" -match "EACD2258-FCAC-4FF4-B36D-419E924A6D79|EC1CC9CE-FAED-4822-828A-82A81A6F018F") { $eqLeft = $true }
-        }
-    }
+    $eqLeft = Test-EqClsidLeft "Capture" $endpoints.Capture
     $roundRecord.uninstall = [ordered]@{ exitCode = $uninstall.ExitCode; eqClsidLeft = $eqLeft }
     Save-EndpointSnapshot $endpoints.Capture "50-$round-uninstalled"
     if ($uninstall.ExitCode -ne 0) { Add-Failure "$round/uninstall: DeviceSelector --uninstall-endpoint exited with $($uninstall.ExitCode)" }
     if ($eqLeft) { Add-Failure "$round/uninstall: the endpoint's FxProperties still names an EQ APO CLSID" }
+    Wait-GraphSettle
     Measure-Cable $measurements[4] $round | Out-Null
     Copy-Logs "50-$round-uninstalled"
     $summary.rounds += [pscustomobject]$roundRecord
@@ -602,6 +602,7 @@ $lowLatency.uninstall = [ordered]@{ exitCode = $uninstall.ExitCode; eqClsidLeft 
 Save-EndpointSnapshot $endpoints.Render "80-low-latency-uninstalled" "Render"
 if ($uninstall.ExitCode -ne 0) { Add-Failure "low-latency/uninstall: DeviceSelector --uninstall-endpoint on the playback endpoint exited with $($uninstall.ExitCode)" }
 if ($eqLeftRender) { Add-Failure "low-latency/uninstall: the playback endpoint's FxProperties still names an EQ APO CLSID" }
+Wait-GraphSettle
 Measure-Cable $lowLatencyMeasurements[3] "low-latency" | Out-Null
 Copy-Logs "80-low-latency-uninstalled"
 [System.IO.File]::WriteAllText($configFile, $config, (New-Object System.Text.UTF8Encoding($false)))
@@ -619,9 +620,9 @@ function Get-EqApoAsioEntries {
 if (-not (Test-Path -LiteralPath $asioProbe)) {
     Add-Failure "asio-entry: AsioProbe.exe is not in the probe directory"
 } else {
-    $install = Invoke-Program (Join-Path $current "DeviceSelector.exe") @("--install-endpoint", $endpoints.Render, "--exclusive-mode-eq") 300 $current
+    $install = Invoke-Program (Join-Path $current "DeviceSelector.exe") @("--install-endpoint", $endpoints.Render, "--asio-entry") 300 $current
     $asioEntry.install = [ordered]@{ exitCode = $install.ExitCode; timedOut = $install.TimedOut }
-    if ($install.ExitCode -ne 0) { Add-Failure "asio-entry/install: DeviceSelector --install-endpoint --exclusive-mode-eq exited with $($install.ExitCode)" }
+    if ($install.ExitCode -ne 0) { Add-Failure "asio-entry/install: DeviceSelector --install-endpoint --asio-entry exited with $($install.ExitCode)" }
     & reg export "HKLM\SOFTWARE\ASIO" (Join-Path $SnapshotDirectory "90-asio-entry-installed-asio.reg") /y 2>$null | Out-Null
     & reg export "HKLM\SOFTWARE\EqualizerAPO\ASIO" (Join-Path $SnapshotDirectory "90-asio-entry-installed-records.reg") /y 2>$null | Out-Null
     $global:LASTEXITCODE = 0
@@ -646,6 +647,9 @@ if (-not (Test-Path -LiteralPath $asioProbe)) {
         # sizes are recorded as evidence of how this driver behaves.
         # The probe asks for the cable's own rate, the one the recording side
         # runs at; the entry's default is the endpoint's device format.
+        # --wrapper none: the entry is driven as the DAW would drive it. A
+        # probe wrapper around it (passthrough) used to report its own late
+        # and gone counts, not the product's (audit #348 F14).
         $env:PATH = "$current;$env:PATH"
         $asioEntry.probes = @()
         foreach ($frames in $asioEntryFrames) {
@@ -654,7 +658,7 @@ if (-not (Test-Path -LiteralPath $asioProbe)) {
             Write-Host "-- $frames frames"
             $probeOut = [System.IO.Path]::GetTempFileName()
             $probeErr = [System.IO.Path]::GetTempFileName()
-            $probeProcess = Start-Process -FilePath $asioProbe -ArgumentList @("--target", "clsid:$($asioEntry.wrapperClsid)", "--wrapper", "static", "--processor", "passthrough", "--seconds", "25", "--sine", "1000", "--rate", "$impulseRate", "--frames", "$frames") -PassThru -NoNewWindow -RedirectStandardOutput $probeOut -RedirectStandardError $probeErr -WorkingDirectory $current
+            $probeProcess = Start-Process -FilePath $asioProbe -ArgumentList @("--target", "clsid:$($asioEntry.wrapperClsid)", "--wrapper", "none", "--seconds", "25", "--sine", "1000", "--rate", "$impulseRate", "--frames", "$frames") -PassThru -NoNewWindow -RedirectStandardOutput $probeOut -RedirectStandardError $probeErr -WorkingDirectory $current
             # Measure only once the stream runs: the probe prints its latency
             # line after createBuffers and start succeeded. The first probe
             # starts the engine host cold, which on a busy runner took long

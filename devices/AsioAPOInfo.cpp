@@ -7,8 +7,12 @@
 #include "stdafx.h"
 #include "devices/AsioAPOInfo.h"
 
+#include "asio/StreamFacts.h"
 #include "asio/WrapperRecord.h"
 #include "audio/ChannelLayout.h"
+#include "devices/DeviceException.h"
+#include "devices/ReportedOperation.h"
+#include "services/registry/RegistryTransaction.h"
 #include "services/registry/RegistryError.h"
 #include "services/registry/RegistryPaths.h"
 
@@ -17,19 +21,6 @@ using eapo::asio::AsioRegistration::wrapperClsidFor;
 using eapo::asio::AsioTarget;
 using eapo::asio::WrapperRecord;
 namespace WrapperRecords = eapo::asio::WrapperRecords;
-
-namespace
-{
-	const wchar_t* const sampleRateFact = L"SampleRate";
-	const wchar_t* const outputChannelsFact = L"OutputChannels";
-	const wchar_t* const inputChannelsFact = L"InputChannels";
-
-	bool fileExists(const std::wstring& path)
-	{
-		const DWORD attributes = GetFileAttributesW(path.c_str());
-		return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
-	}
-}
 
 void AsioAPOInfo::appendInfos(std::vector<std::shared_ptr<AbstractAPOInfo>>& list, bool input, IRegistry& registry)
 {
@@ -43,45 +34,26 @@ AsioAPOInfo::AsioAPOInfo(const AsioTarget& target, bool input, IRegistry& regist
 	loadState();
 }
 
-std::wstring AsioAPOInfo::factsKey(const std::wstring& targetClsid)
-{
-	return std::wstring(USER_REGPATH) + L"\\ASIO\\" + targetClsid;
-}
-
 void AsioAPOInfo::loadState()
 {
 	installed = false;
-	currentSynchronous = false;
-	currentDeadlinePercent = 25;
-	currentAutoStart = false;
-	currentHost32 = false;
+	current = {};
 	WrapperRecord record;
 	if (eapo::asio::AsioRegistration::wrapperRegistered(registry, target)
 		&& WrapperRecords::read(registry, wrapperClsidFor(target.clsid), record))
 	{
 		installed = input ? record.options.processInput : record.options.processOutput;
-		currentSynchronous = record.options.mode == eapo::asio::Mode::Sync;
-		if (record.options.deadlinePercent != 0)
-			currentDeadlinePercent = record.options.deadlinePercent;
-		currentAutoStart = record.autoStart;
-		currentHost32 = record.register32;
+		current = WrapperRecords::entryOptions(record);
 	}
-	selectedSynchronous = currentSynchronous;
-	selectedDeadlinePercent = currentDeadlinePercent;
-	selectedAutoStart = currentAutoStart;
-	selectedHost32 = currentHost32;
+	selected = current;
 
-	channelCount = 0;
-	sampleRate = 0;
-	const std::wstring facts = factsKey(target.clsid);
-	if (registry.keyExists(facts))
-	{
-		const wchar_t* const channelsFact = input ? inputChannelsFact : outputChannelsFact;
-		if (registry.valueExists(facts, channelsFact))
-			channelCount = registry.readDWORDValue(facts, channelsFact);
-		if (registry.valueExists(facts, sampleRateFact))
-			sampleRate = registry.readDWORDValue(facts, sampleRateFact);
-	}
+	// What the engine host saw of the target's last stream; nothing until a
+	// DAW has opened it once.
+	eapo::asio::StreamShape shape;
+	eapo::asio::StreamFacts::read(registry, target.clsid, shape);
+	const eapo::asio::Direction direction = input ? eapo::asio::Direction::Input : eapo::asio::Direction::Output;
+	channelCount = shape.channels[static_cast<unsigned>(direction)];
+	sampleRate = shape.sampleRate;
 }
 
 std::wstring AsioAPOInfo::getWrapperClsid() const
@@ -143,10 +115,7 @@ bool AsioAPOInfo::canBeUpgraded() const
 
 bool AsioAPOInfo::hasChanges() const
 {
-	return installed && (selectedSynchronous != currentSynchronous
-		|| selectedDeadlinePercent != currentDeadlinePercent
-		|| selectedAutoStart != currentAutoStart
-		|| selectedHost32 != currentHost32);
+	return installed && selected != current;
 }
 
 bool AsioAPOInfo::isEnhancementsDisabled() const
@@ -175,47 +144,43 @@ std::wstring AsioAPOInfo::getTransportLabel() const
 	return L"ASIO";
 }
 
-std::wstring AsioAPOInfo::installDirectory() const
+std::wstring AsioAPOInfo::requiredInstallDirectory(const IRegistry& from)
 {
-	return registry.readValue(APP_REGPATH, L"InstallPath");
+	if (!from.valueExists(APP_REGPATH, L"InstallPath"))
+		throw DeviceException(L"The ASIO entry needs the InstallPath value under HKEY_LOCAL_MACHINE\\SOFTWARE\\EqualizerAPO");
+	return from.readValue(APP_REGPATH, L"InstallPath");
 }
 
-std::wstring AsioAPOInfo::wrapper32Path() const
+std::wstring AsioAPOInfo::optionalInstallDirectory(const IRegistry& from)
 {
-	// The 32-bit wrapper ships beside the 64-bit one under x86\; a build
-	// without it (ARM64) cannot serve 32-bit hosts.
-	return installDirectory() + L"\\x86\\EqualizerAPOAsio.dll";
+	return from.valueExists(APP_REGPATH, L"InstallPath") ? from.readValue(APP_REGPATH, L"InstallPath") : std::wstring();
 }
 
 bool AsioAPOInfo::canHost32() const
 {
-	return fileExists(wrapper32Path());
+	// A build without the x86 wrapper (ARM64) cannot serve 32-bit hosts.
+	return eapo::asio::AsioRegistration::wrapper32Shipped(optionalInstallDirectory(registry));
 }
 
-void AsioAPOInfo::refreshAutoStart()
+void AsioAPOInfo::beginReport(DeviceInstallReport::Operation operation)
 {
-	// One Run value for the machine: present while any installed target
-	// asks for it, gone with the last one.
-	bool wanted = false;
-	const std::wstring root = WrapperRecords::rootKey();
-	if (registry.keyExists(root))
-	{
-		for (const std::wstring& clsid : registry.enumSubKeys(root))
-		{
-			WrapperRecord other;
-			if (WrapperRecords::read(registry, clsid, other) && other.autoStart
-				&& (other.options.processOutput || other.options.processInput))
-				wanted = true;
-		}
-	}
-	eapo::asio::AsioRegistration::setAutoStart(registry, installDirectory() + L"\\EqualizerAPOHost.exe", wanted);
+	DeviceInstallReport report;
+	report.operation = operation;
+	report.deviceName = target.name;
+	report.connectionName = getConnectionName();
+	report.deviceGuid = target.clsid;
+	report.input = input;
+	if (operation != DeviceInstallReport::Operation::Uninstall)
+		report.asioEntry = entryNameFor(target.name);
+	lastOperationReport = report;
 }
 
-void AsioAPOInfo::install()
+void AsioAPOInfo::installWithin(RegistryTransaction& plan)
 {
+	const std::wstring directory = requiredInstallDirectory(plan);
 	const std::wstring wrapperClsid = wrapperClsidFor(target.clsid);
 	WrapperRecord record;
-	const bool fresh = !WrapperRecords::read(registry, wrapperClsid, record);
+	const bool fresh = !WrapperRecords::read(plan, wrapperClsid, record);
 	if (fresh)
 	{
 		record.wrapperClsid = wrapperClsid;
@@ -230,31 +195,35 @@ void AsioAPOInfo::install()
 		record.options.processOutput = true;
 	// Options this row changed win; the other direction's row, installed in
 	// the same pass with an untouched selection, must not put them back.
-	if (fresh || selectedSynchronous != currentSynchronous)
-		record.options.mode = selectedSynchronous ? eapo::asio::Mode::Sync : eapo::asio::Mode::Pipelined;
-	if (fresh || selectedDeadlinePercent != currentDeadlinePercent)
-		record.options.deadlinePercent = selectedDeadlinePercent;
-	if (fresh || selectedAutoStart != currentAutoStart)
-		record.autoStart = selectedAutoStart;
-	if (fresh || selectedHost32 != currentHost32)
-		record.register32 = selectedHost32;
-	WrapperRecords::write(registry, record);
+	eapo::asio::EntryOptions options = fresh ? selected : WrapperRecords::entryOptions(record);
+	if (selected.synchronous != current.synchronous)
+		options.synchronous = selected.synchronous;
+	if (selected.deadlinePercent != current.deadlinePercent)
+		options.deadlinePercent = selected.deadlinePercent;
+	if (selected.autoStart != current.autoStart)
+		options.autoStart = selected.autoStart;
+	if (selected.host32 != current.host32)
+		options.host32 = selected.host32;
+	WrapperRecords::setEntryOptions(record, options);
+	WrapperRecords::write(plan, record);
 
-	const std::wstring dll64 = installDirectory() + L"\\EqualizerAPOAsio.dll";
 	// The 32-bit view only when asked for, and only when the x86 wrapper
 	// is there to point at.
-	const std::wstring dll32 = wrapper32Path();
-	eapo::asio::AsioRegistration::registerWrapper(registry, target, dll64,
-		record.register32 && fileExists(dll32) ? dll32 : std::wstring());
-	refreshAutoStart();
-	loadState();
+	eapo::asio::AsioRegistration::registerWrapper(plan, target,
+		eapo::asio::AsioRegistration::wrapperDllPath(directory),
+		record.register32 && eapo::asio::AsioRegistration::wrapper32Shipped(directory)
+			? eapo::asio::AsioRegistration::wrapper32DllPath(directory) : std::wstring());
+	eapo::asio::AsioRegistration::refreshAutoStart(plan, directory);
 }
 
-void AsioAPOInfo::uninstall()
+void AsioAPOInfo::uninstallWithin(RegistryTransaction& plan)
 {
+	// Removing needs no install directory: the Run value only has to be
+	// rewritten when another entry still asks for it, and then it is kept.
+	const std::wstring directory = optionalInstallDirectory(plan);
 	const std::wstring wrapperClsid = wrapperClsidFor(target.clsid);
 	WrapperRecord record;
-	if (WrapperRecords::read(registry, wrapperClsid, record))
+	if (WrapperRecords::read(plan, wrapperClsid, record))
 	{
 		if (input)
 			record.options.processInput = false;
@@ -262,28 +231,43 @@ void AsioAPOInfo::uninstall()
 			record.options.processOutput = false;
 		if (record.options.processInput || record.options.processOutput)
 		{
-			WrapperRecords::write(registry, record);
-			refreshAutoStart();
-			loadState();
+			WrapperRecords::write(plan, record);
+			eapo::asio::AsioRegistration::refreshAutoStart(plan, directory);
 			return;
 		}
-		WrapperRecords::remove(registry, wrapperClsid);
+		WrapperRecords::remove(plan, wrapperClsid);
 	}
-	eapo::asio::AsioRegistration::unregisterWrapper(registry, target);
-	refreshAutoStart();
+	eapo::asio::AsioRegistration::unregisterWrapper(plan, target);
+	eapo::asio::AsioRegistration::refreshAutoStart(plan, directory);
+}
+
+void AsioAPOInfo::install()
+{
+	beginReport(DeviceInstallReport::Operation::Install);
+	ReportedOperation::run(registry, lastOperationReport, [this](RegistryTransaction& plan) {
+		installWithin(plan);
+	});
+	loadState();
+}
+
+void AsioAPOInfo::uninstall()
+{
+	beginReport(DeviceInstallReport::Operation::Uninstall);
+	ReportedOperation::run(registry, lastOperationReport, [this](RegistryTransaction& plan) {
+		uninstallWithin(plan);
+	});
 	loadState();
 }
 
 void AsioAPOInfo::reinstall()
 {
-	const bool synchronous = selectedSynchronous;
-	const unsigned deadlinePercent = selectedDeadlinePercent;
-	const bool autoStart = selectedAutoStart;
-	const bool host32 = selectedHost32;
-	uninstall();
-	selectedSynchronous = synchronous;
-	selectedDeadlinePercent = deadlinePercent;
-	selectedAutoStart = autoStart;
-	selectedHost32 = host32;
-	install();
+	// One transaction for both halves: a failing install puts the entry back
+	// as it was instead of leaving it removed (the endpoint adapter's
+	// reinstall had the same fix, see RegistryTransaction.h).
+	beginReport(DeviceInstallReport::Operation::Reinstall);
+	ReportedOperation::run(registry, lastOperationReport, [this](RegistryTransaction& plan) {
+		uninstallWithin(plan);
+		installWithin(plan);
+	});
+	loadState();
 }

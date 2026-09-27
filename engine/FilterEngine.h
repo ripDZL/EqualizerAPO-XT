@@ -20,6 +20,8 @@
 #pragma once
 
 #include <string>
+#include <sstream>
+#include "filters/ConfigFileReference.h"
 #include <vector>
 #include <memory>
 #include <unordered_set>
@@ -29,6 +31,7 @@
 #include <windows.h>
 
 #include "IFilterFactory.h"
+#include "ChannelRoutingPlan.h"
 #include "FilterConfiguration.h"
 #include "ConfigSwapChannel.h"
 #include "parser/EngineParser.h"
@@ -86,14 +89,18 @@ public:
 	// the active configuration and returns false; no initialization exception is
 	// allowed to escape the configuration-loading boundary.
 	bool loadConfig(const std::wstring& customPath = L"");
-	void loadConfigFile(const std::wstring& path);
+	void loadConfigFile(const JudgedPath& path);
+	ConfigFileReference::Target judgeIncludedFile(const std::wstring& configPath, const std::wstring& written);
 	void watchRegistryKey(const std::wstring& key);
 	// Three surfaces: float interleaved (the APO's usual connection format),
-	// float planar (VoicemeeterClient - Voicemeeter hands per-channel pointer
-	// arrays), and double interleaved (the APO's double connection, Benchmark,
-	// the Editor's analysis engine). The double-planar overload was removed in
-	// audit #275 (A7/TD-17): it had no production caller and only a null-path
-	// test, so it claimed support nothing verified.
+	// float planar (VoicemeeterClient, whose host hands per-channel pointer
+	// arrays, and the ASIO stream processors asio/EngineHostCore.cpp and
+	// asio/InProcProcessor.cpp), and double interleaved (the APO's double
+	// connection, Benchmark, the Editor's analysis engine). The planar surface
+	// reads realChannelCount input pointers and writes outputChannelCount
+	// output pointers. The double-planar overload was removed in audit #275
+	// (A7/TD-17): it had no production caller and only a null-path test, so it
+	// claimed support nothing verified.
 	void process(float* output, float* input, unsigned frameCount);
 	void process(float** output, float** input, unsigned frameCount);
 	void process(double* output, double* input, unsigned frameCount);
@@ -135,8 +142,16 @@ public:
 	// A factory saying "this line was mine and its parameters are wrong". Stamps
 	// the current file and line, logs it, and passes it to the trace sink so the
 	// Editor can mark the row. See ParseReportingFactory in IFilterFactory.h for
-	// why the factories report this rather than the engine inferring it.
-	void reportParseError(const std::wstring& command, const std::wstring& reason);
+	// why the factories report this rather than the engine inferring it. A
+	// nonzero line stamps that line of the current file instead: an If that
+	// the end of its file shows to be unclosed is reported on its own line.
+	void reportParseError(const std::wstring& command, const std::wstring& reason, int line = 0);
+	// The 1-based line of the current file the load is at, for a factory that
+	// has to report on a line later (the If family).
+	int loadTraceLine() const
+	{
+		return load.traceLine;
+	}
 	// Returns true if the active configuration (or any transition target) carries
 	// state across blocks or has a tail. Used by the APO to skip processing on
 	// silent input when safe. Conservative: returns true while a config swap is
@@ -144,6 +159,8 @@ public:
 	bool hasStatefulOrTailFilters() const;
 
 private:
+	void loadConfigFile(const std::wstring& path);
+	void loadConfigStream(const std::wstring& path, std::stringstream inputStream);
 	struct FilterConfigurationDeleter
 	{
 		void operator()(FilterConfiguration* config) const;
@@ -199,17 +216,15 @@ private:
 	struct LoadSession
 	{
 		std::vector<std::unique_ptr<FilterInfo>> filterInfos;
-		std::vector<std::wstring> currentChannelNames;
-		std::vector<std::wstring> lastChannelNames;
-		std::vector<std::wstring> lastNewChannelNames;
-		std::vector<std::wstring> allChannelNames;
+		// Which channel names each filter sees and where its buffers sit
+		// (audit #348 F1); its lastInPlace carries across loads.
+		ChannelRoutingPlan routing;
 		std::unordered_set<std::wstring> watchRegistryKeys;
 		// Position of the line loadConfigFile is currently feeding to the
 		// factories; saved/restored across Include recursion like the
 		// channel names. Only meaningful while a sink is attached.
 		std::wstring traceFile;
 		int traceLine = 0;
-		bool lastInPlace = false;
 		bool frozenDynamicAnalysis = false;
 	};
 	LoadSession load;
@@ -225,6 +240,5 @@ private:
 	std::mutex loadMutex;
 	PrecisionTimer timer;
 	std::thread notificationWorker;
-	bool lastInputWasSilent;
 };
 #pragma AVRT_VTABLES_END

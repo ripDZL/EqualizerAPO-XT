@@ -2,9 +2,9 @@ name: Build EqualizerAPO
 
 on:
   push:
-    branches: [ main, SIMD_CI ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, feat/asio ]
+    branches: [ main ]
   workflow_dispatch:
     inputs:
       regenerate_references:
@@ -151,6 +151,11 @@ jobs:
       # cross-variant-compare job so its gating list cannot drift from the
       # manifest.
       runner_executable_variants: ${{ steps.gen.outputs.runner_executable_variants }}
+      # The primary variant's artifact name, for the jobs that test the
+      # product the PR leg builds (audit #348 TD-77: it was spelled out as
+      # EqualizerAPO-x64-avx2 in those jobs, and the build steps chose the
+      # primary leg by comparing simd_variant with 'avx2').
+      primary_artifact: ${{ steps.gen.outputs.primary_artifact }}
     steps:
     - name: Checkout repository
       uses: actions/checkout@v6
@@ -219,21 +224,6 @@ jobs:
         # host-architecture spelling ('x64'/'arm64') for exactly this purpose.
         msbuild-architecture: ${{ matrix.msvcdevplatform }}
 
-    # Pinned dependency tags/versions live in .github/simd-variants.psd1 so they are
-    # defined once and shared with setup-build.ps1. Export them as job env vars for the
-    # checkout/download steps below (a typo'd tag would otherwise diverge silently).
-    - name: Resolve pinned dependency tags
-      shell: pwsh
-      run: |
-        $ErrorActionPreference = "Stop"
-        $manifest = Import-PowerShellDataFile -Path "${{ github.workspace }}\.github\simd-variants.psd1"
-        "VST3_TAG=$($manifest.Shared.Vst3Tag)" >> $env:GITHUB_ENV
-        "HIGHWAY_TAG=$($manifest.Shared.HighwayTag)" >> $env:GITHUB_ENV
-        "TCLAP_TAG=$($manifest.Shared.TclapTag)" >> $env:GITHUB_ENV
-        Write-Host "VST3 tag: $($manifest.Shared.Vst3Tag)"
-        Write-Host "Highway tag: $($manifest.Shared.HighwayTag)"
-        Write-Host "TCLAP tag: $($manifest.Shared.TclapTag)"
-
     # Supply-chain pins: the prebuilt binary dependencies (and velopack_libc)
     # are downloaded from a pinned release tag and verified against the SHA-256
     # recorded in .github/simd-variants.psd1, so a new upload to those personal
@@ -279,39 +269,17 @@ jobs:
           -SimdVariant "${{ matrix.simd_variant }}" `
           -VcpkgCommit $manifest.Shared.VcpkgCommit
 
-    # Clone tclap repository (header-only library). Pinned like the other source
-    # dependencies; the tag comes from .github/simd-variants.psd1 (Shared.TclapTag).
-    - name: Download TCLAP
-      uses: actions/checkout@v6
-      with:
-        repository: 115dkk/tclap
-        ref: ${{ env.TCLAP_TAG }}
-        token: ${{ secrets.GITHUB_TOKEN }}
-        path: deps/tclap
-
-    # Clone the VST3 SDK pluginterfaces (header-only COM interfaces + IID unit).
-    # Only this submodule is needed for VST3 hosting; public.sdk / vstgui are not
-    # compiled. Pinned to the first MIT-licensed release; the exact tag comes from
-    # .github/simd-variants.psd1 (Shared.Vst3Tag), shared with setup-build.ps1.
-    - name: Download VST3 pluginterfaces
-      uses: actions/checkout@v6
-      with:
-        repository: steinbergmedia/vst3_pluginterfaces
-        ref: ${{ env.VST3_TAG }}
-        token: ${{ secrets.GITHUB_TOKEN }}
-        path: deps/vst3sdk/pluginterfaces
-
-    # Clone Google Highway (header-only portable SIMD). The Common DSP kernels
-    # use it in static per-target dispatch mode (one TU compiled per /arch), so
-    # only the headers are needed; libhwy / the runtime dispatch table are not.
-    # The exact tag comes from .github/simd-variants.psd1 (Shared.HighwayTag).
-    - name: Download Highway
-      uses: actions/checkout@v6
-      with:
-        repository: google/highway
-        ref: ${{ env.HIGHWAY_TAG }}
-        token: ${{ secrets.GITHUB_TOKEN }}
-        path: deps/highway
+    # The header-only source dependencies (TCLAP, VST3 pluginterfaces,
+    # Highway), cloned at the manifest's tags and held to its commits by the
+    # same routine setup-build.ps1 uses: a retargeted upstream tag fails here
+    # instead of changing what ships (audit #348 TD-26).
+    - name: Clone pinned source dependencies
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = "Stop"
+        Import-Module "${{ github.workspace }}\.github\scripts\Provisioning.psm1" -Force
+        $manifest = Import-PowerShellDataFile -Path "${{ github.workspace }}\.github\simd-variants.psd1"
+        Install-PinnedSourceDependency -Manifest $manifest -DepsRoot "${{ github.workspace }}\deps"
 
     # Setup dependency structures
     - name: Setup dependency structures
@@ -324,7 +292,7 @@ jobs:
       with:
         python-version: '3.12'
 
-    # Install Qt for Editor, DeviceSelector, and UpdateChecker. The aqt install
+    # Install Qt for Editor and DeviceSelector. The aqt install
     # (concurrency 1: parallel extraction raced intermittently) lives in
     # .github/scripts/Provisioning.psm1, shared with setup-build.ps1 (TD015).
     - name: Install Qt
@@ -399,55 +367,17 @@ jobs:
       # The gate is the manifest's per-variant RunnerCanExecute flag.
       if: matrix.can_execute == true
       shell: pwsh
+      # The verify/record decision lives in Invoke-AudioRegression.ps1
+      # (audit #348 TD-75), where Pester pins it. Regeneration is an explicit
+      # workflow_dispatch decision (audit #275 TD-08), empty on push and
+      # pull_request events, which therefore always verify.
       run: |
-        $variant = "${{ matrix.simd_variant }}"
-        $platform = "${{ matrix.platform }}"
-        $exe = "${{ github.workspace }}\Tests\AudioRegressionTests\$platform\Release\AudioRegressionTests.exe"
-        if (-not (Test-Path $exe)) {
-          Write-Error "AudioRegressionTests executable not found at $exe"
-          exit 1
-        }
-
-        $env:PATH = "$env:FFTW_LIB;$env:LIBSNDFILE_LIB;$env:MUPARSERX_LIB;$env:PATH"
-
-        $repoRefDir = "${{ github.workspace }}\Tests\AudioRegressionTests\references"
-        $hasRefs = Test-Path (Join-Path $repoRefDir "cases.json")
-        # The primary (reference-seeding) variant is flagged in simd-variants.psd1.
-        $isPrimary = "${{ matrix.primary }}" -eq "true"
-        # Seeding is an explicit workflow_dispatch decision (audit #275 TD-08).
-        # Empty on push/pull_request events, which therefore always verify.
-        $regenerate = "${{ inputs.regenerate_references }}" -eq "true"
-
-        Push-Location "${{ github.workspace }}\Tests\AudioRegressionTests"
-        try {
-          if ($regenerate) {
-            if ($isPrimary) {
-              Write-Host "::warning::regenerate_references was requested; primary variant '$variant' is RE-RECORDING the golden references instead of verifying against them. See Tests/AudioRegressionTests/references/README.md before committing the result."
-            } else {
-              Write-Host "::warning::regenerate_references was requested; recording variant output only (non-primary variant '$variant')"
-            }
-            & $exe --variant $variant --config-dir configs --ref-dir references --out-dir output --generate-references
-            if ($LASTEXITCODE -ne 0) {
-              Write-Error "AudioRegressionTests reference generation failed for variant '$variant'"
-              exit $LASTEXITCODE
-            }
-          } else {
-            if (-not $hasRefs) {
-              # Never fall back to seeding implicitly: a deleted or renamed
-              # reference set must fail the gate, not re-record it.
-              Write-Error "references/cases.json is missing and regenerate_references was not requested. Restore the committed reference set, or dispatch the workflow with regenerate_references=true if re-recording is genuinely intended."
-              exit 1
-            }
-            Write-Host "Running verify mode for variant '$variant'"
-            & $exe --variant $variant --config-dir configs --ref-dir references --out-dir output
-            if ($LASTEXITCODE -ne 0) {
-              Write-Error "AudioRegressionTests verify failed for variant '$variant'"
-              exit $LASTEXITCODE
-            }
-          }
-        } finally {
-          Pop-Location
-        }
+        & "${{ github.workspace }}\.github\scripts\Invoke-AudioRegression.ps1" `
+          -WorkspaceRoot "${{ github.workspace }}" `
+          -Platform "${{ matrix.platform }}" `
+          -SimdVariant "${{ matrix.simd_variant }}" `
+          -Primary:$("${{ matrix.primary }}" -eq "true") `
+          -Regenerate:$("${{ inputs.regenerate_references }}" -eq "true")
 
     - name: Upload audio regression outputs
       if: matrix.can_execute == true
@@ -467,7 +397,7 @@ jobs:
         retention-days: 30
         if-no-files-found: warn
 
-    # Build Qt projects with qmake (Editor, DeviceSelector, UpdateChecker)
+    # Build Qt projects with qmake (Editor, DeviceSelector)
     - name: Build Qt Applications
       shell: pwsh
       run: |
@@ -503,7 +433,7 @@ jobs:
     #   rebuild costs 1.4-1.6 s per move on this runner and fails the gate).
     # - card-selection pins pointer-selection chrome across skins.
     - name: Run VST Editor self-test (offscreen)
-      if: matrix.simd_variant == 'avx2'
+      if: matrix.primary == true
       timeout-minutes: 3
       shell: pwsh
       run: |
@@ -515,7 +445,7 @@ jobs:
     # (the audit #275 B4 extraction silently turned every plain biquad row
     # into a collapsed raw fragment), and the toggle round-trips the text.
     - name: Run power toggle test (offscreen)
-      if: matrix.simd_variant == 'avx2'
+      if: matrix.primary == true
       timeout-minutes: 5
       shell: pwsh
       run: |
@@ -529,7 +459,7 @@ jobs:
     # a Channel / Device card written as ALL must take the next chip click
     # as the new selection in every skin.
     - name: Run routing edit test (offscreen)
-      if: matrix.simd_variant == 'avx2'
+      if: matrix.primary == true
       timeout-minutes: 5
       shell: pwsh
       run: |
@@ -540,7 +470,7 @@ jobs:
     # fatal-error dialog again, the job must fail in minutes, not hang for
     # hours.
     - name: Run skin gallery (offscreen)
-      if: matrix.simd_variant == 'avx2'
+      if: matrix.primary == true
       timeout-minutes: 10
       shell: pwsh
       run: |
@@ -556,7 +486,7 @@ jobs:
           -WorkspaceRoot "${{ github.workspace }}" -Gate readability-legacy-gallery -Platform "${{ matrix.platform }}"
 
     - name: Run skin switch test (offscreen)
-      if: matrix.simd_variant == 'avx2'
+      if: matrix.primary == true
       timeout-minutes: 10
       shell: pwsh
       run: |
@@ -564,7 +494,7 @@ jobs:
           -WorkspaceRoot "${{ github.workspace }}" -Gate skin-switch
 
     - name: Run analysis dock layout test (offscreen)
-      if: matrix.simd_variant == 'avx2'
+      if: matrix.primary == true
       timeout-minutes: 5
       shell: pwsh
       run: |
@@ -572,7 +502,7 @@ jobs:
           -WorkspaceRoot "${{ github.workspace }}" -Gate analysis-layout
 
     - name: Run card move test (offscreen)
-      if: matrix.simd_variant == 'avx2'
+      if: matrix.primary == true
       timeout-minutes: 10
       shell: pwsh
       run: |
@@ -580,7 +510,7 @@ jobs:
           -WorkspaceRoot "${{ github.workspace }}" -Gate card-move
 
     - name: Run card selection test (offscreen)
-      if: matrix.simd_variant == 'avx2'
+      if: matrix.primary == true
       timeout-minutes: 5
       shell: pwsh
       run: |
@@ -588,7 +518,7 @@ jobs:
           -WorkspaceRoot "${{ github.workspace }}" -Gate card-selection
 
     - name: Upload skin gallery
-      if: matrix.simd_variant == 'avx2'
+      if: matrix.primary == true
       uses: actions/upload-artifact@v7
       with:
         name: skin-gallery
@@ -597,47 +527,37 @@ jobs:
           readability-legacy-gallery/*.png
 
     - name: Upload analysis dock layout proof
-      if: matrix.simd_variant == 'avx2'
+      if: matrix.primary == true
       uses: actions/upload-artifact@v7
       with:
         name: analysis-layout
         path: analysis-layout/*
 
     - name: Upload card selection proof
-      if: matrix.simd_variant == 'avx2'
+      if: matrix.primary == true
       uses: actions/upload-artifact@v7
       with:
         name: card-selection
         path: card-selection/*
 
-    # Pull the debug symbols out of the release dirs so the installers stay
-    # lean, and keep them as a run artifact: field crash minidumps written by
-    # the Editor's CrashHandler can only be symbolized against the PDB of the
-    # exact shipped binary.
+    # Keep the debug symbols of every shipped program as a run artifact:
+    # field crash minidumps can only be symbolized against the PDB of the
+    # exact shipped binary. The list comes from Package-Artifacts.ps1's plan,
+    # and a missing PDB fails the step (audit #348 TD-75).
     - name: Collect debug symbols
       shell: pwsh
       run: |
-        $symDir = "${{ github.workspace }}\symbols"
-        New-Item -ItemType Directory -Force -Path $symDir | Out-Null
-        foreach ($app in @("Editor", "DeviceSelector", "UpdateChecker")) {
-          $pdb = "build-$app-${{ matrix.platform }}\release\$app.pdb"
-          if (Test-Path $pdb) {
-            Move-Item $pdb (Join-Path $symDir "$app.pdb") -Force
-          } else {
-            Write-Warning "$pdb not found (force_debug_info missing?)"
-          }
-        }
-        $apoPdb = "EqualizerAPO\${{ matrix.platform }}\Release\EqualizerAPO.pdb"
-        if (Test-Path $apoPdb) {
-          Copy-Item $apoPdb (Join-Path $symDir "EqualizerAPO.pdb") -Force
-        }
-        Get-ChildItem $symDir
+        & "${{ github.workspace }}\.github\scripts\Collect-Symbols.ps1" `
+          -WorkspaceRoot "${{ github.workspace }}" `
+          -Platform "${{ matrix.platform }}" `
+          -SimdVariant "${{ matrix.simd_variant }}"
 
     - name: Upload debug symbols
       uses: actions/upload-artifact@v7
       with:
         name: symbols-${{ matrix.platform }}-${{ matrix.simd_variant }}
-        path: symbols/*.pdb
+        path: symbols/
+        if-no-files-found: error
 
     # Package artifacts
     - name: Package binaries
@@ -729,8 +649,6 @@ jobs:
           --suppress=postfixOperator \
           --suppress=noExplicitConstructor \
           --suppress=LocalAllocCalled \
-          --suppress=unknownMacro:vst/VSTPluginInstance.cpp \
-          --suppress=unknownMacro:vst/VSTPluginInstanceInternal.h \
           --suppress=unknownMacro:vst/VSTPluginLibrary.cpp \
           --suppress=unusedStructMember:engine/FilterEngine.Process.cpp \
           --suppress=uninitMemberVarNoCtor:libHybridConv-0.1.1/* \
@@ -765,9 +683,13 @@ jobs:
   # MSVC has no LeakSanitizer on Windows, so full-heap leak detection is
   # not available; the canary covers the engine-buffer class - the
   # original convolution-tail bug class - deterministically instead.
-  # Build/run mechanics live in .github/scripts/Invoke-MemcheckTests.ps1.
+  # Build/run mechanics live in .github/scripts/Invoke-MemcheckTests.ps1,
+  # which takes its suite list from Build-Solution.ps1's plan plus
+  # AudioRegressionTests. create-release waits for this job.
   memcheck:
-    runs-on: windows-latest
+    # Named image rather than windows-latest (audit #348 TD-78):
+    # Invoke-MemcheckTests.ps1 builds with the v145 toolset this image carries.
+    runs-on: windows-2025-vs2026
     steps:
     - name: Checkout repository
       uses: actions/checkout@v6
@@ -776,15 +698,6 @@ jobs:
       uses: microsoft/setup-msbuild@v3
       with:
         msbuild-architecture: x64
-
-    - name: Resolve pinned dependency tags
-      shell: pwsh
-      run: |
-        $ErrorActionPreference = "Stop"
-        $manifest = Import-PowerShellDataFile -Path "${{ github.workspace }}\.github\simd-variants.psd1"
-        "VST3_TAG=$($manifest.Shared.Vst3Tag)" >> $env:GITHUB_ENV
-        "HIGHWAY_TAG=$($manifest.Shared.HighwayTag)" >> $env:GITHUB_ENV
-        "TCLAP_TAG=$($manifest.Shared.TclapTag)" >> $env:GITHUB_ENV
 
     - name: Download dependency release assets
       shell: pwsh
@@ -802,29 +715,17 @@ jobs:
         Invoke-DependencyDownload -Downloads (Get-SdkDownloadSpec -Manifest $manifest -DepsRoot "${{ github.workspace }}\deps") `
           -DownloadRoot "${{ github.workspace }}\deps\_downloads"
 
-    - name: Download TCLAP
-      uses: actions/checkout@v6
-      with:
-        repository: 115dkk/tclap
-        ref: ${{ env.TCLAP_TAG }}
-        token: ${{ secrets.GITHUB_TOKEN }}
-        path: deps/tclap
-
-    - name: Download VST3 pluginterfaces
-      uses: actions/checkout@v6
-      with:
-        repository: steinbergmedia/vst3_pluginterfaces
-        ref: ${{ env.VST3_TAG }}
-        token: ${{ secrets.GITHUB_TOKEN }}
-        path: deps/vst3sdk/pluginterfaces
-
-    - name: Download Highway
-      uses: actions/checkout@v6
-      with:
-        repository: google/highway
-        ref: ${{ env.HIGHWAY_TAG }}
-        token: ${{ secrets.GITHUB_TOKEN }}
-        path: deps/highway
+    # The header-only source dependencies (TCLAP, VST3 pluginterfaces,
+    # Highway), cloned at the manifest's tags and held to its commits by the
+    # same routine setup-build.ps1 uses: a retargeted upstream tag fails here
+    # instead of changing what ships (audit #348 TD-26).
+    - name: Clone pinned source dependencies
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = "Stop"
+        Import-Module "${{ github.workspace }}\.github\scripts\Provisioning.psm1" -Force
+        $manifest = Import-PowerShellDataFile -Path "${{ github.workspace }}\.github\simd-variants.psd1"
+        Install-PinnedSourceDependency -Manifest $manifest -DepsRoot "${{ github.workspace }}\deps"
 
     - name: Setup dependency structures
       shell: pwsh
@@ -860,14 +761,15 @@ jobs:
           -WorkspaceRoot "${{ github.workspace }}"
 
   pester:
-    # Unit-tests the release-keystone scripts the version-bump job runs:
-    # Bump-Version.ps1 (the Conventional Commit -> SemVer mapping that decides
-    # every release) and Update-Changelog.ps1 (moving the Unreleased entries
-    # under the bumped version). Like cppcheck this is an independent gate with
-    # no `if:`, so it runs on pull requests too, where the version-bump job is
-    # skipped. Pester 5 is pinned for reproducibility the same way the cppcheck
-    # version is.
-    runs-on: windows-latest
+    # Runs every Pester suite under .github/scripts/Tests: the release-keystone
+    # scripts the version-bump job runs (Bump-Version.ps1, Update-Changelog.ps1),
+    # the build, packaging and release-note scripts, and the project and source
+    # lints. Like cppcheck this is an independent gate with no `if:`, so it
+    # runs on pull requests too, where the version-bump job is skipped. Pester 5
+    # is pinned for reproducibility the same way the cppcheck version is.
+    # The image is named rather than windows-latest (audit #348 TD-78), the
+    # same one the build matrix uses.
+    runs-on: windows-2025-vs2026
     steps:
     - name: Checkout repository
       uses: actions/checkout@v6
@@ -941,6 +843,9 @@ jobs:
         path: pester-results.xml
         retention-days: 30
 
+  # A signal, not a release gate: create-release does not wait for it (the
+  # release notes say so). A difference between variants is read here and
+  # handled by a follow-up change.
   cross-variant-compare:
     needs: [build, prepare-matrix]
     runs-on: ubuntu-latest
@@ -978,12 +883,15 @@ jobs:
   # no audio hardware, so the gate installs VB-CABLE (a signed virtual cable
   # driver) and measures its recording side with Tests/CaptureProbe before
   # and after the product's own install path puts the APO on it, with a
-  # config that says Preamp: -20 dB. Blocking: a field report of "neither
-  # the EQ nor a VST reaches my microphone" is exactly what this catches.
+  # config that says Preamp: -20 dB. It blocks the release (create-release
+  # waits for it): a field report of "neither the EQ nor a VST reaches my
+  # microphone" is exactly what this catches. A failed VB-CABLE download
+  # exits 3 with its own annotation; re-running the failed job re-runs
+  # create-release too.
   # windows-2022 deliberately, like audio-live-repro.yml: the virtual driver
   # recipe is verified there.
   capture-gate:
-    needs: [build]
+    needs: [build, prepare-matrix]
     runs-on: windows-2022
     if: always() && needs.build.result == 'success'
     timeout-minutes: 30
@@ -994,8 +902,8 @@ jobs:
     - name: Download the primary build artifact
       uses: actions/download-artifact@v7
       with:
-        name: EqualizerAPO-x64-avx2
-        path: artifacts/EqualizerAPO-x64-avx2
+        name: ${{ needs.prepare-matrix.outputs.primary_artifact }}
+        path: artifacts/${{ needs.prepare-matrix.outputs.primary_artifact }}
 
     - name: Download the capture probes
       uses: actions/download-artifact@v7
@@ -1012,7 +920,7 @@ jobs:
         foreach ($probe in $probes) { Copy-Item -LiteralPath $probe.FullName -Destination $probeDir -Force }
         & "${{ github.workspace }}\.github\scripts\Invoke-CaptureGate.ps1" `
           -WorkspaceRoot "${{ github.workspace }}" `
-          -ArtifactPath "${{ github.workspace }}\artifacts\EqualizerAPO-x64-avx2" `
+          -ArtifactPath "${{ github.workspace }}\artifacts\${{ needs.prepare-matrix.outputs.primary_artifact }}" `
           -ProbeDirectory $probeDir `
           -SnapshotDirectory "${{ runner.temp }}\capture-gate"
 
@@ -1025,13 +933,22 @@ jobs:
         retention-days: 30
         if-no-files-found: warn
 
+  # The release waits for every blocking gate (audit #348 D5). main has no
+  # branch protection, so these needs are what keeps a red memcheck, capture
+  # gate, cppcheck or Pester run from publishing installers and a Velopack
+  # feed. New-ReleaseNotes.ps1 reads this list to say what the release waited
+  # for. The cross-variant comparison is not a gate; it runs alongside.
   create-release:
-    needs: [build, version-bump]
+    needs: [build, version-bump, memcheck, capture-gate, cppcheck, pester]
     runs-on: windows-2025-vs2026
-    # A maintainer may deliberately set version.h and skip version-bump.
-    # `always()` keeps that skipped dependency from suppressing the release
-    # after the full build matrix has succeeded.
-    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.build.result == 'success'
+    if: >-
+      always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+      && needs.build.result == 'success'
+      && (needs.version-bump.result == 'success' || needs.version-bump.result == 'skipped')
+      && needs.memcheck.result == 'success'
+      && needs.capture-gate.result == 'success'
+      && needs.cppcheck.result == 'success'
+      && needs.pester.result == 'success'
     permissions:
       actions: read
       contents: write

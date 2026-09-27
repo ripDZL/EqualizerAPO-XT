@@ -5,8 +5,6 @@
 */
 
 /*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-
 	The heritage presentation as a skin (audit #275 B5). Heritage mode - the
 	frozen legacy-rows look - used to live as six special-case branches inside
 	SkinManager's forwarders, three of which literally called the ISkin base
@@ -32,8 +30,6 @@ public:
 	// Classic light values for the custom painters that consume tokens; the
 	// dark flag is ignored (heritage is the classic light look, always).
 	SkinTokens tokens(bool dark) const override;
-	// No QSS: the widget chrome comes from the native style.
-	QString qssResource(bool dark) const override;
 	// No skin routing view: Copy rows keep the legacy CopyFilterGUI.
 	IRoutingRenderer* routingRenderer() const override;
 	// Native toolbar and platform file dialog: the skin adds nothing.

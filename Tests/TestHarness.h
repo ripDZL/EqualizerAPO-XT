@@ -56,6 +56,16 @@ enum class FailurePolicy
 	Collect
 };
 
+// Absolute-tolerance comparison behind Harness::expectNear, for the call sites
+// that fold several comparisons into one check (a && b, or a loop that
+// accumulates a verdict) and so cannot call expectNear once per value. A NaN
+// on either side is never near anything.
+inline bool nearlyEqual(double actual, double expected, double tolerance)
+{
+	const double diff = actual > expected ? actual - expected : expected - actual;
+	return diff <= tolerance;
+}
+
 // Counts assertions that passed (and, under Collect, failed) within a single
 // suite and labels failure output with the suite name. One instance is
 // created in each suite's main().
@@ -82,6 +92,13 @@ public:
 	// namespace-scope harness still constructs and destructs, which is where
 	// this catches it. Suites that legitimately run nothing (soft skips) call
 	// report(), which keeps them out of this branch.
+	//
+	// This only protects suites whose runner owns its harness, which is
+	// HybridConvTests' sub-suites. EditorLogicTests and
+	// EngineOrchestrationTests share one harness across many test functions,
+	// so a forgotten call there still leaves checks from the others; for those
+	// two, .github/scripts/Test-SourceSync.ps1 checks that every test function
+	// is called (audit #348 TD-23).
 	~Harness()
 	{
 		if (reported_ || aborting_)
@@ -152,13 +169,15 @@ public:
 
 	// Approximate floating-point equality with an absolute tolerance (audit
 	// #275 D5/TD-23: the suites carried three private variants of this). A
-	// NaN on either side fails, because !(diff <= tolerance) is then true.
+	// NaN on either side fails, because nearlyEqual is then false.
 	void expectNear(double actual, double expected, double tolerance, const std::string& message)
 	{
-		const double diff = actual > expected ? actual - expected : expected - actual;
-		if (!(diff <= tolerance))
+		if (!nearlyEqual(actual, expected, tolerance))
 		{
+			// Twelve digits, so a miss by less than a millionth still shows
+			// which digit differs.
 			std::ostringstream oss;
+			oss.precision(12);
 			oss << message << ": expected '" << expected << "' within " << tolerance
 				<< ", got '" << actual << "'";
 			recordFailure(oss.str());

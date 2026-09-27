@@ -21,6 +21,7 @@
 
 #include <atomic>
 #include <devices/DeviceAPOInfo.h>
+#include <devices/DeviceTestPlan.h>
 #include <QHash>
 #include <QThread>
 #include "ReceiveThread.h"
@@ -42,9 +43,23 @@ class DeviceTestThread : public QThread
 public:
 	DeviceTestThread(QObject* parent, const QVector<std::shared_ptr<DeviceAPOInfo>>& devices);
 
-	// How many devices no install mode worked for, once finished() fired.
-	// The dialog reads the verdict off the log; the headless command
-	// (DeviceSelector --install-endpoint) needs it as a number.
+	// How a run ended. Incomplete covers every exit before the verdict: a
+	// pipe that could not be read, a message that was not JSON, an aborted
+	// service restart, an interruption. Audit #348 TD-19: the headless command
+	// used to read a count that starts at 0 and is only written at the very
+	// end, so a run that stopped early reported "the APO is alive".
+	enum class Verdict
+	{
+		Incomplete,
+		Passed,
+		Failed
+	};
+
+	// Valid once finished() fired. The dialog reads the verdict off the log;
+	// the headless command (DeviceSelector --install-endpoint) needs it as a
+	// value, and treats Incomplete as a failure.
+	Verdict verdict() const {return verdictValue.load();}
+	// How many devices no install mode worked for; meaningful for Failed.
 	int nonWorkingDeviceCount() const {return nonWorking.load();}
 
 signals:
@@ -59,46 +74,23 @@ protected:
 	__override void run();
 
 private:
-	class TestResult
+	// The ladder, the verdict and the rows' status are decided by
+	// devices/DeviceTestPlan (audit #348 F15); this thread restarts the
+	// service, reinstalls, listens on the pipe and reports.
+	struct DeviceUnderTest
 	{
-	public:
-		bool preMixOk = false;
-		bool postMixOk = false;
-		bool childAPOPreMixOk = true;
-		bool childAPOPostMixOk = true;
-
-		int getScore()
-		{
-			int score = 0;
-			if (preMixOk)
-				score += 20;
-			if (postMixOk)
-				score += 10;
-			if (!childAPOPreMixOk)
-				score -= 2;
-			if (!childAPOPostMixOk)
-				score -= 1;
-			return score;
-		}
-	};
-
-	class DeviceTestInfo
-	{
-	public:
-		DeviceTestInfo(std::shared_ptr<DeviceAPOInfo> deviceInfo)
-			:deviceInfo(deviceInfo)
+		DeviceUnderTest(std::shared_ptr<DeviceAPOInfo> deviceInfo, const DeviceTestSelection& selection)
+			: deviceInfo(std::move(deviceInfo)), plan(selection)
 		{
 		}
 
 		std::shared_ptr<DeviceAPOInfo> deviceInfo;
-		TestResult currentResult;
-		QVector<DeviceAPOInfo::InstallMode> remainingInstallModes;
-		DeviceAPOInfo::InstallMode bestInstallMode;
-		TestResult bestResult;
-		bool wantsOriginalApoPreMix = false;
-		bool wantsOriginalApoPostMix = false;
+		DeviceTestPlan plan;
 	};
 
-	QHash<QString, DeviceTestInfo> infoMap;
+	void showStatus(const QString& deviceGuid, DeviceTestStage stage, DeviceTestItemStatus status);
+
+	QHash<QString, DeviceUnderTest> infoMap;
 	std::atomic<int> nonWorking{0};
+	std::atomic<Verdict> verdictValue{Verdict::Incomplete};
 };

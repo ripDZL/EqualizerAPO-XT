@@ -35,6 +35,21 @@
     <ClCompile Include="..\..\Editor\analysis\AnalysisResponse.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Editor\analysis\AnalysisRequestFence.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Editor\analysis\ImpulseMeasurement.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Editor\widgets\subwooferrouting\SubwooferRoutingStateReads.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SubwooferRoutingStateReadsTests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="AnalysisMeasurementTests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Editor\analysis\ResponseCurveBuilder.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -71,6 +86,9 @@
     <ClCompile Include="FilterPickerModelTests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="CommandLineQuotingTests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="ReferenceCardStateTests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -92,13 +110,25 @@
     <ClCompile Include="FilterListModelTests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ChannelFlowTests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Editor\widgets\ChannelFlow.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="ConfigImportTests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="UpdateCheckerTests.cpp">
+    <ClCompile Include="SelectionModelTests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="SelectionModelTests.cpp">
+    <ClCompile Include="RoutingGridModelTests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Editor\widgets\routing\RoutingGridModel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Editor\widgets\routing\CopyRoutingAdapter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="RoutingModelTests.cpp">
@@ -119,12 +149,6 @@
     <ClCompile Include="..\..\Editor\widgets\cards\ChannelSelectionModel.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\UpdateChecker\UpdateInfoFormatter.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\UpdateChecker\VelopackUpdateInfo.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Editor\skins\SkinThemeData.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -143,8 +167,20 @@
     <ClCompile Include="..\..\Editor\widgets\cards\VSTBusModel.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Editor\widgets\cards\VSTRowDocument.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="VSTRowDocumentTests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\Editor\widgets\routing\RoutingGridModel.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Editor\widgets\routing\CopyRoutingAdapter.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Benchmark\BatchPlan.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -184,12 +220,6 @@
     <ClInclude Include="..\..\filters\ChannelCommand.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\UpdateChecker\UpdateInfoFormatter.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\UpdateChecker\VelopackUpdateInfo.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\services\update\UpdateSession.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -203,6 +233,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Editor\widgets\cards\FileReferenceController.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Editor\analysis\AnalysisRequestFence.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Editor\analysis\ImpulseMeasurement.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Editor\widgets\subwooferrouting\SubwooferRoutingStateReads.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

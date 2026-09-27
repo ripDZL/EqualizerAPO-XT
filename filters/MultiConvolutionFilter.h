@@ -23,7 +23,7 @@
 #include <vector>
 
 #include "engine/IFilter.h"
-#include "ConvolverMuteDiagnostics.h"
+#include "ConvolverBank.h"
 #include "IrCache.h"
 #include "MultiConvolutionCommand.h"
 
@@ -50,7 +50,7 @@ public:
 	static constexpr const wchar_t* kFrameCountMismatchLogPrefix =
 		L"MultiConvolutionFilter: frameCount";
 
-	MultiConvolutionFilter(const std::vector<MultiConvolutionCommand::Mapping>& mappings, const std::wstring& filename);
+	MultiConvolutionFilter(const std::vector<MultiConvolutionCommand::Mapping>& mappings, JudgedPath filename);
 	virtual ~MultiConvolutionFilter();
 	bool getAllChannels() override {return true;}
 	bool getInPlace() override {return false;}
@@ -61,9 +61,8 @@ private:
 	void cleanup();
 
 	std::vector<MultiConvolutionCommand::Mapping> mappings;
-	std::wstring filename;
+	JudgedPath filename;
 	float sampleRate;
-	ConvolverMuteState muteState;
 
 	// Where one mapping reads and writes: units [firstUnit, firstUnit+unitCount)
 	// of the flat convolution-state array feed output[outputSlot] from
@@ -79,9 +78,9 @@ private:
 	std::vector<MappingPlan> plans;
 
 	// One convolution state per (mapping, impulse-response channel) pair, laid
-	// out mapping by mapping; plans[] holds the per-mapping ranges. The holder
-	// runs the close-then-free teardown.
-	HConvSingleArray filters;
+	// out mapping by mapping; plans[] holds the per-mapping ranges. The bank
+	// also keeps the mute bookkeeping and runs the close-then-free teardown.
+	ConvolverBank bank;
 	unsigned unitCount;
 	// Linear scale per unit (dB factors already converted), aligned with the
 	// flat convolution-state array.

@@ -114,6 +114,7 @@ public:
 
 	// The VST channel-fill rails (ISkin::paintVstSlotFillCell /
 	// ISkin::paintVstSlotFillRail). Same heritage reasoning as the bus strip.
+	QSize vstSlotFillCellSize(const QString& role, const QString& value) const;
 	void paintVstSlotFillCell(QPainter& painter, const VstSlotFillCellState& state) const;
 	void paintVstSlotFillRail(QPainter& painter, const VstSlotFillRailState& state) const;
 
@@ -144,9 +145,9 @@ signals:
 private:
 	explicit SkinManager(QObject* parent = nullptr);
 
-	// Class invariant: never null. Seeded in the constructor and only ever
-	// reassigned through Skins::byId (which falls back to studio), so the
-	// hook forwarders in the .cpp delegate without a null check.
+	// Class invariant: never null. The constructor and applySkin use
+	// Skins::byId, which falls back to studio; applyHeritage uses the
+	// HeritageSkin singleton.
 	ISkin* activeSkin = nullptr;
 	SkinTokens currentTokens;
 	QString skinId = QStringLiteral("studio");

@@ -5,7 +5,8 @@
 
 	Self-contained runtime test for the VST2 hosting path of the engine's VST
 	host classes - VSTPluginLibrary (LoadLibrary + GetProcAddress(VSTPluginMain))
-	and VSTPluginInstance (VSTPluginInstance.cpp + .VST2.cpp + .State.cpp).
+	and VSTPluginInstance (the facade in VSTPluginInstance.cpp and the VST2
+	implementation behind it in VST2Instance.cpp).
 	It loads the companion TestVst2Plugin.dll (built
 	from Tests/TestVst2Plugin from our own source, so it always matches the host
 	architecture) and round-trips state plus audio through the engine's public
@@ -16,21 +17,20 @@
 	round-tripping chunk state - without depending on any plugin installed on
 	the machine.
 
-	Soft skip: if TestVst2Plugin.dll is not found next to the running test
-	executable (e.g. the plugin project was not built or copied), the test
-	prints a clear "skipped" line and returns without failing, so the suite
-	never breaks the build. The HybridConvTests project copies the DLL next to
-	HybridConvTests.exe as a post-build step, which is what makes the
-	GetModuleFileName-relative lookup succeed on both x64 and ARM64.
+	A missing TestVst2Plugin.dll fails the suite: the HybridConvTests project
+	copies the DLL next to HybridConvTests.exe as a post-build step (which is
+	what makes the executable-relative lookup work on both x64 and ARM64), so
+	its absence is a build or copy problem. The one path that still skips is
+	a test executable whose own directory cannot be read; it prints a
+	"skipped" line.
 
 	VST headers: this translation unit includes VSTPluginLibrary.h and
-	VSTPluginInstance.h, exactly as VSTPluginInstance.cpp does. Those headers
-	pull in the VST2 ABI (vst/aeffectx.h) and the Steinberg pluginterfaces/
-	vst headers (ibstream, ivstaudioprocessor, ivsteditcontroller, ivstevents,
-	ivsthostapplication, ivstmessage, ivstparameterchanges, ivstprocesscontext,
-	iplugview) that VSTPluginInstance.h needs for its Steinberg::Vst:: pointer
-	members. They resolve through $(VST3_SDK), already on this project's include
-	path. No additional include directory is required.
+	VSTPluginInstance.h, exactly as VSTPluginInstance.cpp does.
+	VSTPluginLibrary.h pulls in the VST2 ABI (vst/aeffectx.h) and two base
+	Steinberg headers (ipluginbase, smartpointer) for the factory it owns;
+	VSTPluginInstance.h includes no SDK header since the instance was split by
+	format. They resolve through $(VST3_SDK), already on this project's
+	include path. No additional include directory is required.
 */
 
 #include <cmath>
@@ -53,6 +53,7 @@
 #include "filters/VSTPluginFilterFactory.h"
 #include "filters/loudnessCorrection/VolumeController.h"
 #include "Tests/TestHarness.h"
+#include "platform/windows/WindowsPath.h"
 
 using std::shared_ptr;
 using std::unordered_map;
@@ -130,26 +131,10 @@ constexpr int expectedVstTimeFlags = vstTimeTransportPlaying
 	| vstTimeBarsValid
 	| vstTimeTimeSigValid;
 
-// Directory of the running test executable. The plugin DLL is copied next to it
-// by the HybridConvTests post-build step.
-wstring exeDirectory()
-{
-	wchar_t path[MAX_PATH] = {};
-	DWORD len = GetModuleFileNameW(nullptr, path, MAX_PATH);
-	if (len == 0 || len >= MAX_PATH)
-		return wstring();
-
-	wstring full(path, len);
-	size_t slash = full.find_last_of(L"\\/");
-	if (slash == wstring::npos)
-		return wstring();
-	return full.substr(0, slash);
-}
-
-bool fileExists(const wstring& path)
-{
-	return GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES;
-}
+// The plugin DLL is copied next to the running test executable by the
+// HybridConvTests post-build step.
+using pathutil::exeDirectory;
+using pathutil::fileExists;
 
 // Base64-encode a ChunkBlob the way the engine stores chunk state, so it can be
 // fed straight into VSTPluginInstance::writeToEffect.
@@ -186,11 +171,6 @@ bool decodeChunk(const wstring& chunkData, ChunkBlob& out)
 	return out.magic == kChunkMagic;
 }
 
-bool closeEnough(double a, double b)
-{
-	return std::fabs(a - b) <= 1.0e-9;
-}
-
 void expectRejectedMetadataPassesThrough(const shared_ptr<VSTPluginLibrary>& library,
 	const wchar_t* mode, const std::string& label)
 {
@@ -216,7 +196,7 @@ void expectRejectedMetadataPassesThrough(const shared_ptr<VSTPluginLibrary>& lib
 		bool unchanged = true;
 		for (int i = 0; i < 4; ++i)
 		{
-			if (!closeEnough(outLeft[i], inLeft[i]) || !closeEnough(outRight[i], inRight[i]))
+			if (!test::nearlyEqual(outLeft[i], inLeft[i], 1.0e-9) || !test::nearlyEqual(outRight[i], inRight[i], 1.0e-9))
 				unchanged = false;
 		}
 		harness.expectTrue(unchanged, label + ": malformed plugin is bypassed");
@@ -225,23 +205,61 @@ void expectRejectedMetadataPassesThrough(const shared_ptr<VSTPluginLibrary>& lib
 	SetEnvironmentVariableW(L"EAPO_TEST_VST_METADATA", nullptr);
 }
 
-// TestVst2Plugin deliberately has no native editor. Keep the pre-fix access
-// violation inside this probe so the harness can report the expected safe
-// failure instead of aborting the complete VST host suite.
-bool tryStartEditingWithoutNativeEditor(VSTPluginInstance* instance, HWND parent, bool& raisedException)
+// Streams a unit impulse at sample 0 on both channels, then silence, through a
+// fresh gain-0.5 filter over {L, R} in blocks of blockSize frames (max frame
+// count 1024), and reports whether every output sample is 0.5 x the input
+// delayed by expectedDelay samples.
+bool latencyStreamMatches(const shared_ptr<VSTPluginLibrary>& library, unsigned blockSize, unsigned expectedDelay)
 {
-	raisedException = false;
-	short width = 0;
-	short height = 0;
-	__try
+	constexpr unsigned maxFrameCount = 1024;
+	constexpr unsigned streamLength = 2048;
+
+	ChunkBlob gainBlob = {};
+	gainBlob.magic = kChunkMagic;
+	gainBlob.version = kChunkVersion;
+	gainBlob.gain = 0.5f;
+
+	VSTPluginFilter filter(library, encodeChunk(gainBlob), unordered_map<wstring, float>());
+	filter.initialize(48000.0f, maxFrameCount, {L"L", L"R"});
+
+	vector<double> inLeft(streamLength, 0.0);
+	vector<double> inRight(streamLength, 0.0);
+	inLeft[0] = 1.0;
+	inRight[0] = 1.0;
+	vector<double> outLeft(streamLength, -1.0);
+	vector<double> outRight(streamLength, -1.0);
+	for (unsigned offset = 0; offset < streamLength; offset += blockSize)
 	{
-		return instance != nullptr && instance->startEditing(parent, &width, &height);
+		double* input[2] = {inLeft.data() + offset, inRight.data() + offset};
+		double* output[2] = {outLeft.data() + offset, outRight.data() + offset};
+		filter.process(output, input, blockSize);
 	}
-	__except (EXCEPTION_EXECUTE_HANDLER)
+
+	for (unsigned i = 0; i < streamLength; ++i)
 	{
-		raisedException = true;
-		return false;
+		const double expected = i >= expectedDelay ? 0.5 * inLeft[i - expectedDelay] : 0.0;
+		if (outLeft[i] != expected || outRight[i] != expected)
+			return false;
 	}
+	return true;
+}
+
+// Audit #348 A10: the plug-in reports 512 samples of latency. The compensation
+// delays only the channels no plug-in output writes (maintainer decision; it
+// used to delay every channel, the processed ones included, which left them
+// twice as late). A VST2 plug-in's instances cover every channel, so nothing
+// is delayed here and no ring is allocated; Vst3HostTests covers a fill that
+// leaves a channel unwritten.
+void expectLatencyCompensationGolden(const shared_ptr<VSTPluginLibrary>& library)
+{
+	SetEnvironmentVariableW(L"EAPO_TEST_VST_METADATA", L"latency-512");
+
+	harness.expectTrue(latencyStreamMatches(library, 128, 0),
+		"latency-512: 128-frame blocks come out 0.5 x input with no extra delay");
+	harness.expectTrue(latencyStreamMatches(library, 1024, 0),
+		"latency-512: 1024-frame blocks come out 0.5 x input with no extra delay");
+
+	SetEnvironmentVariableW(L"EAPO_TEST_VST_METADATA", nullptr);
 }
 
 void testVolumeControllerBalancesComInitialization()
@@ -262,14 +280,74 @@ void testVolumeControllerBalancesComInitialization()
 	harness.expectTrue(threadStartedUninitialized, "COM balance test starts on an uninitialized thread");
 	harness.expectTrue(threadEndedUninitialized, "VolumeController balances COM initialization");
 }
+// The DLL is held against writers from the judgment to LoadLibraryW, the
+// window in which an emptied leaf could otherwise be given reparse data
+// (AbstractLibrary::holdForLoad). The hold must not stop the loader itself.
+void testLoadHold(const wstring& dir, const wstring& dllPath)
+{
+	const wstring folder = dir + L"\\load-hold";
+	const wstring plugin = folder + L"\\plugin.dll";
+	const wstring empty = folder + L"\\empty.dll";
+	CreateDirectoryW(folder.c_str(), nullptr);
+	harness.require(CopyFileW(dllPath.c_str(), plugin.c_str(), FALSE) != FALSE, "copy the test plugin for the hold test");
+	{
+		const auto judged = ConfigFileReference::library(L"", plugin, L"");
+		harness.require(judged.refusal.empty() && judged.path.leaf() != nullptr, "hold test plugin is judged");
+		winutil::UniqueHandle held;
+		harness.expectEqual(AbstractLibrary::holdForLoad(judged.path.leaf(), held), DWORD(ERROR_SUCCESS),
+			"a local plugin with data is held for loading");
+		harness.expectTrue(static_cast<bool>(held), "the hold is a handle of its own");
+		const winutil::UniqueHandle writer(CreateFileW(plugin.c_str(), FILE_WRITE_DATA,
+			FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+		const DWORD writerError = GetLastError();
+		harness.expectTrue(!writer && writerError == ERROR_SHARING_VIOLATION,
+			"while held, nobody can open the plugin to empty it");
+		HMODULE module = LoadLibraryW(plugin.c_str());
+		harness.expectTrue(module != nullptr, "the loader opens a held plugin as before");
+		if (module != nullptr)
+			FreeLibrary(module);
+	}
+	{
+		const winutil::UniqueHandle writer(CreateFileW(plugin.c_str(), FILE_WRITE_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE,
+			nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+		harness.require(static_cast<bool>(writer), "open a writer before the hold");
+		const auto judged = ConfigFileReference::library(L"", plugin, L"");
+		harness.require(judged.path.leaf() != nullptr, "a plugin open for writing is still judged");
+		winutil::UniqueHandle held;
+		harness.expectEqual(AbstractLibrary::holdForLoad(judged.path.leaf(), held), DWORD(ERROR_SHARING_VIOLATION),
+			"a plugin another program is writing is not held");
+		shared_ptr<VSTPluginLibrary> library = VSTPluginLibrary::getInstance(plugin);
+		harness.expectEqual(library->initialize(judged.path), AbstractLibrary::LOADING_FAILED,
+			"and not loaded, as LoadLibraryW would have refused it too");
+	}
+	{
+		const winutil::UniqueHandle create(CreateFileW(empty.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+			FILE_ATTRIBUTE_NORMAL, nullptr));
+		harness.require(static_cast<bool>(create), "create an empty plugin file");
+	}
+	{
+		const auto judged = ConfigFileReference::library(L"", empty, L"");
+		harness.require(judged.path.leaf() != nullptr, "an empty file is judged");
+		winutil::UniqueHandle held;
+		harness.expectEqual(AbstractLibrary::holdForLoad(judged.path.leaf(), held), DWORD(ERROR_BAD_EXE_FORMAT),
+			"an empty file, the one file that can become a link, is refused");
+		shared_ptr<VSTPluginLibrary> library = VSTPluginLibrary::getInstance(empty);
+		harness.expectEqual(library->initialize(judged.path), AbstractLibrary::LOADING_FAILED,
+			"an empty file fails to load as it did before");
+	}
+	DeleteFileW(empty.c_str());
+	DeleteFileW(plugin.c_str());
+	RemoveDirectoryW(folder.c_str());
+}
 } // namespace
 
 void runVstHostTests()
 {
 	testVolumeControllerBalancesComInitialization();
 
-	// Both soft-skip paths report before returning: under the harness default
-	// (Collect) a failure recorded above only fails the build through report().
+	// Both early returns (the skip below and the missing-DLL failure after it)
+	// report first: under the harness default (Collect) a failure recorded
+	// above only fails the build through report().
 	const wstring dir = exeDirectory();
 	if (dir.empty())
 	{
@@ -292,6 +370,8 @@ void runVstHostTests()
 		harness.report();
 		return;
 	}
+
+	testLoadHold(dir, dllPath);
 
 	// A failed subclass initialization must roll the DLL load back completely.
 	// Otherwise the second call sees a non-null module and returns 0 (already
@@ -317,7 +397,10 @@ void runVstHostTests()
 	harness.require(library != nullptr, "getInstance returned a library");
 	harness.expectFalse(library->isVST3(), "test plugin is hosted via the VST2 path");
 
-	int loadResult = library->initialize();
+	const auto judgedLibrary = ConfigFileReference::library(dir, L"TestVst2Plugin.dll", L"");
+	harness.require(judgedLibrary.refusal.empty() && judgedLibrary.path.leaf() != nullptr,
+		"VST2 library reference retains a readable pinned leaf");
+	int loadResult = library->initialize(judgedLibrary.path);
 	harness.expectTrue(loadResult >= 0, "library initialize did not return an error code");
 	harness.expectTrue(library->VSTPluginMain != nullptr, "VSTPluginMain symbol resolved");
 
@@ -355,6 +438,7 @@ void runVstHostTests()
 	expectRejectedMetadataPassesThrough(library, L"negative-outputs", "negative output count");
 	expectRejectedMetadataPassesThrough(library, L"negative-delay", "negative initial delay");
 	expectRejectedMetadataPassesThrough(library, L"huge-delay", "unrealistic initial delay");
+	expectLatencyCompensationGolden(library);
 
 	// Construct and initialize the instance the way the engine does (heap
 	// allocated, owned here). processLevel mirrors a realtime audio thread.
@@ -368,27 +452,19 @@ void runVstHostTests()
 	harness.expectTrue(instance->canDoubleReplacing(), "plugin advertises double replacing");
 	harness.expectTrue(instance->getName() == L"TestVst2Plugin", "plugin reports its name");
 
-	HWND noEditorParent = CreateWindowExW(0, L"STATIC", L"VST2 no-editor test parent", WS_OVERLAPPED,
-		0, 0, 640, 480, nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
-	harness.expectTrue(noEditorParent != nullptr, "VST2 no-editor test parent is created");
-	bool noEditorRaisedException = false;
-	const bool noEditorOpened = noEditorParent != nullptr
-		&& tryStartEditingWithoutNativeEditor(instance.get(), noEditorParent, noEditorRaisedException);
-	harness.expectFalse(noEditorRaisedException,
-		"VST2 without a native editor does not fault when opening its panel");
-	harness.expectFalse(noEditorOpened,
-		"VST2 without a native editor reports that no panel can be opened");
-	if (noEditorParent != nullptr)
-		DestroyWindow(noEditorParent);
+	// Audit #348 TD-14: this plugin has no editor (VST_EFFECT_FLAG_EDITOR is
+	// clear). Opening its panel used to dereference an uninitialised rect.
+	short editorWidth = 0;
+	short editorHeight = 0;
+	harness.expectFalse(instance->startEditing(nullptr, &editorWidth, &editorHeight),
+		"startEditing on a VST2 plugin without an editor reports failure");
 
 	instance->prepareForProcessing(48000.0f, 512);
+	harness.expectFalse(instance->canProcessNow(),
+		"a prepared VST2 instance cannot process before startProcessing");
 	instance->startProcessing();
-
-	vst_time_info* initialTime = instance->hostTimeInfo();
-	harness.expectTrue(closeEnough(initialTime->sampleRate, 48000.0), "VST2 host time reports the prepared sample rate");
-	harness.expectTrue(closeEnough(initialTime->samplePos, 0.0), "VST2 host time starts at sample 0");
-	harness.expectEqual(initialTime->flags & expectedVstTimeFlags, expectedVstTimeFlags,
-		"VST2 host time advertises playing/time-position fields");
+	harness.expectTrue(instance->canProcessNow(),
+		"a started VST2 instance reports that it can process");
 
 	// --- Chunk round-trip: read default state, then set a known gain and read
 	// it back. The plugin sets the programChunks flag, so the engine routes all
@@ -401,7 +477,7 @@ void runVstHostTests()
 	ChunkBlob defaultBlob = {};
 	harness.expectTrue(decodeChunk(chunkA, defaultBlob), "default chunk decodes with the expected magic");
 	harness.expectEqual(defaultBlob.version, kChunkVersion, "default chunk version");
-	harness.expectTrue(closeEnough(defaultBlob.gain, 1.0), "default gain is unity");
+	harness.expectNear(defaultBlob.gain, 1.0, 1.0e-9, "default gain is unity");
 
 	// Write a chunk that sets gain = 0.5, bypass off, and read it back.
 	const float testGain = 0.5f;
@@ -420,7 +496,7 @@ void runVstHostTests()
 	instance->readFromEffect(chunkB, paramsB);
 	ChunkBlob readBlob = {};
 	harness.expectTrue(decodeChunk(chunkB, readBlob), "round-tripped chunk decodes");
-	harness.expectTrue(closeEnough(readBlob.gain, testGain), "gain survived the chunk write/read round-trip");
+	harness.expectNear(readBlob.gain, testGain, 1.0e-9, "gain survived the chunk write/read round-trip");
 	harness.expectTrue(chunkB == writeChunk, "chunk string is stable after writing the same state");
 
 	// Re-reading without an intervening write must return the identical string.
@@ -443,12 +519,6 @@ void runVstHostTests()
 	double* outArray[2] = { outLeft.data(), outRight.data() };
 	instance->processDoubleReplacing(inArray, outArray, frameCount);
 
-	vst_time_info* timeAfterFirstBlock = instance->hostTimeInfo();
-	harness.expectTrue(closeEnough(timeAfterFirstBlock->samplePos, static_cast<double>(frameCount)),
-		"VST2 host time advances by processed frame count");
-	harness.expectEqual(timeAfterFirstBlock->flags & expectedVstTimeFlags, expectedVstTimeFlags,
-		"VST2 host time keeps playing/time-position flags after processing");
-
 	wstring processedChunk;
 	unordered_map<wstring, float> processedParams;
 	instance->readFromEffect(processedChunk, processedParams);
@@ -458,15 +528,15 @@ void runVstHostTests()
 		"VST2 process callback reports the audio process level");
 	harness.expectEqual(processedBlob.lastTimeFlags & expectedVstTimeFlags, expectedVstTimeFlags,
 		"plugin-observed VST2 time advertises playing/time-position fields");
-	harness.expectTrue(closeEnough(processedBlob.lastTimeSamplePos, 0.0),
+	harness.expectTrue(test::nearlyEqual(processedBlob.lastTimeSamplePos, 0.0, 1.0e-9),
 		"plugin-observed first process block starts at sample 0");
-	harness.expectTrue(closeEnough(processedBlob.lastTimeSampleRate, 48000.0),
+	harness.expectTrue(test::nearlyEqual(processedBlob.lastTimeSampleRate, 48000.0, 1.0e-9),
 		"plugin-observed VST2 time reports sample rate");
 
 	bool audioMatches = true;
 	for (int i = 0; i < frameCount && audioMatches; ++i)
 	{
-		if (!closeEnough(outLeft[i], inLeft[i] * testGain) || !closeEnough(outRight[i], inRight[i] * testGain))
+		if (!test::nearlyEqual(outLeft[i], inLeft[i] * testGain, 1.0e-9) || !test::nearlyEqual(outRight[i], inRight[i] * testGain, 1.0e-9))
 			audioMatches = false;
 	}
 	harness.expectTrue(audioMatches, "processDoubleReplacing output equals input * gain");
@@ -487,12 +557,14 @@ void runVstHostTests()
 	bool unityMatches = true;
 	for (int i = 0; i < frameCount && unityMatches; ++i)
 	{
-		if (!closeEnough(unityOutLeft[i], inLeft[i]) || !closeEnough(unityOutRight[i], inRight[i]))
+		if (!test::nearlyEqual(unityOutLeft[i], inLeft[i], 1.0e-9) || !test::nearlyEqual(unityOutRight[i], inRight[i], 1.0e-9))
 			unityMatches = false;
 	}
 	harness.expectTrue(unityMatches, "unity gain passes audio through unchanged");
 
 	instance->stopProcessing();
+	harness.expectFalse(instance->canProcessNow(),
+		"a stopped VST2 instance no longer reports that it can process");
 
 	// The owning pointer mirrors the engine and sends effClose on every exit,
 	// including an unexpected exception from a later assertion.

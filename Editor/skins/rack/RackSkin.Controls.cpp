@@ -4,11 +4,8 @@
 	SPDX-License-Identifier: GPL-2.0-or-later
 */
 
-/*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-*/
-
 #include "RackSkin.h"
+#include "Editor/skins/rack/RackPalette.h"
 
 #include <QFontMetricsF>
 #include <QLinearGradient>
@@ -72,14 +69,14 @@ void RackSkin::paintKnob(QPainter& painter, const QRect& rect, const KnobState& 
 	if (state.bipolar)
 	{
 		QFont glyphFont(tokens.fontFamily);
-		glyphFont.setPixelSize(11);
+		glyphFont.setPixelSize(12);
 		glyphFont.setBold(true);
 		painter.setFont(glyphFont);
 		const QPointF minusAt = pointAt(-0.07, scaleRadius - 2.5);
 		const QPointF plusAt = pointAt(1.07, scaleRadius - 2.5);
 		const QRectF minusRect(minusAt.x() - 7, minusAt.y() - 7, 14, 14);
 		const QRectF plusRect(plusAt.x() - 7, plusAt.y() - 7, 14, 14);
-		painter.setPen(dark ? QColor(0, 0, 0, 170) : QColor(255, 255, 255, 200));
+		painter.setPen(RackPalette::EngraveRelief(dark));
 		painter.drawText(minusRect.translated(0, 1), Qt::AlignCenter, QStringLiteral("-"));
 		painter.drawText(plusRect.translated(0, 1), Qt::AlignCenter, QStringLiteral("+"));
 		painter.setPen(withAlpha(inkStrong, inkAlpha));
@@ -99,20 +96,20 @@ void RackSkin::paintKnob(QPainter& painter, const QRect& rect, const KnobState& 
 	}
 	else
 	{
-		bodyGrad.setColorAt(0.0, QColor(0xFF, 0xFF, 0xFF));
-		bodyGrad.setColorAt(0.6, QColor(0xDE, 0xD7, 0xC6));
-		bodyGrad.setColorAt(1.0, QColor(0xA8, 0x9F, 0x8C));
+		bodyGrad.setColorAt(0.0, RackPalette::KnobAluminiumHighlight);
+		bodyGrad.setColorAt(0.6, RackPalette::KnobAluminiumBody);
+		bodyGrad.setColorAt(1.0, RackPalette::KnobAluminiumEdge);
 	}
-	painter.setPen(QPen(dark ? QColor(0, 0, 0, 200) : QColor(0x7E, 0x75, 0x62), 1));
+	painter.setPen(QPen(RackPalette::KnobRim(dark), 1));
 	painter.setBrush(bodyGrad);
 	painter.drawEllipse(center, bodyRadius, bodyRadius);
 
 	// Machined cap step and the specular arc on its top edge.
 	const qreal capRadius = bodyRadius - 3.5;
-	painter.setPen(QPen(QColor(0, 0, 0, dark ? 90 : 50), 1));
+	painter.setPen(QPen(RackPalette::shadow(dark ? 90 : 50), 1));
 	painter.setBrush(Qt::NoBrush);
 	painter.drawEllipse(center, capRadius, capRadius);
-	painter.setPen(QPen(QColor(255, 255, 255, dark ? 70 : 150), 1.2));
+	painter.setPen(QPen(RackPalette::light(dark ? 70 : 150), 1.2));
 	painter.drawArc(QRectF(center.x() - capRadius, center.y() - capRadius, capRadius * 2, capRadius * 2), 60 * 16, 60 * 16);
 
 	// The pointer: a physical painted line. Hover/drag turns it amber (the
@@ -125,10 +122,10 @@ void RackSkin::paintKnob(QPainter& painter, const QRect& rect, const KnobState& 
 	else if (state.dragging || state.hovered)
 		pointerColor = QColor(tokens.accent);
 	else
-		pointerColor = dark ? QColor(0xF2, 0xEC, 0xDC) : QColor(0x2E, 0x29, 0x22);
+		pointerColor = RackPalette::KnobPointer(dark);
 	const QPointF pointerBase = pointAt(state.ratio, bodyRadius * 0.28);
 	const QPointF pointerTip = pointAt(state.ratio, bodyRadius - 1.8);
-	painter.setPen(QPen(QColor(0, 0, 0, state.enabled ? (dark ? 150 : 90) : 50), 3.6, Qt::SolidLine, Qt::RoundCap));
+	painter.setPen(QPen(RackPalette::shadow(state.enabled ? (dark ? 150 : 90) : 50), 3.6, Qt::SolidLine, Qt::RoundCap));
 	painter.drawLine(pointerBase, pointerTip);
 	painter.setPen(QPen(pointerColor, 2.4, Qt::SolidLine, Qt::RoundCap));
 	painter.drawLine(pointerBase, pointerTip);
@@ -153,7 +150,7 @@ void RackSkin::paintKnob(QPainter& painter, const QRect& rect, const KnobState& 
 	if (!state.enabled)
 	{
 		painter.setPen(Qt::NoPen);
-		painter.setBrush(dark ? QColor(0, 0, 0, 90) : QColor(255, 252, 244, 130));
+		painter.setBrush(RackPalette::KnobPoweredDownFilm(dark));
 		painter.drawEllipse(center, bodyRadius, bodyRadius);
 	}
 
@@ -178,8 +175,8 @@ void RackSkin::paintSegmentedControl(QPainter& painter, const SegmentedControlSt
 	// work light falling across metal. The dark side keeps the cream finish warm
 	// by mixing the plate's own ink toward black rather than laying a neutral
 	// grey over it - this skin's shadows are never cold.
-	const QColor shadowInk = dark ? QColor(0, 0, 0) : mixColor(bodyInk, QColor(0, 0, 0), 0.35);
-	const QColor lightInk(255, 255, 255);
+	const QColor shadowInk = dark ? RackPalette::shadow(255) : mixColor(bodyInk, RackPalette::shadow(255), 0.35);
+	const QColor lightInk = RackPalette::light(255);
 	const QColor grainInk = dark ? lightInk : mixColor(bodyInk, panel, 0.30);
 
 	QPainterStateGuard painterState(&painter);
@@ -276,7 +273,7 @@ void RackSkin::paintSegmentedControl(QPainter& painter, const SegmentedControlSt
 	};
 
 	QFont legendFont(tokens.fontFamily);
-	legendFont.setPixelSize(9);
+	legendFont.setPixelSize(10);
 	legendFont.setBold(true);
 	const QFontMetricsF legendMetrics(legendFont);
 
@@ -467,7 +464,7 @@ void RackSkin::paintVstBusSelector(QPainter& painter, const VstBusSelectorState&
 	const QRectF rect(state.rect);
 
 	QFont roleFont(tokens.fontFamily);
-	roleFont.setPixelSize(8);
+	roleFont.setPixelSize(9);
 	roleFont.setBold(true);
 	roleFont.setLetterSpacing(QFont::AbsoluteSpacing, 1.2);
 	painter.setFont(roleFont);
@@ -493,7 +490,7 @@ void RackSkin::paintVstBusSelector(QPainter& painter, const VstBusSelectorState&
 	// latched cap carries its print down with it.
 	const qreal drop = down ? 1.0 : 0.0;
 	QFont valueFont(tokens.monoFontFamily);
-	valueFont.setPixelSize(11);
+	valueFont.setPixelSize(12);
 	painter.setFont(valueFont);
 	QColor print(state.enabled ? tokens.text : tokens.mutedText);
 	QRectF printRect = cap.adjusted(6.0, drop, -5.0, drop);
@@ -503,7 +500,7 @@ void RackSkin::paintVstBusSelector(QPainter& painter, const VstBusSelectorState&
 	{
 		const qreal valueWidth = QFontMetricsF(valueFont).horizontalAdvance(state.layoutText);
 		QFont countFont(tokens.monoFontFamily);
-		countFont.setPixelSize(8);
+		countFont.setPixelSize(9);
 		painter.setFont(countFont);
 		painter.setPen(withAlpha(QColor(tokens.mutedText), state.enabled ? 255 : 150));
 		painter.drawText(QRectF(printRect.left() + valueWidth + 4.0, printRect.top(),
@@ -533,7 +530,7 @@ void RackSkin::paintVstBusFrame(QPainter& painter, const VstBusFrameState& state
 	const qreal midY = state.jointRect.center().y() + 0.5;
 	const QPointF tail(state.jointRect.left() + 4.0, midY);
 	const QPointF head(state.jointRect.right() - 4.0, midY);
-	painter.setPen(QPen(dark ? QColor(0, 0, 0, 170) : QColor(255, 255, 255, 200), 1.2, Qt::SolidLine, Qt::RoundCap));
+	painter.setPen(QPen(RackPalette::EngraveRelief(dark), 1.2, Qt::SolidLine, Qt::RoundCap));
 	painter.drawLine(tail + QPointF(0, 1), head + QPointF(0, 1));
 	painter.drawLine(head + QPointF(0, 1), head + QPointF(-3.0, -2.0));
 	painter.drawLine(head + QPointF(0, 1), head + QPointF(-3.0, 4.0));
@@ -567,7 +564,7 @@ void RackSkin::paintVstBusFrame(QPainter& painter, const VstBusFrameState& state
 		return;
 
 	QFont engraveFont(tokens.monoFontFamily);
-	engraveFont.setPixelSize(9);
+	engraveFont.setPixelSize(10);
 	engraveFont.setLetterSpacing(QFont::AbsoluteSpacing, 0.4);
 	painter.setFont(engraveFont);
 	const QColor textInk = state.tone == VstBusFrameState::Tone::Critical && state.enabled
@@ -583,6 +580,37 @@ void RackSkin::paintVstBusFrame(QPainter& painter, const VstBusFrameState& state
 		QFontMetricsF(engraveFont).elidedText(text, Qt::ElideRight, textRect.width()), textInk, dark);
 }
 
+namespace
+{
+// The fill cell's fonts, shared by the painter and the size it answers:
+// an engraved bold, letter-spaced role and the mono channel print.
+QFont rackFillRoleFont(const SkinTokens& tokens)
+{
+	QFont font(tokens.fontFamily);
+	font.setPixelSize(9);
+	font.setBold(true);
+	font.setLetterSpacing(QFont::AbsoluteSpacing, 1.0);
+	return font;
+}
+
+QFont rackFillValueFont(const SkinTokens& tokens)
+{
+	QFont font(tokens.monoFontFamily);
+	font.setPixelSize(12);
+	return font;
+}
+}
+
+QSize RackSkin::vstSlotFillCellSize(const QString& role, const QString& value, const SkinTokens& tokens) const
+{
+	// The painter's layout: the engraved role, 5 to the cap, and the channel
+	// printed inside the cap with 6 before it and 5 after (the cap itself
+	// ends 0.5 short of the cell). The cap has no caret.
+	const qreal roleWidth = QFontMetricsF(rackFillRoleFont(tokens)).horizontalAdvance(role);
+	const qreal valueWidth = QFontMetricsF(rackFillValueFont(tokens)).horizontalAdvance(value);
+	return QSize(qCeil(roleWidth + 5.0 + 6.0 + valueWidth + 5.0 + 0.5), 20);
+}
+
 void RackSkin::paintVstSlotFillCell(QPainter& painter, const VstSlotFillCellState& state, const SkinTokens& tokens) const
 {
 	QPainterStateGuard guard(&painter);
@@ -595,10 +623,7 @@ void RackSkin::paintVstSlotFillCell(QPainter& painter, const VstSlotFillCellStat
 	const QColor mutedInk(tokens.mutedText);
 	const QRectF rect(state.rect);
 
-	QFont roleFont(tokens.fontFamily);
-	roleFont.setPixelSize(8);
-	roleFont.setBold(true);
-	roleFont.setLetterSpacing(QFont::AbsoluteSpacing, 1.0);
+	const QFont roleFont = rackFillRoleFont(tokens);
 	painter.setFont(roleFont);
 	const qreal roleWidth = QFontMetricsF(roleFont).horizontalAdvance(state.roleToken);
 	RackSkinDetail::engraveText(painter,
@@ -629,9 +654,7 @@ void RackSkin::paintVstSlotFillCell(QPainter& painter, const VstSlotFillCellStat
 	}
 
 	const qreal drop = down ? 1.0 : 0.0;
-	QFont valueFont(tokens.monoFontFamily);
-	valueFont.setPixelSize(11);
-	painter.setFont(valueFont);
+	painter.setFont(rackFillValueFont(tokens));
 	QColor print(state.silent || state.defaulted ? mutedInk : bodyInk);
 	if (state.missingChannel)
 		print = QColor(tokens.danger);
@@ -682,7 +705,7 @@ void RackSkin::paintVstSlotFillRail(QPainter& painter, const VstSlotFillRailStat
 	RackSkinDetail::paintLed(painter, QPointF(cap.left() + 8.0, cap.center().y() + 0.5 + drop), 2.6,
 		amber, state.enabled && !state.collapsed, dark);
 	QFont capFont(tokens.fontFamily);
-	capFont.setPixelSize(8);
+	capFont.setPixelSize(9);
 	capFont.setBold(true);
 	capFont.setLetterSpacing(QFont::AbsoluteSpacing, 1.0);
 	painter.setFont(capFont);

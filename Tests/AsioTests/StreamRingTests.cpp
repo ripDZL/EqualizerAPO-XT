@@ -230,6 +230,157 @@ namespace
 		harness.expectFalse(consumer.valid(), "the consumer rejects a totalBytes value that disagrees with the format");
 	}
 
+	// Audit #348 TD-16: the consumer checked only that each slot ended inside
+	// totalBytes, never that the lane geometry was the one the format gives,
+	// and it read neither the strings' termination nor the sample rate. Every
+	// header below keeps frames and channels, so totalBytes still matches and
+	// the rejection comes from the new checks.
+	void testHeaderGeometryAndFieldsAreChecked()
+	{
+		const auto consumerAccepts = [](const auto& corrupt) {
+			StreamFormat valid = stereoFormat();
+			Region region(valid);
+			RingProducer producer(region.base(), valid, 1, region.producerSync());
+			corrupt(*static_cast<eapo::ipc::RingHeader*>(region.base()));
+			RingConsumer consumer(region.base(), region.bytes.size(), region.consumerSync());
+			return consumer.valid();
+		};
+
+		harness.expect(consumerAccepts([](eapo::ipc::RingHeader&) {}), "an untouched header is accepted");
+		harness.expectFalse(consumerAccepts([](eapo::ipc::RingHeader& header) {
+			header.lanes[0].slotBytes = 0;
+		}), "a lane whose slotBytes is zero instead of the format's size is rejected");
+		harness.expectFalse(consumerAccepts([](eapo::ipc::RingHeader& header) {
+			header.lanes[0].slotBytes = 0;
+			header.lanes[0].slotOffset[0] = header.totalBytes;
+			header.lanes[0].slotOffset[1] = header.totalBytes;
+		}), "zero slot bytes at an offset equal to totalBytes (which passed the old end check) is rejected");
+		harness.expectFalse(consumerAccepts([](eapo::ipc::RingHeader& header) {
+			header.lanes[1].slotOffset[1] = header.totalBytes;
+		}), "a slot offset at the end of the ring is rejected");
+		harness.expectFalse(consumerAccepts([](eapo::ipc::RingHeader& header) {
+			header.lanes[0].slotOffset[1] = header.lanes[0].slotOffset[0];
+		}), "two slots at one offset are rejected");
+
+		StreamFormat unterminatedName = stereoFormat();
+		for (wchar_t& c : unterminatedName.deviceName)
+			c = L'A';
+		harness.expectFalse(RingGeometry::validFormat(unterminatedName), "a device name without a NUL in its field is invalid");
+		harness.expectFalse(consumerAccepts([&](eapo::ipc::RingHeader& header) {
+			header.format = unterminatedName;
+		}), "the consumer rejects a device name without a NUL");
+
+		StreamFormat unterminatedGuid = stereoFormat();
+		for (wchar_t& c : unterminatedGuid.deviceGuid)
+			c = L'{';
+		harness.expectFalse(RingGeometry::validFormat(unterminatedGuid), "a device GUID without a NUL in its field is invalid");
+		harness.expectFalse(consumerAccepts([&](eapo::ipc::RingHeader& header) {
+			header.format = unterminatedGuid;
+		}), "the consumer rejects a device GUID without a NUL");
+
+		StreamFormat fullName = stereoFormat();
+		for (size_t i = 0; i + 1 < sizeof(fullName.deviceName) / sizeof(wchar_t); i++)
+			fullName.deviceName[i] = L'A';
+		harness.expect(RingGeometry::validFormat(fullName), "a name that fills its field up to the last NUL is valid");
+
+		const double rates[] = {0.0, -48000.0, 999.0, 1000001.0, 1e300, std::nan(""), HUGE_VAL};
+		const char* const names[] = {"zero", "negative", "below 1 kHz", "above 1 MHz", "absurd", "NaN", "infinite"};
+		for (size_t i = 0; i < sizeof(rates) / sizeof(rates[0]); i++)
+		{
+			StreamFormat badRate = stereoFormat();
+			badRate.sampleRate = rates[i];
+			harness.expectFalse(RingGeometry::validFormat(badRate), std::string("a ") + names[i] + " sample rate is invalid");
+			harness.expectFalse(consumerAccepts([&](eapo::ipc::RingHeader& header) {
+				header.format.sampleRate = rates[i];
+			}), std::string("the consumer rejects a ") + names[i] + " sample rate");
+		}
+		const double supported[] = {eapo::ipc::minRingSampleRate, 8000.0, 44100.0, 192000.0, 768000.0, eapo::ipc::maxRingSampleRate};
+		for (double rate : supported)
+		{
+			StreamFormat format = stereoFormat();
+			format.sampleRate = rate;
+			harness.expect(RingGeometry::validFormat(format), "a " + std::to_string(static_cast<long>(rate)) + " Hz stream is valid");
+		}
+	}
+
+	// The slot a block lives in comes from the geometry computed at attach,
+	// so a producer that rewrites slotOffset afterwards moves nothing.
+	void testLaterSlotOffsetChangeHasNoEffect()
+	{
+		StreamFormat format = stereoFormat(64, 0);
+		Region region(format);
+		RingProducer producer(region.base(), format, 1, region.producerSync());
+		RingConsumer consumer(region.base(), region.bytes.size(), region.consumerSync());
+		harness.require(consumer.valid(), "the consumer accepts the ring");
+		consumer.setState(RingState::Ready);
+		const unsigned char* base = static_cast<const unsigned char*>(region.base());
+		eapo::ipc::RingHeader* header = static_cast<eapo::ipc::RingHeader*>(region.base());
+		const uint32_t slot0 = header->lanes[0].slotOffset[0];
+		const uint32_t slot1 = header->lanes[0].slotOffset[1];
+
+		RingConsumer::Acquired acquired = {};
+		producer.publish(Direction::Output, 1);
+		harness.require(consumer.acquire(acquired, 1000), "seq 1 is acquired");
+		harness.expect(reinterpret_cast<const unsigned char*>(acquired.slot) == base + slot1, "seq 1 lives in slot 1");
+		consumer.release(acquired);
+
+		header->lanes[0].slotOffset[0] = header->totalBytes - 4;
+		header->lanes[0].slotOffset[1] = 0;
+		producer.publish(Direction::Output, 2);
+		harness.require(consumer.acquire(acquired, 1000), "seq 2 is acquired");
+		harness.expect(reinterpret_cast<const unsigned char*>(acquired.slot) == base + slot0,
+			"seq 2 still lives in slot 0 after the header's offsets were rewritten");
+		consumer.release(acquired);
+		producer.publish(Direction::Output, 3);
+		harness.require(consumer.acquire(acquired, 1000), "seq 3 is acquired");
+		harness.expect(reinterpret_cast<const unsigned char*>(acquired.slot) == base + slot1, "and seq 3 in slot 1");
+		consumer.release(acquired);
+
+		header->format.frames = 1;
+		header->format.channels[0] = 64;
+		harness.expectEqual(consumer.format().frames, 64u, "the format the consumer serves is its own copy");
+		harness.expectEqual(consumer.format().channels[0], 2u, "channels too");
+		producer.close();
+	}
+
+	// The serving loop's --trace-slow diagnostic measures a block's wake-up
+	// from the producer's publish time, which acquire hands over with the block.
+	void testAcquiredCarriesThePublishTime()
+	{
+		StreamFormat format = stereoFormat(64, 2);
+		Region region(format);
+		RingProducer producer(region.base(), format, 1, region.producerSync());
+		RingConsumer consumer(region.base(), region.bytes.size(), region.consumerSync());
+		harness.require(consumer.valid(), "the consumer accepts the ring");
+		consumer.setState(RingState::Ready);
+		const eapo::ipc::RingHeader* header = static_cast<const eapo::ipc::RingHeader*>(region.base());
+
+		RingConsumer::Acquired acquired = {};
+		producer.publish(Direction::Input, 1);
+		harness.require(consumer.acquire(acquired, 1000), "seq 1 is acquired");
+		harness.expect(acquired.direction == Direction::Input, "on the lane it was published on");
+		harness.expect(acquired.publishTick != 0, "with a publish time");
+		harness.expect(acquired.publishTick == header->publishTick[static_cast<unsigned>(Direction::Input)],
+			"the one the producer wrote for that lane");
+		harness.expect(acquired.publishTick <= header->acquireTick[static_cast<unsigned>(Direction::Input)],
+			"and not after the acquire");
+		harness.expectEqual(acquired.behind, 0u, "nothing was published after it");
+		consumer.release(acquired);
+
+		// A consumer a block behind: the lane's publish time is the later
+		// block's, and the count says so.
+		producer.publish(Direction::Input, 2);
+		producer.publish(Direction::Input, 3);
+		harness.require(consumer.acquire(acquired, 1000), "seq 2 is acquired");
+		harness.expectEqual(acquired.sequence, 2u, "in order");
+		harness.expectEqual(acquired.behind, 1u, "seq 3 was published after it");
+		consumer.release(acquired);
+		harness.require(consumer.acquire(acquired, 1000), "seq 3 is acquired");
+		harness.expectEqual(acquired.behind, 0u, "and seq 3 is the latest");
+		consumer.release(acquired);
+		producer.close();
+	}
+
 	void testReadinessAndInOrderService()
 	{
 		StreamFormat format = stereoFormat();
@@ -395,6 +546,9 @@ int runStreamRingTests()
 {
 	testGeometry();
 	testInvalidGeometryIsRejected();
+	testHeaderGeometryAndFieldsAreChecked();
+	testLaterSlotOffsetChangeHasNoEffect();
+	testAcquiredCarriesThePublishTime();
 	testReadinessAndInOrderService();
 	testLateThenCatchUp();
 	testGoneWhenTheConsumerDies();

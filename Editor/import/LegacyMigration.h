@@ -17,19 +17,30 @@
 #include <QString>
 
 #include <string>
+#include <optional>
+#include <vector>
 
 class QWidget;
 class IRegistry;
 
 namespace EqAPO::Import
 {
+namespace CallerProfileCheck { class FileSystem; }
 
 class LegacyMigration
 {
 public:
     // %LOCALAPPDATA%\EqualizerAPO-XT\config for the current user; empty when
     // the environment variable is missing.
+    // %LOCALAPPDATA%\EqualizerAPO-XT\config, read as UTF-16 (audit #348
+    // TD-05: the ANSI qgetenv turned characters outside the code page into
+    // '?', and the elevated hook wrote that path to HKLM ConfigPath).
     static QString stableConfigRoot();
+    // The folder the Editor edits: HKLM ConfigPath when it can be read, else
+    // the stable root when it exists, else the working directory. One rule
+    // for the startup path and the file dialog's sidebar (audit #348 TD-50);
+    // a registry error is logged and falls through instead of escaping.
+    static QString configRoot(const IRegistry& registry);
 
     // On-disk verdict for a candidate legacy config dir: its parent holds an
     // Equalizer APO install (EqualizerAPO.dll or the NSIS Uninstall.exe).
@@ -44,6 +55,23 @@ public:
     // now drives this through a fake registry.
     static void runElevatedHookStep(const std::wstring& exeDir);
     static void runElevatedHookStep(const std::wstring& exeDir, IRegistry& registry);
+    struct Handoff
+    {
+        std::optional<std::wstring> localAppData;
+        std::wstring outcome;
+        std::wstring migratedFrom;
+        std::wstring migratedFiles;
+        bool installGrantsPrepared = false;
+    };
+    // File work is forbidden when elevated. The returned action is a hint,
+    // not authority: recordPreparedHookStep reclassifies the current HKLM value.
+    static std::wstring prepareHookStep(const std::wstring& exeDir, const IRegistry& registry,
+        Handoff* details = nullptr);
+    static std::wstring prepareHookStep(const std::wstring& exeDir, Handoff* details = nullptr);
+    static Handoff parseHandoff(const std::vector<std::wstring>& arguments);
+    static void runElevatedHookStep(const std::wstring& exeDir, const Handoff& handoff);
+    static bool recordPreparedHookStep(const Handoff& handoff, IRegistry& registry,
+        const CallerProfileCheck::FileSystem* fileSystem = nullptr);
 
     // "--migration-dry-run": print the classification and the manifest the
     // hook would act on, write nothing. Field diagnostics for "why did my

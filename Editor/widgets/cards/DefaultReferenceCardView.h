@@ -5,8 +5,6 @@
 */
 
 /*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-
 	The neutral reference-card presentation: the ISkin::createReferenceCardView
 	default for skins that have not answered with their own view. It renders
 	the reference-card information hierarchy plainly - icon, name-first label with format /
@@ -19,6 +17,7 @@
 #pragma once
 
 #include "ReferenceCardView.h"
+#include "Editor/SkinTokens.h"
 
 class ElidedLabel;
 class QHBoxLayout;
@@ -29,7 +28,7 @@ class DefaultReferenceCardView : public ReferenceCardView
 	Q_OBJECT
 
 public:
-	explicit DefaultReferenceCardView(QWidget* parent = nullptr);
+	explicit DefaultReferenceCardView(const SkinTokens& tokens, QWidget* parent = nullptr);
 
 	void addLeadingWidget(QWidget* widget) override;
 
@@ -38,6 +37,7 @@ protected:
 	void applyState(const ReferenceCardState& state) override;
 
 private:
+	const SkinTokens skinTokens;
 	QHBoxLayout* rootLayout = nullptr;
 	QHBoxLayout* actionLayout = nullptr;
 	QLabel* iconLabel = nullptr;

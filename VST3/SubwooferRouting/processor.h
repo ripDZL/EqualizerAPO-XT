@@ -10,8 +10,10 @@
 #include <vector>
 
 #include "SubwooferRouting/State.h"
+#include "parameter_table.h"
 #include "pluginterfaces/vst/ivstaudioprocessor.h"
 #include "pluginterfaces/vst/ivstcomponent.h"
+#include "pluginterfaces/vst/ivsthostapplication.h"
 #include "pluginterfaces/vst/ivstmessage.h"
 
 namespace eapoxt::subwooferrouting::vst3
@@ -88,11 +90,6 @@ private:
 	static bool isAcceptedArrangement(Steinberg::Vst::SpeakerArrangement arrangement);
 	static std::vector<std::string> channelLayoutForArrangement(
 		Steinberg::Vst::SpeakerArrangement arrangement);
-	static bool readFramedState(Steinberg::IBStream* stream, std::string& json);
-	static Steinberg::tresult writeFramedState(
-		Steinberg::IBStream* stream,
-		const std::string& json);
-
 	std::unique_ptr<PreparedEngine> buildPrepared(
 		const subroute::SubwooferRoutingState& state,
 		const std::string& canonicalJson,
@@ -108,6 +105,10 @@ private:
 		bool rebuild);
 	bool rebuildCurrentLocked();
 	void clearPublishedEngineLocked();
+	// Tells the connected controller the rate processing runs at. Takes
+	// stateMutex_ itself only to copy host_ and peer_; the notify call runs
+	// outside it.
+	void sendSampleRate(double sampleRate);
 
 	std::atomic<Steinberg::uint32> refCount_{1};
 	std::atomic<bool> active_{false};
@@ -127,8 +128,9 @@ private:
 
 	std::atomic<bool> bypass_{false};
 	std::atomic<Steinberg::uint32> pendingParameterMask_{0};
-	std::atomic<double> pendingParameterValues_[6];
+	std::atomic<double> pendingParameterValues_[kParameterCount];
 
+	Steinberg::Vst::IHostApplication* host_ = nullptr;
 	Steinberg::Vst::IConnectionPoint* peer_ = nullptr;
 };
 

@@ -4,12 +4,10 @@
 	SPDX-License-Identifier: GPL-2.0-or-later
 */
 
-/*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-*/
-
 #include "CopyRoutingAdapter.h"
+#include "ChannelIdentity.h"
 #include "RoutingFold.h"
+#include "RoutingGridModel.h"
 
 #include <QSet>
 
@@ -48,63 +46,20 @@ void CopyRoutingAdapter::pinChannel(QStringList& pinnedChannels, const QString& 
 void CopyRoutingAdapter::ensureTargetChannel(std::vector<Assignment>& assignments,
 	QStringList& pinnedChannels, const QString& channel)
 {
-	for (const Assignment& assignment : assignments)
+	if (RoutingGridModel::rowIndexOf(assignments, channel) < 0)
 	{
-		if (QString::fromStdWString(assignment.targetChannel).compare(channel, Qt::CaseInsensitive) == 0)
-		{
-			pinChannel(pinnedChannels, channel);
-			return;
-		}
+		Assignment assignment;
+		assignment.targetChannel = channel.toStdWString();
+		assignments.push_back(assignment);
 	}
-	Assignment assignment;
-	assignment.targetChannel = channel.toStdWString();
-	assignments.push_back(assignment);
 	pinChannel(pinnedChannels, channel);
-}
-
-bool CopyRoutingAdapter::isVirtualChannel(const QString& channel)
-{
-	static const QSet<QString> physical = {
-		QStringLiteral("L"), QStringLiteral("R"), QStringLiteral("C"),
-		QStringLiteral("LFE"), QStringLiteral("SUB"),
-		QStringLiteral("SL"), QStringLiteral("SR"),
-		QStringLiteral("RL"), QStringLiteral("RR"),
-		QStringLiteral("BL"), QStringLiteral("BR"),
-		QStringLiteral("SBL"), QStringLiteral("SBR"),
-		QStringLiteral("RC"), QStringLiteral("FLC"), QStringLiteral("FRC")
-	};
-	return !physical.contains(channel.toUpper());
 }
 
 QString CopyRoutingAdapter::channelColor(const QString& channel)
 {
-	// Fixed per-channel hues: the cross-skin data ink for channel identity.
-	static const QHash<QString, QString> colors = {
-		{ QStringLiteral("L"), QStringLiteral("#ef4444") },
-		{ QStringLiteral("R"), QStringLiteral("#3b82f6") },
-		{ QStringLiteral("C"), QStringLiteral("#22c55e") },
-		{ QStringLiteral("LFE"), QStringLiteral("#f59e0b") },
-		{ QStringLiteral("SUB"), QStringLiteral("#f59e0b") },
-		{ QStringLiteral("SL"), QStringLiteral("#a855f7") },
-		{ QStringLiteral("SR"), QStringLiteral("#ec4899") },
-		{ QStringLiteral("RL"), QStringLiteral("#f97316") },
-		{ QStringLiteral("RR"), QStringLiteral("#06b6d4") },
-		{ QStringLiteral("SBL"), QStringLiteral("#8b5cf6") },
-		{ QStringLiteral("SBR"), QStringLiteral("#14b8a6") }
-	};
-
-	QString key = channel.toUpper();
-	if (colors.contains(key))
-		return colors.value(key);
-	// Virtual channels: derive from their trailing physical-ish suffix or fall
-	// back to a neutral slate.
-	if (key.startsWith(QLatin1Char('V')) && key.size() > 1)
-	{
-		const QString base = key.mid(1);
-		if (colors.contains(base))
-			return colors.value(base);
-	}
-	return QStringLiteral("#94a3b8");
+	// The cross-skin data ink for channel identity lives in ChannelIdentity,
+	// which the header badges read as well.
+	return ChannelIdentity::colorName(channel);
 }
 
 CopyRoutingAdapter::Cell CopyRoutingAdapter::Matrix::cell(int outRow, int inCol) const

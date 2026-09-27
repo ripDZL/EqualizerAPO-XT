@@ -5,8 +5,6 @@
 */
 
 /*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-
 	Signal Matrix skin's Copy renderer: a flat crosspoint grid (input columns ×
 	output rows) where each cell encodes the routing coefficient by colour and
 	number, in the manner of an audio routing matrix / patch-bay. Best for the
@@ -51,8 +49,6 @@ private:
 	const SkinTokens skinTokens;
 	void rebuildMatrix();
 	void updateMetrics();
-	Assignment& rowAssignment(int outRow);
-	int summandIndex(int outRow, const QString& channel) const;
 	QRect cellRect(int outRow, int inCol) const;
 	bool hitTest(const QPoint& pos, int& outRow, int& inCol) const;
 	QRect footerRect() const;

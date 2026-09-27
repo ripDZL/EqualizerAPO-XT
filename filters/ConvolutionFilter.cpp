@@ -27,7 +27,6 @@
 #include <windows.h>
 #include <fftw3.h>
 
-#include "ConvolverMuteDiagnostics.h"
 #include "services/logging/Logging.h"
 #include "runtime/memory/AlignedMemory.h"
 #include "runtime/concurrency/ParallelExecutor.h"
@@ -43,12 +42,19 @@ using std::wstring;
 namespace
 {
 	// Audit #250 A4: the shared bookkeeping; see ConvolverMuteDiagnostics.h.
-	ConvolverMuteDiagnostics muteDiagnostics;
+	ConvolverMuteDiagnostics convolutionMuteDiagnostics;
 }
 
-ConvolutionFilter::ConvolutionFilter(const wstring& filename)
+ConvolutionFilter::ConvolutionFilter(JudgedPath filename)
+	: ConvolutionFilter(std::move(filename), convolutionMuteDiagnostics, kFrameCountMismatchLogPrefix)
 {
-	this->filename = filename;
+}
+
+ConvolutionFilter::ConvolutionFilter(JudgedPath filename, ConvolverMuteDiagnostics& muteDiagnostics,
+	const wchar_t* muteLogPrefix)
+	: muteDiagnostics(&muteDiagnostics), muteLogPrefix(muteLogPrefix)
+{
+	this->filename = std::move(filename);
 }
 
 ConvolutionFilter::~ConvolutionFilter()
@@ -58,14 +64,14 @@ ConvolutionFilter::~ConvolutionFilter()
 
 vector<wstring> ConvolutionFilter::initialize(float sampleRate, unsigned maxFrameCount, vector<wstring> channelNames)
 {
+	auto previousIr = irEntry;
 	cleanup();
+	irEntry = std::move(previousIr);
 
 	this->sampleRate = sampleRate;
 	channelCount = (unsigned)channelNames.size();
 
 	initializeFilters(maxFrameCount);
-	if (filters != nullptr)
-		muteState.arm(maxFrameCount);
 
 	return channelNames;
 }
@@ -74,7 +80,7 @@ vector<wstring> ConvolutionFilter::initialize(float sampleRate, unsigned maxFram
 void ConvolutionFilter::process(double** output, double** input, unsigned frameCount)
 {
 	PerfScope _ps("ConvolutionFilter::process");
-	if (filters == nullptr)
+	if (!bank.installed())
 		return;
 	if (frameCount == 0)
 		return;
@@ -83,11 +89,11 @@ void ConvolutionFilter::process(double** output, double** input, unsigned frameC
 	// audio 콜백 중 재초기화는 파일 I/O, FFTW plan, malloc/free를 일으키므로 금지한다.
 	// mismatch가 들어오면 무음으로 빠지고, 진단은 원자 카운터에만 남긴다. 정상
 	// stream에서는 LockForProcess가 frameCount를 고정하므로 이 분기는 거의 들어오지 않는다.
-	if (muteState.shouldMute(frameCount))
+	if (!bank.admit(*muteDiagnostics, frameCount))
 	{
-		// The deferred report is written by cleanup() through
-		// muteState.finishAndReport(); nothing is logged on the audio thread.
-		muteState.recordMute(muteDiagnostics, frameCount);
+		// admit() recorded the mute; the deferred report is written by
+		// cleanup() through bank.finishAndReport(), nothing is logged on the
+		// audio thread.
 		for (unsigned i = 0; i < channelCount; i++)
 			memset(output[i], 0, sizeof(double) * frameCount);
 		return;
@@ -97,7 +103,7 @@ void ConvolutionFilter::process(double** output, double** input, unsigned frameC
 	{
 		double* inputChannel = input[i];
 		double* outputChannel = output[i];
-		HConvSingle* filter = &filters[i];
+		HConvSingle* filter = bank.unit(i);
 
 		hcPutSingle(filter, inputChannel);
 		hcProcessSingle(filter);
@@ -109,12 +115,8 @@ void ConvolutionFilter::process(double** output, double** input, unsigned frameC
 void ConvolutionFilter::cleanup()
 {
 	// Deferred report of the mute path that process() took on the audio
-	// thread; finishAndReport also disarms, so teardown order below is free.
-	muteState.finishAndReport(muteDiagnostics, kFrameCountMismatchLogPrefix, __FILE__, __LINE__, this);
-
-	// HConvSingleArray::reset() runs the exact close-then-free sequence; assigning
-	// nullptr makes the teardown automatic and idempotent.
-	filters = nullptr;
+	// thread, then disarm and release the units (close-then-free), in one call.
+	bank.finishAndReport(*muteDiagnostics, muteLogPrefix, __FILE__, __LINE__, this);
 	// Release this filter's hold on the cached IR. With the cache holding only weak
 	// references, dropping the last shared_ptr frees the entry.
 	irEntry.reset();
@@ -122,7 +124,9 @@ void ConvolutionFilter::cleanup()
 
 void ConvolutionFilter::initializeFilters(unsigned frameCount)
 {
-	auto ir = loadIrCached(filename, sampleRate);
+	const wstring displayPath = filename.path();
+	auto ir = filename.empty() ? irEntry : loadIrCached(filename, sampleRate);
+	filename = JudgedPath{};
 	if (!ir)
 		return;
 
@@ -132,7 +136,7 @@ void ConvolutionFilter::initializeFilters(unsigned frameCount)
 	irEntry = ir;
 
 	TraceF(L"Convolving using impulse response file %s (%u channels, %u frames)",
-		filename.c_str(), ir->channels, ir->frames);
+		displayPath.c_str(), ir->channels, ir->frames);
 
 	// Build one immutable frequency-domain filter bank per distinct IR channel.
 	// Output channels that reuse a mono/stereo IR still receive independent
@@ -145,5 +149,5 @@ void ConvolutionFilter::initializeFilters(unsigned frameCount)
 		sources[i] = { ir->buffers[irChannel].data(), ir->frames,
 			i < distinctIrChannels ? i : irChannel };
 	}
-	filters = buildConvolverArray(sources, frameCount);
+	bank.install(buildConvolverArray(sources, frameCount), frameCount);
 }

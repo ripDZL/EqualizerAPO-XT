@@ -31,7 +31,7 @@
 #include "audio/ChannelLayout.h"
 #include "Editor/helpers/GUIChannelHelper.h"
 #include "Editor/helpers/GUIHelper.h"
-#include "Editor/helpers/EditorSettings.h"
+#include "services/settings/EditorSettings.h"
 #include "version.h"
 #include "FilterTable.h"
 #include "MainWindow.h"
@@ -50,7 +50,7 @@ using std::wstring;
 
 namespace
 {
-// Companion tools (DeviceSelector, UpdateChecker) dress themselves from
+// The companion DeviceSelector dresses itself from
 // interface/skin + interface/dark at startup. savePreferences() writes the
 // pair only when the Editor closes, so a freshly picked skin stayed
 // invisible to a tool launched right after the switch - persist immediately.
@@ -276,7 +276,7 @@ void MainWindow::languageSelected(bool selected)
 		QSettings settings(QString::fromWCharArray(EDITOR_REGPATH), QSettings::NativeFormat);
 		if (language == QLocale::AnyLanguage)
 		{
-			settings.remove("language");
+			settings.remove(QLatin1String(EditorSettings::Keys::Language));
 		}
 		else
 		{
@@ -284,7 +284,7 @@ void MainWindow::languageSelected(bool selected)
 			int index = name.indexOf('_');
 			if (index != -1)
 				name = name.left(index);
-			settings.setValue("language", name);
+			settings.setValue(QLatin1String(EditorSettings::Keys::Language), name);
 		}
 
 		restart = true;

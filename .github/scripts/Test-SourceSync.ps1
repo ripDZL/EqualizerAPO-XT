@@ -98,117 +98,210 @@ if ($missingInEditor.Count -gt 0 -or $omissionsNowInEditor.Count -gt 0 -or $omis
 $sharedCount = $commonSources.Count - $knownEditorOmissions.Count
 Write-Host "Editor.pro compiles all $sharedCount shared engine sources from Common.vcxproj; known omissions: $($knownEditorOmissions.Keys -join ', ')."
 
-# The test projects keep their own hand-written source lists too, and those had
-# nothing checking them at all. A sync against Editor.pro would be wrong - they
-# compile a deliberate subset, the part that stands up without the Qt widget stack
-# - so what is checked is the property that actually breaks: an entry that no
-# longer exists on disk. That happens when a source is renamed or moved, and the
-# failure it produces today is a compiler error twenty minutes into a matrix leg.
-$testProjects = @(
-  (Join-Path $RepoRoot "Tests" "EditorLogicTests" "EditorLogicTests.vcxproj"),
-  (Join-Path $RepoRoot "Tests" "EngineOrchestrationTests" "EngineOrchestrationTests.vcxproj"),
-  (Join-Path $RepoRoot "Tests" "HybridConvTests" "HybridConvTests.vcxproj"),
-  (Join-Path $RepoRoot "Tests" "AudioRegressionTests" "AudioRegressionTests.vcxproj"),
-  (Join-Path $RepoRoot "Tests" "AsioTests" "AsioTests.vcxproj"),
-  (Join-Path $RepoRoot "Tests" "AsioProbe" "AsioProbe.vcxproj"),
-  (Join-Path $RepoRoot "Tests" "FakeAsioDriver" "FakeAsioDriver.vcxproj"),
-  (Join-Path $RepoRoot "EqualizerAPOAsio" "EqualizerAPOAsio.vcxproj"),
-  (Join-Path $RepoRoot "EqualizerAPOHost" "EqualizerAPOHost.vcxproj")
+# Every tracked MSBuild project, imported source list and .filters file is
+# checked (audit #348 TD-74). The hand-written list this replaced named nine
+# projects, so new probes and the product projects outside it went unchecked,
+# and nothing looked at .filters files or at an entry listed twice. The Pester
+# fixtures are plain folders rather than repositories, so without git the
+# tree is walked instead.
+function Get-ProjectFileList {
+  param([string]$Root)
+  $listed = @()
+  if (Get-Command git -ErrorAction SilentlyContinue) {
+    $listed = @(& git -C $Root ls-files -- '*.vcxproj' '*.props' '*.vcxproj.filters' 2>$null)
+    if ($LASTEXITCODE -ne 0) { $listed = @() }
+  }
+  if ($listed.Count -eq 0) {
+    $listed = @(Get-ChildItem -LiteralPath $Root -Recurse -File |
+      Where-Object { $_.Name -like '*.vcxproj' -or $_.Name -like '*.props' -or $_.Name -like '*.vcxproj.filters' } |
+      ForEach-Object { [System.IO.Path]::GetRelativePath($Root, $_.FullName) })
+  }
+  return @($listed | ForEach-Object { $_ -replace '\\', '/' })
+}
+
+# The ClCompile and ClInclude entries of one project file, each with the full
+# path MSBuild resolves it to. MSBuild resolves a relative Include against the
+# project directory; an imported source list spells its own directory as a
+# property instead.
+function Get-ProjectEntries {
+  param([string]$Root, [string]$RelativePath)
+  $path = Join-Path $Root $RelativePath
+  $document = New-Object System.Xml.XmlDocument
+  $document.Load((Resolve-Path -LiteralPath $path).ProviderPath)
+  $directory = Split-Path -Parent $path
+  foreach ($node in $document.SelectNodes("//*[local-name()='ClCompile' or local-name()='ClInclude'][@Include]")) {
+    $include = $node.Include.Replace('$(MSBuildThisFileDirectory)', '')
+    [pscustomobject]@{
+      Include = $node.Include
+      FullPath = [System.IO.Path]::GetFullPath((Join-Path $directory $include))
+    }
+  }
+}
+
+$projectFiles = Get-ProjectFileList -Root $RepoRoot
+$projectErrors = @()
+$checkedEntries = 0
+$entriesByProject = @{}
+foreach ($relative in @($projectFiles | Where-Object { $_ -notlike '*.filters' })) {
+  $entries = @(Get-ProjectEntries -Root $RepoRoot -RelativePath $relative)
+  $entriesByProject[$relative.ToLowerInvariant()] = $entries
+  $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+  foreach ($entry in $entries) {
+    $checkedEntries++
+    if (-not (Test-Path -LiteralPath $entry.FullPath)) {
+      $projectErrors += "::error file=$relative::$relative lists $($entry.Include), which is not on disk. Update the project's source list or restore the file."
+    }
+    if (-not $seen.Add($entry.FullPath)) {
+      $projectErrors += "::error file=$relative::$relative lists $($entry.Include) twice. MSBuild compiles it once but the duplicate hides which entry is meant; remove one."
+    }
+  }
+}
+
+# A .filters file only groups the entries of its project for the IDE. An entry
+# the project does not list is a leftover of a rename or a removal.
+$checkedFilters = 0
+foreach ($relative in @($projectFiles | Where-Object { $_ -like '*.vcxproj.filters' })) {
+  $checkedFilters++
+  $projectRelative = $relative.Substring(0, $relative.Length - '.filters'.Length)
+  $projectEntries = $entriesByProject[$projectRelative.ToLowerInvariant()]
+  if ($null -eq $projectEntries) {
+    $projectErrors += "::error file=$relative::$relative belongs to $projectRelative, which is not in the repository. Delete it."
+    continue
+  }
+  $known = [System.Collections.Generic.HashSet[string]]::new(
+    [string[]]@($projectEntries | ForEach-Object { $_.FullPath }), [System.StringComparer]::OrdinalIgnoreCase)
+  foreach ($entry in @(Get-ProjectEntries -Root $RepoRoot -RelativePath $relative)) {
+    if (-not $known.Contains($entry.FullPath)) {
+      $projectErrors += "::error file=$relative::$relative groups $($entry.Include), which $projectRelative does not list. Remove the entry or add the file to the project."
+    }
+  }
+}
+
+foreach ($message in $projectErrors) {
+  Write-Host $message
+}
+if ($projectErrors.Count -gt 0) {
+  throw "A project file lists a missing or duplicate source, or a .filters file lists what its project does not."
+}
+
+Write-Host "The $($entriesByProject.Count) project files' $checkedEntries listed sources and headers all exist, none is listed twice, and the $checkedFilters .filters files list only their projects' entries."
+
+# Audit #250 F071 compared the Qt apps' .pro and .vcxproj source lists here.
+# Audit #348 TD-29 deleted the .vcxproj files (and UpdateChecker itself), so
+# DeviceSelector builds from its .pro alone and there is no second list.
+
+# Audit #348 TD-23: TestHarness's "zero checks" backstop fires per harness, so
+# it only catches a forgotten call in HybridConvTests, where every sub-suite
+# owns a harness. EditorLogicTests shares one harness across every test
+# function and EngineOrchestrationTests hands one to all its runners: there a
+# test function that is defined but never called leaves the suite green. Every
+# test function must be called somewhere in its suite besides its definition.
+$sharedHarnessSuites = @(
+  @{ Name = "EditorLogicTests"; Pattern = '(?m)^void (test\w+)\(\)\s*$' },
+  @{ Name = "EngineOrchestrationTests"; Pattern = '(?m)^void ((?:test|run)\w+)\(test::Harness&\s*\w*\)\s*$' }
 )
-
-$missingTestSources = @()
-$checkedTestSources = 0
-foreach ($projectFile in $testProjects) {
-  if (-not (Test-Path -LiteralPath $projectFile)) { continue }
-
-  $testProject = New-Object System.Xml.XmlDocument
-  $testProject.Load((Resolve-Path -LiteralPath $projectFile).ProviderPath)
-  $projectDirectory = Split-Path -Parent $projectFile
-
-  foreach ($node in $testProject.SelectNodes("//*[local-name()='ClCompile' or local-name()='ClInclude'][@Include]")) {
-    # MSBuild resolves a relative Include against the project directory, and the
-    # test projects reach out of theirs with ..\..\ for the sources they share.
-    $resolved = Join-Path $projectDirectory $node.Include
-    $checkedTestSources++
-    if (-not (Test-Path -LiteralPath $resolved)) {
-      $missingTestSources += [pscustomobject]@{
-        Project = (Split-Path -Leaf $projectFile)
-        Include = $node.Include
+$uncalled = @()
+$checkedTestFunctions = 0
+$checkedSuites = 0
+foreach ($suite in $sharedHarnessSuites) {
+  $suiteDir = Join-Path $RepoRoot "Tests" $suite.Name
+  # The Pester cases run this script against a minimal fake tree.
+  if (-not (Test-Path -LiteralPath $suiteDir)) { continue }
+  $checkedSuites++
+  $files = @(Get-ChildItem -LiteralPath $suiteDir -Filter "*.cpp" -File)
+  $texts = @{}
+  foreach ($file in $files) { $texts[$file.Name] = Get-Content -LiteralPath $file.FullName -Raw }
+  foreach ($file in $files) {
+    foreach ($match in [regex]::Matches($texts[$file.Name], $suite.Pattern)) {
+      $name = $match.Groups[1].Value
+      $checkedTestFunctions++
+      $callPattern = '(?<![\w:])' + [regex]::Escape($name) + '\s*\((?!\s*\)\s*$)'
+      $called = $false
+      foreach ($other in $files) {
+        $text = $texts[$other.Name]
+        # The definition line itself matches the pattern too; count calls only.
+        $calls = [regex]::Matches($text, '(?m)^(?!void ).*' + $callPattern)
+        if ($calls.Count -gt 0) { $called = $true; break }
       }
+      if (-not $called) { $uncalled += "$($suite.Name): $name is defined in $($file.Name) but never called" }
     }
   }
 }
-
-foreach ($entry in $missingTestSources) {
-  Write-Host "::error file=Tests/$($entry.Project)::$($entry.Project) lists $($entry.Include), which is not on disk. Update the project's source list or restore the file."
+if ($checkedSuites -gt 0 -and $checkedTestFunctions -eq 0) {
+  throw "No test functions found in the shared-harness suites, so this lint checked nothing."
 }
-
-if ($missingTestSources.Count -gt 0) {
-  throw "A test project lists a source that does not exist."
-}
-
-Write-Host "The test projects' $checkedTestSources listed sources and headers all exist."
-
-# Audit #250 F071: the two Qt satellite apps hand-maintain a .pro (CI) and a
-# .vcxproj (local VS) in parallel, and they had already drifted - both .pro
-# files compiled QtAppBootstrap.cpp while neither .vcxproj listed it, so CI
-# stayed green while the local VS build silently broke. Assert that every
-# source the .pro compiles is also in the .vcxproj and vice versa.
-$satellitePairs = @(
-  @{ Pro = (Join-Path $RepoRoot "DeviceSelector" "DeviceSelector.pro"); Vcxproj = (Join-Path $RepoRoot "DeviceSelector" "DeviceSelector.vcxproj") },
-  @{ Pro = (Join-Path $RepoRoot "UpdateChecker" "UpdateChecker.pro"); Vcxproj = (Join-Path $RepoRoot "UpdateChecker" "UpdateChecker.vcxproj") }
-)
-
-function Get-NormalizedLeafSet {
-  param([string[]] $Paths)
-  $set = @{}
-  foreach ($p in $Paths) {
-    $leaf = (Split-Path -Leaf ($p -replace '/', '\')).ToLowerInvariant()
-    $set[$leaf] = $true
-  }
-  return $set
-}
-
-$satelliteDrift = @()
-foreach ($pair in $satellitePairs) {
-  if (-not (Test-Path -LiteralPath $pair.Pro) -or -not (Test-Path -LiteralPath $pair.Vcxproj)) { continue }
-
-  # .pro SOURCES: continuation-joined list of paths.
-  $proText = Get-Content -LiteralPath $pair.Pro -Raw
-  $proSources = @()
-  if ($proText -match '(?ms)^SOURCES\s*\+=\s*(.+?)(?:\r?\n\r?\n|\r?\n(?=[A-Z_]+\s*[+]?=))') {
-    $block = $Matches[1] -replace '\\r?\n', ' '
-    $proSources = @($block -split '\s+' | Where-Object { $_ -match '\.(cpp|cc)$' })
-  }
-
-  $vcx = New-Object System.Xml.XmlDocument
-  $vcx.Load((Resolve-Path -LiteralPath $pair.Vcxproj).ProviderPath)
-  $vcxSources = @($vcx.SelectNodes("//*[local-name()='ClCompile'][@Include]") | ForEach-Object { $_.Include })
-
-  # moc/rcc/ui artifacts only exist on one side by design; compare the
-  # hand-written translation units by leaf name.
-  $proSet = Get-NormalizedLeafSet $proSources
-  $vcxSet = Get-NormalizedLeafSet ($vcxSources | Where-Object { (Split-Path -Leaf $_) -notmatch '(?i)^(moc_|qrc_)' })
-
-  $projectName = Split-Path -Leaf $pair.Pro
-  foreach ($leaf in $proSet.Keys) {
-    if (-not $vcxSet.ContainsKey($leaf)) {
-      $satelliteDrift += "$projectName compiles $leaf but the .vcxproj does not list it"
-    }
-  }
-  foreach ($leaf in $vcxSet.Keys) {
-    if (-not $proSet.ContainsKey($leaf)) {
-      $satelliteDrift += "$(Split-Path -Leaf $pair.Vcxproj) compiles $leaf but the .pro does not list it"
-    }
-  }
-}
-
-foreach ($entry in $satelliteDrift) {
+foreach ($entry in $uncalled) {
   Write-Host "::error::$entry"
 }
+if ($uncalled.Count -gt 0) {
+  throw "A test function in a shared-harness suite is never called."
+}
+Write-Host "All $checkedTestFunctions test functions of the shared-harness suites are called."
 
-if ($satelliteDrift.Count -gt 0) {
-  throw "A satellite app's .pro and .vcxproj source lists drifted apart."
+# Audit #348 TD-80: docs/EnvironmentVariables.md calls itself the one list of
+# EAPO_* variables, and ten the code reads were missing from it. Every EAPO_*
+# name a C++ source reads from the environment must be written there.
+$environmentDoc = Join-Path $RepoRoot "docs" "EnvironmentVariables.md"
+if (Test-Path -LiteralPath $environmentDoc) {
+  $documented = Get-Content -LiteralPath $environmentDoc -Raw
+  $readPattern = '(?:qEnvironmentVariable\w*|qgetenv|GetEnvironmentVariableW?|_wgetenv|getenv)\(\s*(?:QStringLiteral\()?L?"(EAPO_[A-Z0-9_]+)"'
+  $sources = @()
+  if (Get-Command git -ErrorAction SilentlyContinue) {
+    $sources = @(& git -C $RepoRoot ls-files -- '*.cpp' '*.h' 2>$null)
+    if ($LASTEXITCODE -ne 0) { $sources = @() }
+  }
+  if ($sources.Count -eq 0) {
+    $sources = @(Get-ChildItem -LiteralPath $RepoRoot -Recurse -File -Include '*.cpp', '*.h' |
+      ForEach-Object { [System.IO.Path]::GetRelativePath($RepoRoot, $_.FullName) })
+  }
+  $read = @{}
+  foreach ($source in $sources) {
+    $text = Get-Content -LiteralPath (Join-Path $RepoRoot $source) -Raw
+    if ($null -eq $text -or $text -notmatch 'EAPO_') { continue }
+    foreach ($match in [regex]::Matches($text, $readPattern)) {
+      $read[$match.Groups[1].Value] = $source -replace '\\', '/'
+    }
+  }
+  $undocumented = @($read.Keys | Where-Object { $documented -notmatch ('\b' + [regex]::Escape($_) + '\b') } | Sort-Object)
+  foreach ($name in $undocumented) {
+    Write-Host "::error file=docs/EnvironmentVariables.md::$($read[$name]) reads $name from the environment, but docs/EnvironmentVariables.md does not list it."
+  }
+  if ($undocumented.Count -gt 0) {
+    throw "An EAPO_* environment variable the code reads is missing from docs/EnvironmentVariables.md."
+  }
+  Write-Host "All $($read.Count) EAPO_* environment variables the code reads are listed in docs/EnvironmentVariables.md."
 }
 
-Write-Host "The satellite apps' .pro and .vcxproj source lists agree."
+# Audit #348 TD-66: a bulk insert once put a second licence header above
+# files that already opened with the project sentence, and a GPL SPDX line
+# above a BSD vendor header. A source file names the project once and
+# declares one licence.
+$headerSources = @()
+if (Get-Command git -ErrorAction SilentlyContinue) {
+  $headerSources = @(& git -C $RepoRoot ls-files -- '*.cpp' '*.h' 2>$null)
+  if ($LASTEXITCODE -ne 0) { $headerSources = @() }
+}
+if ($headerSources.Count -eq 0) {
+  $headerSources = @(Get-ChildItem -LiteralPath $RepoRoot -Recurse -File -Include '*.cpp', '*.h' |
+    ForEach-Object { [System.IO.Path]::GetRelativePath($RepoRoot, $_.FullName) })
+}
+$headerProblems = @()
+foreach ($source in $headerSources) {
+  $text = Get-Content -LiteralPath (Join-Path $RepoRoot $source) -Raw
+  if ($null -eq $text) { continue }
+  $sentences = [regex]::Matches($text, 'This file is part of EqualizerAPO-XT, a system-wide equalizer').Count
+  $licences = [regex]::Matches($text, 'SPDX-License-Identifier:').Count
+  if ($sentences -gt 1) {
+    $headerProblems += "::error file=$($source -replace '\\', '/')::names the project in $sentences licence headers; keep one."
+  }
+  if ($licences -gt 1) {
+    $headerProblems += "::error file=$($source -replace '\\', '/')::declares $licences SPDX licences; a file declares one."
+  }
+}
+foreach ($problem in $headerProblems) {
+  Write-Host $problem
+}
+if ($headerProblems.Count -gt 0) {
+  throw "A source file carries a duplicated licence header or more than one SPDX licence."
+}
+Write-Host "All $($headerSources.Count) C++ sources carry at most one licence header and one SPDX licence."

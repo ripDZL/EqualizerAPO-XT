@@ -8,19 +8,550 @@ fork started on 2026-05-22.
 
 Versions are bumped automatically by CI from Conventional Commits message
 types, so some version numbers were skipped (1.7, 1.9, 1.12.1, 1.14, 1.16,
-1.23, 1.25, 2.30.1, 2.31, and 2.32 were never released). Tags up to v1.10.1 carried a `-main.<run>` suffix; from v1.11.0 on,
+1.23, 1.25, 2.30.1, 2.31, 2.32, and 2.53 were never released). Tags up to v1.10.1 carried a `-main.<run>` suffix; from v1.11.0 on,
 tags are clean `vX.Y.Z` names. Installers for every version are on the
 [Releases page](https://github.com/115dkk/EqualizerAPO-XT/releases).
 
 ## Unreleased
 
-- **Clarity and Graphite Clarity make the Editor easier to read.** Both new
-  themes cover Modern cards and Legacy Rows in dark and light modes with
-  clear labels, focus states, disabled rows, controls, and knob values.
-  Graphite uses a dark-grey instrument style, while Clarity prioritizes
-  maximum contrast.
-- **Legacy VST3 channel-fill controls wrap cleanly.** Long channel layouts no
-  longer overlap their labels or controls.
+## v2.54.31 — 2026-09-26
+
+- **The ASIO host no longer loses its real-time priority while it waits.**
+  On a busy machine the host now and then served a block a period late (3 of
+  200 loaded probe runs measured for #391). While waiting for the next block
+  the host polled for a whole buffer period instead of sleeping, and Windows
+  (MMCSS) takes real-time priority away from a thread that runs through its
+  share: by default it keeps 20% of every 10 ms for other programs. Measured
+  with every processor busy, the polling host stopped for about 2 ms at a
+  time over 3,000 times in 150 runs, and its slowest wake-up took 2272 us
+  out of a 2667 us period; at 64 frames it passed the whole period in half
+  the runs. The host now sleeps until a block arrives, as it already did
+  where MMCSS is off: no such stops, a slowest wake-up of 224 us, and one
+  processor core no longer kept busy per stream. Waking from sleep costs
+  about 5 us on an idle machine. The late block itself did not recur in
+  about 1,500 loaded runs before or after the change, so this removes the
+  stops that caused it rather than a reproduced failure
+  ([#405](https://github.com/115dkk/EqualizerAPO-XT/pull/405)).
+
+## v2.54.30 — 2026-09-26
+
+- **A plug-in file can no longer be swapped for a link while the engine
+  loads it.** The engine checks where a VSTPlugin line's file leads and
+  holds every folder on the way, but Windows loads a plug-in by its name, so
+  one step was left: an empty file can be given link data in place, and the
+  plug-in file allowed writers, so it could be emptied first. The engine now
+  reopens the checked file without allowing writers just before loading it,
+  and does not load an empty file. A plug-in another program is writing at
+  that moment was already refused by Windows; it is now also named in the
+  log. Measured on NTFS and on a Dev Drive (ReFS): a file with data and a
+  folder with anything in it cannot be made a link, even by an
+  administrator, and a folder with held files below it cannot be renamed.
+  Plug-ins on the configuration's own network share, and on FAT32 or exFAT
+  drives where no file can be a link, load exactly as before
+  ([#404](https://github.com/115dkk/EqualizerAPO-XT/pull/404)).
+
+## v2.54.29 — 2026-09-25
+
+- **The rack skin prints short file names in full.** On Include, Convolution
+  and VST cards, a name such as `example.txt` could be shortened to
+  `exam….txt` although the card had room for it. The label measured the name
+  in whole pixels but shortened it against the exact width, so about half of
+  all names lost their middle. Names are now shortened only when they really
+  do not fit, and the gallery checks this for 288 names
+  ([#403](https://github.com/115dkk/EqualizerAPO-XT/pull/403)).
+
+## v2.54.28 — 2026-09-25
+
+- **A VST3 plug-in's saved state reaches it whole.** Restoring the state of
+  a VST3 plug-in hands its parameter values to the plug-in's audio side
+  through a queue of 1023 entries; a plug-in with more parameters than that
+  lost the rest without any message, so some settings came back at their
+  old values. The host now empties the queue and continues, so every value
+  arrives. When it cannot (audio is playing through the plug-in at that
+  moment), it writes to the log how many values did not reach the plug-in
+  ([#401](https://github.com/115dkk/EqualizerAPO-XT/pull/401)).
+- **The VST3 host refuses calls that break the plug-in protocol.** A plug-in
+  that kept the host's handle after its instance was closed and called it
+  later reached memory that was already freed; those calls are now refused.
+  A plug-in asking the state stream to move to an unreasonable position
+  (beyond 256 MiB) made the host allocate that much memory; that request is
+  now refused as well
+  ([#401](https://github.com/115dkk/EqualizerAPO-XT/pull/401)).
+
+## v2.54.27 — 2026-09-25
+
+- **The ASIO host no longer frees a pipe wait the system is still using.**
+  When EqualizerAPOHost stopped waiting for its client to connect, it
+  cancelled the wait and released the event and buffer at once, although
+  Windows completes a cancelled wait later. It now waits for the
+  cancellation to finish, and a failed wait or a failure to create one of
+  its events is logged and ends the host cleanly instead of being ignored
+  ([#400](https://github.com/115dkk/EqualizerAPO-XT/pull/400)).
+
+## v2.54.26 — 2026-09-25
+
+- **Virtual channels are the channels your device does not have.** The
+  channel badges, the Copy routing views and the Copy card's header each
+  decided which channels are virtual by their own rule (a name starting with
+  V, or a fixed list of sixteen names). They now all ask one rule, the one
+  the engine uses when a line names a channel: a channel is virtual when it
+  is not one of the device's channels, by name, alias (SL/RL, SR/RR,
+  SUB/LFE) or 1-based number. On a stereo device, for example, `Channel: C`
+  now shows C as a dotted (virtual) badge, and SBL/SBR on a 5.1 device are
+  drawn as virtual in the routing views. When the device is not known, the
+  7.1 layout stands in
+  ([#399](https://github.com/115dkk/EqualizerAPO-XT/pull/399)).
+- **The rack skin's module picker uses the same LED as the cards.** The
+  picker drew its lamps with a painter of its own; an unlit lamp now looks
+  like an unlit lamp on a card
+  ([#399](https://github.com/115dkk/EqualizerAPO-XT/pull/399)).
+
+## v2.54.25 — 2026-09-25
+
+- **The SubwooferRouting card and its dialog name a built-in preset the same
+  way.** The card showed "Built-in preset: Issue #246 - Front/Rear 4.1" and
+  the dialog "Issue #246 - Front/Rear 4.1"; both now show the preset's own
+  name ([#398](https://github.com/115dkk/EqualizerAPO-XT/pull/398)).
+
+## v2.54.24 — 2026-09-25
+
+- **The soft skin's file dialog uses its own icons.** The other four skins
+  draw the folder and file pictograms in the Open and Save dialogs
+  themselves, but soft still showed the Windows shell icons. Soft now draws
+  them as its small rounded pastel tiles: folders, drives and the computer
+  on the warm tint of the dialog's folder buttons, files on the Include
+  blue, with the file kind (configuration, audio, plug-in, other) told apart
+  by the glyph ([#395](https://github.com/115dkk/EqualizerAPO-XT/pull/395)).
+
+## v2.54.23 — 2026-09-25
+
+- **The audio engine opens a file a configuration line names through the
+  same handles it checked.** Include, Convolution, MultiConvolution,
+  SubwooferRouting profiles and VSTPlugin libraries are checked so that the
+  engine never opens a file on a network share (#346, #369). The check and
+  the open used to be two separate lookups by name, so a folder on the path
+  could be swapped for a link to a share in between. The engine now walks
+  the path one folder at a time, each opened relative to the one before and
+  kept open until the file is loaded, and reads the file through the handle
+  it checked. VST plug-ins are still loaded by name, with every folder and
+  the plug-in file held open during the load; on NTFS a folder cannot be
+  renamed while something below it is open. A folder or file the engine
+  cannot examine is now refused instead of being judged by its final name
+  ([#394](https://github.com/115dkk/EqualizerAPO-XT/pull/394)). This was
+  tested with unit tests, including a folder the test account may not list;
+  the audio service's own account and file systems other than NTFS were not
+  tested.
+
+## v2.54.22 — 2026-09-25
+
+- **A channel wears one colour everywhere.** The channel badges in a card's
+  header used their own palette, so R was orange there and blue in the Copy
+  routing view, and C, SL and the channels after them also differed. The
+  badges in the studio, soft, rack and matrix skins now use the routing
+  colours, LFE, SBL and SBR get their routing colours in the header too, and
+  channels outside the palette (ALL, numbered channels) use one neutral
+  slate. The minimal skin's console inks are unchanged
+  ([#393](https://github.com/115dkk/EqualizerAPO-XT/pull/393)).
+- **Text drawn by the skins' own painters follows the larger type step.**
+  The +1 step in #300 raised the sizes set in style sheets but not the 89
+  sizes that the skins' painters set in pixels (knob and scale labels, rack
+  engravings, matrix board text, meter readouts and similar), so those
+  stayed one step smaller than the text next to them. They are now 1 px
+  larger. In the rack skin, the red status line under a VST bus or a file
+  card now has a line of its own across the unit and wraps when it is long;
+  before, it shared the unit row and was cut off with an ellipsis. The
+  vertical stencil on the rack channel card's ear now shows the whole word
+  CHANNEL in a smaller type, where it used to be cut off
+  ([#393](https://github.com/115dkk/EqualizerAPO-XT/pull/393)).
+- **The VST channel fill cells fit their labels in every skin.** The width
+  of the fill cells was measured with a font no product skin uses, so in the
+  soft skin the SR label touched the cell's arrow. Each skin now measures
+  with the font it draws in
+  ([#393](https://github.com/115dkk/EqualizerAPO-XT/pull/393)).
+
+## v2.54.21 — 2026-09-25
+
+- **The ASIO host keeps a high priority on machines where Windows refuses
+  its audio priority.** EqualizerAPOHost serves ASIO streams on a thread
+  registered with the Pro Audio class of the Multimedia Class Scheduler
+  Service (MMCSS) and busy-waits up to one period for the next block. Where
+  MMCSS is turned off (the SystemResponsiveness registry value is 100), that
+  registration fails and the thread used to run at normal priority while
+  still busy-waiting, which in local tests left 95 of 100 runs with late
+  blocks under load. The thread now runs at time-critical priority there and
+  does not busy-wait (0 of 150 runs late in the same test), and the host log
+  says which of the two applies. The CI check that failed now and then on
+  late blocks ran its test threads at normal priority, unlike the host; it
+  now runs them the way the host does
+  ([#391](https://github.com/115dkk/EqualizerAPO-XT/pull/391)). Whether
+  MMCSS is on for real users with SystemResponsiveness 100 was not checked
+  on such a machine.
+
+## v2.54.20 — 2026-09-25
+
+- **Copy routing edits follow one rule in every skin.** In the studio skin
+  the factor editor refused `INV`, which the other skins accept, and took
+  `inf` and `nan`, which are not numbers a filter can use. In the soft skin,
+  text that could not be read as a factor left the chip unchanged but still
+  marked the configuration as changed. All five skins now commit factor
+  edits, added channels and removed channels through one shared model, so
+  studio accepts `INV` and refuses non-finite values, and soft no longer
+  reports a change when nothing changed
+  ([#390](https://github.com/115dkk/EqualizerAPO-XT/pull/390)). The gallery
+  renders every scene as before.
+
+## v2.54.19 — 2026-09-25
+
+- **The installer no longer grants permissions recursively, as
+  administrator, on a folder a standard user can change.** EqualizerAPO-XT
+  installs per user under `%LocalAppData%`. When a standard user installed
+  or updated it with an administrator approving the prompt, the elevated
+  install step walked that user's folder with `icacls /T` to let the audio
+  service read it. A link placed in the folder during that walk could carry
+  the grant to another folder. The Editor now grants the audio service and
+  users access to its own install folder as the user who owns it, before
+  asking for elevation, and the elevated step skips its recursive grants
+  when that worked. When the install starts already elevated, nothing
+  changes ([#387](https://github.com/115dkk/EqualizerAPO-XT/pull/387)). This was checked with unit tests; an install approved by
+  a second, administrator account was not run.
+
+## v2.54.18 — 2026-09-25
+
+- **The configuration folder lands in the installing user's profile.** When
+  a standard user installed or updated EqualizerAPO-XT with an administrator
+  approving the prompt, the install step ran as the administrator and put the
+  configuration folder in the administrator's profile. The Editor now creates
+  the folder, sets its permissions and moves the old configuration into it as
+  the user, before asking for elevation. The elevated step only checks that
+  the folder is a real folder in a local user profile (no links along the
+  way) and records it, without creating, re-permissioning or copying
+  anything in that folder; if the check fails, it keeps the old behaviour
+  ([#384](https://github.com/115dkk/EqualizerAPO-XT/pull/384)). This was checked with unit
+  tests on this machine; an install with a second, administrator account
+  approving it was not run.
+
+## v2.54.17 — 2026-09-25
+
+- **The Editor's channel lists follow `Device:` and `Stage:` lines.** The
+  channels each line offers (a VST row's channel fill, the Channel and Copy
+  pickers) were worked out without looking at `Device:` or `Stage:`, so a
+  `Channel:` line inside a block for another device still narrowed the lines
+  below it in the Editor, though the engine skips it. They now follow the
+  engine. Which `If` branch runs cannot be known while editing, so each
+  branch starts from the channels at its `If` line and the lines after
+  `EndIf` continue from the `If` branch; `docs/FilterListUiPolicy.md`
+  describes this.
+- **The legacy VST row no longer marks valid channel fills as missing.** A
+  fill entry written as a position number (`1`) or an alias (`SL`) was
+  painted red on the legacy row although the engine accepts it; the legacy
+  row now judges fills the way the card does, and both rows share one plug-in
+  session, so a VST feature lands in both ([#381](https://github.com/115dkk/EqualizerAPO-XT/pull/381)).
+
+## v2.54.16 — 2026-09-25
+
+- **Korean and other non-English text in the Device Selector's command-line
+  output is readable.** Its headless messages were converted to the ANSI code
+  page and came out garbled; they are now written as Unicode to a console and
+  as UTF-8 otherwise. Paths ending in a backslash, or containing quotes, now
+  survive when the Editor restarts the Device Selector or when a Voicemeeter
+  shortcut is written.
+- **A configuration folder whose registry value cannot be read is left
+  alone.** When the Editor could not read the configured ConfigPath, its
+  first-run migration treated the value as if no folder were set; it now
+  keeps the configured folder and logs why.
+- **More failures reach the log.** Qt warnings and errors are now written to
+  `Editor.log` and the Device Selector's log, as are a failed APO
+  registration, a failed Velopack update check at restart and a failed
+  Device Selector launch on the first run ([#380](https://github.com/115dkk/EqualizerAPO-XT/pull/380)).
+
+## v2.54.15 — 2026-09-25
+
+- **The subwoofer routing screens show the same numbers.** With no device
+  selected, the card and the response graph assumed 48 kHz for the headroom
+  trim, while the editor dialog showed "Unavailable"; all three now show the
+  48 kHz trim. The dialog's gain field, which sets the adjustment before the
+  LFE path, is labelled "LFE gain adjustment", and the Minimal card's
+  accessible name for its value, which adds up every gain on that path, is
+  "Effective LFE gain". The card now reads a group's crossover from the same
+  path the dialog does. In the SubwooferRouting VST3 plug-in, the headroom
+  trim shown in its controls is computed at the sample rate the host runs,
+  instead of always at 48 kHz ([#379](https://github.com/115dkk/EqualizerAPO-XT/pull/379)).
+
+## v2.54.14 — 2026-09-25
+
+- **ASIO: a late block no longer makes the output jump.** With the separate
+  host process in pipelined mode, the output runs one block behind. When the
+  host fell behind, the ASIO app got the current block's unprocessed input,
+  a block early, so the sound skipped forward and back. It now gets a copy of
+  the previous block's input, which keeps the timeline. The ASIO host also
+  checks the shared stream header more strictly (sample rate between 1 kHz
+  and 1 MHz, terminated names, slot layout recomputed from the format), logs
+  when it cannot watch the app's process, keeps its buffers when the app's
+  callbacks do not finish in time instead of releasing them under the app,
+  and refuses an ASIO driver entry whose CLSID is not a GUID ([#378](https://github.com/115dkk/EqualizerAPO-XT/pull/378)).
+
+## v2.54.13 — 2026-09-25
+
+- **A VST plug-in that reports latency no longer delays its own output a
+  second time.** The latency compensation delayed every channel of the
+  filter by the plug-in's reported latency, including the channels the
+  plug-in had just processed, which were already late by that amount. The
+  processed channels came out twice as late, and the channels passed through
+  once as late, so the two still did not line up. Now only the channels the plug-in does not
+  write (the ones an explicit bus layout or a channel fill passes through)
+  are delayed, so they line up with the processed ones ([#377](https://github.com/115dkk/EqualizerAPO-XT/pull/377)).
+
+## v2.54.12 — 2026-09-25
+
+- **An endpoint's "Use in ASIO apps" entry notices an unplugged device.** When
+  the device behind the entry disappeared (a USB DAC pulled out), the stream
+  kept waiting for it and the ASIO app heard nothing until it was restarted.
+  The stream now ends when Windows reports the device invalidated, or after
+  four 500 ms waits with no signal from the device, and asks the app to reset
+  ([#375](https://github.com/115dkk/EqualizerAPO-XT/pull/375)). This was checked with unit tests on synthetic input; unplugging
+  real hardware was not tried.
+
+## v2.54.11 — 2026-09-25
+
+- **Lines below a `MultiConvolution` line can select the channels it
+  creates in the Editor.** A `MultiConvolution` line that writes to a new
+  channel, such as `Wet=0`, creates that channel in the engine, but the
+  channel pickers on the lines below it in the Editor did not offer it. They
+  now do, as they already did for channels created by `Copy`. A `Filter` line
+  whose type the engine rejects, such as `ON pk` in lower case, is no longer
+  drawn as a card of that type, and the Editor no longer writes an
+  out-of-range channel number to its log each time it refreshes the channel
+  lists ([#370](https://github.com/115dkk/EqualizerAPO-XT/pull/370)).
+
+## v2.54.10 — 2026-09-25
+
+- **`Include` takes quoted file names and environment variables, and a link
+  to a network share is refused like the share.** `Include: "my presets.txt"`
+  and `Include: %USERPROFILE%\eq\room.txt` now load, as they always did for
+  `Convolution`, and the Editor's Include card and its import of a
+  configuration folder read such lines the same way. A path that looks local
+  but leads through a symbolic link or junction to a network share is now
+  refused on its line like a share written out, and the Editor's file cards
+  say so instead of showing the file as usable. A configuration kept on a
+  share may now name that share in the `\\?\UNC\server\share` form too, a
+  local path written as `\\?\C:\...` is no longer refused, and an
+  `Include:` with no file name is reported on its line. A file chosen in a
+  legacy Convolution or MultiConvolution row is now written the way the
+  cards write it: relative to the configuration folder unless it lies more
+  than one level above it, so a file in a sibling folder is no longer
+  written as an absolute path ([#369](https://github.com/115dkk/EqualizerAPO-XT/pull/369)).
+
+## v2.54.9 — 2026-09-25
+
+- **More configuration mistakes are reported on their line.** A misspelled
+  `Stage`, an `ElseIf`, `Else` or `EndIf` with no `If` before it, an `If`
+  with no `EndIf` (now on the `If` line itself), and an `Include` nested too
+  deep went only to the log; the Editor now shows them on that line's card as
+  a tooltip, as it does for other unusable lines. When a filter fails while
+  being set up, the configuration is still not applied as a whole, and both
+  the log and the Editor now name the line that caused it. The Editor says so
+  in plain words: a notice at the bottom of the window names the line and
+  file and says the previous settings keep playing, the analysis panel reads
+  "Not applied" and draws no curve, and the line's card explains what to
+  check. The engine's error text stays in the log
+  ([#368](https://github.com/115dkk/EqualizerAPO-XT/pull/368)).
+
+## v2.54.8 — 2026-09-25
+
+- **The Voicemeeter client no longer holds up audio while it sets up strips.**
+  When Voicemeeter reported a different set of strips, the client loaded the
+  configuration for every strip while the audio callback waited for it; the
+  engines are now prepared first and swapped in at once. Applying the Device
+  Selector also no longer turns on the debug privilege when no Voicemeeter
+  client is running, and turns it back off after checking one
+  ([#367](https://github.com/115dkk/EqualizerAPO-XT/pull/367)).
+
+## v2.54.7 — 2026-09-25
+
+- **A driver's own effects keep running when an endpoint's ASIO entry cannot
+  be read.** When the audio service starts the EQ on an endpoint, the EQ reads
+  the endpoint's install record, which says which of the driver's own effects
+  it runs behind. It read the endpoint's ASIO entry in the same step, and when
+  that entry could not be read it dropped the whole record: the driver's
+  effects stopped and a recording endpoint was treated as a playback one. An
+  unreadable ASIO entry now counts as none, and the EQ no longer asks Windows
+  for the default device from inside the audio service ([#363](https://github.com/115dkk/EqualizerAPO-XT/pull/363)).
+
+## v2.54.6 — 2026-09-25
+
+- **The device test and ASIO pipes answer only the programs they are for.**
+  Any account could add its own instance of the Device Selector's device
+  test pipe and receive what the audio service sent, and the ASIO driver
+  sent its stream request to whichever program held the engine host's pipe
+  name. Both pipes now name who may use them, their servers refuse a name
+  another program took first, and the driver checks that the program
+  serving the pipe is the engine host. A host that stops answering now fails
+  the application's open call within seconds instead of hanging it
+  ([#361](https://github.com/115dkk/EqualizerAPO-XT/pull/361)).
+- **The 32-bit ASIO driver can start the engine host.** It ships alone in the
+  `x86` folder and looked for the host there, so a 32-bit application could
+  open an ASIO entry only while the host was already running. It now starts
+  the host from the install folder. A unit test covers where it looks; it
+  has not been run with a real 32-bit application ([#361](https://github.com/115dkk/EqualizerAPO-XT/pull/361)).
+
+## v2.54.5 — 2026-09-25
+
+- **A device whose driver locks its effect settings is no longer offered for
+  an install that loses them.** When a driver kept its endpoint's effect
+  settings (the FxProperties key) from being read, the Device Selector took
+  that as "no driver effects", and installing there took ownership of the
+  key without recording the driver's effects, so uninstalling could not bring
+  them back. Such a device is now left out of the device lists in the Device
+  Selector and the Editor and written to the log, like any device whose
+  registry keys cannot be read. Before, one device whose other keys could
+  not be read emptied the Device Selector's whole list with an error
+  ([#365](https://github.com/115dkk/EqualizerAPO-XT/pull/365)).
+
+## v2.54.4 — 2026-09-25
+
+- **`LoudnessCorrection` reads an attenuation written with a decimal comma.**
+  `Attenuation 0,5` was accepted but read as 0; it now reads as 0.5, like a
+  decimal comma everywhere else in the configuration. The commands that read
+  numbers now share one reader: `MultiConvolution` no longer takes `inf`,
+  `nan` or hexadecimal text as a factor, and `Copy` no longer takes
+  hexadecimal text ([#364](https://github.com/115dkk/EqualizerAPO-XT/pull/364)).
+
+## v2.54.3 — 2026-09-25
+
+- **Benchmark.exe on ARM64 applies every filter in the configuration.** The
+  ARM64 build was linked without the option that keeps every filter in the
+  program, so filters nothing else in it referred to were left out and their
+  configuration lines were skipped as unknown commands. Every build of the
+  programs that contain the audio engine now takes its link settings from one
+  shared file ([#360](https://github.com/115dkk/EqualizerAPO-XT/pull/360)).
+
+## v2.54.2 — 2026-09-24
+
+- **A failed ASIO entry change is put back and reported.** Turning an ASIO
+  driver's entry on, off or changing its options wrote the record, the
+  driver-list entry in both registry views and the start-at-boot value one
+  after another; a failure midway left a record without an entry, and
+  nothing was logged. The Device Selector now applies the change in one step
+  that it undoes on failure, writes the outcome to its log, and a missing
+  install folder is reported the same way for ASIO drivers as for devices
+  ([#359](https://github.com/115dkk/EqualizerAPO-XT/pull/359)).
+
+## v2.54.1 — 2026-09-24
+
+- **Benchmark.exe stops with an error instead of hanging on a short read or
+  write.** When libsndfile returned no frames before the expected count, the
+  input and output loops spun forever; they now print the reason and exit
+  with code 1. The `--from` help text now states the real default (1.0 Hz)
+  ([#353](https://github.com/115dkk/EqualizerAPO-XT/pull/353)).
+- **A VSTPlugin line keeps parameter values written as `-0.5` or `.5`.** In
+  the key-value form (`VSTPlugin: Library ... Gain -0.5`), a value that did
+  not start with a digit was read as a parameter name, so the parameter was
+  dropped and the next token's value was filed under the name `-0.5`. Values
+  starting with a sign or a decimal point are numbers now; the
+  `ParamName <name> <value>` form still works ([#353](https://github.com/115dkk/EqualizerAPO-XT/pull/353)).
+- **ARM64 handles very quiet signals the way x64 does.** On x64 the engine
+  flushes subnormal numbers (the tail of a signal decaying below about
+  -300 dB, such as a filter's feedback ringing out) to zero; the ARM64 build
+  did not, so the same configuration produced slightly different and slower
+  output there. ARM64 now sets the matching flush-to-zero mode for each
+  processed block ([#353](https://github.com/115dkk/EqualizerAPO-XT/pull/353)).
+- **Closing the setup window no longer stops the install.** Closing
+  `EqualizerAPO-XT-Setup.exe` during the download used to cancel it, while
+  closing it a moment later, during the checksum check, did not, and the
+  Velopack installer then appeared behind a window that was already gone.
+  Now closing only hides the window at every step: the install carries on,
+  and if a step fails afterwards the window comes back with the error. Exit
+  code 5 is retired ([#353](https://github.com/115dkk/EqualizerAPO-XT/pull/353)).
+
+## v2.54.0 — 2026-09-24
+
+- **A Windows device's ASIO entry has the options a driver's entry has.**
+  Ticking **Use in ASIO apps** for a playback or recording endpoint in the
+  Device Selector now unfolds **Remove the buffer** with its **Wait time**,
+  **Start the engine host automatically at boot** and **32-bit host
+  support** under it, the options an ASIO driver's entry already offered.
+  Until now the endpoint's entry always ran with the extra buffer, could not
+  start the host at boot, and was not registered for 32-bit applications.
+  The command-line option `--exclusive-mode-eq` is now `--asio-entry`; the
+  old name still works ([#351](https://github.com/115dkk/EqualizerAPO-XT/pull/351)).
+
+## v2.52.0 — 2026-09-24
+
+- **UpdateChecker.exe is no longer shipped.** The Editor already downloads a
+  new release in the background and applies it when it closes. The separate
+  notify-only tool had not been started automatically since the NSIS
+  installer was removed, and on the `x64-avx` channel it could offer another
+  channel's installer, because it matched installer names by prefix. An
+  update removes it from the install folder ([#352](https://github.com/115dkk/EqualizerAPO-XT/pull/352)).
+
+## v2.51.2 — 2026-09-24
+
+- **Uninstalling no longer leaves the PC without sound when one audio device
+  cannot be read.** The uninstall step stops the Windows audio service, then
+  removes the APO from every device; one device whose registry entries could
+  not be read stopped it there, with the service still stopped, until a
+  reboot. Each device is now handled on its own, a failure is logged and the
+  rest are still cleaned, and the audio service is started again on every
+  path. Device Selector's `/u` does the same ([#349](https://github.com/115dkk/EqualizerAPO-XT/pull/349)).
+- **LoudnessCorrection no longer applies a random attenuation at the reference
+  volume.** With the system volume exactly at the reference point the filter
+  computed its preamp from an uninitialised value, and returning to that
+  volume kept the previous volume's attenuation ([#349](https://github.com/115dkk/EqualizerAPO-XT/pull/349)).
+- **Editing a switched-off line no longer switches it on.** Touching the Copy
+  routing grid of a line turned off with the power button dropped the `#` and
+  put the copy back into the chain; a VST card writing its plugin state back
+  did the same. The routing grid is now disabled on a switched-off line, and
+  every card keeps a switched-off line switched off ([#349](https://github.com/115dkk/EqualizerAPO-XT/pull/349)).
+- **A failed save no longer marks the tab as saved.** The tab lost its `*`
+  even when the file could not be written, so closing it did not ask, and
+  "Save as" adopted the new name anyway. In instant mode a change made in the
+  last 200 ms before closing a tab or the window is now written first ([#349](https://github.com/115dkk/EqualizerAPO-XT/pull/349)).
+- **The configuration folder is right for user names outside the system code
+  page.** The installer derived the folder from an ANSI copy of
+  `%LOCALAPPDATA%`, so a character the code page cannot hold became `?` and the
+  audio engine read a folder that does not exist. The variable is now read as
+  Unicode, and the Editor and its file dialog find the folder by one rule
+  ([#349](https://github.com/115dkk/EqualizerAPO-XT/pull/349)).
+- **Device Selector no longer closes when an install step fails.** An error
+  from the ASIO entry or from the device test's fallback reinstall ended the
+  program instead of being reported. The command-line device test now reports
+  a test that stopped early as a failure instead of "the APO is alive", and a
+  translated message on its console is no longer cut at the first non-ASCII
+  character ([#349](https://github.com/115dkk/EqualizerAPO-XT/pull/349)).
+- **Filter lines with a frequency, Q, bandwidth or slope of zero or below are
+  reported as errors**, and a band exactly at the Nyquist frequency passes the
+  signal through instead of ringing without bound ([#349](https://github.com/115dkk/EqualizerAPO-XT/pull/349)).
+- **ASIO entries follow the device.** Removing the ASIO entry of an endpoint
+  that was renamed after it was created left the old entry in every DAW's
+  driver list; a non-ASCII endpoint name (a Korean "스피커") reached the
+  engine and the device list garbled, so a `Device:` line naming it never
+  matched; and the 32-bit driver needed the x86 Visual C++ runtime, which the
+  installer does not provide ([#349](https://github.com/115dkk/EqualizerAPO-XT/pull/349)).
+- **Opening the panel of a VST2 plugin without an editor no longer crashes the
+  Editor**, and a panel that cannot open reports it on the card instead of
+  showing an empty window ([#349](https://github.com/115dkk/EqualizerAPO-XT/pull/349)).
+- **The bundled fonts come back after the Editor restarts itself** (language
+  or interface-mode switch); every skin fell back to the system font until the
+  next launch ([#349](https://github.com/115dkk/EqualizerAPO-XT/pull/349)).
+- The analysis graph's peak gain includes the Nyquist bin; the first session
+  after installing opens Device Selector once even when the Editor restarts
+  itself; a configuration that reads a registry key that does not exist no
+  longer logs the same error every second; `tools/Repair-EqualizerAPO.ps1`
+  grants the configuration folder the same Modify right as the installer
+  instead of Full control ([#349](https://github.com/115dkk/EqualizerAPO-XT/pull/349)).
+
+## v2.51.1 — 2026-09-19
+
+- **A configuration line can no longer make the audio service open a network
+  share or a device path.** `Include`, `Convolution`, `MultiConvolution`,
+  `SubwooferRouting: Profile` and `VSTPlugin: Library` opened whatever path
+  the line named, and the engine runs as LOCAL SERVICE inside audiodg.exe
+  reading a file any user of the PC may edit, so one line naming
+  `\\host\share\...` made the service authenticate to that host with the
+  machine account. Such a path is now refused with the reason on that line
+  (log and Editor card) and the rest of the file still loads; a configuration
+  that itself lives on a network share may still reference that share. Local
+  paths of every shape are untouched ([#346](https://github.com/115dkk/EqualizerAPO-XT/pull/346)).
 
 ## v2.51.0 — 2026-09-03
 

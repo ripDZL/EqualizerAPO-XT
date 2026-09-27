@@ -30,8 +30,10 @@
 
 #include "asio/EngineHostCore.h"
 #include "asio/HostProtocol.h"
+#include "platform/windows/NamedPipeSecurity.h"
 #include "runtime/ipc/StreamRing.h"
 #include "services/logging/Logging.h"
+#include "services/registry/WindowsRegistry.h"
 
 // After windows.h (through the ring header): shellapi.h needs its types.
 #include <shellapi.h>
@@ -89,10 +91,11 @@ namespace
 
 		static bool overlappedIo(HANDLE pipe, bool write, void* buffer, DWORD bytes, std::stop_token stop = {})
 		{
-			OVERLAPPED overlapped = {};
-			overlapped.hEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
-			if (overlapped.hEvent == nullptr)
+			winutil::UniqueHandle event(CreateEventW(nullptr, TRUE, FALSE, nullptr));
+			if (!event)
 				return false;
+			OVERLAPPED overlapped = {};
+			overlapped.hEvent = event.get();
 			DWORD transferred = 0;
 			BOOL ok = write ? WriteFile(pipe, buffer, bytes, &transferred, &overlapped) : ReadFile(pipe, buffer, bytes, &transferred, &overlapped);
 			if (!ok && GetLastError() == ERROR_IO_PENDING)
@@ -115,93 +118,47 @@ namespace
 					}
 				}
 			}
-			CloseHandle(overlapped.hEvent);
 			return ok && transferred == bytes;
 		}
 
-		void serve(HostOpenRequest request, ServeThread& worker, std::stop_token stop)
+		void serve(HostOpenRequest request, ServeThread& worker)
 		{
-			HANDLE mapping = OpenFileMappingW(FILE_MAP_ALL_ACCESS, FALSE, request.ringName);
-			void* base = mapping != nullptr ? MapViewOfFile(mapping, FILE_MAP_ALL_ACCESS, 0, 0, request.ringBytes) : nullptr;
-			const wchar_t* const suffixes[5] = {L"work0", L"work1", L"done0", L"done1", L"ready"};
-			HANDLE events[5] = {};
-			bool ok = base != nullptr;
-			for (int i = 0; ok && i < 5; i++)
+			winutil::UniqueHandle mapping(OpenFileMappingW(FILE_MAP_ALL_ACCESS, FALSE, request.ringName));
+			winutil::UniqueMappedView base(mapping ? MapViewOfFile(mapping.get(), FILE_MAP_ALL_ACCESS, 0, 0, request.ringBytes) : nullptr);
+			winutil::UniqueHandle events[eapo::asio::RingEvents::count];
+			bool ok = static_cast<bool>(base);
+			for (unsigned i = 0; ok && i < eapo::asio::RingEvents::count; i++)
 			{
-				events[i] = OpenEventW(EVENT_MODIFY_STATE | SYNCHRONIZE, FALSE, eapo::asio::HostNames::event(request.ringName, suffixes[i]).c_str());
-				ok = events[i] != nullptr;
+				events[i].reset(OpenEventW(EVENT_MODIFY_STATE | SYNCHRONIZE, FALSE,
+					eapo::asio::HostNames::event(request.ringName, eapo::asio::RingEvents::table[i].suffix).c_str()));
+				ok = static_cast<bool>(events[i]);
 			}
-			HANDLE producer = OpenProcess(SYNCHRONIZE, FALSE, request.producerPid);
+			if (!ok)
+				LogFStatic(L"ASIO host: the ring %s could not be opened (error %lu)", request.ringName, GetLastError());
+			winutil::UniqueHandle producer(OpenProcess(SYNCHRONIZE, FALSE, request.producerPid));
+			if (ok && !producer)
+			{
+				// The stream still runs, but a producer that dies without
+				// closing the ring now goes unnoticed: this stream's thread
+				// keeps waiting for work, and the host counts it as active.
+				LogFStatic(L"ASIO host: the producer process %u of %s could not be opened (error %lu); serving without a liveness watch",
+					request.producerPid, request.ringName, GetLastError());
+			}
 			if (ok)
 			{
-				eapo::ipc::RingSync sync;
-				sync.work[0] = events[0];
-				sync.work[1] = events[1];
-				sync.done[0] = events[2];
-				sync.done[1] = events[3];
-				sync.ready = events[4];
-				sync.peer = producer;
-
-				// HostOpenRequest has no readiness timeout. Match ThreadHostLink's
-				// fixed 5 ms poll and StreamOptions' 20 second cold-start bound.
-				eapo::ipc::RingHeader* header = static_cast<eapo::ipc::RingHeader*>(base);
-				const ULONGLONG deadline = GetTickCount64() + 20000;
-				while (ReadAcquire(&header->state) == static_cast<LONG>(eapo::ipc::RingState::Empty) && !stop.stop_requested())
-				{
-					if (producer != nullptr)
-					{
-						const DWORD waited = WaitForSingleObject(producer, 5);
-						if (waited == WAIT_OBJECT_0)
-							break;
-						if (waited == WAIT_FAILED)
-							Sleep(5);
-					}
-					else
-					{
-						Sleep(5);
-					}
-					if (GetTickCount64() >= deadline)
-						break;
-				}
-
-				if (!stop.stop_requested() || ReadAcquire(&header->state) != static_cast<LONG>(eapo::ipc::RingState::Empty))
-				{
-					const bool validFormat = eapo::ipc::RingGeometry::validFormat(header->format);
-					const uint64_t expectedBytes = validFormat ? eapo::ipc::RingGeometry::totalBytes(header->format) : 0;
-					if (!validFormat || expectedBytes != header->totalBytes || expectedBytes > request.ringBytes)
-					{
-						WriteRelease(&header->faultCode, static_cast<LONG>(eapo::ipc::RingFault::LayoutMismatch));
-						WriteRelease(&header->state, static_cast<LONG>(eapo::ipc::RingState::Fault));
-						SetEvent(sync.ready);
-					}
-					else
-					{
-						eapo::ipc::RingConsumer consumer(base, request.ringBytes, sync);
-						eapo::asio::ServeOptions options;
-						options.configPath = request.configPath;
-						options.proAudio = true;
-						options.spinPeriods = 1.0;
-						options.publishFacts = true;
-						options.abandon = &worker.abandon;
-						eapo::asio::EngineHostCore::serveStream(consumer, options, GetCurrentProcessId());
-					}
-				}
+				eapo::asio::ServeOptions options;
+				options.configPath = request.configPath;
+				options.proAudio = true;
+				options.registry = &systemRegistry();
+				options.abandon = &worker.abandon;
+				eapo::asio::EngineHostCore::attachAndServe(base.get(), request.ringBytes,
+					eapo::asio::RingEvents::toSync(events, producer.get()), options, GetCurrentProcessId());
 			}
-			else
-			{
-				LogFStatic(L"ASIO host: the ring %s could not be opened (error %lu)", request.ringName, GetLastError());
-			}
-			if (producer != nullptr)
-				CloseHandle(producer);
-			for (HANDLE event : events)
-			{
-				if (event != nullptr)
-					CloseHandle(event);
-			}
-			if (base != nullptr)
-				UnmapViewOfFile(base);
-			if (mapping != nullptr)
-				CloseHandle(mapping);
+			producer.reset();
+			for (winutil::UniqueHandle& event : events)
+				event.reset();
+			base.reset();
+			mapping.reset();
 			idleSince.store(GetTickCount64(), std::memory_order_release);
 			activeStreams.fetch_sub(1, std::memory_order_release);
 			worker.finished.store(true, std::memory_order_release);
@@ -253,7 +210,7 @@ namespace
 				std::unique_ptr<ServeThread> worker = std::make_unique<ServeThread>();
 				ServeThread* raw = worker.get();
 				activeStreams.fetch_add(1, std::memory_order_release);
-				raw->thread = std::jthread([this, request, raw](std::stop_token stop) {serve(request, *raw, stop);});
+				raw->thread = std::jthread([this, request, raw] {serve(request, *raw);});
 				serveThreads.push_back(std::move(worker));
 			}
 			overlappedIo(pipe, true, &reply, sizeof(reply));
@@ -263,47 +220,110 @@ namespace
 		int run()
 		{
 			const std::wstring pipeName = eapo::asio::HostNames::pipe(arguments.endpoint);
+			// This user and SYSTEM only, where the default descriptor let
+			// everyone open the pipe for reading (audit #348 TD-46).
+			winutil::pipes::PipeSecurity security(winutil::pipes::userOnlySddl(winutil::pipes::currentUserSid()));
+			if (!security.valid())
+			{
+				LogFStatic(L"ASIO host: the control pipe's security descriptor could not be built (error %lu)", security.error());
+				return 2;
+			}
+			const auto createInstance = [&](bool first) {
+				return CreateNamedPipeW(pipeName.c_str(),
+					PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED | (first ? FILE_FLAG_FIRST_PIPE_INSTANCE : 0),
+					PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT, PIPE_UNLIMITED_INSTANCES,
+					sizeof(HostOpenReply), sizeof(HostOpenRequest), 0, security.attributes());
+			};
+
 			idleSince = GetTickCount64();
 			LogFStatic(L"ASIO host: listening on %s, linger %u ms%s", pipeName.c_str(), arguments.lingerMs,
 				arguments.resident ? L", resident" : L"");
+			// The first instance has to be the first one of that name: a
+			// program that took it earlier would otherwise receive the
+			// wrappers' stream requests. The wrapper also checks who serves.
+			winutil::UniqueHandle pipe(createInstance(true));
+			if (!pipe)
+			{
+				const DWORD error = GetLastError();
+				if (error == ERROR_ACCESS_DENIED)
+					LogFStatic(L"ASIO host: another program already holds %s", pipeName.c_str());
+				else
+					LogFStatic(L"ASIO host: the control pipe could not be created (error %lu)", error);
+				stopServeThreads();
+				return 2;
+			}
 			for (;;)
 			{
-				HANDLE pipe = CreateNamedPipeW(pipeName.c_str(), PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
-					PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT, PIPE_UNLIMITED_INSTANCES,
-					sizeof(HostOpenReply), sizeof(HostOpenRequest), 0, nullptr);
-				if (pipe == INVALID_HANDLE_VALUE)
+				winutil::UniqueHandle event(CreateEventW(nullptr, TRUE, FALSE, nullptr));
+				if (!event)
 				{
-					LogFStatic(L"ASIO host: the control pipe could not be created (error %lu)", GetLastError());
+					LogFStatic(L"ASIO host: the control pipe event could not be created (error %lu)", GetLastError());
 					stopServeThreads();
 					return 2;
 				}
 				OVERLAPPED overlapped = {};
-				overlapped.hEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
-				bool connected = false;
-				if (ConnectNamedPipe(pipe, &overlapped) || GetLastError() == ERROR_PIPE_CONNECTED)
+				overlapped.hEvent = event.get();
+				bool connected = ConnectNamedPipe(pipe.get(), &overlapped) != FALSE;
+				const DWORD connectError = connected ? ERROR_SUCCESS : GetLastError();
+				if (connectError == ERROR_PIPE_CONNECTED)
 					connected = true;
+				else if (!connected && connectError != ERROR_IO_PENDING)
+				{
+					LogFStatic(L"ASIO host: the control pipe could not accept a connection (error %lu)", connectError);
+					stopServeThreads();
+					return 2;
+				}
+				DWORD transferred = 0;
 				while (!connected)
 				{
-					const DWORD waited = WaitForSingleObject(overlapped.hEvent, 1000);
+					const DWORD waited = WaitForSingleObject(event.get(), 1000);
 					if (waited == WAIT_OBJECT_0)
 					{
-						connected = true;
+						connected = GetOverlappedResult(pipe.get(), &overlapped, &transferred, FALSE) != FALSE;
+						if (!connected)
+						{
+							LogFStatic(L"ASIO host: the control pipe connection failed (error %lu)", GetLastError());
+							stopServeThreads();
+							return 2;
+						}
 						break;
+					}
+					if (waited == WAIT_FAILED)
+					{
+						LogFStatic(L"ASIO host: waiting for the control pipe failed (error %lu)", GetLastError());
+						CancelIoEx(pipe.get(), &overlapped);
+						GetOverlappedResult(pipe.get(), &overlapped, &transferred, TRUE);
+						stopServeThreads();
+						return 2;
 					}
 					if (!arguments.resident && activeStreams.load() == 0 && GetTickCount64() - idleSince.load() >= arguments.lingerMs)
 					{
 						stopping = true;
-						CancelIo(pipe);
+						// Cancellation is asynchronous: drain it before the event or
+						// its OVERLAPPED storage leaves this iteration.
+						CancelIoEx(pipe.get(), &overlapped);
+						GetOverlappedResult(pipe.get(), &overlapped, &transferred, TRUE);
 						break;
 					}
 				}
-				CloseHandle(overlapped.hEvent);
 				if (connected)
-					handleConnection(pipe);
-				DisconnectNamedPipe(pipe);
-				CloseHandle(pipe);
+					handleConnection(pipe.get());
+				// The next instance exists before this one closes, so the name
+				// is never free for another program to take between two
+				// wrappers.
+				winutil::UniqueHandle next(stopping.load() ? INVALID_HANDLE_VALUE : createInstance(false));
+				const DWORD nextError = GetLastError();
+				DisconnectNamedPipe(pipe.get());
+				pipe.reset();
 				if (stopping.load())
 					break;
+				if (!next)
+				{
+					LogFStatic(L"ASIO host: the control pipe could not be created (error %lu)", nextError);
+					stopServeThreads();
+					return 2;
+				}
+				pipe = std::move(next);
 			}
 			stopServeThreads();
 			LogFStatic(L"ASIO host: idle for %u ms, leaving", arguments.lingerMs);
@@ -324,16 +344,12 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 
 	// One host per endpoint: a second start (two wrappers racing) leaves at
 	// once and the first keeps serving.
-	HANDLE owner = CreateMutexW(nullptr, TRUE, eapo::asio::HostNames::owner(server.arguments.endpoint).c_str());
-	if (owner == nullptr)
+	winutil::UniqueHandle owner(CreateMutexW(nullptr, TRUE, eapo::asio::HostNames::owner(server.arguments.endpoint).c_str()));
+	if (!owner)
 		return 2;
 	if (GetLastError() == ERROR_ALREADY_EXISTS)
-	{
-		CloseHandle(owner);
 		return 0;
-	}
 	const int result = server.run();
-	ReleaseMutex(owner);
-	CloseHandle(owner);
+	ReleaseMutex(owner.get());
 	return result;
 }

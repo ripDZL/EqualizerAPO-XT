@@ -21,6 +21,8 @@
 #include <string>
 #include <type_traits>
 
+#include "asio/AsioConstants.h"
+
 namespace eapo::asio
 {
 	enum class Direction : uint32_t
@@ -68,7 +70,12 @@ namespace eapo::asio
 	enum class Outcome : uint32_t
 	{
 		Processed,      // the planes hold the audio to write back
-		Late,           // the deadline passed; the caller writes the original audio
+		// The deadline passed. The caller writes the original audio, except
+		// after an adapter that reported extraLatencyFrames: that one leaves
+		// the previous block's original audio in the planes, so the added
+		// latency holds through the late block, and the caller writes the
+		// planes.
+		Late,
 		Gone,           // the processor is dead for the rest of the stream; original audio
 		Off             // this direction is not processed by this adapter; original audio
 	};
@@ -102,7 +109,7 @@ namespace eapo::asio
 		// wrapper then copies the original samples without conversion.
 		float** planes[directionCount] = {nullptr, nullptr};
 		uint32_t extraLatencyFrames = 0;  // 0 for Sync, frames for Pipelined
-		char message[124] = {};           // reported through getErrorMessage when status != Ok
+		char message[errorMessageBytes] = {};           // reported through getErrorMessage when status != Ok
 	};
 
 	// The value both the registry record and the probe's command line fill.
@@ -126,6 +133,16 @@ namespace eapo::asio
 		std::wstring daemonEndpoint;      // empty = per-session default; the probe pins a name
 	};
 
+	// One buffer period of a format in microseconds, or 0 without a rate.
+	// The wrapper, the daemon adapter and the engine host derive their
+	// deadlines and spin budgets from this one computation.
+	inline double periodUs(const StreamFormat& format) noexcept
+	{
+		if (format.sampleRate <= 0.0)
+			return 0.0;
+		return static_cast<double>(format.frames) * 1000000.0 / format.sampleRate;
+	}
+
 	// The synchronous deadline for a format: an explicit microsecond budget
 	// wins; otherwise the share of the buffer period the options name.
 	inline uint32_t syncDeadlineUs(const StreamFormat& format, const StreamOptions& options) noexcept
@@ -134,9 +151,8 @@ namespace eapo::asio
 			return options.deadlineUs;
 		if (format.sampleRate <= 0.0)
 			return 0;
-		const double periodUs = static_cast<double>(format.frames) * 1000000.0 / format.sampleRate;
-		const uint32_t percent = options.deadlinePercent != 0 ? options.deadlinePercent : 25;
-		return static_cast<uint32_t>(periodUs * static_cast<double>(percent) / 100.0);
+		const uint32_t percent = options.deadlinePercent != 0 ? options.deadlinePercent : defaultDeadlinePercent;
+		return static_cast<uint32_t>(periodUs(format) * static_cast<double>(percent) / 100.0);
 	}
 
 	class IStreamProcessor
@@ -153,8 +169,9 @@ namespace eapo::asio
 		// The target driver's buffer-switch thread. Once per enabled direction
 		// per switch. Transforms planes[direction] in place. No allocation, no
 		// C++ locks, no exceptions; waiting on a kernel object inside the
-		// deadline is allowed. After anything but Processed the plane contents
-		// are unspecified and the caller writes the original audio instead.
+		// deadline is allowed. After anything but Processed (or a pipelined
+		// Late, see Outcome) the plane contents are unspecified and the caller
+		// writes the original audio instead.
 		virtual Outcome process(Direction direction) noexcept = 0;
 
 		// Control thread, after the target's disposeBuffers() returned so no

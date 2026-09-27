@@ -23,13 +23,14 @@
 #include <windows.h>
 
 #include "filters/ConvolutionFilter.h"
-#include "filters/ConvolutionFilePath.h"
+#include "filters/ConfigFileReference.h"
 #include "filters/IrCache.h"
 #include "services/logging/Logging.h"
 #include "runtime/memory/AlignedMemory.h"
-#include "audio/io/SndfileRAII.h"
 #include "libHybridConv-0.1.1/libHybridConv_eapo.h"
+#include "Tests/TestDirectory.h"
 #include "Tests/TestHarness.h"
+#include "Tests/WavFixtures.h"
 #include "Tests/AlignedMemoryGate.h"
 
 // Forward declarations for the additional suites that share this binary's
@@ -46,6 +47,7 @@ void runSubwooferRoutingProcessorTests();
 void runBiQuadKernelTests();
 void runChannelCommandTests();
 void runCommonLogicTests();
+void runConfigPathPolicyTests();
 void runConvolutionCommandTests();
 void runCopyCommandTests();
 void runDelayCommandTests();
@@ -60,10 +62,14 @@ void runIncludeCommandTests();
 void runLoudnessCorrectionCommandTests();
 void runStageCommandTests();
 void runVSTPluginCommandTests();
+void runVST3SpeakerMappingTests();
+void runVST3LifecycleTests();
+void runVSTChannelPlanTests();
 void runVstHostTests();
 void runVst3HostTests();
 void runParserTests();
 void runParserPreampTests();
+void runNumericTextTests();
 void runMultiConvolutionTests();
 
 using std::string;
@@ -77,17 +83,24 @@ constexpr int sampleRate = 48000;
 constexpr double tolerance = 1.0e-8;
 
 test::Harness harness("HybridConvTests");
+
+test::TestDirectory& scratchDirectory()
+{
+	static test::TestDirectory directory(L"HybridConvTests");
+	return directory;
+}
+
 wstring wisdomTestDirectory;
 wstring previousLocalAppData;
 
 void assertFftwWisdomIsExported()
 {
-	wchar_t tempPath[MAX_PATH] = {};
-	harness.expectTrue(GetTempPathW(MAX_PATH, tempPath) > 0,
-		"FFTW wisdom test resolves temporary directory");
-	wisdomTestDirectory = wstring(tempPath)
-		+ L"EqualizerAPO-XT-wisdom-" + std::to_wstring(GetCurrentProcessId());
-	CreateDirectoryW(wisdomTestDirectory.c_str(), nullptr);
+	wisdomTestDirectory = scratchDirectory().path() + L"\\wisdom";
+	// The scratch directory is named after the process id; a leftover from an
+	// earlier run with a reused id already holds this folder.
+	harness.expectTrue(CreateDirectoryW(wisdomTestDirectory.c_str(), nullptr) != FALSE
+			|| GetLastError() == ERROR_ALREADY_EXISTS,
+		"FFTW wisdom test creates its stand-in LOCALAPPDATA directory");
 
 	wchar_t oldLocalAppData[MAX_PATH] = {};
 	const DWORD oldLength = GetEnvironmentVariableW(
@@ -133,9 +146,7 @@ void fail(const string& message)
 
 void expectClose(double actual, double expected, int sample)
 {
-	char message[256];
-	snprintf(message, sizeof(message), "sample %d expected %.12g, got %.12g", sample, expected, actual);
-	harness.expectTrue(fabs(actual - expected) <= tolerance, message);
+	harness.expectNear(actual, expected, tolerance, "sample " + std::to_string(sample));
 }
 
 vector<double> renderImpulseResponse(const vector<double>& impulseResponse, int leadingSilentFrames)
@@ -169,37 +180,33 @@ vector<double> renderImpulseResponse(const vector<double>& impulseResponse, int 
 
 wstring createImpulseResponseFile(const vector<double>& impulseResponse)
 {
-	wchar_t tempPath[MAX_PATH] = {};
-	wchar_t tempFile[MAX_PATH] = {};
-	if (GetTempPathW(MAX_PATH, tempPath) == 0)
-		fail("GetTempPathW failed");
-	if (GetTempFileNameW(tempPath, L"hc", 0, tempFile) == 0)
-		fail("GetTempFileNameW failed");
-
-	wstring filename = tempFile;
-	DeleteFileW(filename.c_str());
-	filename += L".wav";
-
-	SF_INFO info = {};
-	info.samplerate = sampleRate;
-	info.channels = 1;
-	info.format = SF_FORMAT_WAV | SF_FORMAT_DOUBLE;
-
-	sndfile::Handle file(sf_wchar_open(filename.c_str(), SFM_WRITE, &info));
-	if (!file)
-		fail("could not create temporary impulse response file");
-
-	sf_count_t written = sf_writef_double(file.get(), impulseResponse.data(), (sf_count_t)impulseResponse.size());
-
-	if (written != (sf_count_t)impulseResponse.size())
-		fail("could not write complete temporary impulse response file");
-
+	static unsigned fileCount = 0;
+	const wstring filename = scratchDirectory().trackFile(L"ir-" + std::to_wstring(fileCount++) + L".wav");
+	harness.require(test::writeWavFile(filename, sampleRate, impulseResponse),
+		"the temporary impulse response file is written completely");
 	return filename;
+}
+
+void assertJudgedIrCacheReuse()
+{
+	const wstring filename = createImpulseResponseFile({1.0, 0.5, 0.25});
+	_wputenv_s(L"EAPO_XT_JUDGED_IR", filename.c_str());
+	{
+		const auto first = ConfigFileReference::target(L"", L"\"%EAPO_XT_JUDGED_IR%\"");
+		const auto second = ConfigFileReference::target(L"", L"\"%EAPO_XT_JUDGED_IR%\"");
+		auto left = loadIrCached(first.path, sampleRate);
+		auto right = loadIrCached(second.path, sampleRate);
+		harness.require(left != nullptr, "quoted environment IR loads through its held handle");
+		harness.expectTrue(left == right, "second handle-backed IR load reuses the decoded cache entry");
+		harness.expectTrue(left->frames == 3 && left->buffers[0][1] == 0.5, "virtual IO preserves IR samples");
+	}
+	_wputenv_s(L"EAPO_XT_JUDGED_IR", L"");
+	DeleteFileW(filename.c_str());
 }
 
 vector<double> renderConvolutionFilter(const wstring& filename, int firstFrameLength)
 {
-	ConvolutionFilter filter(filename);
+	ConvolutionFilter filter(ConfigFileReference::target(L"", filename).path);
 	vector<wstring> channels = {L"L"};
 	filter.initialize(static_cast<float>(sampleRate), frameLength, channels);
 
@@ -439,17 +446,41 @@ void assertConvolutionPathParsing()
 	_wputenv_s(L"EAPO_XT_TEST_IR_DIR", L"C:\\Impulse Responses");
 
 	harness.expectTrue(
-		ConvolutionFilePath::normalizeParameter(L"  \"room with spaces.wav\"  ") == L"room with spaces.wav",
+		ConfigFileReference::normalize(L"  \"room with spaces.wav\"  ") == L"room with spaces.wav",
 		"quoted convolution path was not normalized");
 	harness.expectTrue(
-		ConvolutionFilePath::normalizeParameter(L"%EAPO_XT_TEST_IR_DIR%\\room.wav") == L"C:\\Impulse Responses\\room.wav",
+		ConfigFileReference::normalize(L"%EAPO_XT_TEST_IR_DIR%\\room.wav") == L"C:\\Impulse Responses\\room.wav",
 		"convolution path environment variable was not expanded");
 	harness.expectTrue(
-		ConvolutionFilePath::resolve(L"C:\\EqualizerAPO\\config\\config.txt", L"\"irs\\room.wav\"") == L"C:\\EqualizerAPO\\config\\irs\\room.wav",
+		ConfigFileReference::resolve(L"C:\\EqualizerAPO\\config\\config.txt", L"\"irs\\room.wav\"") == L"C:\\EqualizerAPO\\config\\irs\\room.wav",
 		"relative convolution path was not resolved from the config file directory");
 	harness.expectTrue(
-		ConvolutionFilePath::resolve(L"C:\\EqualizerAPO\\config\\config.txt", L"") == L"",
+		ConfigFileReference::resolve(L"C:\\EqualizerAPO\\config\\config.txt", L"") == L"",
 		"empty convolution path should remain empty");
+
+	// VSTPlugin's own rule, kept beside the shared one (audit #348 A1).
+	harness.expectTrue(
+		ConfigFileReference::resolveLibrary(L"C:\\VST\\", L"sub\\plug.dll") == L"C:\\VST\\sub\\plug.dll",
+		"a relative plug-in reference is taken from the plug-in folder");
+	harness.expectTrue(
+		ConfigFileReference::resolveLibrary(L"C:\\VST", L"D:\\x\\plug.dll") == L"D:\\x\\plug.dll",
+		"an absolute plug-in reference is kept as written");
+	harness.expectTrue(
+		ConfigFileReference::resolveLibrary(L"C:\\VST", L"\\x\\plug.dll") == L"\\x\\plug.dll",
+		"a root-relative plug-in reference is not relative to the plug-in folder");
+	harness.expectTrue(ConfigFileReference::resolveLibrary(L"C:\\VST", L"") == L"", "an empty plug-in reference stays empty");
+
+	// target() is the pair every opening factory uses: resolved, then judged.
+	const ConfigFileReference::Target local =
+		ConfigFileReference::target(L"C:\\EqualizerAPO\\config\\config.txt", L"\"%EAPO_XT_TEST_IR_DIR%\\room.wav\"");
+	harness.expectTrue(local.path.path() == L"C:\\Impulse Responses\\room.wav" && local.refusal.empty(),
+		"a quoted local reference with a variable resolves and is allowed");
+	const ConfigFileReference::Target share =
+		ConfigFileReference::target(L"C:\\EqualizerAPO\\config\\config.txt", L"\\\\nas\\irs\\room.wav");
+	harness.expectTrue(share.path.empty() && !share.refusal.empty(),
+		"a refused reference carries the refusal and no path to open");
+	const ConfigFileReference::Target none = ConfigFileReference::target(L"C:\\EqualizerAPO\\config\\config.txt", L"  ");
+	harness.expectTrue(none.path.empty() && none.refusal.empty(), "an empty reference has neither");
 }
 
 }
@@ -458,6 +489,7 @@ int runHybridConvTests()
 {
 	Logging::set(stdout, true, true, false);
 
+	assertJudgedIrCacheReuse();
 	assertFftwWisdomIsExported();
 	assertSparseImpulseResponseSurvivesPastOneSecond(0);
 	assertSparseImpulseResponseSurvivesPastOneSecond(137);
@@ -487,6 +519,7 @@ int runHybridConvTests()
 	runBiQuadKernelTests();
 	runChannelCommandTests();
 	runCommonLogicTests();
+	runConfigPathPolicyTests();
 	runConvolutionCommandTests();
 	runCopyCommandTests();
 	runDelayCommandTests();
@@ -503,6 +536,11 @@ int runHybridConvTests()
 	runLoudnessCorrectionCommandTests();
 	runStageCommandTests();
 	runVSTPluginCommandTests();
+	// Pure VST3 speaker-layout and lifecycle state-machine contracts.
+	runVST3SpeakerMappingTests();
+	runVST3LifecycleTests();
+	// Channel-to-instance plan of a VSTPlugin line, judged without a plug-in.
+	runVSTChannelPlanTests();
 	// Runtime VST2 host load/state/audio test. Soft-skips if the
 	// companion TestVst2Plugin.dll is not next to this executable.
 	runVstHostTests();
@@ -517,9 +555,11 @@ int runHybridConvTests()
 	runSubwooferRoutingVst3Tests();
 	runParserTests();
 	runParserPreampTests();
+	runNumericTextTests();
 	runMultiConvolutionTests();
 
 	cleanupFftwWisdomTest();
+	scratchDirectory().removeAll();
 	harness.report();
 	return test::reportAlignedMemoryBalance("HybridConvTests");
 }

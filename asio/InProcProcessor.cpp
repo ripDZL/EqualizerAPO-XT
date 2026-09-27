@@ -9,13 +9,14 @@
 #include <cstring>
 #include <exception>
 
+#include "asio/StreamEngineSetup.h"
 #include "engine/FilterEngine.h"
 
 namespace eapo::asio
 {
 	namespace
 	{
-		void copyMessage(char (&destination)[124], const char* source) noexcept
+		void copyMessage(char (&destination)[errorMessageBytes], const char* source) noexcept
 		{
 			size_t i = 0;
 			for (; i + 1 < sizeof(destination) && source[i] != '\0'; i++)
@@ -53,22 +54,7 @@ namespace eapo::asio
 					lane.planes[c] = lane.storage.data() + static_cast<size_t>(c) * format.frames;
 
 				lane.engine = std::make_unique<FilterEngine>();
-				EngineSetup setup{
-					.sampleRate = static_cast<float>(format.sampleRate),
-					.inputChannelCount = channels,
-					.realChannelCount = channels,
-					.outputChannelCount = channels,
-					.channelMask = 0,
-					.maxFrameCount = format.frames,
-					.customPath = options.configPath,
-					.preMix = false,
-					.capture = direction == Direction::Input,
-					.postMixInstalled = true,
-					.deviceName = format.deviceName,
-					.connectionName = L"ASIO",
-					.deviceGuid = format.deviceGuid
-				};
-				lane.engine->initialize(setup);
+				lane.engine->initialize(streamEngineSetup(format, direction, options.configPath));
 			}
 			catch (const std::exception& e)
 			{

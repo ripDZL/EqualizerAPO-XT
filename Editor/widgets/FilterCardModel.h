@@ -12,6 +12,9 @@
 #include <QList>
 #include <QVector>
 
+#include <string>
+#include <vector>
+
 struct FilterCardDescriptor
 {
 	QString command;
@@ -38,6 +41,10 @@ struct FilterCardDescriptor
 	bool canToggleEnabled = true;
 	bool routeType = false;
 	bool dynamicLine = false;
+	// True when channelBadges lists the channels a Copy line writes, in
+	// line order and virtual ones included. The line alone cannot tell which
+	// are virtual; headerChannels() judges that against the device.
+	bool channelBadgesAreCopyTargets = false;
 };
 
 // Per-row scope answer of calculateScopes(): the indent that drives the left
@@ -80,8 +87,9 @@ public:
 	// code so every EQ shape carries its response-curve glyph; an unmapped
 	// descriptor (raw text lines) returns empty and the badge falls back to
 	// its monogram, so future commands degrade gracefully instead of going
-	// blank. Picker entries use commandIconResource below, so the command
-	// vocabulary and these descriptor-specific cases stay in one owner.
+	// blank. The lookup itself is FilterCommandCatalog::badgeIconResource,
+	// over the same catalog entries picker entries read through
+	// commandIconResource below.
 	static QString badgeIconResource(const QString& type, const QString& badge);
 	// Shared command vocabulary used by picker entries and card badges.
 	// Parameters are consulted only for the Filter response-curve split.
@@ -124,12 +132,30 @@ public:
 	// editor has no raw label to style, which the skins' findChild guards
 	// already absorb.
 	static bool hostsSharedRawBody(const QString& type, bool dynamicLine);
+	// The channels a card header shows as badges, for the device whose
+	// channels are given (empty when no device is known). A row's own list
+	// wins: a Channel line's selection, or the device channels a Copy line
+	// writes (its virtual targets dropped by ChannelIdentity::isVirtual, the
+	// rule the Copy routing view draws with, so header and body agree).
+	// Rows without one inherit the enclosing selection when the engine
+	// narrows their type to it.
+	static QStringList headerChannels(const FilterCardDescriptor& descriptor,
+		const std::vector<std::wstring>& deviceChannels);
 	// A Copy line opens the skin routing view only while its factors are
 	// static: the routing editor parses and re-serializes the parameters, so
 	// inline-expression factors must stay on the raw body or the first edit
 	// would serialize the expression away. Both deciders (the editor factory
 	// gate and the row's body construction) ask this one predicate.
 	static bool opensRoutingView(const FilterCardDescriptor& descriptor);
+	// The line an edited card writes back. `command` "#" is the note card's
+	// sentinel (a pure comment has no colon): "# text", or a bare "#" for an
+	// empty note. Any other command becomes "command: parameters", and when
+	// the line being replaced was switched off (a disabled command line) the
+	// result stays off: "# command: parameters". Editing a switched-off line
+	// must never switch it on; the Copy routing view and the VST card's state
+	// read-back used to drop the '#' (audit #348 TD-04/B7).
+	static QString assembleLine(const QString& command, const QString& parameters,
+		const QString& replacedLine);
 
 private:
 	static QStringList parseChannelList(const QString& text);

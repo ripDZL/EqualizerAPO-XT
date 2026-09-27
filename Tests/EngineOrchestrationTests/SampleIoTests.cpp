@@ -191,12 +191,26 @@ double minBatchSeconds(Fn&& fn, int samples, int batch)
 // meaningless. Both directions are always measured and printed for the
 // benchmark record; three attempts absorb CI scheduling outliers.
 //
-// This TU is pinned to /std:c++17 in the project file: under /std:c++20 the
+// What the ratio compares (maintainer decision, audit #348 TD-74: keep this
+// contract as it is). The candidate is the product code: writeFloatInterleaved
+// and readFloatInterleaved come from Common.lib, compiled as C++20 with the
+// build variant's instruction set, exactly as the APO ships them. The
+// reference is the two lambdas below, a fixed yardstick: the one strided
+// element at a time loop the conversions used to be (the 2026-07 finding).
+// So the bar asks "is the shipped conversion still clearly faster than the
+// naive loop it replaced", and it fails if the product code ever falls back
+// to that shape. It does not ask whether the hand-written SIMD beats what
+// the C++20 compiler could make of a naive loop; the printed timings are the
+// record for that, not a gate.
+//
+// Why the reference is compiled as C++17. This TU is pinned to /std:c++17 in
+// the project file so the yardstick keeps its shape: under /std:c++20 the
 // compiler optimizes the reference lambdas themselves (avx2 runner: write
-// reference 1650 ns -> 295 ns, candidate unchanged), which collapses the
-// ratio and inverts the meaning of the bar. #pragma loop(no_vector) did not
-// restore the naive shape, so the pin keeps the compilation the bars were
-// calibrated against. Revisit if the bars are ever recalibrated for C++20.
+// reference 1650 ns -> 295 ns, candidate unchanged), so the ratio would
+// measure the compiler's treatment of the test's own loop instead of the
+// product code. #pragma loop(no_vector) did not restore the naive shape.
+// Only this TU is pinned; the product code under test is not. Revisit if the
+// bars are ever recalibrated for C++20.
 void testStereoFloatConversionBeatsScalarReference(test::Harness& harness)
 {
 	constexpr unsigned channels = 2;
@@ -291,9 +305,43 @@ void testStereoFloatConversionBeatsScalarReference(test::Harness& harness)
 
 } // namespace
 
+// Audit #348 TD-41/A3: the planar write covers every output channel, like the
+// interleaved writes. With one input and two outputs (a mono source feeding a
+// stereo device) it used to stop after channel 0 and leave channel 1 holding
+// whatever the caller's buffer held; with more inputs than outputs it wrote
+// past the caller's pointer array.
+void testFloatPlanarWriteCoversEveryOutputChannel(test::Harness& harness)
+{
+	constexpr unsigned frames = 64;
+	const EngineStreamFormat monoToStereo{ 1, 2, maxFrames };
+	FilterConfiguration config(monoToStereo, {}, 2);
+
+	std::vector<float> input(frames);
+	for (unsigned i = 0; i < frames; i++)
+		input[i] = static_cast<float>(i) / frames;
+	const float* inputs[1] = { input.data() };
+	config.readFloatPlanar(inputs, frames);
+
+	std::vector<float> left(frames, -2.0f);
+	std::vector<float> right(frames, -2.0f);
+	float* outputs[2] = { left.data(), right.data() };
+	config.writeFloatPlanar(outputs, frames);
+
+	bool leftCopied = true;
+	bool rightWritten = true;
+	for (unsigned i = 0; i < frames; i++)
+	{
+		leftCopied = leftCopied && left[i] == input[i];
+		rightWritten = rightWritten && right[i] != -2.0f;
+	}
+	harness.expect(leftCopied, "writeFloatPlanar mono->stereo: channel 0 carries the input");
+	harness.expect(rightWritten, "writeFloatPlanar mono->stereo: channel 1 is written, not left untouched");
+}
+
 void runSampleIoTests(test::Harness& harness)
 {
 	testConversionsMatchScalarReferenceBitExactly(harness);
+	testFloatPlanarWriteCoversEveryOutputChannel(harness);
 	// Timing contracts are meaningless under AddressSanitizer: the
 	// instrumentation cost lands on the vectorized candidate, not on the
 	// reference loop shape, so the ratio inverts regardless of the code

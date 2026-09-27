@@ -24,6 +24,8 @@
 #include <vector>
 #include <memory>
 #include "AbstractAPOInfo.h"
+#include "DeviceException.h"
+#include "asio/EntryOptions.h"
 #include "services/registry/IRegistry.h"
 #include "services/registry/RegistryTransaction.h"
 
@@ -50,12 +52,17 @@ public:
 		bool autoAdjust;
 		InstallMode installMode;
 		bool allowSilentBufferModification;
-		// "Enable the EQ in WASAPI exclusive mode": an entry for this endpoint
-		// in the ASIO driver list, served by the wrapper over a WASAPI
-		// exclusive target (asio/WasapiExclusiveTarget.h), for applications
-		// whose exclusive-mode stream no APO can reach. Part of the
-		// installation: it goes with the APO and leaves with it.
-		bool exclusiveModeEq;
+		// "Use in ASIO apps": an entry for this endpoint in the ASIO driver
+		// list, served by the wrapper over a WASAPI exclusive target
+		// (asio/WasapiExclusiveTarget.h), for applications whose
+		// exclusive-mode stream no APO can reach. Part of the installation:
+		// it goes with the APO and leaves with it. The headless install sets it
+		// with --asio-entry (--exclusive-mode-eq, its first name, is still
+		// accepted).
+		bool asioEntry;
+		// The entry's stream options, the same ones an ASIO driver row offers
+		// (AsioAPOInfo). Only written while asioEntry is on.
+		eapo::asio::EntryOptions asioEntryOptions;
 
 		InstallState()
 		{
@@ -66,7 +73,7 @@ public:
 			autoAdjust = true;
 			installMode = INSTALL_LFX_GFX;
 			allowSilentBufferModification = false;
-			exclusiveModeEq = false;
+			asioEntry = false;
 		}
 
 		bool operator==(const InstallState&) const = default;
@@ -86,6 +93,11 @@ public:
 	// own DllRegisterServer, and never writes through the port.
 	static bool checkAPORegistration(bool fix, const IRegistry& registry = systemRegistry());
 	bool load(const std::wstring& deviceGuid, std::wstring defaultDeviceGuid = L"");
+	// load() without the default-endpoint lookup, which goes through the
+	// MMDevice enumerator: everything it reads comes through the registry
+	// port. isDefaultDevice() stays false. The APO reads its endpoint this way
+	// from inside audiodg (ApoRuntimeFacts.h).
+	bool loadFromRegistry(const std::wstring& deviceGuid);
 	bool canBeUpgraded() const override;
 	bool hasChanges() const override;
 	// True when the audio driver published an effect chain (an FxProperties
@@ -97,6 +109,13 @@ public:
 	bool hasDriverEffectChain() const;
 	std::wstring getOriginalAPOPreMix();
 	std::wstring getOriginalAPOPostMix();
+	bool changesNeedAudioRestart() const override
+	{
+		return true;
+	}
+	// Whether the ASIO entry can be offered to 32-bit hosts: the x86
+	// wrapper ships beside the product (not in ARM64 builds).
+	bool canHostAsio32() const;
 
 	// POST-CONDITIONS ON FAILURE. All three run their registry changes inside one
 	// RegistryTransaction, so a throw leaves the endpoint as it was found: no
@@ -160,18 +179,15 @@ private:
 	void applyAsioEntry(RegistryTransaction& plan);
 	void removeAsioEntry(RegistryTransaction& plan);
 
-	// The one place the three public operations share: it opens the transaction,
-	// records what the device looked like beforehand, runs the steps, and fills in
-	// the report whether they finished or threw. The steps are a callable because
-	// reinstall() is three of them under one transaction, which a member-function
-	// pointer could not express.
+	// The one place the three public operations share: it records what the
+	// device looked like beforehand and runs the steps through
+	// ReportedOperation::run (one transaction, the report filled whether they
+	// finished or threw). The steps are a callable because reinstall() is three
+	// of them under one transaction, which a member-function pointer could not
+	// express.
 	void runReported(DeviceInstallReport::Operation operation,
 		const std::function<void(RegistryTransaction&)>& steps);
 	void beginReport(DeviceInstallReport::Operation operation);
-	void finishReport(RegistryTransaction& plan);
-	// Rolls the transaction back before reading what the rollback could not do,
-	// then logs the whole report. The caller rethrows.
-	void failReport(RegistryTransaction& plan, const std::wstring& failure);
 
 	std::wstring deviceName;
 	std::wstring connectionName;
@@ -204,21 +220,4 @@ private:
 	// DeviceAPOInfo in the tree is constructed in place and used through a
 	// shared_ptr or as a local.
 	IRegistry& registry;
-};
-
-class DeviceException
-{
-public:
-	DeviceException(const std::wstring& message)
-		: message(message)
-	{
-	}
-
-	const std::wstring& getMessage() const
-	{
-		return message;
-	}
-
-private:
-	std::wstring message;
 };

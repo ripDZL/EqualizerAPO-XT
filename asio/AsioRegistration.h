@@ -43,7 +43,8 @@ namespace eapo::asio
 		bool isWrapperEntry(const std::wstring& entryName);
 
 		// A CLSID for the wrapper entry, derived from the target's CLSID so
-		// the same target always maps to the same wrapper.
+		// the same target always maps to the same wrapper. Empty when the
+		// target's CLSID is not a braced GUID (a ProgID is not accepted).
 		std::wstring wrapperClsidFor(const std::wstring& targetClsid);
 
 		// A Windows audio endpoint as a target: the entry is named after the
@@ -53,18 +54,22 @@ namespace eapo::asio
 		// and become slashes.
 		AsioTarget endpointTarget(const std::wstring& endpointGuid, const std::wstring& connectionName, const std::wstring& deviceName);
 		// Every target driver registered in the 64-bit view, without the
-		// wrapper's own entries. A subkey without a CLSID is skipped.
+		// wrapper's own entries. A subkey without a CLSID, or with one that
+		// is not a braced GUID, is skipped.
 		std::vector<AsioTarget> enumerateTargets(const IRegistry& registry);
 
 		bool wrapperRegistered(const IRegistry& registry, const AsioTarget& target);
 
 		// Writes the entry and the class tree in the 64-bit view, and again in
 		// the WOW6432Node view when a 32-bit DLL path is given. Idempotent.
+		// Throws WideError, writing nothing, when the target's CLSID is not a
+		// braced GUID.
 		void registerWrapper(IRegistry& registry, const AsioTarget& target,
 			const std::wstring& dll64Path, const std::wstring& dll32Path);
 
 		// Removes what registerWrapper wrote, in both views, ignoring what is
-		// already absent.
+		// already absent. A target whose CLSID is not a GUID was never
+		// registered, so nothing is touched for it.
 		void unregisterWrapper(IRegistry& registry, const AsioTarget& target);
 
 		// The engine host at boot: one Run value for the machine, present
@@ -74,5 +79,18 @@ namespace eapo::asio
 		std::wstring autoStartValueName();
 		bool autoStartRegistered(const IRegistry& registry);
 		void setAutoStart(IRegistry& registry, const std::wstring& hostExePath, bool wanted);
+
+		// Recomputes the Run value from the wrapper records after an entry
+		// changed: present while any enabled entry asks for it, gone with the
+		// last one. Needs the install directory only to write the value; with
+		// none known, a wanted value that is already there stays as it is.
+		void refreshAutoStart(IRegistry& registry, const std::wstring& installDirectory);
+
+		// The files the product ships under its install directory: the 64-bit
+		// wrapper beside the product, the 32-bit one under x86\ (absent from
+		// ARM64 builds), and the engine host.
+		std::wstring wrapperDllPath(const std::wstring& installDirectory);
+		std::wstring wrapper32DllPath(const std::wstring& installDirectory);
+		bool wrapper32Shipped(const std::wstring& installDirectory);
 	}
 }

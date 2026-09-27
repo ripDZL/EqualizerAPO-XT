@@ -35,13 +35,11 @@
 
 #include <utility>
 
-#include "MainWindow.h"
+#include "services/settings/EditorSettings.h"
 #include "SkinManager.h"
 #include "FilterTableRow.h"
 #include "FilterTableMimeData.h"
 #include "FilterGUIFactoryRegistry.h"
-#include "Editor/helpers/GUIHelper.h"
-#include "Editor/helpers/VSTPreviewEndpoint.h"
 #include "services/logging/Logging.h"
 #include "audio/ChannelLayout.h"
 #include "services/registry/WindowsRegistry.h"
@@ -71,7 +69,7 @@ FilterTable::FilterTable(QWidget* parent)
 
 	QIcon icon(QStringLiteral(":/icons/arrow_right.ico"));
 	insertArrow = new QLabel(this);
-	insertArrow->setPixmap(icon.pixmap(GUIHelper::scale(QSize(24, 15))));
+	insertArrow->setPixmap(icon.pixmap(QSize(24, 15)));
 	insertArrow->setVisible(false);
 
 	// The roster and its matching order live in the factory translation units
@@ -181,7 +179,7 @@ void FilterTable::updateGuis()
 
 	clearRows();
 
-	qDebug("Delete took %d ms", int(timer.elapsed()));
+	TraceF(L"Delete took %d ms", int(timer.elapsed()));
 	timer.start();
 
 	gridLayout = new QGridLayout(this);
@@ -268,10 +266,10 @@ void FilterTable::updateGuis()
 	{
 		// Frozen heritage flow: the classic toolbar action and cascading menu.
 		QToolBar* toolBar = new QToolBar;
-		toolBar->setIconSize(GUIHelper::scale(QSize(16, 16)));
+		toolBar->setIconSize(QSize(16, 16));
 
 		QWidget* spacer = new QWidget;
-		spacer->setFixedWidth(GUIHelper::scale(25));
+		spacer->setFixedWidth(25);
 		toolBar->addWidget(spacer);
 
 		QAction* addAction = new QAction(QIcon(":/icons/list-add-green.ico"), tr("Add filter"), toolBar);
@@ -315,7 +313,7 @@ void FilterTable::updateGuis()
 
 	setUpdatesEnabled(updatesWereEnabled);
 
-	qDebug("Create took %d ms (prepare %d, editor guis %d, card rows %d, add %d, channels %d, rows %d)",
+	TraceF(L"Create took %d ms (prepare %d, editor guis %d, card rows %d, add %d, channels %d, rows %d)",
 		int(timer.elapsed()), int(prepareNs / 1000000), int(guiNs / 1000000),
 		int(rowCtorNs / 1000000), int(addNs / 1000000), int(channelsNs / 1000000), row);
 	update();
@@ -446,13 +444,11 @@ IFilterGUI* FilterTable::createRowGui(Item* item, const FilterCardDescriptor* pr
 		IFilterGUI* cardGui = FilterCardEditorFactory::create(this, factoryKey, factoryValue);
 		if (cardGui != nullptr)
 			return cardGui;
-		// The decision only says the registry answers this keyword; the
-		// shared "Filter" creator still returns nullptr on purpose for an
-		// ordinary biquad line (FilterCardEditorRouter - that nullptr is
-		// load-bearing). It has to fall through to the legacy chain like it
-		// did before the policy extraction (audit #275 B4): returning the
-		// nullptr here left every plain "Filter: ON PK/LP/NO ..." row a
-		// collapsed raw fragment with no knob editor.
+		// available() answers per line since audit #348 TD-57, so an
+		// ordinary "Filter: ON PK/LP/NO ..." no longer reaches this case. A
+		// creator that still returns nullptr falls through to the legacy
+		// chain rather than leaving the row a collapsed raw fragment with no
+		// editor (audit #275 B4).
 		break;
 	}
 	case RowGuiDecision::LegacyChain:
@@ -701,7 +697,7 @@ void FilterTable::insertRowAt(int index)
 	// state on paint; repaint them all like a full rebuild would have.
 	updateRowWidgets();
 
-	qDebug("Incremental insert took %d ms", int(timer.elapsed()));
+	TraceF(L"Incremental insert took %d ms", int(timer.elapsed()));
 	update();
 }
 
@@ -762,6 +758,6 @@ void FilterTable::removeRowAt(int index)
 	syncListChrome();
 	updateRowWidgets();
 
-	qDebug("Incremental remove took %d ms", int(timer.elapsed()));
+	TraceF(L"Incremental remove took %d ms", int(timer.elapsed()));
 	update();
 }

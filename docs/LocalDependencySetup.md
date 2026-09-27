@@ -52,7 +52,7 @@ GitHub Actions artifact를 직접 받는 방법은 CI 설정과 방향이 맞습
 Qt 프로젝트는 CI와 같은 방식으로 qmake/nmake를 씁니다. 먼저 VS 개발자 환경과 Qt 경로를 잡아야 합니다.
 
 ```cmd
-set "PATH=%CD%\Qt\bin;%PATH%"
+set "PATH=%CD%\Qt\6.10.1\msvc2022_64\bin;%PATH%"
 call "C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
 ```
 
@@ -61,21 +61,18 @@ call "C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\
 ```cmd
 mkdir build-Editor-x64
 cd build-Editor-x64
-..\Qt\bin\lrelease.exe ..\Editor\Editor.pro
-..\Qt\bin\qmake.exe ..\Editor\Editor.pro -r "CONFIG+=release" "EAPO_UPDATE_CHANNEL=x64-avx2" "EAPO_SIMD_FLAGS=/arch:AVX2"
+..\Qt\6.10.1\msvc2022_64\bin\lrelease.exe ..\Editor\Editor.pro
+..\Qt\6.10.1\msvc2022_64\bin\qmake.exe ..\Editor\Editor.pro -r "CONFIG+=release" "EAPO_UPDATE_CHANNEL=x64-avx2" "EAPO_SIMD_FLAGS=/arch:AVX2"
 nmake /NOLOGO
 ```
 
-`DeviceSelector`와 `UpdateChecker`도 같은 방식으로 빌드합니다. 세 `.pro` 파일 모두 x64 빌드에서 `EAPO_SIMD_FLAGS`(또는 SSE2 기준선의 `EAPO_SIMD_BASELINE=1`)가 없으면 qmake가 `error()`로 실패합니다. 변형별 플래그와 채널 값은 `.github/simd-variants.psd1`을 기준으로 합니다. 빌드 뒤에는 다음처럼 Qt 런타임을 배치합니다.
+`DeviceSelector`도 같은 방식으로 빌드합니다. 두 `.pro` 파일 모두 x64 빌드에서 `EAPO_SIMD_FLAGS`(또는 SSE2 기준선의 `EAPO_SIMD_BASELINE=1`)가 없으면 qmake가 `error()`로 실패합니다. 변형별 플래그와 채널 값은 `.github/simd-variants.psd1`을 기준으로 합니다. 빌드 뒤에는 다음처럼 Qt 런타임을 배치합니다.
 
 ```powershell
-& .\Qt\bin\windeployqt.exe .\build-Editor-x64\release\Editor.exe --release --no-opengl-sw
-& .\Qt\bin\windeployqt.exe .\build-DeviceSelector-x64\release\DeviceSelector.exe --release --no-opengl-sw
-& .\Qt\bin\windeployqt.exe .\build-UpdateChecker-x64\release\UpdateChecker.exe --release --no-opengl-sw
+& .\Qt\6.10.1\msvc2022_64\bin\windeployqt.exe .\build-Editor-x64\release\Editor.exe --release --no-opengl-sw
+& .\Qt\6.10.1\msvc2022_64\bin\windeployqt.exe .\build-DeviceSelector-x64\release\DeviceSelector.exe --release --no-opengl-sw
 ```
 
 ## 주의할 점
 
-`EqualizerAPO.sln` 전체 MSBuild는 Qt VS Tools의 `QtMsBuild` 파일이 없으면 Qt `.vcxproj`에서 실패합니다. CI도 이 문제를 피하려고 Qt 앱은 qmake로 따로 빌드합니다.
-
-전체 솔루션을 Visual Studio에서 바로 빌드하려면 Qt VS Tools 또는 호환되는 `QtMsBuild` 배치가 추가로 필요합니다.
+Qt 앱(Editor, DeviceSelector)은 `.vcxproj`가 없고 qmake로만 빌드합니다. `EqualizerAPO.sln`에는 MSBuild 프로젝트만 있으며, 명령줄 빌드 명령은 CLAUDE.md의 '빌드 명령' 절에 있습니다.

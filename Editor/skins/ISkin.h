@@ -5,8 +5,6 @@
 */
 
 /*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-
 	A skin is a self-contained visual identity. Beyond colour tokens it decides
 	which QSS sheet to load and which Copy routing renderer to inject, so that
 	each skin can present the same configuration with a genuinely different
@@ -106,6 +104,10 @@ struct CommandRowInfo
 	// belongs in a round with the gallery gate. The card carries it as a tooltip
 	// in the meantime, which is not a skin surface.
 	QString parseError;
+	// The engine could not prepare this line's filter (it threw while being set
+	// up), so the whole configuration was not applied and the previous one keeps
+	// playing. Like parseError, the card carries it as a tooltip for now.
+	bool setupFailed = false;
 	// True when the line's parameters carry inline `expression` segments, so
 	// its numbers are decided at load time. Rows without a dynamic-capable
 	// editor host the shared raw body; skins extend their raw-body styling
@@ -398,6 +400,11 @@ struct KnobState
 	// Centred text when non-empty (e.g. "3.2 dB"). Empty for promoted legacy
 	// dials, which show their value in a separate spin box.
 	QString valueText;
+	// A legacy host can request the universally recognisable circular control
+	// when the active skin's specialised control would otherwise hide its
+	// meaning (for example, a numberless preamp dial beside a separate value
+	// box). Skins that have no specialised alternative simply ignore this.
+	bool conventionalPresentation = false;
 	bool enabled = true;
 	bool hovered = false;
 	bool dragging = false;
@@ -427,13 +434,11 @@ public:
 
 	// Colour + metric tokens for the requested mode. The default resolves the
 	// table SkinThemeData keeps for id(); the five shipped skins live there,
-	// so they do not override this.
+	// so they do not override this. An override reaches the painters and
+	// skinChanged only: the application's QSS and palette are built by
+	// SkinThemeData::applyToApplication from the table's tokens for id(), so
+	// they never see it.
 	virtual SkinTokens tokens(bool dark) const;
-
-	// Resource path of the QSS sheet for the requested mode. Default:
-	// SkinThemeData::qssResource(id(), dark), which also carries the minimal
-	// skin's historical precision_* file names.
-	virtual QString qssResource(bool dark) const;
 
 	// The Copy routing renderer that matches this skin's philosophy. May be
 	// nullptr, in which case the caller falls back to the legacy CopyFilterGUI.
@@ -503,7 +508,8 @@ public:
 	// One channel-scope token in a card header (the "Channel:'s influence"
 	// badges). Return true to replace ChBadge's shared chip painting; the
 	// neutral default keeps it, so every skin stays pixel-identical until
-	// it answers. virtualChannel marks a Copy-created (unverified) name.
+	// it answers. virtualChannel marks a channel that is not one of the
+	// device's (ChannelIdentity::isVirtual): a Copy-created name.
 	virtual bool paintChannelBadge(QPainter& painter, const QRect& rect, const QString& channel,
 		bool virtualChannel, const SkinTokens& tokens) const;
 
@@ -578,9 +584,16 @@ public:
 	// tone lamp.
 	virtual void paintVstBusFrame(QPainter& painter, const VstBusFrameState& state, const SkinTokens& tokens) const;
 
+	// The size one slot cell needs for its role token and channel, measured
+	// with the fonts and paddings this skin's paintVstSlotFillCell draws
+	// with, so the drawn text fits the cell the rail lays out. The default
+	// measures the default painter's fonts; a skin whose cell fonts or
+	// paddings differ answers for itself.
+	virtual QSize vstSlotFillCellSize(const QString& role, const QString& value, const SkinTokens& tokens) const;
+
 	// One slot cell of the VST channel-fill rails: role engraving, the
-	// assigned channel, and the dropdown cue, sized by the widget so text
-	// never collides with the caret. The default is a neutral cell that
+	// assigned channel, and the dropdown cue, in a cell the widget sizes
+	// through vstSlotFillCellSize. The default is a neutral cell that
 	// reads visibly different from paintVstBusSelector (no channel-count
 	// suffix, silent slots in muted strike ink, missing channels in the
 	// danger tone).

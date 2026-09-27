@@ -19,7 +19,6 @@
 
 #include <cmath>
 
-#include "Editor/helpers/GUIHelper.h"
 #include "PreampFilterGUI.h"
 #include <filters/PreampCommand.h>
 #include "ui_PreampFilterGUI.h"
@@ -31,7 +30,13 @@ PreampFilterGUI::PreampFilterGUI(double dbGain)
 {
 	ui->setupUi(this);
 
-	ui->dial->setFixedSize(GUIHelper::scale(QSize(100, 66)));
+	// Qt owns high-DPI scaling in the v2.54 UI stack, so this is deliberately
+	// expressed in logical pixels rather than manually scaled a second time.
+	ui->dial->setFixedSize(QSize(100, 66));
+	// The legacy row already puts the exact dB value beside its dial. Minimal's
+	// numberless register drum therefore looked like an unlabelled striped
+	// rectangle here; keep this host on the shared circular control instead.
+	ui->dial->setConventionalPresentation(true);
 	// Gain has a real neutral point. AudioKnob forwards this to the active
 	// skin so Clarity can draw an explicit zero detent in Legacy Rows too.
 	ui->dial->setBipolar(true);

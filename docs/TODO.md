@@ -1,5 +1,14 @@
 # TODO
 
+- [x] Integrate tagged upstream `v2.54.31` (`00f578cd`) into isolated local candidate `codex/upstream-v25431-beta` over `origin/beta` `26e2a0bb`, retaining fork VST recovery, selected-endpoint preview, themes, and distribution identity. Local native/UI/gallery validation is green.
+- [x] Package and install-test the v2.54.31 candidate: the unsigned local AVX-512 MSI is hash-verified at `C:\Program Files\EqualizerAPO-XT-x64-avx512\current`; config and update-pause marker are preserved, and Windows Audio is Running.
+- [ ] User manually test installed v2.54.31: real VST3 chain (including conflicting plug-ins), selected-microphone live preview, microphone continuity in recording/chat apps, and latency. Do not push beta, touch `main`, or create a release until accepted.
+
+- [x] Reproduce and repair the Minimal-derived Legacy Preamp striped-drum regression with a deterministic 100x66 knob specimen. The legacy host now requests the token-aware precision dial and rotary drag; 112 dark/light specimen renders and Theme Lab pass.
+- [x] Install the v2.54.31 UI follow-up as an Editor-only overlay at the exact AVX-512 Program Files target, with a rollback copy and before/after hashes proving config, engine, VST3 routing, and Qt platform unchanged.
+- [x] User manually verified the installed Preamp overlay: the Minimal-derived Legacy dial is clear, circular, and usable. User approved updating `beta`.
+- [ ] Retain the separate real VST3-chain, microphone-continuity, and latency acceptance before any `main` promotion or release.
+
 - [x] Reproduce and repair VST3 path-alias lifetime, explicit processing rejection, and optional startup-notification bugs; 170 host checks and real RNNoise/FabFilter/Clear OSS synthetic mono tests pass.
 - [x] Finish local per-machine AVX-512 test MSI and packaged Editor/panel checks; fix `26b23931` pushed to beta, no install.
 - [ ] Full beta CI `34061852125`, then complete beta prerelease from exact green `26b23931`. Main stays unchanged.

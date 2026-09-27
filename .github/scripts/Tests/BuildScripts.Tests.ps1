@@ -85,6 +85,26 @@ Describe "extracted build script decisions" {
         # --burst is pinned exactly once, in sync mode; a regression there
         # cannot hide behind the pipelined run's timing-bound retries.
         @($plan.Runs | Where-Object { $_.Arguments -contains "--burst" }).Count | Should -Be 1
+        # The paced pipelined daemon-thread run refuses every late block and
+        # names the slow ones, so a failure says which block and which step.
+        $pipelinedThread = $plan.Runs | Where-Object { $_.Name -eq "daemon-thread-pipelined-int24-128" }
+        $pipelinedThread.Arguments | Should -Contain "--trace-slow"
+        $pipelinedThread.Arguments[[array]::IndexOf($pipelinedThread.Arguments, "--max-late") + 1] | Should -Be "0"
+    }
+
+    It "runs every runtime suite and the golden regression suite under the memory gate" {
+        # Audit #348 D1/TD-22: the memcheck list was typed by hand and had
+        # drifted (AsioTests rebuilt with ASan but never run,
+        # AudioRegressionTests absent). It now derives from Build-Solution.
+        $solution = & (Join-Path $PSScriptRoot "..\Build-Solution.ps1") `
+            -WorkspaceRoot $root -Platform x64 -SimdVariant avx2 -ArchFlag AdvancedVectorExtensions2 -PlanOnly
+        $memcheck = & (Join-Path $PSScriptRoot "..\Invoke-MemcheckTests.ps1") -WorkspaceRoot $root -PlanOnly
+        foreach ($suite in $solution.RuntimeTests) {
+            $memcheck.Suites | Should -Contain $suite -Because "memcheck must run every suite Build-Solution runs"
+            $memcheck.Projects | Should -Contain "Tests\$suite\$suite.vcxproj"
+        }
+        $memcheck.Suites | Should -Contain "AudioRegressionTests"
+        $memcheck.SuiteArguments["AudioRegressionTests"] | Should -Contain "--ref-dir"
     }
 
     It "lists the capture probes so every leg builds them" {
@@ -144,6 +164,28 @@ Describe "extracted build script decisions" {
         $plan.AsioEntry.Name | Should -Be "asio-entry"
         $plan.AsioEntry.ExpectGainDb | Should -Be $plan.PreampDb
         $plan.AsioEntry.Required | Should -BeTrue
+    }
+
+    It "compiles every shipped C++ binary for CodeQL" {
+        # Audit #348 TD-25: the CodeQL build was four projects written into the
+        # YAML, and the ASIO wrapper, the engine host, the VST3 plug-in and the
+        # installer shipped unscanned. Every C++ file the x64 artifact ships
+        # maps to its project, which the CodeQL plan must compile.
+        $repo = Join-Path $PSScriptRoot "..\..\.."
+        $codeql = & (Join-Path $PSScriptRoot "..\Invoke-CodeQLBuild.ps1") -PlanOnly
+        $scanned = @($codeql.Targets | ForEach-Object { "$($_.Project)|$($_.Platform)" })
+        $pack = & (Join-Path $PSScriptRoot "..\Package-Artifacts.ps1") `
+            -WorkspaceRoot $repo -Platform x64 -SimdVariant avx2 -PlanOnly
+        $shipped = @($pack.RequiredFiles) + @($pack.Vst3PluginModule)
+        foreach ($file in $shipped) {
+            $projectDir = ($file -split '\\x64\\Release\\')[0]
+            $projects = @(Get-ChildItem -LiteralPath (Join-Path $repo $projectDir) -Filter "*.vcxproj" -File)
+            $projects.Count | Should -Be 1 -Because "$file comes from one project in $projectDir"
+            $scanned | Should -Contain "$projectDir\$($projects[0].Name)|x64" -Because "$file ships"
+        }
+        $pack.Win32Wrapper | Should -Not -BeNullOrEmpty
+        $scanned | Should -Contain "EqualizerAPOAsio\EqualizerAPOAsio.vcxproj|Win32" -Because "the x86 wrapper ships"
+        $scanned | Should -Contain "Installer\Installer.vcxproj|Win32" -Because "the installer is a release asset"
     }
 
     It "builds only the two 32-bit ASIO DLLs for Win32" {
@@ -235,5 +277,64 @@ Describe "extracted build script decisions" {
         foreach ($extension in @(".pch", ".cpp", ".h")) {
             $plan.ExcludedExtensions | Should -Contain $extension
         }
+    }
+
+    It "keeps the symbols of every program the artifact ships" {
+        # Audit #348 TD-75: the inline step kept three PDBs of nine. The list
+        # now comes from the packaging plan, so every shipped program has one.
+        foreach ($platform in @("x64", "ARM64")) {
+            $package = & (Join-Path $PSScriptRoot "..\Package-Artifacts.ps1") `
+                -WorkspaceRoot $root -Platform $platform -SimdVariant avx2 -PlanOnly
+            $symbols = @(& (Join-Path $PSScriptRoot "..\Collect-Symbols.ps1") `
+                -WorkspaceRoot $root -Platform $platform -SimdVariant avx2 -PlanOnly)
+            $sources = @($symbols | ForEach-Object { $_.Source })
+            foreach ($binary in @($package.RequiredFiles) + @($package.Vst3PluginModule)) {
+                $sources | Should -Contain ([System.IO.Path]::ChangeExtension($binary, ".pdb"))
+            }
+            foreach ($app in $package.QtApps) {
+                $sources | Should -Contain "build-$app-$platform\release\$app.pdb"
+            }
+            $sources | Should -Contain "EqualizerAPOHost\$platform\Release\EqualizerAPOHost.pdb"
+            # Two programs share a file name only across x64 and x86; no
+            # destination may be written twice.
+            @($symbols | ForEach-Object { $_.Destination } | Sort-Object -Unique).Count | Should -Be $symbols.Count
+        }
+        $x64 = @(& (Join-Path $PSScriptRoot "..\Collect-Symbols.ps1") -WorkspaceRoot $root -Platform x64 -SimdVariant avx2 -PlanOnly)
+        ($x64 | Where-Object { $_.Source -eq "EqualizerAPOAsio\Release\EqualizerAPOAsio.pdb" }).Destination |
+            Should -Be "x86\EqualizerAPOAsio.pdb"
+        $arm64 = @(& (Join-Path $PSScriptRoot "..\Collect-Symbols.ps1") -WorkspaceRoot $root -Platform ARM64 -SimdVariant neon -PlanOnly)
+        @($arm64 | Where-Object { $_.Destination -like "x86\*" }).Count | Should -Be 0
+    }
+
+    It "fails when a shipped program left no symbols" {
+        $fixture = Join-Path $TestDrive "symbols-fixture"
+        New-Item -ItemType Directory -Force -Path $fixture | Out-Null
+        { & (Join-Path $PSScriptRoot "..\Collect-Symbols.ps1") -WorkspaceRoot $fixture -Platform x64 -SimdVariant avx2 `
+            -SymbolsDirectory (Join-Path $fixture "symbols") 6>$null } | Should -Throw "*left no debug symbols*"
+    }
+
+    It "verifies against the committed references and records only on request" {
+        # Audit #348 TD-75 moved the decision out of build.yml; the rules are
+        # audit #275 TD-08's: never seed a missing set implicitly.
+        $suite = Join-Path $TestDrive "art\Tests\AudioRegressionTests\references"
+        New-Item -ItemType Directory -Force -Path $suite | Out-Null
+        $workspace = Join-Path $TestDrive "art"
+        $script = Join-Path $PSScriptRoot "..\Invoke-AudioRegression.ps1"
+
+        $missing = & $script -WorkspaceRoot $workspace -Platform x64 -SimdVariant avx2 -Primary -PlanOnly
+        $missing.Mode | Should -Be "MissingReferences"
+
+        Set-Content -LiteralPath (Join-Path $suite "cases.json") -Value "{}"
+        $verify = & $script -WorkspaceRoot $workspace -Platform x64 -SimdVariant avx2 -Primary -PlanOnly
+        $verify.Mode | Should -Be "Verify"
+        $verify.Arguments | Should -Not -Contain "--generate-references"
+        $verify.Arguments | Should -Contain "avx2"
+
+        $record = & $script -WorkspaceRoot $workspace -Platform x64 -SimdVariant avx2 -Primary -Regenerate -PlanOnly
+        $record.Mode | Should -Be "RecordReferences"
+        $record.Arguments | Should -Contain "--generate-references"
+
+        $variant = & $script -WorkspaceRoot $workspace -Platform x64 -SimdVariant sse2 -Regenerate -PlanOnly
+        $variant.Mode | Should -Be "RecordVariant"
     }
 }

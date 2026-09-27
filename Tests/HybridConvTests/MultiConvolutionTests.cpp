@@ -9,6 +9,7 @@
 	back into that target, independent of the Channel command's selection.
 */
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <sstream>
@@ -19,12 +20,14 @@
 #include <windows.h>
 
 #include "filters/ConvolutionFilter.h"
+#include "filters/GraphicEQFilter.h"
 #include "filters/MultiConvolutionCommand.h"
 #include "filters/MultiConvolutionFilter.h"
-#include "audio/io/SndfileRAII.h"
 #include "services/logging/Logging.h"
 #include "diagnostics/performance/PerfProfile.h"
+#include "Tests/TestDirectory.h"
 #include "Tests/TestHarness.h"
+#include "Tests/WavFixtures.h"
 
 using std::vector;
 using std::wstring;
@@ -39,38 +42,20 @@ constexpr double tolerance = 1.0e-8;
 
 test::Harness harness("MultiConvolutionTests");
 
+test::TestDirectory& scratchDirectory()
+{
+	static test::TestDirectory directory(L"MultiConvolutionTests");
+	return directory;
+}
+
 // Writes a multi-channel impulse response to a temporary WAV. channels[c] holds
 // the samples of IR channel c; all channels must have the same length.
 wstring createMultiChannelIr(const vector<vector<double>>& channels)
 {
-	const unsigned numCh = (unsigned)channels.size();
-	const unsigned frames = (unsigned)channels[0].size();
-	vector<double> interleaved((size_t)frames * numCh);
-	for (unsigned f = 0; f < frames; f++)
-		for (unsigned c = 0; c < numCh; c++)
-			interleaved[(size_t)f * numCh + c] = channels[c][f];
-
-	wchar_t tempPath[MAX_PATH] = {};
-	wchar_t tempFile[MAX_PATH] = {};
-	if (GetTempPathW(MAX_PATH, tempPath) == 0)
-		harness.fail("GetTempPathW failed");
-	if (GetTempFileNameW(tempPath, L"mc", 0, tempFile) == 0)
-		harness.fail("GetTempFileNameW failed");
-
-	wstring filename = tempFile;
-	DeleteFileW(filename.c_str());
-	filename += L".wav";
-
-	SF_INFO info = {};
-	info.samplerate = sampleRate;
-	info.channels = (int)numCh;
-	info.format = SF_FORMAT_WAV | SF_FORMAT_DOUBLE;
-
-	sndfile::Handle file(sf_wchar_open(filename.c_str(), SFM_WRITE, &info));
-	if (!file)
-		harness.fail("could not create temporary impulse response file");
-	sf_writef_double(file.get(), interleaved.data(), (sf_count_t)frames);
-
+	static unsigned fileCount = 0;
+	const wstring filename = scratchDirectory().trackFile(L"ir-" + std::to_wstring(fileCount++) + L".wav");
+	harness.require(test::writeWavFile(filename, sampleRate, channels),
+		"the temporary impulse response file is written completely");
 	return filename;
 }
 
@@ -90,7 +75,7 @@ void assertMismatchIsLoggedAndProfiled()
 		vector<double> ir(frameLength, 0.0);
 		ir[0] = 1.0;
 		wstring irFile = createMultiChannelIr({ ir });
-		MultiConvolutionFilter filter({ { L"L", { 0 } } }, irFile);
+		MultiConvolutionFilter filter({ { L"L", { 0 } } }, ConfigFileReference::target(L"", irFile).path);
 		filter.initialize((float)sampleRate, frameLength, vector<wstring>{ L"L" });
 		DeleteFileW(irFile.c_str());
 
@@ -146,7 +131,7 @@ void assertConvolutionMismatchIsLogged()
 		vector<double> ir(frameLength, 0.0);
 		ir[0] = 1.0;
 		wstring irFile = createMultiChannelIr({ ir });
-		ConvolutionFilter filter(irFile);
+		ConvolutionFilter filter(ConfigFileReference::target(L"", irFile).path);
 		filter.initialize((float)sampleRate, frameLength, vector<wstring>{ L"L" });
 		DeleteFileW(irFile.c_str());
 
@@ -177,6 +162,52 @@ void assertConvolutionMismatchIsLogged()
 		"Convolution mismatch detail is logged only once per instance");
 }
 
+// GraphicEQFilter derives from ConvolutionFilter but counts and reports its
+// mutes under its own prefix (audit #348 F3): before, a GraphicEQ mute was
+// logged as Convolution's, which the second assertion rules out.
+void assertGraphicEQMismatchIsLoggedAsGraphicEQ()
+{
+	FILE* logFile = nullptr;
+	if (tmpfile_s(&logFile) != 0 || logFile == nullptr)
+	{
+		harness.fail("could not create GraphicEQ mismatch log capture");
+		return;
+	}
+	Logging::useStream(logFile, false, true, false);
+
+	{
+		GraphicEQFilter filter({ FilterNode(20.0, 0.0), FilterNode(20000.0, 0.0) }, 1024);
+		filter.initialize((float)sampleRate, frameLength, vector<wstring>{ L"L" });
+
+		constexpr unsigned shortBlock = frameLength / 2;
+		vector<double> in(shortBlock, 0.1);
+		vector<double> out(shortBlock, 1.0);
+		double* input[] = { in.data() };
+		double* output[] = { out.data() };
+		filter.process(output, input, shortBlock);
+		filter.process(output, input, shortBlock);
+		harness.expectTrue(out[0] == 0.0, "a mismatched GraphicEQ block is muted");
+	}
+
+	std::fflush(logFile);
+	std::rewind(logFile);
+	std::wstring log;
+	wchar_t buffer[1024];
+	while (std::fgetws(buffer, static_cast<int>(std::size(buffer)), logFile) != nullptr)
+		log.append(buffer);
+	std::fclose(logFile);
+	Logging::useStream(stdout, true, true, false);
+
+	const std::wstring marker = GraphicEQFilter::kGraphicEQFrameCountMismatchLogPrefix;
+	const size_t first = log.find(marker);
+	harness.expectTrue(first != std::string::npos,
+		"GraphicEQ frame-count mismatch is logged");
+	harness.expectTrue(first != std::string::npos && log.find(marker, first + marker.size()) == std::string::npos,
+		"GraphicEQ mismatch detail is logged only once per instance");
+	harness.expectTrue(log.find(ConvolutionFilter::kFrameCountMismatchLogPrefix) == std::string::npos,
+		"a GraphicEQ mismatch is not reported as Convolution's");
+}
+
 // First tracer bullet for the mapping semantics: "L=0+1" convolves channel L's
 // OWN pre-command signal with IR channels 0 (2x) and 1 (3x) and sums into L,
 // giving 0.1*(2+3) = 0.5. The other channel (R = 0.7) must not take part; the
@@ -190,7 +221,7 @@ void assertMappingConvolvesTargetsOwnSignal()
 	ir1[0] = 3.0;
 	wstring irFile = createMultiChannelIr({ir0, ir1});
 
-	MultiConvolutionFilter filter({{L"L", {0, 1}}}, irFile);
+	MultiConvolutionFilter filter({{L"L", {0, 1}}}, ConfigFileReference::target(L"", irFile).path);
 	vector<wstring> allChannels = {L"L", L"R"};
 	vector<wstring> outChannels = filter.initialize((float)sampleRate, frameLength, allChannels);
 	DeleteFileW(irFile.c_str());
@@ -223,7 +254,7 @@ void assertEachMappingWritesItsOwnOutput()
 	ir1[0] = 3.0;
 	wstring irFile = createMultiChannelIr({ir0, ir1});
 
-	MultiConvolutionFilter filter({{L"L", {0}}, {L"R", {1}}}, irFile);
+	MultiConvolutionFilter filter({{L"L", {0}}, {L"R", {1}}}, ConfigFileReference::target(L"", irFile).path);
 	vector<wstring> allChannels = {L"L", L"R"};
 	vector<wstring> outChannels = filter.initialize((float)sampleRate, frameLength, allChannels);
 	DeleteFileW(irFile.c_str());
@@ -257,7 +288,7 @@ void assertSimpleFormUsesEveryIrChannel()
 	ir1[0] = 3.0;
 	wstring irFile = createMultiChannelIr({ir0, ir1});
 
-	MultiConvolutionFilter filter({{L"L", {}}}, irFile);
+	MultiConvolutionFilter filter({{L"L", {}}}, ConfigFileReference::target(L"", irFile).path);
 	vector<wstring> allChannels = {L"L", L"R"};
 	vector<wstring> outChannels = filter.initialize((float)sampleRate, frameLength, allChannels);
 	DeleteFileW(irFile.c_str());
@@ -288,7 +319,7 @@ void assertMissingSourcesAndDuplicatesDegradeGracefully()
 
 	{
 		wstring irFile = createMultiChannelIr({ir0, ir1});
-		MultiConvolutionFilter filter({{L"Wet", {0}}}, irFile);
+		MultiConvolutionFilter filter({{L"Wet", {0}}}, ConfigFileReference::target(L"", irFile).path);
 		vector<wstring> allChannels = {L"L", L"R"};
 		vector<wstring> outChannels = filter.initialize((float)sampleRate, frameLength, allChannels);
 		DeleteFileW(irFile.c_str());
@@ -309,7 +340,7 @@ void assertMissingSourcesAndDuplicatesDegradeGracefully()
 
 	{
 		wstring irFile = createMultiChannelIr({ir0, ir1});
-		MultiConvolutionFilter filter({{L"L", {0, 7}}}, irFile);
+		MultiConvolutionFilter filter({{L"L", {0, 7}}}, ConfigFileReference::target(L"", irFile).path);
 		vector<wstring> allChannels = {L"L", L"R"};
 		filter.initialize((float)sampleRate, frameLength, allChannels);
 		DeleteFileW(irFile.c_str());
@@ -327,7 +358,7 @@ void assertMissingSourcesAndDuplicatesDegradeGracefully()
 
 	{
 		wstring irFile = createMultiChannelIr({ir0, ir1});
-		MultiConvolutionFilter filter({{L"L", {0}}, {L"L", {1}}}, irFile);
+		MultiConvolutionFilter filter({{L"L", {0}}, {L"L", {1}}}, ConfigFileReference::target(L"", irFile).path);
 		vector<wstring> allChannels = {L"L", L"R"};
 		vector<wstring> outChannels = filter.initialize((float)sampleRate, frameLength, allChannels);
 		DeleteFileW(irFile.c_str());
@@ -511,7 +542,7 @@ void assertFactorScalesConvolutionResult()
 		if (c.alsoUnity1)
 			refs.push_back(IrRef(1));
 		wstring irFile = createMultiChannelIr({ir0, ir1});
-		MultiConvolutionFilter filter({{L"L", refs}}, irFile);
+		MultiConvolutionFilter filter({{L"L", refs}}, ConfigFileReference::target(L"", irFile).path);
 		vector<wstring> allChannels = {L"L", L"R"};
 		filter.initialize((float)sampleRate, frameLength, allChannels);
 		DeleteFileW(irFile.c_str());
@@ -560,10 +591,45 @@ void assertCommandSerializeRoundTrips()
 }
 } // namespace
 
+// Audit #348 A2: the Editor learns a MultiConvolution line's new channels
+// from MultiConvolutionCommand::declareChannels. It must give the list the
+// engine builds: the filter's declared outputs appended by name, the way
+// FilterEngine::addFilters appends them.
+void assertEditorDeclaresTheEnginesChannels()
+{
+	vector<double> ir0(frameLength, 0.0);
+	ir0[0] = 1.0;
+	vector<double> ir1(frameLength, 0.0);
+	ir1[0] = 1.0;
+
+	MultiConvolutionCommand command;
+	command.mappings = {{L"Wet", {0}}, {L"2", {1}}, {L"SUB", {0}}, {L"Wet", {1}}, {L"Dry", {1}}};
+	const vector<wstring> device = {L"L", L"R", L"C", L"LFE"};
+
+	vector<wstring> editor = device;
+	command.declareChannels(editor);
+
+	const wstring irFile = createMultiChannelIr({ir0, ir1});
+	MultiConvolutionFilter filter(command.mappings, ConfigFileReference::target(L"", irFile).path);
+	const vector<wstring> outputs = filter.initialize((float)sampleRate, frameLength, device);
+	DeleteFileW(irFile.c_str());
+	vector<wstring> engine = device;
+	for (const wstring& name : outputs)
+	{
+		if (std::find(engine.begin(), engine.end(), name) == engine.end())
+			engine.push_back(name);
+	}
+
+	harness.expectTrue(editor == engine, "the Editor's channel list after the line is the engine's");
+	harness.expectTrue(editor == vector<wstring>({L"L", L"R", L"C", L"LFE", L"Wet", L"Dry"}),
+		"new targets are added once, in order; a number and an alias name existing channels");
+}
+
 void runMultiConvolutionTests()
 {
 	assertMismatchIsLoggedAndProfiled();
 	assertConvolutionMismatchIsLogged();
+	assertGraphicEQMismatchIsLoggedAsGraphicEQ();
 	assertMappingConvolvesTargetsOwnSignal();
 	assertEachMappingWritesItsOwnOutput();
 	assertSimpleFormUsesEveryIrChannel();
@@ -574,5 +640,7 @@ void runMultiConvolutionTests()
 	assertFactorGrammarParses();
 	assertFactorScalesConvolutionResult();
 	assertCommandSerializeRoundTrips();
+	assertEditorDeclaresTheEnginesChannels();
+	scratchDirectory().removeAll();
 	harness.report();
 }

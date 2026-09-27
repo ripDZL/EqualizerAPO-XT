@@ -38,7 +38,6 @@
 #include "Editor/FilterTable.h"
 #include "Editor/SkinManager.h"
 #include "Editor/skins/ISkin.h"
-#include "Editor/helpers/ConvolutionPathHelper.h"
 #include "Editor/helpers/GUIHelper.h"
 #include "Editor/import/ConfigDependencyScanner.h"
 #include "Editor/import/ImportDialog.h"
@@ -136,9 +135,9 @@ void MultiConvolutionCardEditor::store(QString& command, QString& parameters)
 	parameters = QString::fromStdWString(cmd.serialize());
 }
 
-void MultiConvolutionCardEditor::configureChannels(std::vector<std::wstring>& channelNames)
+void MultiConvolutionCardEditor::setChannelFlow(const ChannelFlowAtLine& flow)
 {
-	rowChannels = channelNames;
+	rowChannels = flow.namesInScope;
 	rebuildRoutingView();
 }
 
@@ -218,6 +217,10 @@ void MultiConvolutionCardEditor::rebuildRoutingView()
 
 	RoutingPortModel portModel;
 	portModel.fixedSources = MultiConvolutionRoutingAdapter::sourcePorts(fileChannelCount, mappings);
+	// The device's channels, not targets: the session's added outputs are
+	// exactly the virtual ones.
+	if (filterTable != nullptr)
+		portModel.deviceChannels = filterTable->getChannelNames();
 
 	routingView = renderer->create(assignments, targets, portModel, this,
 		SkinManager::instance()->tokens());
@@ -341,9 +344,11 @@ void MultiConvolutionCardEditor::updateFileInfo()
 			// inside the config directory. The offscreen gallery skips the probe.
 			if (!qEnvironmentVariableIsSet("EAPO_SKIN_GALLERY"))
 			{
-				if (!FileReferenceController::isReadableByAudioService(state.fullPath))
+				const QString problem = FileReferenceController::audioServiceProblem(
+					state.fullPath, filterTable->getConfigPath());
+				if (!problem.isEmpty())
 				{
-					state.statusText = tr("Not readable by the audio service");
+					state.statusText = problem;
 					state.statusSeverity = ReferenceCardState::Severity::Critical;
 					offerImport = true;
 				}

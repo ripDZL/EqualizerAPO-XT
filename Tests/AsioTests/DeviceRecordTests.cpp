@@ -7,17 +7,22 @@
 	registry: target enumeration from HKLM\SOFTWARE\ASIO, the derived
 	wrapper CLSID, the entry and class trees in both registry views, the
 	playback/capture records sharing one wrapper record, and the facts the
-	engine host publishes. Nothing here touches the machine.
+	engine host publishes. Nothing here touches the machine's registry, and
+	the install directory the records point at is a folder of the test's own.
 */
 
 #include <string>
 #include <vector>
 
 #include "asio/AsioRegistration.h"
+#include "asio/StreamFacts.h"
 #include "asio/WrapperRecord.h"
 #include "devices/AsioAPOInfo.h"
+#include "devices/DeviceException.h"
+#include "runtime/errors/WideError.h"
 #include "services/registry/RegistryPaths.h"
-#include "Tests/EngineOrchestrationTests/FakeRegistry.h"
+#include "Tests/FakeRegistry.h"
+#include "Tests/TestDirectory.h"
 #include "Tests/TestHarness.h"
 
 using eapo::asio::AsioTarget;
@@ -30,6 +35,16 @@ namespace
 	const wchar_t* const toppingClsid = L"{6D241B5E-CF73-4043-A85F-EF11D4670955}";
 	const wchar_t* const minidspClsid = L"{466A3ACF-0324-46F9-9A38-FB08FFDD208E}";
 
+	// The InstallPath the records see. Whether the x86 wrapper ships is a
+	// file test under it, so it has to be a folder this test owns: on a
+	// machine with the product installed, C:\Program Files\EqualizerAPO
+	// answered differently (audit #348 TD-73).
+	test::TestDirectory& installDirectory()
+	{
+		static test::TestDirectory directory(L"DeviceRecordTests");
+		return directory;
+	}
+
 	void seedTargets(test::FakeRegistry& registry)
 	{
 		const std::wstring root = AsioRegistration::asioRoot(false);
@@ -41,7 +56,7 @@ namespace
 		// A stray subkey without a CLSID (some installers leave one) is skipped.
 		registry.seedKey(root + L"\\Broken Driver");
 		registry.seedKey(APP_REGPATH);
-		registry.seedString(APP_REGPATH, L"InstallPath", L"C:\\Program Files\\EqualizerAPO");
+		registry.seedString(APP_REGPATH, L"InstallPath", installDirectory().path());
 	}
 
 	void testEnumerationAndDerivedIds()
@@ -68,6 +83,7 @@ namespace
 		harness.expect(wrapper == AsioRegistration::wrapperClsidFor(toppingClsid), "the derivation is deterministic");
 		harness.expect(wrapper != AsioRegistration::wrapperClsidFor(minidspClsid), "different targets derive different wrappers");
 		harness.expect(AsioRegistration::wrapperClsidFor(L"not a guid").empty(), "a malformed target CLSID derives nothing");
+		harness.expect(AsioRegistration::wrapperClsidFor(L"Some.ProgID").empty(), "a ProgID is not taken for a CLSID");
 		harness.expect(AsioRegistration::entryNameFor(L"Topping USB Audio Device") == L"Topping USB Audio Device (EQ APO XT)", "the entry name carries the suffix");
 		harness.expectTrue(AsioRegistration::isWrapperEntry(L"X (EQ APO XT)"), "the suffix is recognized");
 		harness.expectFalse(AsioRegistration::isWrapperEntry(L"Topping USB Audio Device"), "a target name is not a wrapper entry");
@@ -155,6 +171,42 @@ namespace
 		harness.expect(old.renderEndpoint.empty() && old.captureEndpoint.empty(), "with no endpoints");
 	}
 
+	// Audit #348 TD-08: an endpoint entry is named after the device's
+	// friendly name at install time. Removing it after the device was renamed
+	// used to derive the new name, miss the old key, and leave the entry in
+	// every DAW's list. Removal now follows the wrapper CLSID.
+	void testUnregisterFindsAnEntryUnderItsOldName()
+	{
+		test::FakeRegistry registry;
+		const std::wstring endpoint = L"{A6974EEF-CBB1-4E81-B9CA-34B91FFF5279}";
+		const AsioTarget installed = AsioRegistration::endpointTarget(endpoint, L"Speakers", L"TOPPING USB DAC");
+		AsioRegistration::registerWrapper(registry, installed, L"C:\\eapo\\EqualizerAPOAsio.dll", L"C:\\eapo\\x86\\EqualizerAPOAsio.dll");
+		harness.require(AsioRegistration::wrapperRegistered(registry, installed), "the entry is registered under the install-time name");
+
+		// An unrelated driver entry must survive the sweep.
+		registry.seedString(L"HKEY_LOCAL_MACHINE\\SOFTWARE\\ASIO\\Other Driver", L"CLSID", L"{11111111-2222-3333-4444-555555555555}");
+
+		const AsioTarget renamed = AsioRegistration::endpointTarget(endpoint, L"Speakers", L"Desk DAC");
+		AsioRegistration::unregisterWrapper(registry, renamed);
+
+		const std::wstring wrapperClsid = AsioRegistration::wrapperClsidFor(endpoint);
+		for (int view = 0; view < 2; view++)
+		{
+			const std::wstring root = AsioRegistration::asioRoot(view == 1);
+			bool left = false;
+			if (registry.keyExists(root))
+				for (const std::wstring& name : registry.enumSubKeys(root))
+				{
+					const std::wstring key = root + L"\\" + name;
+					if (registry.valueExists(key, L"CLSID") && _wcsicmp(registry.readValue(key, L"CLSID").c_str(), wrapperClsid.c_str()) == 0)
+						left = true;
+				}
+			harness.expect(!left, view == 0 ? "no 64-bit ASIO entry points at the wrapper after removal under a new name"
+				: "no 32-bit ASIO entry points at the wrapper after removal under a new name");
+		}
+		harness.expect(registry.keyExists(L"HKEY_LOCAL_MACHINE\\SOFTWARE\\ASIO\\Other Driver"), "another driver's entry is left alone");
+	}
+
 	void testRecordsShareOneWrapperRecord()
 	{
 		test::FakeRegistry registry;
@@ -197,7 +249,7 @@ namespace
 		harness.expectFalse(record.options.processInput, "ProcessInput stays off");
 		harness.expect(record.targetClsid == toppingClsid, "the record names the target");
 		harness.expect(registry.readValue(AsioRegistration::classesClsidRoot(false) + L"\\" + wrapper + L"\\InprocServer32", L"")
-			== L"C:\\Program Files\\EqualizerAPO\\EqualizerAPOAsio.dll", "the class tree points at the install directory's DLL");
+			== installDirectory().path() + L"\\EqualizerAPOAsio.dll", "the class tree points at the install directory's DLL");
 		harness.expectFalse(registry.keyExists(AsioRegistration::classesClsidRoot(true) + L"\\" + wrapper), "no 32-bit view when the x86 DLL file is absent");
 
 		// A second enumeration sees the state.
@@ -268,7 +320,7 @@ namespace
 		topping->reinstall();
 		harness.expectTrue(AsioRegistration::autoStartRegistered(registry), "the Run value appears");
 		harness.expect(registry.readValue(AsioRegistration::autoStartKey(), AsioRegistration::autoStartValueName())
-			== L"\"C:\\Program Files\\EqualizerAPO\\EqualizerAPOHost.exe\" --resident", "the Run value starts the host resident");
+			== L"\"" + installDirectory().path() + L"\\EqualizerAPOHost.exe\" --resident", "the Run value starts the host resident");
 		harness.expect(topping->isAutoStart() && !topping->hasChanges(), "applied: the option reads back, no change pending");
 
 		minidsp->setAutoStart(true);
@@ -291,6 +343,20 @@ namespace
 			"without the x86 file the 32-bit view still stays empty");
 		harness.expectEqual(topping->getDeadlinePercent(), 75u, "the wait share reads back");
 		harness.expectFalse(topping->hasChanges(), "applied");
+
+		// With the x86 wrapper in the install directory the same record
+		// registers the 32-bit view.
+		const std::wstring x86 = installDirectory().path() + L"\\x86";
+		CreateDirectoryW(x86.c_str(), nullptr);
+		const std::wstring wrapper32 = AsioRegistration::wrapper32DllPath(installDirectory().path());
+		CloseHandle(CreateFileW(wrapper32.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, 0, nullptr));
+		harness.expectTrue(topping->canHost32(), "an x86 wrapper in the install directory makes 32-bit support available");
+		topping->reinstall();
+		harness.expect(registry.keyExists(AsioRegistration::classesClsidRoot(true) + L"\\" + topping->getWrapperClsid())
+			&& registry.readValue(AsioRegistration::classesClsidRoot(true) + L"\\" + topping->getWrapperClsid() + L"\\InprocServer32", L"")
+				== wrapper32, "and the 32-bit class tree points at it");
+		DeleteFileW(wrapper32.c_str());
+		RemoveDirectoryW(x86.c_str());
 		topping->uninstall();
 		harness.expectFalse(eapo::asio::WrapperRecords::read(registry, topping->getWrapperClsid(), record), "the record goes with the last direction");
 	}
@@ -299,11 +365,20 @@ namespace
 	{
 		test::FakeRegistry registry;
 		seedTargets(registry);
-		const std::wstring facts = AsioAPOInfo::factsKey(toppingClsid);
-		registry.seedKey(facts);
-		registry.seedDword(facts, L"SampleRate", 96000);
-		registry.seedDword(facts, L"OutputChannels", 2);
-		registry.seedDword(facts, L"InputChannels", 0);
+		// What the engine host writes (EngineHostCore publishes through the
+		// same function), read back by the records.
+		eapo::asio::StreamFormat format;
+		format.sampleRate = 96000.0;
+		format.frames = 128;
+		format.channels[0] = 2;
+		format.channels[1] = 0;
+		wcsncpy_s(format.deviceName, L"Topping USB Audio Device", _TRUNCATE);
+		wcsncpy_s(format.deviceGuid, toppingClsid, _TRUNCATE);
+		eapo::asio::StreamFacts::write(registry, format);
+		const std::wstring facts = eapo::asio::StreamFacts::key(toppingClsid);
+		harness.expect(facts == std::wstring(USER_REGPATH) + L"\\ASIO\\" + toppingClsid, "the facts live under the user's hive, keyed by the target CLSID");
+		harness.expectEqual(registry.readDWORDValue(facts, L"Frames"), 128ul, "the buffer size is kept for diagnostics");
+		harness.expect(registry.readValue(facts, L"DeviceName") == L"Topping USB Audio Device", "and so is the driver's name");
 		std::vector<std::shared_ptr<AbstractAPOInfo>> playback, capture;
 		AsioAPOInfo::appendInfos(playback, false, registry);
 		AsioAPOInfo::appendInfos(capture, true, registry);
@@ -323,6 +398,162 @@ namespace
 		harness.expectEqual(out->getChannelCount(), 2u, "the output channel count comes from the facts");
 		harness.expectEqual(out->getChannelMask(), 3ul, "two channels derive the stereo mask");
 		harness.expectEqual(in->getChannelCount(), 0u, "the capture record reads its own count");
+
+		eapo::asio::StreamShape shape;
+		harness.expectFalse(eapo::asio::StreamFacts::read(registry, minidspClsid, shape), "a target never streamed has no facts");
+		harness.expectEqual(shape.sampleRate, 0ul, "and reads as zero");
+	}
+
+	// Audit #348 TD-45: a target CLSID that is not a GUID derived an empty
+	// wrapper CLSID, and registering it wrote the class values into the
+	// CLSID root itself.
+	void testNonGuidTargetIsRefused()
+	{
+		test::FakeRegistry registry;
+		seedTargets(registry);
+		const std::wstring root = AsioRegistration::asioRoot(false);
+		registry.seedKey(root + L"\\ProgID Driver");
+		registry.seedString(root + L"\\ProgID Driver", L"CLSID", L"Vendor.AsioDriver");
+		bool listed = false;
+		for (const AsioTarget& target : AsioRegistration::enumerateTargets(registry))
+			listed = listed || target.name == L"ProgID Driver";
+		harness.expectFalse(listed, "a driver whose CLSID is not a GUID is not offered");
+
+		AsioTarget target;
+		target.name = L"ProgID Driver";
+		target.clsid = L"Vendor.AsioDriver";
+		target.description = target.name;
+		bool refused = false;
+		try
+		{
+			AsioRegistration::registerWrapper(registry, target, L"C:\\eapo\\EqualizerAPOAsio.dll", L"");
+		}
+		catch (const WideError&)
+		{
+			refused = true;
+		}
+		harness.expectTrue(refused, "registering it throws");
+		harness.expectFalse(registry.keyExists(root + L"\\ProgID Driver (EQ APO XT)"), "and writes no entry");
+		harness.expectFalse(registry.keyExists(AsioRegistration::classesClsidRoot(false)), "nor anything under the CLSID root");
+
+		AsioRegistration::unregisterWrapper(registry, target);
+		harness.expect(registry.keyExists(root + L"\\ProgID Driver"), "unregistering it touches nothing, the driver's own entry included");
+	}
+
+	AsioAPOInfo* findPlaybackRecord(const std::vector<std::shared_ptr<AbstractAPOInfo>>& list, const wchar_t* clsid)
+	{
+		for (const std::shared_ptr<AbstractAPOInfo>& info : list)
+		{
+			AsioAPOInfo* record = static_cast<AsioAPOInfo*>(info.get());
+			if (record->getDeviceGuid() == clsid)
+				return record;
+		}
+		return nullptr;
+	}
+
+	// Audit #348 C2/TD-31: the ASIO adapter wrote its record, the entry in
+	// both views and the Run value straight to the registry, so a failure
+	// midway left a record with no entry, and nothing was logged or
+	// reported. The three operations now run in one transaction with a
+	// report, like the endpoint adapter's.
+	void testOperationsAreTransactionalAndReported()
+	{
+		const std::wstring entryKey = AsioRegistration::asioRoot(false) + L"\\"
+			+ AsioRegistration::entryNameFor(L"Topping USB Audio Device");
+		const std::wstring recordKey = eapo::asio::WrapperRecords::recordKey(AsioRegistration::wrapperClsidFor(toppingClsid));
+
+		{
+			test::FakeRegistry registry;
+			seedTargets(registry);
+			std::vector<std::shared_ptr<AbstractAPOInfo>> playback;
+			AsioAPOInfo::appendInfos(playback, false, registry);
+			AsioAPOInfo* topping = findPlaybackRecord(playback, toppingClsid);
+			harness.require(topping != nullptr, "the playback record exists");
+
+			// The entry's Description is written after the record: failing it
+			// stops the install midway.
+			registry.failValueWrite(entryKey, L"Description");
+			bool threw = false;
+			try
+			{
+				topping->install();
+			}
+			catch (const WideError& e)
+			{
+				threw = true;
+				harness.expectFalse(e.getMessage().empty(), "the failure carries a message");
+			}
+			harness.expectTrue(threw, "a failing install throws a WideError");
+			harness.expectFalse(registry.keyExists(recordKey), "the record written before the failure is taken back");
+			harness.expectFalse(registry.keyExists(entryKey), "no half-written entry is left");
+			harness.expectFalse(topping->isInstalled(), "the record reads as not installed");
+			const DeviceInstallReport& failed = topping->getLastOperationReport();
+			harness.expect(failed.operation == DeviceInstallReport::Operation::Install, "the report names the install");
+			harness.expect(failed.outcome == DeviceInstallReport::Outcome::Failed, "and says it failed");
+			harness.expectFalse(failed.failure.empty(), "with the reason");
+			harness.expectFalse(failed.leftInconsistent(), "and a complete rollback");
+		}
+
+		{
+			test::FakeRegistry registry;
+			seedTargets(registry);
+			std::vector<std::shared_ptr<AbstractAPOInfo>> playback;
+			AsioAPOInfo::appendInfos(playback, false, registry);
+			AsioAPOInfo* topping = findPlaybackRecord(playback, toppingClsid);
+			harness.require(topping != nullptr, "the playback record exists again");
+
+			topping->install();
+			const DeviceInstallReport& done = topping->getLastOperationReport();
+			harness.expect(done.outcome == DeviceInstallReport::Outcome::Succeeded, "a clean install reports success");
+			harness.expect(done.asioEntry == AsioRegistration::entryNameFor(L"Topping USB Audio Device"), "and names the entry");
+			harness.expectFalse(done.appliedOperations.empty(), "and lists what it wrote");
+
+			// A reinstall that fails in its install half must not leave the
+			// entry removed by its uninstall half.
+			topping->setSynchronous(true);
+			registry.failValueWrite(recordKey, L"Mode");
+			bool threw = false;
+			try
+			{
+				topping->reinstall();
+			}
+			catch (const WideError&)
+			{
+				threw = true;
+			}
+			harness.expectTrue(threw, "the failing reinstall throws");
+			harness.expectTrue(registry.keyExists(entryKey), "the entry is still registered");
+			harness.expectTrue(registry.keyExists(recordKey), "and its record is back");
+			harness.expectTrue(topping->isInstalled(), "the record still reads as installed");
+			harness.expect(topping->getLastOperationReport().operation == DeviceInstallReport::Operation::Reinstall,
+				"the report names the reinstall");
+		}
+
+		{
+			// Without the InstallPath value there is no wrapper DLL to point
+			// at. The endpoint adapter says so with a DeviceException, and so
+			// does this one now (it used to surface readValue's RegistryError).
+			test::FakeRegistry registry;
+			seedTargets(registry);
+			registry.deleteValue(APP_REGPATH, L"InstallPath");
+			std::vector<std::shared_ptr<AbstractAPOInfo>> playback;
+			AsioAPOInfo::appendInfos(playback, false, registry);
+			AsioAPOInfo* topping = findPlaybackRecord(playback, toppingClsid);
+			harness.require(topping != nullptr, "the playback record exists without InstallPath");
+			harness.expectFalse(topping->canHost32(), "32-bit support reads as unavailable instead of throwing");
+			bool deviceError = false;
+			try
+			{
+				topping->install();
+			}
+			catch (const DeviceException&)
+			{
+				deviceError = true;
+			}
+			harness.expectTrue(deviceError, "a missing InstallPath is a DeviceException");
+			harness.expectFalse(registry.keyExists(recordKey), "and nothing is written");
+			harness.expectFalse(topping->changesNeedAudioRestart(), "an ASIO entry needs no audio service restart");
+		}
 	}
 }
 
@@ -331,9 +562,13 @@ int runDeviceRecordTests()
 	testEnumerationAndDerivedIds();
 	testRegisterAndUnregisterBothViews();
 	testWasapiRecordAndEndpointTarget();
+	testUnregisterFindsAnEntryUnderItsOldName();
 	testRecordsShareOneWrapperRecord();
 	testBootAndHost32Options();
 	testFactsFeedTheRecord();
+	testNonGuidTargetIsRefused();
+	testOperationsAreTransactionalAndReported();
+	installDirectory().removeAll();
 	harness.report();
 	return 0;
 }

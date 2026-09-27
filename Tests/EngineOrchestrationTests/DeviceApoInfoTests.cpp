@@ -17,15 +17,17 @@
 	alone and reported, not asserted - a test that pins a wart makes the wart
 	harder to remove.
 
-	Host dependency, deliberately not hidden: load()'s install-mode inference
-	asks WindowsVersion::isAtLeast(6, 3), which reads the running
-	kernel32 and is not part of the port. The two inference tests therefore
-	expect whichever answer the host justifies rather than assuming Windows 8.1
-	or newer.
+	load()'s install-mode inference used to ask the running Windows whether it
+	was 8.1 or newer, so these tests expected whichever answer the host
+	justified. The minimum supported Windows is now 10 1809 (Qt 6.10) and the
+	question is gone (audit #348 TD-53); the inference depends on the registry
+	alone.
 */
 
 #include <algorithm>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include "platform/windows/GuidText.h"
 #include "services/registry/RegistryPaths.h"
 #include <string>
@@ -47,13 +49,18 @@
 
 #include "asio/AsioRegistration.h"
 #include "asio/WrapperRecord.h"
+#include "devices/ApoRuntimeFacts.h"
 #include "devices/DeviceAPOInfo.h"
 #include "devices/DeviceAPOInfoKeys.h"
+#include "services/install/ApoRegistration.h"
+#include "services/security/AudioEngineAccess.h"
+#include "services/windows/WindowsService.h"
 #include "services/registry/WindowsRegistry.h"
-#include "platform/windows/WindowsVersion.h"
 #include "Tests/TestHarness.h"
 
-#include "FakeRegistry.h"
+#include "Tests/FakeRegistry.h"
+
+#include "EngineOrchestrationTestSupport.h"
 
 namespace
 {
@@ -203,10 +210,9 @@ void testLoadWithForeignApoGuidsReportsNotInstalled(test::Harness& harness)
 	harness.expect(info.getOriginalAPOPostMix() == vendorPostMixGuid,
 		"the MFX slot answers the same way for the post-mix half");
 
-	const bool windows81OrNewer = WindowsVersion::isAtLeast(6, 3);
 	harness.expectEqual(static_cast<int>(info.getCurrentInstallState().installMode),
-		static_cast<int>(windows81OrNewer ? DeviceAPOInfo::INSTALL_SFX_EFX : DeviceAPOInfo::INSTALL_LFX_GFX),
-		"a driver that supplies SFX/MFX gets the SFX/EFX mode on Windows 8.1 and newer; before that only LFX/GFX exists");
+		static_cast<int>(DeviceAPOInfo::INSTALL_SFX_EFX),
+		"a driver that supplies SFX/MFX gets the SFX/EFX mode");
 }
 
 void testLoadInfersLfxGfxWhenTheDriverSuppliesOnlyLegacySlots(test::Harness& harness)
@@ -236,9 +242,8 @@ void testLoadInfersSfxMfxForACombinedBluetoothDevice(test::Harness& harness)
 	DeviceAPOInfo info(registry);
 	harness.require(info.load(testDeviceGuid, otherDeviceGuid), "the device loads");
 
-	const bool windows81OrNewer = WindowsVersion::isAtLeast(6, 3);
 	harness.expectEqual(static_cast<int>(info.getCurrentInstallState().installMode),
-		static_cast<int>(windows81OrNewer ? DeviceAPOInfo::INSTALL_SFX_MFX : DeviceAPOInfo::INSTALL_LFX_GFX),
+		static_cast<int>(DeviceAPOInfo::INSTALL_SFX_MFX),
 		"a combined Bluetooth endpoint falls back to SFX/MFX because its EFX slot is never reached");
 }
 
@@ -276,6 +281,91 @@ void testLoadDetectsOurApoAndRecoversTheInstallState(test::Harness& harness)
 		"AllowSilentBufferModification was written as false, and anything other than the literal false counts as true");
 	harness.expect(state.autoAdjust,
 		"automatic adjustment stays on unless a DisableAutomaticAdjustment value says otherwise");
+}
+
+// The install record the APO reads when audiodg initializes it: our GUIDs in
+// SFX and MFX, and the driver's own APOs recorded behind them.
+void seedInstalledWithChildApos(FakeRegistry& registry)
+{
+	seedRenderDevice(registry);
+	registry.seedString(fxPropertiesKey, sfxGuidValueName, ourPreMixGuid());
+	registry.seedString(fxPropertiesKey, mfxGuidValueName, ourPostMixGuid());
+	registry.seedString(childApoKey, versionValueName, installVersion);
+	for (const wchar_t* valueName : allGuidValueNames)
+		registry.seedString(childApoKey, valueName, APOGUID_NOVALUE);
+	registry.seedString(childApoKey, preMixChildGuidValueName, vendorPreMixGuid);
+	registry.seedString(childApoKey, postMixChildGuidValueName, vendorPostMixGuid);
+	registry.seedString(childApoKey, allowSilentBufferValueName, L"true");
+}
+
+// Audit #348 F11/TD-47: what EqualizerAPO::Initialize reads about its
+// endpoint, through the port and without the default-endpoint lookup.
+void testApoRuntimeFactsComeFromTheInstallRecord(test::Harness& harness)
+{
+	FakeRegistry registry;
+	seedInstalledWithChildApos(registry);
+
+	const std::optional<ApoRuntimeFacts> preMix = readApoRuntimeFacts(registry, testDeviceGuid, true);
+	harness.require(preMix.has_value(), "a present endpoint has facts");
+	harness.expectFalse(preMix->capture, "a render endpoint is not a capture one");
+	harness.expect(preMix->postMixInstalled, "the MFX slot holds our post-mix APO");
+	harness.expectEqual(narrow(preMix->deviceName), narrow(deviceName), "the device name");
+	harness.expectEqual(narrow(preMix->connectionName), narrow(connectionName), "the connection name");
+	harness.expectEqual(narrow(preMix->deviceGuid), narrow(testDeviceGuid), "the endpoint GUID");
+	harness.expectEqual(narrow(preMix->childApoGuid), narrow(vendorPreMixGuid), "the pre-mix instance wraps the driver's pre-mix APO");
+	harness.expect(preMix->allowSilentBufferModification, "AllowSilentBufferModification was written as true");
+
+	const std::optional<ApoRuntimeFacts> postMix = readApoRuntimeFacts(registry, testDeviceGuid, false);
+	harness.require(postMix.has_value(), "the post-mix instance reads the same endpoint");
+	harness.expectEqual(narrow(postMix->childApoGuid), narrow(vendorPostMixGuid), "the post-mix instance wraps the driver's post-mix APO");
+}
+
+void testApoRuntimeFactsDropTheInstallSentinels(test::Harness& harness)
+{
+	harness.expectFalse(isChildApoGuid(L""), "no child recorded");
+	harness.expectFalse(isChildApoGuid(APOGUID_NULL), "the NULL sentinel is not an APO");
+	harness.expectFalse(isChildApoGuid(APOGUID_NOKEY), "the NOKEY sentinel is not an APO");
+	harness.expectFalse(isChildApoGuid(APOGUID_NOVALUE), "the NOVALUE sentinel is not an APO");
+	harness.expect(isChildApoGuid(vendorPreMixGuid), "a CLSID is");
+
+	FakeRegistry registry;
+	seedInstalledWithChildApos(registry);
+	registry.seedString(childApoKey, preMixChildGuidValueName, APOGUID_NOKEY);
+	const std::optional<ApoRuntimeFacts> facts = readApoRuntimeFacts(registry, testDeviceGuid, true);
+	harness.require(facts.has_value(), "the endpoint has facts");
+	harness.expect(facts->childApoGuid.empty(), "a sentinel in the record means there is no child APO to create");
+}
+
+void testApoRuntimeFactsSkipAnAbsentEndpoint(test::Harness& harness)
+{
+	FakeRegistry registry;
+	seedRenderDevice(registry, DEVICE_STATE_NOTPRESENT);
+	harness.expectFalse(readApoRuntimeFacts(registry, testDeviceGuid, true).has_value(),
+		"a not-present endpoint has no facts, and the APO keeps its defaults");
+}
+
+// A failing ASIO record read used to throw out of load() and take the child
+// APO and the capture flag with it.
+void testApoRuntimeFactsSurviveAnUnreadableAsioRecord(test::Harness& harness)
+{
+	FakeRegistry registry;
+	seedInstalledWithChildApos(registry);
+	const std::wstring recordKey = eapo::asio::WrapperRecords::recordKey(eapo::asio::AsioRegistration::wrapperClsidFor(testDeviceGuid));
+	registry.seedString(recordKey, L"TargetKind", L"WasapiExclusive");
+	registry.denyRead(recordKey);
+
+	bool threw = false;
+	std::optional<ApoRuntimeFacts> facts;
+	try
+	{
+		facts = readApoRuntimeFacts(registry, testDeviceGuid, true);
+	}
+	catch (const RegistryError&)
+	{
+		threw = true;
+	}
+	harness.expectFalse(threw, "an unreadable ASIO entry does not throw the endpoint's facts away");
+	harness.expect(facts.has_value() && facts->childApoGuid == vendorPreMixGuid, "the child APO is still found");
 }
 
 void testLoadRejectsAnInstallationFromANewerBuild(test::Harness& harness)
@@ -342,6 +432,12 @@ DeviceAPOInfo::InstallState installOnBareDevice(test::Harness& harness, FakeRegi
 	const DeviceAPOInfo::InstallState requested = selected;
 
 	info.install();
+	const DeviceInstallReport& report = info.getLastOperationReport();
+	harness.expectFalse(report.fxPropertiesExisted,
+		"the install report retains the absent driver chain even after creating FxProperties");
+	const std::vector<std::wstring> lines = report.toLines();
+	harness.expect(std::find(lines.begin(), lines.end(), L"  driver published FxProperties: no (Equalizer APO creates the effect chain)") != lines.end(),
+		"the report tells the reader that this install created the effect chain");
 	return requested;
 }
 
@@ -452,11 +548,11 @@ void testInstallWithTheAsioEntryRegistersTheWrapperAndUninstallRemovesIt(test::H
 
 	DeviceAPOInfo info(registry);
 	harness.require(info.load(testDeviceGuid, otherDeviceGuid), "the device loads");
-	harness.expectFalse(info.getCurrentInstallState().exclusiveModeEq, "no entry before install");
+	harness.expectFalse(info.getCurrentInstallState().asioEntry, "no entry before install");
 	DeviceAPOInfo::InstallState& selected = info.getSelectedInstallState();
 	selected.installPreMix = true;
 	selected.installPostMix = true;
-	selected.exclusiveModeEq = true;
+	selected.asioEntry = true;
 	info.install();
 
 	const std::wstring wrapperClsid = eapo::asio::AsioRegistration::wrapperClsidFor(testDeviceGuid);
@@ -484,7 +580,7 @@ void testInstallWithTheAsioEntryRegistersTheWrapperAndUninstallRemovesIt(test::H
 
 	DeviceAPOInfo reloaded(registry);
 	harness.require(reloaded.load(testDeviceGuid, otherDeviceGuid), "the device reloads");
-	harness.expectTrue(reloaded.getCurrentInstallState().exclusiveModeEq, "a fresh load sees the entry");
+	harness.expectTrue(reloaded.getCurrentInstallState().asioEntry, "a fresh load sees the entry");
 
 	reloaded.uninstall();
 	harness.expectFalse(registry.keyExists(recordKey), "the uninstall removes the record");
@@ -499,9 +595,136 @@ void testInstallWithTheAsioEntryRegistersTheWrapperAndUninstallRemovesIt(test::H
 	harness.require(again.load(testDeviceGuid, otherDeviceGuid), "the device loads once more");
 	again.getSelectedInstallState().installPreMix = false;
 	again.getSelectedInstallState().installPostMix = false;
-	again.getSelectedInstallState().exclusiveModeEq = true;
+	again.getSelectedInstallState().asioEntry = true;
 	again.install();
 	harness.expectFalse(registry.keyExists(recordKey), "no APO, no entry");
+}
+
+// The endpoint's ASIO entry offers what an ASIO driver row offers: the
+// stream mode and its wait, the host at boot, and the 32-bit registration.
+// They reach the record, a reload reads them back, and the one Run value
+// follows every entry that asks for it, whichever kind the entry is.
+void testAsioEntryCarriesTheDriverEntryOptions(test::Harness& harness)
+{
+	// A product directory with the x86 wrapper in it, so the 32-bit
+	// registration has a file to point at.
+	const std::filesystem::path product = std::filesystem::path(testDirectory()) / L"asio-product";
+	std::filesystem::create_directories(product / L"x86");
+	std::ofstream(product / L"x86" / L"EqualizerAPOAsio.dll").put('\0');
+	const std::wstring installPath = product.wstring();
+
+	FakeRegistry registry;
+	registry.seedString(APP_REGPATH, L"InstallPath", installPath);
+	seedRenderDevice(registry);
+
+	DeviceAPOInfo info(registry);
+	harness.require(info.load(testDeviceGuid, otherDeviceGuid), "the device loads");
+	harness.expectTrue(info.canHostAsio32(), "the x86 wrapper beside the product makes 32-bit hosts possible");
+	harness.expectTrue(info.getCurrentInstallState().asioEntryOptions == eapo::asio::EntryOptions{},
+		"no entry yet: the options read as the defaults");
+	DeviceAPOInfo::InstallState& selected = info.getSelectedInstallState();
+	selected.installPreMix = true;
+	selected.installPostMix = true;
+	selected.asioEntry = true;
+	selected.asioEntryOptions.synchronous = true;
+	selected.asioEntryOptions.deadlinePercent = 50;
+	selected.asioEntryOptions.autoStart = true;
+	selected.asioEntryOptions.host32 = true;
+	info.install();
+
+	const std::wstring wrapperClsid = eapo::asio::AsioRegistration::wrapperClsidFor(testDeviceGuid);
+	const std::wstring recordKey = eapo::asio::WrapperRecords::recordKey(wrapperClsid);
+	harness.require(registry.keyExists(recordKey), "the wrapper record exists");
+	harness.expectEqual(registry.readDWORDValue(recordKey, L"Mode"), 0ul, "the buffer is removed (synchronous mode)");
+	harness.expectEqual(registry.readDWORDValue(recordKey, L"DeadlinePercent"), 50ul, "with the chosen wait");
+	harness.expectEqual(registry.readDWORDValue(recordKey, L"AutoStart"), 1ul, "the host starts at boot");
+	harness.expectEqual(registry.readDWORDValue(recordKey, L"Register32"), 1ul, "and 32-bit hosts are asked for");
+	const std::wstring class32 = eapo::asio::AsioRegistration::classesClsidRoot(true) + L"\\" + wrapperClsid + L"\\InprocServer32";
+	harness.require(registry.keyExists(class32), "the 32-bit view has the class tree");
+	harness.expect(registry.readValue(class32, L"") == installPath + L"\\x86\\EqualizerAPOAsio.dll",
+		"pointing at the x86 wrapper");
+	const std::wstring runKey = eapo::asio::AsioRegistration::autoStartKey();
+	const std::wstring runValue = eapo::asio::AsioRegistration::autoStartValueName();
+	harness.require(eapo::asio::AsioRegistration::autoStartRegistered(registry), "the Run value appears");
+	harness.expect(registry.readValue(runKey, runValue) == L"\"" + installPath + L"\\EqualizerAPOHost.exe\" --resident",
+		"starting the host beside the product, resident");
+
+	DeviceAPOInfo reloaded(registry);
+	harness.require(reloaded.load(testDeviceGuid, otherDeviceGuid), "the device reloads");
+	harness.expectTrue(reloaded.getCurrentInstallState().asioEntryOptions == selected.asioEntryOptions,
+		"a fresh load reads the options back");
+
+	// Another entry asks for the host at boot too; taking the endpoint's
+	// entry away must leave the value for it.
+	eapo::asio::WrapperRecord driver;
+	driver.wrapperClsid = L"{C0C0C0C0-1111-2222-3333-444444444444}";
+	driver.targetClsid = L"{D0D0D0D0-1111-2222-3333-444444444444}";
+	driver.targetName = L"Some Interface";
+	driver.options.processInput = false;
+	driver.autoStart = true;
+	eapo::asio::WrapperRecords::write(registry, driver);
+
+	reloaded.getSelectedInstallState() = reloaded.getCurrentInstallState();
+	reloaded.getSelectedInstallState().asioEntryOptions.autoStart = false;
+	reloaded.getSelectedInstallState().asioEntryOptions.host32 = false;
+	harness.expectTrue(reloaded.hasChanges(), "an option change is a pending change");
+	reloaded.reinstall();
+	harness.expectEqual(registry.readDWORDValue(recordKey, L"AutoStart"), 0ul, "the entry stops asking for the host");
+	harness.expectFalse(registry.keyExists(class32), "the 32-bit view goes when it is no longer asked for");
+	harness.expectTrue(eapo::asio::AsioRegistration::autoStartRegistered(registry), "the other entry still keeps the Run value");
+
+	eapo::asio::WrapperRecords::remove(registry, driver.wrapperClsid);
+	DeviceAPOInfo last(registry);
+	harness.require(last.load(testDeviceGuid, otherDeviceGuid), "the device loads once more");
+	last.getSelectedInstallState() = last.getCurrentInstallState();
+	last.getSelectedInstallState().asioEntryOptions.autoStart = true;
+	last.reinstall();
+	harness.expectTrue(eapo::asio::AsioRegistration::autoStartRegistered(registry), "asking again brings the value back");
+	last.uninstall();
+	harness.expectFalse(registry.keyExists(recordKey), "the uninstall removes the record");
+	harness.expectFalse(eapo::asio::AsioRegistration::autoStartRegistered(registry),
+		"and the Run value, since no entry is left to ask for it");
+
+	std::error_code ignored;
+	std::filesystem::remove_all(product, ignored);
+}
+
+// Audit #348 C1/TD-32: the wide-message exceptions had no common base and
+// did not derive from std::exception, so every call site picked its own set
+// of catch clauses and some missed a type. They share WideError now, whose
+// what() is the message in UTF-8.
+void testWideErrorsShareOneBase(test::Harness& harness)
+{
+	auto caughtAsWideError = [](auto thrower) {
+		try
+		{
+			thrower();
+		}
+		catch (const WideError& e)
+		{
+			return e.getMessage();
+		}
+		return std::wstring(L"not caught");
+	};
+	harness.expect(caughtAsWideError([] { throw RegistryError(L"registry"); }) == L"registry", "RegistryError is a WideError");
+	harness.expect(caughtAsWideError([] { throw DeviceException(L"device"); }) == L"device", "DeviceException is a WideError");
+	harness.expect(caughtAsWideError([] { throw WindowsServiceError(L"service"); }) == L"service", "WindowsServiceError is a WideError");
+	harness.expect(caughtAsWideError([] { throw AccessQueryException(L"access"); }) == L"access", "AccessQueryException is a WideError");
+
+	try
+	{
+		throw DeviceException(L"\xD55C\xAE00 \xD83D\xDE00 \xD800!");
+	}
+	catch (const std::exception& e)
+	{
+		const std::string expected = "\xED\x95\x9C\xEA\xB8\x80 \xF0\x9F\x98\x80 \xEF\xBF\xBD!";
+		harness.expect(std::string(e.what()) == expected,
+			"what() is UTF-8: Hangul, a surrogate pair, and an unpaired surrogate as U+FFFD");
+	}
+
+	FakeRegistry registry;
+	DeviceAPOInfo endpoint(registry);
+	harness.expectTrue(endpoint.changesNeedAudioRestart(), "an endpoint change needs the audio service restarted");
 }
 
 void testUninstallRemovesTheFxPropertiesKeyItCreated(test::Harness& harness)
@@ -729,6 +952,9 @@ void testInstallLeavesTheEndpointAloneWhenAMidwaySlotWriteFails(test::Harness& h
 		"the rollback finished, so this device is not in the one state that needs a reboot to leave");
 	harness.expect(report.fxPropertiesExisted,
 		"the report says the driver had published its own FxProperties key, which is what makes the vendor-APO branch the one that ran");
+	const std::vector<std::wstring> lines = report.toLines();
+	harness.expect(std::find(lines.begin(), lines.end(), L"  driver published FxProperties: yes") != lines.end(),
+		"the report names the driver's existing effect chain after a failed install too");
 	harness.expectEqual(report.driverSlots.size(), size_t(2),
 		"and which slots the driver had filled, taken from what load() found rather than from the state after the failure");
 	harness.expect(!report.backupPath.empty(),
@@ -789,6 +1015,81 @@ void testCheckProtectedAudioDGReportsAndFixesTheDisabledFlag(test::Harness& harn
 	harness.expect(DeviceAPOInfo::checkProtectedAudioDG(false, registry),
 		"once the flag is set the check passes and stops nagging");
 }
+// Audit #348 TD-02: the package uninstall hook stops AudioSrv and then sweeps
+// every endpoint. The sweep built the whole list with loadAllInfos outside
+// its try, so one endpoint whose values could not be read threw out of the
+// hook before any device was cleaned, the DLL was unregistered or the
+// service restarted. It now isolates each endpoint: the broken one is
+// reported, the healthy one is still cleaned.
+void testUninstallSweepSurvivesAnUnreadableEndpoint(test::Harness& harness)
+{
+	FakeRegistry registry;
+	installOnBareDevice(harness, registry);
+
+	// Sorts before the healthy endpoint, so the sweep meets it first.
+	const std::wstring brokenGuid = L"{00000000-0000-0000-0000-000000000001}";
+	const std::wstring brokenKey = renderKeyPath L"\\" + brokenGuid;
+	registry.seedDword(brokenKey, L"DeviceState", DEVICE_STATE_ACTIVE);
+	registry.seedString(brokenKey + L"\\Properties", connectionValueName, connectionName);
+	registry.denyRead(brokenKey + L"\\Properties");
+
+	std::vector<std::wstring> errors;
+	const ApoRegistration::Result result = ApoRegistration::uninstallAllDeviceApos(
+		[&](const std::wstring& message) { errors.push_back(message); },
+		registry,
+		[](bool) { return otherDeviceGuid; });
+
+	harness.expect(result == ApoRegistration::Result::DeviceUninstallFailed,
+		"the sweep reports that one endpoint could not be handled");
+	harness.expectEqual(errors.size(), static_cast<size_t>(1),
+		"exactly the unreadable endpoint is reported");
+	harness.expect(!errors.empty() && errors.front().find(brokenGuid) != std::wstring::npos,
+		"the report names the endpoint it could not read");
+	harness.expectFalse(registry.keyExists(childApoKey),
+		"the healthy endpoint after the broken one is still uninstalled");
+	harness.expectFalse(registry.keyExists(fxPropertiesKey),
+		"the healthy endpoint's FxProperties created by the install is gone too");
+}
+
+// Audit #348: keyExists answers true for a key that refuses to be opened, so
+// an endpoint whose FxProperties the driver locked now throws in load()
+// instead of loading as one without a driver chain. loadAllInfos has to drop
+// that endpoint and keep the rest, because the Editor builds its device list
+// without a try and the Device Selector would show an empty one.
+void testLoadAllInfosSkipsAnUnreadableEndpoint(test::Harness& harness)
+{
+	FakeRegistry registry;
+	seedRenderDevice(registry);
+
+	const std::wstring lockedGuid = L"{00000000-0000-0000-0000-000000000001}";
+	const std::wstring lockedKey = renderKeyPath L"\\" + lockedGuid;
+	registry.seedDword(lockedKey, L"DeviceState", DEVICE_STATE_ACTIVE);
+	registry.seedString(lockedKey + L"\\Properties", connectionValueName, connectionName);
+	registry.seedString(lockedKey + L"\\Properties", deviceValueName, deviceName);
+	registry.seedKey(lockedKey + L"\\FxProperties");
+	registry.denyRead(lockedKey + L"\\FxProperties");
+
+	std::vector<std::shared_ptr<AbstractAPOInfo>> infos;
+	bool threw = false;
+	try
+	{
+		infos = DeviceAPOInfo::loadAllInfos(false, registry);
+	}
+	catch (const RegistryError&)
+	{
+		threw = true;
+	}
+
+	harness.expectFalse(threw, "an endpoint whose FxProperties cannot be read does not throw the device list away");
+	const auto listed = [&infos](const std::wstring& guid) {
+		return std::count_if(infos.begin(), infos.end(), [&guid](const std::shared_ptr<AbstractAPOInfo>& info) {
+			return info->getDeviceGuid() == guid;
+		});
+	};
+	harness.expectEqual(listed(testDeviceGuid), std::ptrdiff_t(1), "the readable endpoint is listed");
+	harness.expectEqual(listed(lockedGuid), std::ptrdiff_t(0),
+		"the locked endpoint is left out rather than offered as one without a driver chain");
+}
 } // namespace
 
 void runDeviceApoInfoTests(test::Harness& harness)
@@ -801,11 +1102,17 @@ void runDeviceApoInfoTests(test::Harness& harness)
 	testLoadInfersSfxMfxForACombinedBluetoothDevice(harness);
 	testLoadDetectsOurApoAndRecoversTheInstallState(harness);
 	testLoadRejectsAnInstallationFromANewerBuild(harness);
+	testApoRuntimeFactsComeFromTheInstallRecord(harness);
+	testApoRuntimeFactsDropTheInstallSentinels(harness);
+	testApoRuntimeFactsSkipAnAbsentEndpoint(harness);
+	testApoRuntimeFactsSurviveAnUnreadableAsioRecord(harness);
 	testLoadTreatsAVersionlessInstallationAsUpgradable(harness);
 	testInstallThenLoadRoundTripsTheInstallState(harness);
 	testInstallRegistersEveryModeOfTheDirection(harness);
 	testInstallOnACaptureDeviceFillsTheStreamSlotForTheCaptureModes(harness);
 	testInstallWithTheAsioEntryRegistersTheWrapperAndUninstallRemovesIt(harness);
+	testAsioEntryCarriesTheDriverEntryOptions(harness);
+	testWideErrorsShareOneBase(harness);
 	testUninstallRemovesTheFxPropertiesKeyItCreated(harness);
 	testUninstallKeepsFxPropertiesWhenWindowsPutItsOwnSubkeysThere(harness);
 	testInstallExportsTheDriverValuesBeforeOverwritingThem(harness);
@@ -814,4 +1121,6 @@ void runDeviceApoInfoTests(test::Harness& harness)
 	testInstallLeavesTheEndpointAloneWhenAMidwaySlotWriteFails(harness);
 	testUninstallPutsTheInstallationBackWhenItCannotFinish(harness);
 	testCheckProtectedAudioDGReportsAndFixesTheDisabledFlag(harness);
+	testUninstallSweepSurvivesAnUnreadableEndpoint(harness);
+	testLoadAllInfosSkipsAnUnreadableEndpoint(harness);
 }

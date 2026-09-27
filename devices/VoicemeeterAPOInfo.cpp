@@ -26,11 +26,13 @@
 #include <KsMedia.h>
 #include <shellapi.h>
 #include "platform/windows/ComPtr.h"
+#include "platform/windows/CommandLineQuoting.h"
 #include "platform/windows/ProcessCommandLine.h"
 #include "platform/windows/ShellLink.h"
 #include "services/logging/Logging.h"
 #include "services/registry/WindowsRegistry.h"
 #include "platform/windows/Win32Resource.h"
+#include "platform/windows/WindowsPath.h"
 #include "VoicemeeterAPOInfo.h"
 
 using std::exception;
@@ -70,13 +72,7 @@ void VoicemeeterAPOInfo::prependInfos(vector<shared_ptr<AbstractAPOInfo>>& list,
 		else if (setupFilename == L"voicemeeter8setup.exe")
 			voicemeeterType = 3;// potato
 
-		unsigned outputCount;
-		if (voicemeeterType == 3)
-			outputCount = 5;
-		else if (voicemeeterType == 2)
-			outputCount = 3;
-		else
-			outputCount = 1;
+		const unsigned outputCount = voicemeeterOutputCount(voicemeeterType);
 
 		bool defaultDevice = false;
 		std::erase_if(list, [&defaultDevice](const shared_ptr<AbstractAPOInfo>& info) {
@@ -94,9 +90,7 @@ void VoicemeeterAPOInfo::prependInfos(vector<shared_ptr<AbstractAPOInfo>>& list,
 		bool anyInstalled = false;
 		for (unsigned i = 0; i < outputCount; i++)
 		{
-			wstringstream sstream;
-			sstream << "Output A" << (i + 1);
-			shared_ptr<AbstractAPOInfo> info = *list.insert(list.begin() + i, make_shared<VoicemeeterAPOInfo>(sstream.str(), true, registry));
+			shared_ptr<AbstractAPOInfo> info = *list.insert(list.begin() + i, make_shared<VoicemeeterAPOInfo>(voicemeeterOutputName(i), true, registry));
 			if (info->isInstalled())
 				anyInstalled = true;
 		}
@@ -105,7 +99,9 @@ void VoicemeeterAPOInfo::prependInfos(vector<shared_ptr<AbstractAPOInfo>>& list,
 		{
 			for (unsigned i = 0; i < outputCount; i++)
 			{
-				const shared_ptr<VoicemeeterAPOInfo>& info = (const shared_ptr<VoicemeeterAPOInfo>&)list[i];
+				// Inserted as VoicemeeterAPOInfo just above. The C cast this
+				// replaces reinterpreted the shared_ptr object itself.
+				const shared_ptr<VoicemeeterAPOInfo> info = std::static_pointer_cast<VoicemeeterAPOInfo>(list[i]);
 				if (!anyInstalled || info->isInstalled())
 				{
 					info->defaultDevice = true;
@@ -292,13 +288,12 @@ wstring VoicemeeterAPOInfo::getStartupPath()
 
 wstring VoicemeeterAPOInfo::getClientPath()
 {
-	wchar_t filename[MAX_PATH];
-	GetModuleFileNameW(nullptr, filename, ARRAYSIZE(filename));
-	PathRemoveFileSpecW(filename);
-	wstring clientPath = filename;
-	clientPath = clientPath + L"\\" + clientFilename;
-
-	return clientPath;
+	// Empty when the executable's own path cannot be read; the unchecked copy
+	// this replaces went on with whatever the buffer held (audit #348 TD-54).
+	const wstring directory = pathutil::exeDirectory();
+	if (directory.empty())
+		return wstring();
+	return pathutil::joinPath(directory, clientFilename);
 }
 
 void VoicemeeterAPOInfo::createLink(const wstring& lnkPath, const wstring& path, const wstring& args)
@@ -366,19 +361,9 @@ vector<wstring> VoicemeeterAPOInfo::splitArgs(const wstring& argString)
 
 wstring VoicemeeterAPOInfo::joinArgs(const vector<wstring>& args)
 {
-	wstring result;
-	for (const wstring& arg : args)
-	{
-		if (result.length() > 0)
-			result += L" ";
-
-		if (arg.find(' ') != wstring::npos)
-			result += L"\"" + arg + L"\"";
-		else
-			result += arg;
-	}
-
-	return result;
+	// splitArgs reads the result back through CommandLineToArgvW, whose
+	// backslash rules the quoting follows (audit #348 TD-53).
+	return winutil::joinCommandLineArguments(args);
 }
 
 void VoicemeeterAPOInfo::ensureVoicemeeterClientRunning()
@@ -397,6 +382,12 @@ void VoicemeeterAPOInfo::ensureVoicemeeterClientRunning()
 		: winutil::findProcessesByExeName(clientFilename))
 	{
 		vector<wstring> processArgs = splitArgs(process.commandLine);
+		// A command line that could not be read cannot match the link.
+		if (processArgs.empty())
+		{
+			winutil::requestProcessClose(process.processId);
+			continue;
+		}
 		wstring path = processArgs.front();
 		processArgs.erase(processArgs.begin());
 

@@ -7,7 +7,10 @@
 #include "stdafx.h"
 #include "asio/AsioRegistration.h"
 
+#include "asio/WrapperRecord.h"
+#include "devices/DeviceAPOInfoKeys.h"
 #include "platform/windows/GuidText.h"
+#include "runtime/errors/WideError.h"
 #include "services/registry/ClsidRegistration.h"
 
 namespace eapo::asio
@@ -26,6 +29,25 @@ namespace eapo::asio
 			if (registry.keyExists(key))
 				registry.deleteKey(key);
 		}
+
+		// A braced GUID and nothing else. CLSIDFromString would also accept a
+		// ProgID and look it up; IIDFromString takes only the GUID form.
+		bool parseGuid(const std::wstring& text, GUID& guid)
+		{
+			return !text.empty() && SUCCEEDED(IIDFromString(text.c_str(), &guid));
+		}
+
+		// The wrapper CLSID of a target, refused when the target's CLSID is
+		// not a GUID: the empty result would name the CLSID root itself, and
+		// registerWrapper would write the class values there (audit #348
+		// TD-45).
+		std::wstring requireWrapperClsid(const AsioTarget& target)
+		{
+			const std::wstring wrapperClsid = AsioRegistration::wrapperClsidFor(target.clsid);
+			if (wrapperClsid.empty())
+				throw WideError(L"The ASIO target " + target.name + L" has a CLSID that is not a GUID: " + target.clsid);
+			return wrapperClsid;
+		}
 	}
 
 	namespace AsioRegistration
@@ -43,7 +65,7 @@ namespace eapo::asio
 		std::wstring classesClsidRoot(bool wow6432)
 		{
 			return wow6432 ? L"HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\WOW6432Node\\CLSID"
-				: L"HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\CLSID";
+				: clsidKeyPath;
 		}
 
 		std::wstring entryNameFor(const std::wstring& targetName)
@@ -60,7 +82,7 @@ namespace eapo::asio
 		std::wstring wrapperClsidFor(const std::wstring& targetClsid)
 		{
 			GUID guid = {};
-			if (FAILED(CLSIDFromString(targetClsid.c_str(), &guid)))
+			if (!parseGuid(targetClsid, guid))
 				return std::wstring();
 			// Flip a fixed pattern into the target's id and stamp it as a
 			// random-style (version 4) GUID, so the derived id can never equal
@@ -103,7 +125,10 @@ namespace eapo::asio
 				target.name = name;
 				target.clsid = registry.readValue(key, clsidValue);
 				target.description = registry.valueExists(key, descriptionValue) ? registry.readValue(key, descriptionValue) : name;
-				if (!target.clsid.empty())
+				// A driver whose CLSID is not a GUID cannot be loaded, and no
+				// wrapper CLSID derives from it; it is not offered.
+				GUID guid = {};
+				if (parseGuid(target.clsid, guid))
 					targets.push_back(std::move(target));
 			}
 			return targets;
@@ -117,7 +142,7 @@ namespace eapo::asio
 		void registerWrapper(IRegistry& registry, const AsioTarget& target,
 			const std::wstring& dll64Path, const std::wstring& dll32Path)
 		{
-			const std::wstring wrapperClsid = wrapperClsidFor(target.clsid);
+			const std::wstring wrapperClsid = requireWrapperClsid(target);
 			const std::wstring entryName = entryNameFor(target.name);
 			for (int view = 0; view < 2; view++)
 			{
@@ -135,12 +160,36 @@ namespace eapo::asio
 
 		void unregisterWrapper(IRegistry& registry, const AsioTarget& target)
 		{
+			// registerWrapper refuses a target whose CLSID is not a GUID, so
+			// nothing was ever written for one; an empty wrapper CLSID must
+			// not reach the key paths below, where it would name the CLSID
+			// root.
 			const std::wstring wrapperClsid = wrapperClsidFor(target.clsid);
+			if (wrapperClsid.empty())
+				return;
 			const std::wstring entryName = entryNameFor(target.name);
 			for (int view = 0; view < 2; view++)
 			{
 				const bool wow = view == 1;
-				deleteKeyIfPresent(registry, asioRoot(wow) + L"\\" + entryName);
+				// Every entry that points at this wrapper, whatever it is called.
+				// The entry is named after the target, and an endpoint target's
+				// name is the device's friendly name at install time: after the
+				// user (or a driver update) renamed the device, the name derived
+				// here no longer matched, and the old entry stayed in every DAW's
+				// list pointing at a CLSID that was unregistered below (audit
+				// #348 TD-08).
+				const std::wstring root = asioRoot(wow);
+				if (registry.keyExists(root))
+				{
+					for (const std::wstring& name : registry.enumSubKeys(root))
+					{
+						const std::wstring key = root + L"\\" + name;
+						if (registry.valueExists(key, clsidValue)
+							&& _wcsicmp(registry.readValue(key, clsidValue).c_str(), wrapperClsid.c_str()) == 0)
+							registry.deleteKey(key);
+					}
+				}
+				deleteKeyIfPresent(registry, root + L"\\" + entryName);
 				const std::wstring classKey = classesClsidRoot(wow) + L"\\" + wrapperClsid;
 				deleteKeyIfPresent(registry, classKey + L"\\InprocServer32");
 				deleteKeyIfPresent(registry, classKey);
@@ -174,6 +223,32 @@ namespace eapo::asio
 			{
 				registry.deleteValue(runKey, runValueName);
 			}
+		}
+
+		void refreshAutoStart(IRegistry& registry, const std::wstring& installDirectory)
+		{
+			const bool wanted = WrapperRecords::autoStartWanted(registry);
+			if (wanted && installDirectory.empty())
+				return;
+			setAutoStart(registry, installDirectory + L"\\EqualizerAPOHost.exe", wanted);
+		}
+
+		std::wstring wrapperDllPath(const std::wstring& installDirectory)
+		{
+			return installDirectory + L"\\EqualizerAPOAsio.dll";
+		}
+
+		std::wstring wrapper32DllPath(const std::wstring& installDirectory)
+		{
+			return installDirectory + L"\\x86\\EqualizerAPOAsio.dll";
+		}
+
+		bool wrapper32Shipped(const std::wstring& installDirectory)
+		{
+			if (installDirectory.empty())
+				return false;
+			const DWORD attributes = GetFileAttributesW(wrapper32DllPath(installDirectory).c_str());
+			return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
 		}
 	}
 }

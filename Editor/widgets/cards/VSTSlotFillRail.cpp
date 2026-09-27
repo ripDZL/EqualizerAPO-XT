@@ -4,10 +4,6 @@
 	SPDX-License-Identifier: GPL-2.0-or-later
 */
 
-/*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-*/
-
 #include <QAccessible>
 #include <QEnterEvent>
 #include <QFontMetricsF>
@@ -16,7 +12,6 @@
 #include <QMouseEvent>
 #include <QPainter>
 
-#include "Editor/helpers/GUIHelper.h"
 #include "Editor/SkinManager.h"
 #include "VSTSlotFillRail.h"
 
@@ -38,35 +33,19 @@ protected:
 
 int cellHeight()
 {
-	return GUIHelper::scale(20.0);
-}
-
-// The cell is sized from the exact fonts the neutral painter uses, with the
-// caret reserved separately, so the role, the value and the caret can never
-// collide (the mockup round reused the bus-selector painter and they did).
-int cellWidth(const QString& role, const QString& value)
-{
-	const SkinTokens& t = SkinManager::instance()->tokens();
-	QFont roleFont(t.fontFamily);
-	roleFont.setPixelSize(GUIHelper::scale(9.0));
-	QFont valueFont(t.monoFontFamily);
-	valueFont.setPixelSize(GUIHelper::scale(11.0));
-	return qRound(GUIHelper::scale(6.0) * 2
-		+ QFontMetricsF(roleFont).horizontalAdvance(role) + GUIHelper::scale(5.0)
-		+ QFontMetricsF(valueFont).horizontalAdvance(value) + GUIHelper::scale(4.0)
-		+ GUIHelper::scale(6.0));
+	return 20;
 }
 
 int latchWidth()
 {
-	// Wide enough for the busiest skin answer (rack's machined key: recess
-	// walls, a bezel LED and the engraved legend side by side).
+	// The rack treatment is the widest: its pilot LED, engraved FILL label and
+	// margins must fit side by side.
 	const SkinTokens& t = SkinManager::instance()->tokens();
 	QFont latchFont(t.fontFamily);
-	latchFont.setPixelSize(GUIHelper::scale(9.0));
-	return qRound(GUIHelper::scale(21.0)
+	latchFont.setPixelSize(10);
+	return qRound(21
 		+ QFontMetricsF(latchFont).horizontalAdvance(QStringLiteral("FILL"))
-		+ GUIHelper::scale(10.0));
+		+ 10);
 }
 }
 
@@ -114,7 +93,12 @@ QStringList VSTSlotFillCell::channelChoices() const
 
 QSize VSTSlotFillCell::sizeHint() const
 {
-	return QSize(cellWidth(role, value), cellHeight());
+	// The active skin measures the cell with the fonts and paddings its own
+	// painter draws with, so the role, the value and the caret fit the cell
+	// in each skin. (The mockup round reused the bus-selector painter and
+	// they collided; until audit #348 F10 the neutral painter's fonts sized
+	// the cell in every skin.)
+	return SkinManager::instance()->vstSlotFillCellSize(role, value);
 }
 
 QSize VSTSlotFillCell::minimumSizeHint() const
@@ -318,20 +302,20 @@ void VSTSlotFillRail::setCollapsed(bool newCollapsed)
 
 QSize VSTSlotFillRail::sizeHint() const
 {
-	int width = GUIHelper::scale(12.0);
+	int width = 12;
 	if (latch != nullptr && latch->isVisibleTo(const_cast<VSTSlotFillRail*>(this)))
-		width += latchWidth() + GUIHelper::scale(10.0);
+		width += latchWidth() + 10;
 	if (!collapsed)
 	{
 		for (const VSTSlotFillCell* cell : cells)
-			width += cell->sizeHint().width() + GUIHelper::scale(4.0);
+			width += cell->sizeHint().width() + 4;
 	}
-	return QSize(width + GUIHelper::scale(8.0), railHeight());
+	return QSize(width + 8, railHeight());
 }
 
 QSize VSTSlotFillRail::minimumSizeHint() const
 {
-	return QSize(GUIHelper::scale(40.0), railHeight());
+	return QSize(40, railHeight());
 }
 
 void VSTSlotFillRail::paintEvent(QPaintEvent*)
@@ -420,14 +404,14 @@ bool VSTSlotFillRail::eventFilter(QObject* watched, QEvent* event)
 
 void VSTSlotFillRail::relayout()
 {
-	int x = GUIHelper::scale(12.0);
+	int x = 12;
 	const int height = railHeight();
 	if (latch != nullptr && latch->isVisibleTo(this))
 	{
 		const int lw = latchWidth();
 		const int lh = cellHeight();
 		latch->setGeometry(x, (height - lh) / 2, lw, lh);
-		x += lw + GUIHelper::scale(10.0);
+		x += lw + 10;
 	}
 	if (collapsed)
 		return;
@@ -435,11 +419,11 @@ void VSTSlotFillRail::relayout()
 	{
 		const QSize hint = cell->sizeHint();
 		cell->setGeometry(x, (height - hint.height()) / 2, hint.width(), hint.height());
-		x += hint.width() + GUIHelper::scale(4.0);
+		x += hint.width() + 4;
 	}
 }
 
-int VSTSlotFillRail::railHeight() const
+int VSTSlotFillRail::railHeight()
 {
-	return GUIHelper::scale(26.0);
+	return 26;
 }

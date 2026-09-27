@@ -5,8 +5,6 @@
 */
 
 /*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-
 	See AudioEngineAccess.h for why this module exists.
 
 	The grants are applied by spawning the system icacls.exe rather than by
@@ -21,6 +19,10 @@
 	install location and the principals are built-in well-known SIDs, never from
 	network or user input. If either ever becomes caller-supplied it has to be
 	validated and quoted before it reaches a command line.
+
+	grantOwnedConfigAccess runs only unelevated on the user's own config root.
+	It uses SetSecurityInfo, propagating inheritable ACEs to eligible existing
+	children; it never performs this operation with an administrator token.
 */
 
 #include "services/security/AudioEngineAccess.h"
@@ -35,9 +37,10 @@
 #include <authz.h>
 #include <sddl.h>
 
-#include "services/logging/Logging.h"
+#include "services/logging/TaggedLogger.h"
 #include "platform/windows/Win32Resource.h"
 #include "platform/windows/WindowsPath.h"
+#include "services/security/ConfigDirectoryHandles.h"
 
 namespace
 {
@@ -70,6 +73,8 @@ std::wstring systemPath()
 using pathutil::joinPath;
 using pathutil::pathExists;
 
+constexpr logging::TaggedLogger logLine(L"AudioEngineAccess");
+
 // Runs a system tool to completion and returns its exit code, or -1 when it
 // could not be started or timed out. Moved here with the icacls calls it exists
 // for; nothing else in the tree spawned a process through the old copy.
@@ -90,7 +95,7 @@ int runToCompletion(const std::wstring& executable, const std::wstring& argument
 	if (!CreateProcessW(executable.c_str(), mutableCommand.data(), nullptr, nullptr, FALSE,
 			CREATE_NO_WINDOW, nullptr, nullptr, &startupInfo, processInfo.put()))
 	{
-		LogFStatic(L"[AudioEngineAccess] CreateProcess failed for %s (gle=%lu)", executable.c_str(), GetLastError());
+		logLine(L"ERR", L"CreateProcess failed for %s (gle=%lu)", executable.c_str(), GetLastError());
 		return -1;
 	}
 
@@ -102,7 +107,7 @@ int runToCompletion(const std::wstring& executable, const std::wstring& argument
 	}
 	else
 	{
-		LogFStatic(L"[AudioEngineAccess] %s timed out after %u ms", executable.c_str(), timeoutMs);
+		logLine(L"ERR", L"%s timed out after %u ms", executable.c_str(), timeoutMs);
 		TerminateProcess(processInfo.process(), 1);
 	}
 
@@ -286,6 +291,83 @@ Grant grantConfigAccess(const std::wstring& configDir)
 		L"/grant " + std::wstring(kUsersSid) + L":(OI)(CI)M "
 		L"/grant " + std::wstring(kLocalServiceSid) + L":(OI)(CI)M";
 	return applyGrant(configDir, grants);
+}
+
+namespace
+{
+// Only the two owned-directory grants share ACL construction; no public
+// arbitrary-permissions API is needed for installation preparation.
+Grant grantOwnedDirectoryAccess(const std::wstring& configDir, DWORD permissions)
+{
+	// This entry point is exclusively for the unelevated prepare step. Even
+	// a raced pathname cannot give the process more authority than its user.
+	if (isElevated())
+		return Grant::Failed;
+	std::wstring reason;
+	auto handle = configaccess::openDirectory(configDir, FILE_READ_ATTRIBUTES | FILE_LIST_DIRECTORY
+		| READ_CONTROL | WRITE_DAC, FILE_SHARE_READ | FILE_SHARE_WRITE, reason);
+	if (!handle)
+	{
+		logLine(L"ERR", L"Owned config grant refused: %s", reason.c_str());
+		return Grant::Failed;
+	}
+	winutil::UniqueLocalPtr<void> descriptor;
+	PACL oldAcl = nullptr;
+	DWORD error = GetSecurityInfo(handle.get(), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION,
+		nullptr, nullptr, &oldAcl, nullptr, descriptor.put());
+	if (error != ERROR_SUCCESS || oldAcl == nullptr)
+	{
+		// Do not replace a null (unrestricted) DACL with a two-principal DACL.
+		logLine(L"ERR", L"Cannot read config DACL (error=%lu, null=%d)", error, oldAcl == nullptr);
+		return Grant::Failed;
+	}
+
+	winutil::UniqueLocalPtr<void> users;
+	winutil::UniqueLocalPtr<void> service;
+	// Skip icacls's leading '*'; retain the one SID vocabulary above.
+	if (!ConvertStringSidToSidW(kUsersSid + 1, users.put())
+		|| !ConvertStringSidToSidW(kLocalServiceSid + 1, service.put()))
+		return Grant::Failed;
+	EXPLICIT_ACCESSW entries[2] = {};
+	entries[0].Trustee.ptstrName = static_cast<LPWSTR>(users.get());
+	entries[1].Trustee.ptstrName = static_cast<LPWSTR>(service.get());
+	for (auto& entry : entries)
+	{
+		entry.grfAccessPermissions = permissions;
+		entry.grfAccessMode = GRANT_ACCESS;
+		entry.grfInheritance = OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE;
+		entry.Trustee.TrusteeForm = TRUSTEE_IS_SID;
+		entry.Trustee.TrusteeType = TRUSTEE_IS_UNKNOWN;
+	}
+	winutil::UniqueLocalPtr<ACL> acl;
+	error = SetEntriesInAclW(2, entries, oldAcl, acl.put());
+	if (error == ERROR_SUCCESS)
+	{
+		// Allow normal inheritance propagation to existing children. This is
+		// deliberately unelevated; neither a link nor a concurrent replacement
+		// gives this operation authority beyond the installing user's token.
+		// Protected child DACLs and inaccessible children need not inherit.
+		error = SetSecurityInfo(handle.get(), SE_FILE_OBJECT, DACL_SECURITY_INFORMATION,
+			nullptr, nullptr, acl.get(), nullptr);
+	}
+	if (error != ERROR_SUCCESS)
+	{
+		logLine(L"ERR", L"Config handle grant failed (error=%lu)", error);
+		return Grant::Failed;
+	}
+	return Grant::Applied;
+}
+
+} // namespace
+
+Grant grantOwnedConfigAccess(const std::wstring& configDir)
+{
+	return grantOwnedDirectoryAccess(configDir, FILE_GENERIC_READ | FILE_GENERIC_WRITE | FILE_GENERIC_EXECUTE | DELETE);
+}
+
+Grant grantOwnedEngineAccess(const std::wstring& installRoot)
+{
+	return grantOwnedDirectoryAccess(installRoot, FILE_GENERIC_READ | FILE_GENERIC_EXECUTE);
 }
 
 const wchar_t* describe(Grant grant)

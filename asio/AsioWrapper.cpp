@@ -5,6 +5,8 @@
 */
 
 #include "asio/AsioWrapper.h"
+#include "asio/DriverNameText.h"
+#include "services/logging/Logging.h"
 
 #include <cstring>
 #include <new>
@@ -23,14 +25,12 @@ namespace eapo::asio
 			return static_cast<unsigned>(direction);
 		}
 
-		// Driver names are ASCII by convention; widen byte-wise so no code page
-		// decision is made inside a DAW's process.
+		// Driver names are in the ANSI code page of this (the DAW's) process;
+		// the WASAPI target narrowed its endpoint name with CP_ACP in this same
+		// process, so CP_ACP widens it back exactly.
 		void widen(const char* source, wchar_t* destination, size_t capacity) noexcept
 		{
-			size_t i = 0;
-			for (; i + 1 < capacity && source[i] != '\0'; i++)
-				destination[i] = static_cast<wchar_t>(static_cast<unsigned char>(source[i]));
-			destination[i] = L'\0';
+			drivername::widen(source, destination, capacity, CP_ACP);
 		}
 
 		inline uint64_t tickNow() noexcept
@@ -45,10 +45,11 @@ namespace eapo::asio
 
 	AsioWrapper::AsioWrapper(IASIO* target, const GUID& wrapperClsid, const std::wstring& targetClsid,
 		StreamOptions options, std::unique_ptr<IStreamProcessor> processor)
-		: target_(target), wrapperClsid_(wrapperClsid), targetClsid_(targetClsid),
+		: wrapperClsid_(wrapperClsid), targetClsid_(targetClsid),
 		options_(std::move(options)), processor_(std::move(processor))
 	{
-		target_->AddRef();
+		target->AddRef();
+		*target_.put() = target;
 		LARGE_INTEGER frequency;
 		QueryPerformanceFrequency(&frequency);
 		tickToMicros_ = frequency.QuadPart > 0 ? 1000000.0 / static_cast<double>(frequency.QuadPart) : 0.0;
@@ -63,7 +64,7 @@ namespace eapo::asio
 			stop();
 		if (state() == State::Prepared)
 			disposeBuffers();
-		target_->Release();
+		target_.reset();
 		instances.fetch_sub(1, std::memory_order_acq_rel);
 	}
 
@@ -124,7 +125,7 @@ namespace eapo::asio
 			return ASIOTrue;
 		if (target_->init(sysHandle) == ASIOFalse)
 		{
-			char message[124] = {};
+			char message[errorMessageBytes] = {};
 			target_->getErrorMessage(message);
 			setError(message);
 			return ASIOFalse;
@@ -140,9 +141,10 @@ namespace eapo::asio
 		target_->getDriverName(targetName);
 		targetName[31] = '\0';
 		const size_t suffixLength = std::strlen(driverSuffix);
-		size_t baseLength = std::strlen(targetName);
-		if (baseLength + suffixLength > 31)
-			baseLength = 31 - suffixLength;
+		// Cut on a character boundary: half a double-byte character before
+		// the suffix would garble the name in the DAW's list.
+		const size_t baseLength = drivername::characterBoundary(
+			targetName, std::strlen(targetName), 31 - suffixLength, CP_ACP);
 		std::memcpy(name, targetName, baseLength);
 		std::memcpy(name + baseLength, driverSuffix, suffixLength);
 		name[baseLength + suffixLength] = '\0';
@@ -319,6 +321,23 @@ namespace eapo::asio
 		return ASE_OK;
 	}
 
+	bool AsioWrapper::retireCallbacks(const char* during) noexcept
+	{
+		CallbackTrampolines::release(this);
+		bool drained = CallbackTrampolines::drained(trampolines_);
+		for (int i = 0; i < 2000 && !drained; i++)
+		{
+			Sleep(1);
+			drained = CallbackTrampolines::drained(trampolines_);
+		}
+		// A timed-out slot remains closed with entrants and is quarantined:
+		// claim cannot reuse it until the stalled callbacks leave.
+		trampolines_ = nullptr;
+		if (!drained)
+			LogFStatic(L"ASIO wrapper: a callback from the driver was still running 2 s after %S; its buffers are kept, not freed", during);
+		return drained;
+	}
+
 	void AsioWrapper::releaseChannels() noexcept
 	{
 		for (Channel& channel : channels_)
@@ -418,11 +437,8 @@ namespace eapo::asio
 
 		auto unwind = [this]() noexcept {
 			target_->disposeBuffers();
-			CallbackTrampolines::release(this);
-			for (int i = 0; i < 2000 && !CallbackTrampolines::drained(trampolines_); i++)
-				Sleep(1);
-			trampolines_ = nullptr;
-			releaseChannels();
+			if (retireCallbacks("a failed createBuffers"))
+				releaseChannels();
 		};
 
 		if (!fillFormat(bufferSize))
@@ -473,17 +489,16 @@ namespace eapo::asio
 		// a switch that was already inside the wrapper to leave.
 		state_.store(State::Initialized, std::memory_order_release);
 		const ASIOError error = target_->disposeBuffers();
-		CallbackTrampolines::release(this);
-		for (int i = 0; i < 2000 && !CallbackTrampolines::drained(trampolines_); i++)
-			Sleep(1);
-		// A timed-out slot remains closed with entrants and is quarantined: claim
-		// cannot reuse it until the stalled callbacks leave.
-		trampolines_ = nullptr;
-
-		processor_->close(stats_);
-		planes_[outputSlot] = nullptr;
-		planes_[inputSlot] = nullptr;
-		releaseChannels();
+		// A callback that did not leave may still be in the processor or in
+		// the channel buffers, so neither is torn down under it: the
+		// processor closes on the next open, and the buffers stay allocated.
+		if (retireCallbacks("disposeBuffers"))
+		{
+			processor_->close(stats_);
+			planes_[outputSlot] = nullptr;
+			planes_[inputSlot] = nullptr;
+			releaseChannels();
+		}
 		hostPresent_ = false;
 		return error;
 	}
@@ -528,6 +543,11 @@ namespace eapo::asio
 	bool AsioWrapper::processorEnabled(Direction direction) const noexcept
 	{
 		return planes_[slotOf(direction)] != nullptr && format_.channelCount(direction) > 0;
+	}
+
+	bool AsioWrapper::planesCarryAudio(Outcome outcome) const noexcept
+	{
+		return outcome == Outcome::Processed || (outcome == Outcome::Late && extraLatencyFrames_ != 0);
 	}
 
 	void AsioWrapper::onBufferSwitch(long doubleBufferIndex, ASIOBool directProcess) noexcept
@@ -618,7 +638,7 @@ namespace eapo::asio
 				const uint64_t started = tickNow();
 				const Outcome outcome = processor_->process(Direction::Input);
 				account(Direction::Input, outcome, started);
-				if (outcome == Outcome::Processed)
+				if (planesCarryAudio(outcome))
 				{
 					for (size_t i = first; i < end; i++)
 					{
@@ -671,7 +691,7 @@ namespace eapo::asio
 				const uint64_t started = tickNow();
 				const Outcome outcome = processor_->process(Direction::Output);
 				account(Direction::Output, outcome, started);
-				if (outcome == Outcome::Processed)
+				if (planesCarryAudio(outcome))
 				{
 					for (size_t i = first; i < end; i++)
 						channels_[i].codec.fromFloat(planes[i - first], channels_[i].targetBuffers[index], static_cast<unsigned>(frames_));

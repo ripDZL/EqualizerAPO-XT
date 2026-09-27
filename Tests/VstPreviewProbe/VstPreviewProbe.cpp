@@ -5,8 +5,6 @@
 */
 
 /*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-
 	The VST panel-preview probe: a disposable console harness behind the
 	vst3-preview-probe workflow. It validates the two premises of the panel
 	preview feed (Editor/helpers/PanelPreviewFeeder) on a real machine.
@@ -135,7 +133,9 @@ int runPluginProbe(const std::wstring& pluginPath, double seconds, float sampleR
 	}
 	wprintf(L"INFO: loaded '%s' (%hs)\n", instance.getName().c_str(), instance.isVST3() ? "VST3" : "VST2");
 
-	instance.negotiateChannelCount(channels);
+	const std::vector<std::wstring> channelNames = channels == 1
+		? std::vector<std::wstring>{L"C"} : std::vector<std::wstring>{L"L", L"R"};
+	instance.negotiateChannelCount(channels, channelNames);
 	const int inputChannelCount = engine ? channels : instance.numInputs();
 	const int outputChannelCount = engine ? channels : instance.numOutputs();
 	wprintf(L"INFO: negotiated %d in / %d out\n", inputChannelCount, outputChannelCount);
@@ -155,8 +155,7 @@ int runPluginProbe(const std::wstring& pluginPath, double seconds, float sampleR
 	if (engine)
 	{
 		filter = std::make_unique<VSTPluginFilter>(library, state, std::unordered_map<std::wstring, float>());
-		filter->initialize(sampleRate, blockFrames, channels == 1
-			? std::vector<std::wstring>{L"C"} : std::vector<std::wstring>{L"L", L"R"});
+		filter->initialize(sampleRate, blockFrames, channelNames);
 		if (filter->isProcessingBypassed())
 		{
 			wprintf(L"FAIL: engine bypassed plugin initialization/setup\n");
@@ -545,7 +544,7 @@ int runMonitorProbe(const std::wstring& pluginPath, double seconds, bool expectL
 		wprintf(L"FAIL: plugin instance initialize failed\n");
 		return 2;
 	}
-	instance.negotiateChannelCount(2);
+	instance.negotiateChannelCount(2, {});
 	wprintf(L"INFO: loaded '%s' (%hs), %d in / %d out\n", instance.getName().c_str(),
 		instance.isVST3() ? "VST3" : "VST2", instance.numInputs(), instance.numOutputs());
 

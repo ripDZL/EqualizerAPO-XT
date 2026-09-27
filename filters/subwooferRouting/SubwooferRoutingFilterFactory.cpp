@@ -21,15 +21,12 @@
 #include "platform/windows/TextEncoding.h"
 #include "SubwooferRoutingFilterFactory.h"
 
-#include <filesystem>
-#include <fstream>
-#include <iterator>
 #include <string>
 #include <utility>
 
 #include "SubwooferRouting/Compiler.h"
 #include "SubwooferRouting/StateCodec.h"
-#include "filters/ConvolutionFilePath.h"
+#include "filters/ConfigFileReference.h"
 #include "filters/FilterFactoryRegistry.h"
 #include "SubwooferRoutingCommand.h"
 #include "SubwooferRoutingFilter.h"
@@ -75,15 +72,22 @@ std::wstring validationErrorMessage(
 	return fromUtf8(message);
 }
 
-bool readProfile(const std::wstring& path, std::string& text)
+bool readProfile(const JudgedPath& path, std::string& text)
 {
-	std::ifstream stream(std::filesystem::path(path), std::ios::binary);
-	if (!stream.is_open())
+	HANDLE file = path.leaf();
+	LARGE_INTEGER zero = {};
+	if (file == nullptr || !SetFilePointerEx(file, zero, nullptr, FILE_BEGIN))
 		return false;
-
-	text.assign(std::istreambuf_iterator<char>(stream),
-		std::istreambuf_iterator<char>());
-	return !stream.bad();
+	char buffer[8192];
+	for (;;)
+	{
+		DWORD count = 0;
+		if (!ReadFile(file, buffer, sizeof(buffer), &count, nullptr))
+			return false;
+		if (count == 0)
+			return true;
+		text.append(buffer, count);
+	}
 }
 }
 
@@ -106,13 +110,16 @@ FilterVector SubwooferRoutingFilterFactory::createFilter(
 	std::string utf8Text;
 	if (parsed.form == SubwooferRoutingCommand::Form::Profile)
 	{
-		const std::wstring resolvedPath =
-			ConvolutionFilePath::resolve(configPath, parsed.payload);
-		if (resolvedPath.empty())
+		const ConfigFileReference::Target profile =
+			ConfigFileReference::target(configPath, parsed.payload);
+		if (!profile.refusal.empty())
+			return reportParseError(command, profile.refusal);
+		if (profile.path.empty())
 			return reportParseError(command,
 				L"expected the path of a profile file");
+		const std::wstring& resolvedPath = profile.path.path();
 
-		if (!readProfile(resolvedPath, utf8Text))
+		if (!readProfile(profile.path, utf8Text))
 		{
 			return reportParseError(command,
 				L"could not read profile file \"" + resolvedPath + L"\"");

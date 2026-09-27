@@ -20,6 +20,7 @@
 #include "stdafx.h"
 #include "services/registry/RegistryPaths.h"
 #include <devices/DeviceAPOInfo.h>
+#include <devices/DevicePlan.h>
 #include <services/registry/WindowsRegistry.h>
 #include <ObjBase.h>
 #include <QDir>
@@ -28,11 +29,11 @@
 #include <QMessageBox>
 #include <QRegularExpression>
 #include <cstdarg>
+#include <io.h>
 #include <cstring>
 #include <QFontDatabase>
 #include <QSettings>
 #include <QStyleFactory>
-#include <QTemporaryDir>
 #include <QtWidgets/QApplication>
 #include <devices/VoicemeeterAPOInfo.h>
 #include <winsock2.h>
@@ -43,8 +44,8 @@
 #include <services/windows/WindowsService.h>
 #include "PreviewDevices.h"
 #include "skins/DeviceSkinPainter.h"
-#include "Editor/helpers/QtAppBootstrap.h"
-#include "Editor/helpers/EditorSettings.h"
+#include "platform/qt/QtAppBootstrap.h"
+#include "services/settings/EditorSettings.h"
 #include "Editor/skins/CustomThemeStore.h"
 #include "Editor/skins/SkinThemeData.h"
 #include "services/install/ApoRegistration.h"
@@ -57,8 +58,9 @@ namespace
 // interface/dark; both default to the Editor's own defaults, so a machine
 // that never chose gets Studio). In the Editor's heritage mode (legacyRows)
 // the dialog keeps its classic native look, matching the Editor's choice.
-void applyEditorTheme(QApplication& app, QSettings& settings)
+void applyEditorTheme(QApplication& app)
 {
+	QSettings settings(QString::fromWCharArray(EDITOR_REGPATH), QSettings::NativeFormat);
 	if (settings.value(QLatin1String(EditorSettings::Keys::LegacyRows), false).toBool())
 	{
 		// Neutral base forms in classic light colours for the painted chrome;
@@ -83,20 +85,12 @@ void applyEditorTheme(QApplication& app, QSettings& settings)
 	DeviceSkinPainter::setActiveTheme(choice.id, choice.dark);
 }
 
-void applyEditorTheme(QApplication& app)
-{
-	QSettings settings(QString::fromWCharArray(EDITOR_REGPATH), QSettings::NativeFormat);
-	applyEditorTheme(app, settings);
-}
-
 // --skin-shots <outDir>: renders the dialog with canned devices for every
-// skin x dark/light in five states (rest, hovered row, troubleshooting,
-// ASIO options, and ASIO buffer removal), then one saved custom-theme probe
-// from temporary settings. The
-// review gate's capture source and the skin work's regression harness - no
-// registry writes, no COM. Renders in the user's language (translators install
-// before the harness runs), so byte-comparison only holds for a fixed language
-// setting.
+// skin x dark/light in three states (rest, hovered row, troubleshooting
+// open) on the offscreen platform. The review gate's capture source and the
+// skin work's regression harness - no registry writes, no COM. Renders in
+// the user's language (translators install before the harness runs), so
+// byte-comparison only holds for a fixed language setting.
 int runSkinShots(QApplication& app)
 {
 	const QStringList args = app.arguments();
@@ -117,48 +111,6 @@ int runSkinShots(QApplication& app)
 	// From the roster, so a new skin appears in the review captures without
 	// anybody remembering this list.
 	const QStringList skins = SkinThemeData::ids();
-	auto captureStates = [&outDir, &failures](const QString& outputId, bool dark,
-		bool reportInitialSize) {
-		DeviceSelector dialog(PreviewDevices::playback(), PreviewDevices::capture());
-		// The size the dialog would open at, before the harness pins its own:
-		// the one number the "opens too narrow" report is about.
-		if (reportInitialSize)
-			fprintf(stderr, "DeviceSelector shots: initial size %dx%d\n", dialog.width(), dialog.height());
-		dialog.resize(760, 700);
-		dialog.show();
-		QApplication::processEvents();
-		// One pending install so the will-install state shows.
-		dialog.previewCheckDevice(0, 1);
-		QApplication::processEvents();
-
-		const QString mode = dark ? QStringLiteral("dark") : QStringLiteral("light");
-		auto save = [&](const QString& state) {
-			const QString file = outDir.filePath(
-				QStringLiteral("devsel_%1_%2_%3.png").arg(outputId, mode, state));
-			if (!dialog.grab().save(file))
-			{
-				fprintf(stderr, "DeviceSelector shots: failed to save %s\n", qPrintable(file));
-				failures++;
-			}
-		};
-
-		save(QStringLiteral("normal"));
-		dialog.previewHoverDevice(0, 2);
-		QApplication::processEvents();
-		save(QStringLiteral("hover"));
-		dialog.previewSelectDevice(0, 0);
-		dialog.previewOpenTroubleshooting();
-		QApplication::processEvents();
-		save(QStringLiteral("options"));
-		// The installed ASIO row's options page exercises the extra product path.
-		dialog.previewSelectDevice(0, 4);
-		QApplication::processEvents();
-		save(QStringLiteral("asio"));
-		// Buffer removal unfolds its wait-time control beside the checkbox.
-		dialog.previewRemoveBuffer();
-		QApplication::processEvents();
-		save(QStringLiteral("asiowait"));
-	};
 	for (const QString& skinId : skins)
 	{
 		for (int darkIndex = 0; darkIndex < 2; darkIndex++)
@@ -166,45 +118,52 @@ int runSkinShots(QApplication& app)
 			const bool dark = darkIndex == 0;
 			SkinThemeData::applyToApplication(app, skinId, dark);
 			DeviceSkinPainter::setActiveTheme(skinId, dark);
-			captureStates(skinId, dark, skinId == skins.first() && !dark);
-		}
-	}
 
-	QTemporaryDir customSettingsDirectory;
-	if (!customSettingsDirectory.isValid())
-	{
-		fprintf(stderr, "DeviceSelector shots: cannot create custom-theme settings\n");
-		failures++;
-	}
-	else
-	{
-		QSettings customSettings(customSettingsDirectory.filePath(QStringLiteral("selector-theme.ini")),
-			QSettings::IniFormat);
-		CustomThemeStore::Theme customTheme;
-		customTheme.id = QStringLiteral("selector-probe");
-		customTheme.name = QStringLiteral("Selector probe");
-		customTheme.baseTheme = QStringLiteral("nebula");
-		customTheme.dark = true;
-		customTheme.colors.insert(QStringLiteral("background"), QStringLiteral("#06111D"));
-		customTheme.colors.insert(QStringLiteral("accent"), QStringLiteral("#EE46D4"));
-		if (!CustomThemeStore::saveTheme(customSettings, customTheme))
-		{
-			fprintf(stderr, "DeviceSelector shots: cannot save custom theme\n");
-			failures++;
-		}
-		else
-		{
-			EditorSettings::writeSkinChoice(customSettings, { customTheme.skinId(), false });
-			customSettings.sync();
-			applyEditorTheme(app, customSettings);
-			const SkinTokens expectedTokens = CustomThemeStore::tokensForTheme(customTheme);
-			if (DeviceSkinPainter::activeTokens().background != expectedTokens.background
-				|| DeviceSkinPainter::activeTokens().accent != expectedTokens.accent)
-			{
-				fprintf(stderr, "DeviceSelector shots: custom theme tokens were not applied\n");
-				failures++;
-			}
-			captureStates(QStringLiteral("custom-nebula"), customTheme.dark, false);
+			DeviceSelector dialog(PreviewDevices::playback(), PreviewDevices::capture());
+			// The size the dialog would open at, before the harness pins its
+			// own: the one number the "opens too narrow" report is about.
+			if (skinId == skins.first() && !dark)
+				fprintf(stderr, "DeviceSelector shots: initial size %dx%d\n", dialog.width(), dialog.height());
+			dialog.resize(760, 700);
+			dialog.show();
+			QApplication::processEvents();
+			// One pending install so the will-install state shows.
+			dialog.previewCheckDevice(0, 1);
+			QApplication::processEvents();
+
+			const QString mode = dark ? QStringLiteral("dark") : QStringLiteral("light");
+			auto save = [&](const QString& state) {
+				const QString file = outDir.filePath(
+					QStringLiteral("devsel_%1_%2_%3.png").arg(skinId, mode, state));
+				if (!dialog.grab().save(file))
+				{
+					fprintf(stderr, "DeviceSelector shots: failed to save %s\n", qPrintable(file));
+					failures++;
+				}
+			};
+
+			save(QStringLiteral("normal"));
+			dialog.previewHoverDevice(0, 2);
+			QApplication::processEvents();
+			save(QStringLiteral("hover"));
+			dialog.previewSelectDevice(0, 0);
+			dialog.previewOpenTroubleshooting();
+			QApplication::processEvents();
+			save(QStringLiteral("options"));
+			// The endpoint's ASIO entry ticked: the same ASIO options unfold
+			// under it.
+			dialog.previewAsioEntry();
+			QApplication::processEvents();
+			save(QStringLiteral("asioentry"));
+			// The ASIO target's own options page (the installed ASIO row of
+			// the preview roster), for the judging material.
+			dialog.previewSelectDevice(0, 4);
+			QApplication::processEvents();
+			save(QStringLiteral("asio"));
+			// Buffer removal ticked: the wait time unfolds beside it.
+			dialog.previewRemoveBuffer();
+			QApplication::processEvents();
+			save(QStringLiteral("asiowait"));
 		}
 	}
 
@@ -282,6 +241,33 @@ QString plainText(const QString& html)
 	return text;
 }
 
+// Wide text to a CRT stream without passing it through a code page: a console
+// takes it as UTF-16 through WriteConsoleW, anything else (a pipe, a
+// redirected file) gets UTF-8. fputws converted through the CRT locale, which
+// lost the Korean messages on consoles whose code page could not hold them
+// (audit #348 TD-53). The stream's own handle is asked rather than
+// GetStdHandle, because ConsoleAttachment rebinds the CRT stream with
+// freopen_s and leaves the Win32 standard handle where it was.
+void writeWide(FILE* stream, const wchar_t* text, size_t length)
+{
+	fflush(stream);
+	const int descriptor = _fileno(stream);
+	if (descriptor >= 0)
+	{
+		const HANDLE handle = reinterpret_cast<HANDLE>(_get_osfhandle(descriptor));
+		DWORD mode = 0;
+		if (handle != INVALID_HANDLE_VALUE && handle != nullptr && GetConsoleMode(handle, &mode))
+		{
+			DWORD written = 0;
+			WriteConsoleW(handle, text, static_cast<DWORD>(length), &written, nullptr);
+			return;
+		}
+	}
+	const QByteArray utf8 = QString::fromWCharArray(text, static_cast<qsizetype>(length)).toUtf8();
+	fwrite(utf8.constData(), 1, static_cast<size_t>(utf8.size()), stream);
+	fflush(stream);
+}
+
 // The headless commands' output goes to the attached console and to
 // DeviceSelector.log both: a CI runner has no console to attach to, and the
 // log is what its job uploads.
@@ -292,7 +278,7 @@ void say(const wchar_t* format, ...)
 	va_start(args, format);
 	_vsnwprintf_s(line, _TRUNCATE, format, args);
 	va_end(args);
-	fputws(line, stderr);
+	writeWide(stderr, line, wcslen(line));
 	size_t length = wcslen(line);
 	while (length > 0 && (line[length - 1] == L'\n' || line[length - 1] == L'\r'))
 		line[--length] = L'\0';
@@ -300,7 +286,7 @@ void say(const wchar_t* format, ...)
 }
 
 // --install-endpoint {guid} [--install-mode lfx-gfx|sfx-mfx|sfx-efx]
-//                           [--no-original-apo] [--exclusive-mode-eq] [--no-test]
+//                           [--no-original-apo] [--asio-entry] [--no-test]
 // --uninstall-endpoint {guid}
 //
 // The dialog's OK for one endpoint, without the dialog: the same
@@ -319,7 +305,7 @@ int runEndpointCommand(QApplication& app, bool install)
 	const int flagIndex = args.indexOf(flag);
 	if (flagIndex < 0 || flagIndex + 1 >= args.size())
 	{
-		say(L"usage: DeviceSelector %hs {endpoint-guid} [--install-mode lfx-gfx|sfx-mfx|sfx-efx] [--no-original-apo] [--exclusive-mode-eq] [--no-test]\n", qPrintable(flag));
+		say(L"usage: DeviceSelector %s {endpoint-guid} [--install-mode lfx-gfx|sfx-mfx|sfx-efx] [--no-original-apo] [--asio-entry] [--no-test]\n", reinterpret_cast<const wchar_t*>(flag.utf16()));
 		return 2;
 	}
 	const std::wstring guid = args[flagIndex + 1].toStdWString();
@@ -355,7 +341,7 @@ int runEndpointCommand(QApplication& app, bool install)
 			state.installMode = DeviceAPOInfo::INSTALL_SFX_EFX;
 		else
 		{
-			say(L"unknown install mode %hs\n", qPrintable(mode));
+			say(L"unknown install mode %s\n", reinterpret_cast<const wchar_t*>(mode.utf16()));
 			return 2;
 		}
 		// A named mode is a decision; the test must not wander off it.
@@ -366,16 +352,18 @@ int runEndpointCommand(QApplication& app, bool install)
 		state.useOriginalAPOPreMix = false;
 		state.useOriginalAPOPostMix = false;
 	}
-	// "Enable the EQ in WASAPI exclusive mode": the endpoint's entry in the
-	// ASIO driver list, the dialog's checkbox.
-	if (args.contains(QStringLiteral("--exclusive-mode-eq")))
-		state.exclusiveModeEq = true;
+	// "Use in ASIO apps": the endpoint's entry in the ASIO driver list, the
+	// dialog's checkbox. The entry keeps the options it already has; a new
+	// one gets the defaults.
+	// --exclusive-mode-eq is its first name, still accepted.
+	if (args.contains(QStringLiteral("--asio-entry")) || args.contains(QStringLiteral("--exclusive-mode-eq")))
+		state.asioEntry = true;
 
 	try
 	{
 		if (install)
 		{
-			if (info->isInstalled())
+			if (planForHeadlessInstall(deviceFactsOf(*info)).action == DeviceAction::Reinstall)
 				info->reinstall();
 			else
 				info->install();
@@ -390,12 +378,7 @@ int runEndpointCommand(QApplication& app, bool install)
 			info->uninstall();
 		}
 	}
-	catch (const RegistryError& e)
-	{
-		say(L"%s\n", e.getMessage().c_str());
-		return 1;
-	}
-	catch (const DeviceException& e)
+	catch (const WideError& e)
 	{
 		say(L"%s\n", e.getMessage().c_str());
 		return 1;
@@ -423,21 +406,21 @@ int runEndpointCommand(QApplication& app, bool install)
 	DeviceTestThread thread(nullptr, devices);
 	bool aborted = false;
 	QObject::connect(&thread, &DeviceTestThread::log, [](const QString& message) {
-		say(L"test: %hs\n", qPrintable(plainText(message)));
+		say(L"test: %s\n", reinterpret_cast<const wchar_t*>(plainText(message).utf16()));
 	});
 	QObject::connect(&thread, &DeviceTestThread::logError, [](const QString& message) {
-		say(L"test error: %hs\n", qPrintable(plainText(message)));
+		say(L"test error: %s\n", reinterpret_cast<const wchar_t*>(plainText(message).utf16()));
 	});
 	QObject::connect(&thread, &DeviceTestThread::showErrorDialog, [](const QString& message) {
-		say(L"test error: %hs\n", qPrintable(plainText(message)));
+		say(L"test error: %s\n", reinterpret_cast<const wchar_t*>(plainText(message).utf16()));
 	});
 	QObject::connect(&thread, &DeviceTestThread::abort, [&aborted](const QString& message, int) {
 		aborted = true;
-		say(L"test aborted: %hs\n", qPrintable(plainText(message)));
+		say(L"test aborted: %s\n", reinterpret_cast<const wchar_t*>(plainText(message).utf16()));
 	});
 	QObject::connect(&thread, &DeviceTestThread::setItemStatus, [](const QString& deviceGuid, bool postMix, ItemStatusType status) {
 		static const char* const names[] = {"waiting", "success", "warning", "error"};
-		say(L"test status: %hs %hs %hs\n", qPrintable(deviceGuid), postMix ? "post-mix" : "pre-mix", names[static_cast<int>(status)]);
+		say(L"test status: %s %hs %hs\n", reinterpret_cast<const wchar_t*>(deviceGuid.utf16()), postMix ? "post-mix" : "pre-mix", names[static_cast<int>(status)]);
 	});
 	QEventLoop loop;
 	QObject::connect(&thread, &DeviceTestThread::finished, &loop, &QEventLoop::quit);
@@ -445,7 +428,10 @@ int runEndpointCommand(QApplication& app, bool install)
 	loop.exec();
 	thread.wait();
 
-	const bool ok = !aborted && thread.nonWorkingDeviceCount() == 0;
+	const DeviceTestThread::Verdict verdict = thread.verdict();
+	const bool ok = !aborted && verdict == DeviceTestThread::Verdict::Passed;
+	if (!aborted && verdict == DeviceTestThread::Verdict::Incomplete)
+		say(L"device test: the test stopped before it reached a verdict\n");
 	say(L"device test: %hs\n", ok ? "the APO is alive on the endpoint" : "the APO did not come up on the endpoint");
 	return ok ? 0 : 1;
 }
@@ -461,6 +447,7 @@ int main(int argc, char* argv[])
 	// install, because the Editor was not the program that ran it.
 	if (!Logging::useUserFile(L"DeviceSelector.log", true, false, false))
 		Logging::useDefaultApoLog();
+	QtAppBootstrap::installMessageHandler();
 
 	// Shared bootstrap: anchors the plugin path (a security concern for this
 	// elevated process) and, below, applies the language the user picked in
@@ -494,15 +481,33 @@ int main(int argc, char* argv[])
 
 	if (app.arguments().contains("/u"))
 	{
-		const ApoRegistration::Result uninstallResult = ApoRegistration::uninstallAllDeviceApos(
-			[](const std::wstring& message) {
-				// /u is unattended: stderr cannot block on a modal dialog.
-				fwprintf(stderr, L"DeviceSelector /u: %ls\n", message.c_str());
-			});
-		if (uninstallResult != ApoRegistration::Result::Success)
+		// The sweep reports per-item failures and does not throw them; this
+		// guard is for anything else, so an unattended /u always ends with an
+		// exit code instead of a crash (audit #348 TD-02/TD-06).
+		try
+		{
+			const ApoRegistration::Result uninstallResult = ApoRegistration::uninstallAllDeviceApos(
+				[](const std::wstring& message) {
+					// /u is unattended: stderr cannot block on a modal dialog.
+					fwprintf(stderr, L"DeviceSelector /u: %ls\n", message.c_str());
+				});
+			if (uninstallResult != ApoRegistration::Result::Success)
+				result = -1;
+		}
+		catch (const std::exception& e)
+		{
+			fwprintf(stderr, L"DeviceSelector /u: %hs\n", e.what());
 			result = -1;
+		}
 
-		VoicemeeterAPOInfo::ensureVoicemeeterClientRunning();
+		try
+		{
+			VoicemeeterAPOInfo::ensureVoicemeeterClientRunning();
+		}
+		catch (const std::exception& e)
+		{
+			LogFStatic(L"Could not start the Voicemeeter client: %S", e.what());
+		}
 	}
 	else
 	{

@@ -101,24 +101,9 @@ void MainWindow::channelConfigurationSelected(int index)
 
 	if (selectedDevice != nullptr)
 	{
-		unsigned channelCount = selectedDevice->getChannelCount();
-		if (channelMask != 0 && channelMask != static_cast<int>(selectedDevice->getChannelMask()))
-		{
-			channelCount = 0;
-			for (int i = 0; i < 31; i++)
-			{
-				int channelPos = 1 << i;
-				if (channelMask & channelPos)
-					channelCount++;
-			}
-		}
-		if (channelCount == 0)
-		{
-			channelCount = 8;
-			channelMask = KSAUDIO_SPEAKER_7POINT1_SURROUND;
-		}
-
-		vector<wstring> channelNames = ChannelLayout::getChannelNames(channelCount, channelMask);
+		const ChannelLayout::AnalysisLayout layout = ChannelLayout::analysisLayout(
+			selectedDevice->getChannelCount(), selectedDevice->getChannelMask(), channelMask);
+		vector<wstring> channelNames = ChannelLayout::getChannelNames(layout.channelCount, layout.channelMask);
 		for (const wstring& channelName : channelNames)
 		{
 			ui->analysisChannelComboBox->addItem(QString::fromStdWString(channelName));
@@ -165,7 +150,7 @@ FilterTable* MainWindow::addTab(QString title, QString tooltip, QString configPa
 	phaseTimer.start();
 
 	filterTable->setLines(configPath, lines);
-	qDebug("addTab: setup %d, insert %d, setLines %d ms",
+	TraceF(L"addTab: setup %d, insert %d, setLines %d ms",
 		int(setupNs / 1000000), int(insertNs / 1000000), int(phaseTimer.nsecsElapsed() / 1000000));
 
 	return filterTable;

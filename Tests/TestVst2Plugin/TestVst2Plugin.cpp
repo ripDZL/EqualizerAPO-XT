@@ -340,6 +340,8 @@ vst_effect_t* createEffect(vst_host_callback_t host)
 			effect->delay = -1;
 		else if (wcscmp(metadataMode, L"huge-delay") == 0)
 			effect->delay = INT32_MAX;
+		else if (wcscmp(metadataMode, L"latency-512") == 0)
+			effect->delay = 512;
 	}
 
 	return effect;

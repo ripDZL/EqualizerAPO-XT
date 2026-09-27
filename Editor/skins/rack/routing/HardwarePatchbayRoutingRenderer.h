@@ -5,8 +5,6 @@
 */
 
 /*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-
 	Rack skin's Copy renderer: a hardware ROUTING MATRIX button field. The
 	same crosspoint grid as the Signal Matrix, but each crosspoint is a small
 	square illuminated latching button mounted in a recessed sub-panel - the
@@ -55,8 +53,6 @@ private:
 	const SkinTokens skinTokens;
 	void rebuildMatrix();
 	void updateMetrics();
-	Assignment& rowAssignment(int outRow);
-	int summandIndex(int outRow, const QString& channel) const;
 	QRect cellRect(int outRow, int inCol) const;
 	bool hitTest(const QPoint& pos, int& outRow, int& inCol) const;
 	QRect stripRect() const;

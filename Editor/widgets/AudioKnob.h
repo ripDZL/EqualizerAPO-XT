@@ -22,6 +22,10 @@ public:
 	// Purely descriptive: it is forwarded to the skin through KnobState so
 	// skins can render bipolar and unipolar knobs differently.
 	void setBipolar(bool value);
+	// Request the universally recognisable circular presentation for a host
+	// whose value is already shown beside the control. This also makes its
+	// pointer gesture rotary so the visual and interaction stay aligned.
+	void setConventionalPresentation(bool value);
 	QSize sizeHint() const override;
 
 protected:
@@ -34,9 +38,11 @@ private:
 	void setValueFromAngle(const QPointF& widgetPos);
 	void setValueFromTravel(const QPointF& widgetPos, Qt::KeyboardModifiers modifiers);
 	void syncGestureCursor();
+	KnobGesture effectiveGesture() const;
 
 	QString text;
 	bool bipolar = false;
+	bool conventionalPresentation = false;
 	// The gesture of the drag in progress, latched at the press (the skin
 	// names it: ISkin::knobGesture) so a skin switch mid-drag cannot change
 	// the law under the pointer.

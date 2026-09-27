@@ -1,12 +1,11 @@
 #define MAJOR 2
-#define MINOR 51
-#define REVISION 0
+#define MINOR 54
+#define REVISION 31
 
 // Audit #250 F019: the "MAJOR.MINOR, append REVISION when non-zero" display
-// rule used to be copied into four binaries; in the UpdateChecker that string
-// feeds the update decision, so a divergent copy changes the verdict. This is
-// the one implementation. (Guarded: version.h is also included from resource
-// scripts.)
+// rule used to be copied into four binaries, and the copies had diverged. This
+// is the one implementation. (Guarded: version.h is also included from
+// resource scripts.)
 #ifdef __cplusplus
 #include <string>
 inline std::wstring eapoDisplayVersionW()
@@ -29,6 +28,6 @@ inline std::string eapoDisplayVersion()
 #endif
 
 // Canonical GitHub repository for release and update URLs, consumed by the
-// Editor's Velopack bootstrap, the UpdateChecker, and the auto-detect
-// installer so the location is written down once.
+// Editor's Velopack bootstrap and the auto-detect installer so the location
+// is written down once. The fork owns this distribution identity.
 #include "release/DistributionConfig.h"

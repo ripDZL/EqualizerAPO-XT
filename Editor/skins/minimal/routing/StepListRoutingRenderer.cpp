@@ -4,10 +4,6 @@
 	SPDX-License-Identifier: GPL-2.0-or-later
 */
 
-/*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-*/
-
 #include "StepListRoutingRenderer.h"
 #include "Editor/skins/shared/SkinPaint.h"
 
@@ -19,6 +15,7 @@
 #include <QStringListModel>
 
 #include "Editor/SkinManager.h"
+#include "Editor/widgets/routing/RoutingGridModel.h"
 #include "Editor/widgets/routing/CopyRoutingAdapter.h"
 #include "Editor/skins/minimal/MinimalChannelInk.h"
 
@@ -76,34 +73,26 @@ void StepListView::galleryShowcase(const QString& state)
 		// The gate's stand-in for a double-click: the named target's first
 		// summand. paintEvent lays out the hit-rects the editor sits on, so
 		// the view must have painted once (the caller shows it first).
-		const int row = rowIndexOf(state.mid(11));
+		const int row = RoutingGridModel::rowIndexOf(workingAssignments, state.mid(11));
 		if (row >= 0 && !workingAssignments[row].sourceSum.empty())
 			openSourceEditor(row, 0);
 	}
 }
 
-int StepListView::rowIndexOf(const QString& target) const
-{
-	for (int i = 0; i < (int)workingAssignments.size(); i++)
-		if (QString::fromStdWString(workingAssignments[i].targetChannel).compare(target, Qt::CaseInsensitive) == 0)
-			return i;
-	return -1;
-}
-
 QStringList StepListView::sourceCandidates(const QString& target) const
 {
-	return sourceCandidatesForRow(rowIndexOf(target));
+	return sourceCandidatesForRow(RoutingGridModel::rowIndexOf(workingAssignments, target));
 }
 
 bool StepListView::connectSource(const QString& target, const QString& source)
 {
-	return addSourceToRow(rowIndexOf(target), source);
+	return addSourceToRow(RoutingGridModel::rowIndexOf(workingAssignments, target), source);
 }
 
 static QFont monoFont(const SkinTokens& tokens)
 {
 	QFont f(tokens.monoFontFamily);
-	f.setPixelSize(12);
+	f.setPixelSize(13);
 	return f;
 }
 
@@ -177,8 +166,8 @@ void StepListView::paintEvent(QPaintEvent*)
 		// A bare colored token, the way a terminal marks special text (ls
 		// --color). Only virtual channels keep the dashed hairline frame:
 		// fixed sources (IR file channels) are ports, not virtual channels.
-		const bool virt = (sourceSide && portModel.fixedSourceMode()) ? false : CopyRoutingAdapter::isVirtualChannel(ch);
-		const QColor ink = minimalChannelInk(QColor(CopyRoutingAdapter::channelColor(ch)), t.dark);
+		const bool virt = (sourceSide && portModel.fixedSourceMode()) ? false : portModel.isVirtualChannel(ch);
+		const QColor ink = minimalChannelInk(ch, t.dark);
 		const int w = fm.horizontalAdvance(ch) + 12;
 		const QRect pill(x, y + (rowH - h) / 2, w, h);
 		if (virt)
@@ -288,7 +277,7 @@ void StepListView::paintEvent(QPaintEvent*)
 
 		// A virtual channel can leave the listing: hovering its step exposes
 		// an [x] bracket target (device channels fold instead of leaving).
-		if (CopyRoutingAdapter::isVirtualChannel(dest) && hoveredRow == r)
+		if (portModel.isVirtualChannel(dest) && hoveredRow == r)
 		{
 			const QRect xRect(x, y + (rowH - 18) / 2, 18, 18);
 			drawBracketTarget(xRect, QStringLiteral("x"), false);
@@ -339,10 +328,7 @@ void StepListView::mousePressEvent(QMouseEvent* event)
 		if (h.rect.contains(event->pos()))
 		{
 			const QString channel = QString::fromStdWString(workingAssignments[h.row].targetChannel);
-			for (int i = pinnedChannels.size() - 1; i >= 0; i--)
-				if (pinnedChannels[i].compare(channel, Qt::CaseInsensitive) == 0)
-					pinnedChannels.removeAt(i);
-			const bool changed = RoutingFold::removeChannel(workingAssignments, channel);
+			const bool changed = RoutingGridModel::removeChannel(workingAssignments, pinnedChannels, channel);
 			refold();
 			if (changed)
 				emit routingChanged();
@@ -565,31 +551,9 @@ void StepListView::commitSourceEditor()
 	// changes below.
 	update();
 
-	if (row >= (int)workingAssignments.size() || si >= (int)workingAssignments[row].sourceSum.size())
+	if (!RoutingGridModel::commitSource(workingAssignments, row, si, raw,
+		portModel.fixedSourceMode(), portModel.allowFactors))
 		return;
-
-	if (raw.isEmpty())
-	{
-		// Clearing the token removes the source from the sum, mirroring the
-		// crosspoint / patch-bay grids.
-		Assignment& a = workingAssignments[row];
-		a.sourceSum.erase(a.sourceSum.begin() + si);
-		refold();
-		emit routingChanged();
-		return;
-	}
-
-	Assignment::Summand& s = workingAssignments[row].sourceSum[si];
-	Assignment::Summand edited = s;
-	// A token the grammar cannot read leaves the step as it was; so does a
-	// gain where the port model allows none.
-	if (!RoutingFold::parseSourceToken(raw, portModel.fixedSourceMode(), edited))
-		return;
-	if (!portModel.allowFactors && (edited.factor != 1.0 || edited.isDecibel))
-		return;
-	if (edited.channel == s.channel && edited.factor == s.factor && edited.isDecibel == s.isDecibel)
-		return;
-	s = edited;
 	refold();
 	emit routingChanged();
 }
@@ -618,14 +582,8 @@ void StepListView::commitChannelEditor()
 
 	const QString name = channelEditor->text().trimmed();
 	channelEditor->hide();
-	if (!RoutingFold::isValidChannelName(name))
-		return;
-
-	// An existing channel just gets pinned back into the listing; a new name
-	// becomes a virtual step. No routingChanged: a fresh target has no sum
-	// yet and the serializer skips empty targets.
-	CopyRoutingAdapter::ensureTargetChannel(workingAssignments, pinnedChannels, name);
-	refold();
+	if (RoutingGridModel::addChannel(workingAssignments, pinnedChannels, name))
+		refold();
 }
 
 RoutingView* StepListRoutingRenderer::create(const vector<Assignment>& assignments,

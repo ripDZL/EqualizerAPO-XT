@@ -31,7 +31,6 @@ CONFIG += resources_big
 
 PRECOMPILED_HEADER = stable.h
 QMAKE_CXXFLAGS_WARN_ON -= -w34100
-QMAKE_LFLAGS += /STACK:32000000
 QMAKE_CXXFLAGS_RELEASE += /O2
 
 DEFINES += _UNICODE
@@ -84,10 +83,14 @@ SOURCES += main.cpp\
 	guis/DeviceFilterGUIFactory.cpp \
 	../devices/DeviceAPOInfo.cpp \
 	../devices/DeviceAPOInfo.Install.cpp \
+	../devices/ApoRuntimeFacts.cpp \
 	../devices/DeviceAPOInfo.Load.cpp \
 	../devices/DeviceAPOInfo.State.cpp \
 	../devices/DeviceAPOInfo.Uninstall.cpp \
 	../devices/DeviceInstallReport.cpp \
+	../devices/DevicePlan.cpp \
+	../devices/DeviceTestPlan.cpp \
+	../devices/ReportedOperation.cpp \
 	guis/DeviceFilterGUIDialog.cpp \
 	../filters/DeviceCommand.cpp \
 	../filters/DeviceFilterFactory.cpp \
@@ -123,7 +126,7 @@ SOURCES += main.cpp\
 	helpers/GUIHelper.cpp \
 	helpers/PanelFeedEngine.cpp \
 	helpers/PanelPreviewFeeder.cpp \
-	helpers/QtAppBootstrap.cpp \
+	../platform/qt/QtAppBootstrap.cpp \
 	helpers/VstChunkScan.cpp \
 	widgets/ResizingLineEdit.cpp \
 	widgets/ChannelGraphScene.cpp \
@@ -137,6 +140,7 @@ SOURCES += main.cpp\
 	../filters/GraphicEQFilterFactory.cpp \
 	../libHybridConv-0.1.1/libHybridConv_eapo.cpp \
 	../dsp/FftwPlanningPolicy.cpp \
+	../dsp/DelayLine.cpp \
 	../filters/graphicEq/GainCurveIterator.cpp \
 	guis/GraphicEQFilterGUIScene.cpp \
 	widgets/FrequencyPlotView.cpp \
@@ -171,7 +175,9 @@ SOURCES += main.cpp\
 	guis/StageFilterGUIFactory.cpp \
 	guis/ExpressionFilterGUIFactory.cpp \
 	widgets/ResizeCorner.cpp \
+	analysis/AnalysisRequestFence.cpp \
 	analysis/AnalysisResponse.cpp \
+	analysis/ImpulseMeasurement.cpp \
 	analysis/ResponseCurveBuilder.cpp \
 	../engine/FilterEngine.cpp \
 	../engine/FilterEngine.Configuration.cpp \
@@ -180,6 +186,7 @@ SOURCES += main.cpp\
 	../engine/ConfigWatcher.cpp \
 	../filters/FilterFactoryRegistry.cpp \
 	../engine/FilterConfiguration.cpp \
+	../engine/ChannelRoutingPlan.cpp \
 	../filters/ChannelCommand.cpp \
 	../filters/ChannelFilterFactory.cpp \
 	../filters/ExpressionCommand.cpp \
@@ -197,7 +204,8 @@ SOURCES += main.cpp\
 	../filters/IncludeFilterFactory.cpp \
 	../filters/ChannelFilter.cpp \
 	../filters/ConvolutionFilter.cpp \
-	../filters/ConvolutionFilePath.cpp \
+	../filters/ConfigFileReference.cpp \
+	../filters/ConfigPathPolicy.cpp \
 	../filters/MultiConvolutionCommand.cpp \
 	../filters/MultiConvolutionFilter.cpp \
 	../filters/MultiConvolutionFilterFactory.cpp \
@@ -211,6 +219,7 @@ SOURCES += main.cpp\
 	../SubwooferRoutingCore/src/Preset.cpp \
 	../SubwooferRoutingCore/src/Processor.cpp \
 	../SubwooferRoutingCore/src/StateCodec.cpp \
+	../SubwooferRoutingCore/src/Text.cpp \
 	../filters/HilbertCommand.cpp \
 	../filters/HilbertFilter.cpp \
 	../filters/HilbertFilterFactory.cpp \
@@ -234,21 +243,26 @@ SOURCES += main.cpp\
 	../asio/AsioRegistration.cpp \
 	../services/registry/ClsidRegistration.cpp \
 	../asio/WrapperRecord.cpp \
+	../asio/StreamFacts.cpp \
 	../devices/VoicemeeterAPOInfo.cpp \
 	../vst/AbstractLibrary.cpp \
 	../vst/VST3PluginIIDs.cpp \
 	../vst/VSTPluginLibrary.cpp \
+	../vst/VST3Lifecycle.cpp \
+	../vst/VST3SpeakerMapping.cpp \
 	guis/VSTPluginFilterGUI.cpp \
 	guis/VSTPluginFilterGUIFactory.cpp \
 	guis/VSTPluginFilterGUIDialog.cpp \
 	../filters/VSTPluginCommand.cpp \
+	../filters/VSTChannelPlan.cpp \
 	../filters/VSTPluginFilter.cpp \
 	../filters/VSTPluginFilterFactory.cpp \
 	../vst/VSTPluginInstance.cpp \
-	../vst/VSTPluginInstance.Editor.cpp \
-	../vst/VSTPluginInstance.State.cpp \
-	../vst/VSTPluginInstance.VST2.cpp \
-	../vst/VSTPluginInstance.VST3.cpp \
+	../vst/VST2Instance.cpp \
+	../vst/VST3Instance.cpp \
+	../vst/VST3Instance.Editor.cpp \
+	../vst/VST3Instance.Processing.cpp \
+	../vst/VST3Instance.State.cpp \
 	../diagnostics/performance/PerfProfile.cpp \
 	guis/LoudnessCorrectionFilterGUI.cpp \
 	guis/LoudnessCorrectionFilterGUIFactory.cpp \
@@ -261,7 +275,12 @@ SOURCES += main.cpp\
 	helpers/QtSndfileHandle.cpp \
 	helpers/VSTPreviewEndpoint.cpp \
 	helpers/VSTPluginLivePreview.cpp \
-	SkinGallery.cpp \
+	gallery/GalleryGates.cpp \
+	gallery/GalleryKnobSpecimen.cpp \
+	gallery/GalleryProbes.cpp \
+	gallery/GallerySelfTests.cpp \
+	gallery/GallerySkinShots.cpp \
+	gallery/GallerySupport.cpp \
 	SkinManager.cpp \
 	skins/ISkin.cpp \
 	skins/Skins.cpp \
@@ -282,8 +301,10 @@ SOURCES += main.cpp\
 	widgets/cards/ChannelSelectionModel.cpp \
 	widgets/cards/ConvolutionCardEditor.cpp \
 	widgets/cards/SubwooferRoutingCardEditor.cpp \
+	widgets/subwooferrouting/SubwooferRoutingDefaults.cpp \
 	widgets/subwooferrouting/SubwooferRoutingEditorDialog.cpp \
 	widgets/subwooferrouting/SubwooferRoutingResponseView.cpp \
+	widgets/subwooferrouting/SubwooferRoutingStateReads.cpp \
 	widgets/subwooferrouting/SubwooferRoutingUiState.cpp \
 	widgets/subwooferrouting/SubwooferRoutingUiModel.cpp \
 	widgets/routing/SubwooferRoutingRoutingAdapter.cpp \
@@ -305,6 +326,7 @@ SOURCES += main.cpp\
 	widgets/cards/HilbertCardEditor.cpp \
 	widgets/cards/VelvetCardEditor.cpp \
 	widgets/cards/FilterCardEditorRouter.cpp \
+	widgets/cards/FilterLineCard.cpp \
 	analysis/AnalysisViewController.cpp \
 	widgets/cards/IncludeCardEditor.cpp \
 	widgets/cards/PreampCardEditor.cpp \
@@ -316,6 +338,8 @@ SOURCES += main.cpp\
 	widgets/cards/VSTBusStrip.cpp \
 	widgets/cards/VSTSlotFillModel.cpp \
 	widgets/cards/VSTSlotFillRail.cpp \
+	widgets/cards/VSTRowDocument.cpp \
+	widgets/cards/VSTPluginSession.cpp \
 	widgets/cards/VSTCardEditor.cpp \
 	widgets/ElidedLabel.cpp \
 	widgets/EditableValue.cpp \
@@ -327,6 +351,7 @@ SOURCES += main.cpp\
 	widgets/FilterRowGuiPolicy.cpp \
 	widgets/FilterCommandCatalog.cpp \
 	widgets/FilterCardRow.cpp \
+	widgets/ChannelFlow.cpp \
 	widgets/FilterListModel.cpp \
 	widgets/FilterListUndo.cpp \
 	widgets/FilterPickerModel.cpp \
@@ -340,11 +365,12 @@ SOURCES += main.cpp\
 	widgets/routing/CopyRoutingAdapter.cpp \
 	widgets/routing/RoutingFold.cpp \
 	widgets/routing/MultiConvolutionRoutingAdapter.cpp \
-	widgets/routing/StudioRoutingModel.cpp \
+	widgets/routing/RoutingGridModel.cpp \
 	widgets/MiddleClickTabWidget.cpp \
 	import/ConfigDependencyScanner.cpp \
 	import/ImportDialog.cpp \
 	import/ImportExecutor.cpp \
+	import/CallerProfileCheck.cpp \
 	import/LegacyMigration.cpp \
 	import/LegacyMigrationPolicy.cpp \
 	widgets/MiddleClickTabBar.cpp
@@ -366,6 +392,7 @@ HEADERS  += \
 	../services/registry/RegistryError.h \
 	../services/registry/RegistryPaths.h \
 	../platform/windows/WindowsVersion.h \
+	../platform/windows/CommandLineQuoting.h \
 	../platform/windows/GuidText.h \
 	../services/security/AudioEngineAccess.h \
 	../services/diagnostics/InstallDiagnostics.h \
@@ -378,13 +405,13 @@ HEADERS  += \
 	../parser/LogicalOperators.h \
 	IFilterGUIFactory.h \
 	FilterGUIFactoryRegistry.h \
-	helpers/EditorSettings.h \
+	../services/settings/EditorSettings.h \
 	helpers/GUIHelper.h \
 	helpers/PanelFeedEngine.h \
 	helpers/PanelMonitorGate.h \
 	helpers/PanelPreviewFeeder.h \
 	helpers/WindowFrameHitTest.h \
-	helpers/QtAppBootstrap.h \
+	../platform/qt/QtAppBootstrap.h \
 	helpers/VstChunkScan.h \
 	stable.h \
 	IFilterGUI.h \
@@ -401,7 +428,14 @@ HEADERS  += \
 	FilterTemplate.h \
 	guis/DeviceFilterGUI.h \
 	guis/DeviceFilterGUIFactory.h \
+	../devices/ApoRuntimeFacts.h \
 	../devices/DeviceAPOInfo.h \
+	../devices/DevicePlan.h \
+	../devices/DeviceTestPlan.h \
+	../devices/DeviceTestWire.h \
+	../devices/ReportedOperation.h \
+	../devices/DeviceException.h \
+	../runtime/errors/WideError.h \
 	guis/DeviceFilterGUIDialog.h \
 	../filters/DeviceCommand.h \
 	../filters/DeviceFilterFactory.h \
@@ -428,6 +462,7 @@ HEADERS  += \
 	guis/CopyFilterGUIRow.h \
 	helpers/GUIChannelHelper.h \
 	../audio/ChannelLayout.h \
+	../audio/SampleFormat.h \
 	guis/DelayFilterGUI.h \
 	guis/DelayFilterGUIFactory.h \
 	../filters/DelayCommand.h \
@@ -447,6 +482,7 @@ HEADERS  += \
 	../filters/GraphicEQFilterFactory.h \
 	../libHybridConv-0.1.1/libHybridConv_eapo.h \
 	../dsp/FftwPlanningPolicy.h \
+	../dsp/DelayLine.h \
 	../dsp/SampleConversion.h \
 	../runtime/WeakValueCache.h \
 	../filters/graphicEq/GainCurveIterator.h \
@@ -478,11 +514,14 @@ HEADERS  += \
 	guis/ExpressionFilterGUIFactory.h \
 	widgets/ResizeCorner.h \
 	analysis/AnalysisMetric.h \
+	analysis/AnalysisRequestFence.h \
 	analysis/AnalysisResponse.h \
+	analysis/ImpulseMeasurement.h \
 	analysis/ResponseCurveBuilder.h \
 	../engine/FilterEngine.h \
 	../engine/ConfigWatcher.h \
 	../engine/FilterConfiguration.h \
+	../engine/ChannelRoutingPlan.h \
 	../filters/ChannelFilterFactory.h \
 	../filters/ExpressionCommand.h \
 	../filters/ExpressionFilterFactory.h \
@@ -490,6 +529,8 @@ HEADERS  += \
 	../filters/IfFilterFactory.h \
 	../filters/StageCommand.h \
 	../filters/StageFilterFactory.h \
+	../filters/ConfigFileReference.h \
+	../filters/ConfigPathPolicy.h \
 	../filters/ConvolutionFilterFactory.h \
 	../filters/IIRCommand.h \
 	../filters/IIRFilter.h \
@@ -501,6 +542,7 @@ HEADERS  += \
 	../filters/ConvolutionCommand.h \
 	../filters/ConvolutionFilter.h \
 	../filters/IrCache.h \
+	../filters/ConvolverBank.h \
 	../filters/subwooferRouting/SubwooferRoutingCommand.h \
 	../filters/subwooferRouting/SubwooferRoutingFilter.h \
 	../filters/subwooferRouting/SubwooferRoutingFilterFactory.h \
@@ -517,14 +559,15 @@ HEADERS  += \
 	../parser/EngineParser.h \
 	../parser/StringOperators.h \
 	AnalysisThread.h \
-	helpers/AnalysisRequestGeneration.h \
 	widgets/ExponentialSpinBox.h \
 	FilterTableMimeData.h \
 	CustomStyle.h \
 	../devices/AbstractAPOInfo.h \
 	../devices/AsioAPOInfo.h \
 	../asio/AsioRegistration.h \
+	../asio/EntryOptions.h \
 	../asio/WrapperRecord.h \
+	../asio/StreamFacts.h \
 	../asio/StreamProcessor.h \
 	../devices/VoicemeeterAPOInfo.h \
 	../vst/AbstractLibrary.h \
@@ -533,9 +576,17 @@ HEADERS  += \
 	guis/VSTPluginFilterGUIFactory.h \
 	guis/VSTPluginFilterGUIDialog.h \
 	../filters/VSTPluginCommand.h \
+	../filters/VSTChannelPlan.h \
 	../filters/VSTPluginFilter.h \
 	../filters/VSTPluginFilterFactory.h \
 	../vst/VSTPluginInstance.h \
+	../vst/VSTFormatInstance.h \
+	../vst/VST3Instance.h \
+	../vst/VST3HostContext.h \
+	../vst/VST3MemoryStream.h \
+	../vst/VSTChunkBase64.h \
+	../vst/VST3Lifecycle.h \
+	../vst/VST3SpeakerMapping.h \
 	guis/LoudnessCorrectionFilterGUI.h \
 	guis/LoudnessCorrectionFilterGUIFactory.h \
 	../filters/loudnessCorrection/LoudnessCorrectionCommand.h \
@@ -551,6 +602,7 @@ HEADERS  += \
 	helpers/VSTPopupLivePreviewPolicy.h \
 	helpers/VSTPluginLivePreview.h \
 	SkinGallery.h \
+	gallery/GallerySupport.h \
 	SkinTokens.h \
 	SkinManager.h \
 	skins/ISkin.h \
@@ -576,8 +628,10 @@ HEADERS  += \
 	widgets/cards/ChannelSelectionModel.h \
 	widgets/cards/ConvolutionCardEditor.h \
 	widgets/cards/SubwooferRoutingCardEditor.h \
+	widgets/subwooferrouting/SubwooferRoutingDefaults.h \
 	widgets/subwooferrouting/SubwooferRoutingEditorDialog.h \
 	widgets/subwooferrouting/SubwooferRoutingResponseView.h \
+	widgets/subwooferrouting/SubwooferRoutingStateReads.h \
 	widgets/subwooferrouting/SubwooferRoutingUiState.h \
 	widgets/subwooferrouting/SubwooferRoutingUiModel.h \
 	widgets/routing/SubwooferRoutingRoutingAdapter.h \
@@ -591,6 +645,7 @@ HEADERS  += \
 	widgets/cards/FilterCardEditorFactory.h \
 	widgets/cards/DelayCardEditor.h \
 	widgets/cards/FilterCardEditorRegistry.h \
+	widgets/cards/FilterLineCard.h \
 	widgets/cards/FileReferenceController.h \
 	widgets/cards/GraphicEQCardEditor.h \
 	widgets/cards/IIRCardEditor.h \
@@ -607,6 +662,8 @@ HEADERS  += \
 	widgets/cards/VSTBusStrip.h \
 	widgets/cards/VSTSlotFillModel.h \
 	widgets/cards/VSTSlotFillRail.h \
+	widgets/cards/VSTRowDocument.h \
+	widgets/cards/VSTPluginSession.h \
 	widgets/cards/VSTCardEditor.h \
 	widgets/ElidedLabel.h \
 	widgets/EditableValue.h \
@@ -618,6 +675,7 @@ HEADERS  += \
 	widgets/FilterRowGuiPolicy.h \
 	widgets/FilterCommandCatalog.h \
 	widgets/FilterCardRow.h \
+	widgets/ChannelFlow.h \
 	widgets/FilterListModel.h \
 	widgets/FilterListUndo.h \
 	widgets/FilterPickerModel.h \
@@ -628,16 +686,19 @@ HEADERS  += \
 	widgets/DialogChrome.h \
 	widgets/TitleBar.h \
 	widgets/ThemeEditorDialog.h \
+	widgets/routing/ChannelIdentity.h \
 	widgets/routing/CopyRoutingAdapter.h \
 	widgets/routing/RoutingFold.h \
 	widgets/routing/MultiConvolutionRoutingAdapter.h \
 	widgets/routing/IRoutingRenderer.h \
-	widgets/routing/StudioRoutingModel.h \
+	widgets/routing/RoutingGridModel.h \
 	widgets/MiddleClickTabWidget.h \
 	import/ConfigDependencyScanner.h \
 	import/ImportDialog.h \
 	import/ImportExecutor.h \
 	import/ImportManifest.h \
+	import/CallerProfileCheck.h \
+	../services/security/ConfigDirectoryHandles.h \
 	import/LegacyMigration.h \
 	import/LegacyMigrationPolicy.h \
 	widgets/MiddleClickTabBar.h
@@ -725,7 +786,7 @@ contains(QT_ARCH, arm64) {
 }
 
 # The Editor's auto-update needs to know which release channel it was built for so
-# UpdateManager fetches the matching feed (mirrors UpdateChecker.pro).
+# UpdateManager fetches the matching feed.
 !isEmpty(EAPO_UPDATE_CHANNEL) {
 	DEFINES += EAPO_UPDATE_CHANNEL=\\\"$$EAPO_UPDATE_CHANNEL\\\"
 }

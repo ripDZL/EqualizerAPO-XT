@@ -17,14 +17,10 @@ DEFINES += MUP_USE_WIDE_STRING
 DEFINES += NOMINMAX
 QMAKE_CXXFLAGS_RELEASE += /O2
 
-# The skin resource bundle is too large for one generated C++ translation
-# unit on some MSVC hosts. Let Qt embed it in the supported two-step mode.
-CONFIG += resources_big
-
 PRECOMPILED_HEADER = stdafx.h
 
 SOURCES += \
-	../Editor/helpers/QtAppBootstrap.cpp \
+	../platform/qt/QtAppBootstrap.cpp \
 	../Editor/skins/CustomThemeStore.cpp \
 	../Editor/skins/SkinThemeData.cpp \
 	main.cpp \
@@ -52,7 +48,7 @@ SOURCES += \
 	stdafx.cpp
 
 HEADERS += \
-	../Editor/helpers/QtAppBootstrap.h \
+	../platform/qt/QtAppBootstrap.h \
 	../Editor/skins/CustomThemeStore.h \
 	../Editor/skins/SkinThemeData.h \
 	DeviceListDelegate.h \

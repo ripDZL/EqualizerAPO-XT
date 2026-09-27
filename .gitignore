@@ -189,7 +189,6 @@ deps/
 Qt/
 build-*/
 DeviceSelector/translations/DeviceSelector_*.qm
-UpdateChecker/translations/UpdateChecker_*.qm
 
 # Local build helpers
 aqt-settings.ini
@@ -269,3 +268,14 @@ TECH_DEBT_AUDIT.md
 
 # Generated benchmark input (Benchmark/scenarios/New-BenchIr.ps1)
 Benchmark/scenarios/*.wav
+
+# Tool output and IDE settings (audit #348 TD-77)
+.superloopy/
+.vscode/
+
+# Offscreen gate output (.github/scripts/Invoke-EditorOffscreenTest.ps1) and
+# the before/after copies kept while comparing galleries
+/skin-gallery/
+/skin-gallery-*/
+/analysis-layout/
+/card-selection/

@@ -274,9 +274,8 @@ void SkinManager::applyTokenPreview(const QString& newSkinId, bool dark, const S
 		widget->update();
 }
 
-// The forwarders below delegate without a null check on purpose: activeSkin
-// is never null (class invariant, see the header). Only genuinely different
-// behavior - the heritage branches - earns a conditional.
+// The forwarders delegate without a null check because activeSkin always names
+// either a registered skin or the HeritageSkin singleton (see the header).
 
 IRoutingRenderer* SkinManager::routingRenderer() const
 {
@@ -373,6 +372,11 @@ void SkinManager::paintVstBusSelector(QPainter& painter, const VstBusSelectorSta
 void SkinManager::paintVstBusFrame(QPainter& painter, const VstBusFrameState& state) const
 {
 	activeSkin->paintVstBusFrame(painter, state, currentTokens);
+}
+
+QSize SkinManager::vstSlotFillCellSize(const QString& role, const QString& value) const
+{
+	return activeSkin->vstSlotFillCellSize(role, value, currentTokens);
 }
 
 void SkinManager::paintVstSlotFillCell(QPainter& painter, const VstSlotFillCellState& state) const

@@ -4,16 +4,11 @@
 	SPDX-License-Identifier: GPL-2.0-or-later
 */
 
-/*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-*/
-
 #include "SoftSkin.h"
 
 #include <QAction>
 #include <QToolBar>
 
-#include "Editor/helpers/GUIHelper.h"
 #include "Editor/skins/shared/SkinPaint.h"
 
 // The toolbar is this skin's calm header band; the QSS sheets carry the
@@ -29,7 +24,7 @@ void SoftSkin::styleMainToolbar(QToolBar* toolBar, const SkinTokens& tokens) con
 	if (toolBar == nullptr)
 		return;
 
-	toolBar->setIconSize(GUIHelper::scale(QSize(22, 22)));
+	toolBar->setIconSize(QSize(22, 22));
 	const QColor card(tokens.card);
 	for (QAction* action : toolBar->actions())
 	{

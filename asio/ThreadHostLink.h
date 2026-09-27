@@ -19,6 +19,7 @@
 #include <thread>
 
 #include "asio/HostLink.h"
+#include "asio/HostProtocol.h"
 
 namespace eapo::asio
 {
@@ -26,8 +27,8 @@ namespace eapo::asio
 	{
 	public:
 		// proAudio lifts the serving thread to the MMCSS Pro Audio class,
-		// as the real host does; the tests leave it off.
-		explicit ThreadHostLink(bool proAudio = false);
+		// as the real host does; traceSlowUs is a probe-only diagnostic.
+		explicit ThreadHostLink(bool proAudio = false, uint32_t traceSlowUs = 0);
 		~ThreadHostLink() override;
 
 		ThreadHostLink(const ThreadHostLink&) = delete;
@@ -39,14 +40,20 @@ namespace eapo::asio
 		// Makes the serving thread leave without releasing what it holds,
 		// the way a crashed host would. For the tests.
 		void killHost() noexcept;
+		// While held, the serving thread keeps the next block it picks up
+		// without completing it, the way a host the scheduler stalled would;
+		// releasing it resumes in order. For the tests.
+		void holdHost(bool held) noexcept;
 
 	private:
 		void* region_ = nullptr;
-		HANDLE events_[5] = {};
-		HANDLE hostGone_ = nullptr;        // producer's peer: set when the thread leaves
-		HANDLE producerGone_ = nullptr;    // consumer's peer: set by close()
+		winutil::UniqueHandle events_[RingEvents::count];
+		winutil::UniqueHandle hostGone_;        // producer's peer: set when the thread leaves
+		winutil::UniqueHandle producerGone_;    // consumer's peer: set by close()
 		std::thread thread_;
 		std::atomic<bool> kill_{false};
+		std::atomic<bool> hold_{false};
 		bool proAudio_;
+		uint32_t traceSlowUs_;
 	};
 }

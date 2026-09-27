@@ -5,8 +5,6 @@
 */
 
 /*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-
 	"Can audiodg.exe read this file?" - asked and answered in one place.
 
 	That question is the most common failure in the field. audiodg.exe hosts every
@@ -36,6 +34,8 @@
 #pragma once
 
 #include <string>
+
+#include "runtime/errors/WideError.h"
 
 namespace AudioEngineAccess
 {
@@ -72,9 +72,19 @@ bool isRunnableByUsers(const std::wstring& path);
 // Grants LOCAL SERVICE and Users read+execute over the install tree, so audiodg
 // can map EqualizerAPO.dll and a non-administrator can start the Editor.
 Grant grantEngineAccess(const std::wstring& installRoot);
-// Grants Users full control (they edit configs) and LOCAL SERVICE modify
-// (audiodg reads configs and writes APO trace logs) over the config tree.
+// Grants Users modify (they edit configs) and LOCAL SERVICE modify (audiodg
+// reads configs and writes APO trace logs) over the config tree. Not full
+// control for Users: WRITE_DAC would let a standard user re-ACL the tree and
+// cut LOCAL SERVICE off (audit #250 F043). tools/Repair-EqualizerAPO.ps1
+// applies the same grants; a Pester test keeps the two in step.
 Grant grantConfigAccess(const std::wstring& configDir);
+
+// Unelevated preparation only; refuses an elevated token. The user must own
+// or have WRITE_DAC on the existing directory. SetSecurityInfo propagates
+// inheritable ACEs to eligible existing children; new children inherit Modify.
+Grant grantOwnedConfigAccess(const std::wstring& configDir);
+// Same unelevated-only contract, granting read+execute on the install tree.
+Grant grantOwnedEngineAccess(const std::wstring& installRoot);
 
 // A one-line, human-readable form of a Grant, for logs and the diagnostics
 // report. Deliberately not translated: it goes into a log file a maintainer
@@ -87,17 +97,9 @@ const wchar_t* describe(Grant grant);
 // be read. It is a separate type from RegistryError because this module is
 // about files, and because a caller that catches it has to decide something
 // different from "no access".
-class AccessQueryException
+class AccessQueryException : public WideError
 {
 public:
 	explicit AccessQueryException(const std::wstring& message)
-		: message(message) {}
-
-	const std::wstring& getMessage() const
-	{
-		return message;
-	}
-
-private:
-	std::wstring message;
+		: WideError(message) {}
 };

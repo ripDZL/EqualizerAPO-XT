@@ -5,8 +5,6 @@
 */
 
 /*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-
 	One channel-fill rail of the modern VST card: a row of slot cells, each
 	assigning a config channel to one negotiated bus slot, mounted inside the
 	card (input rail under the header, output rail under the body). The input
@@ -15,7 +13,8 @@
 	The rail and its cells own all behavior - the channel popup menu,
 	keyboard access, focus, accessibility - and hand painting to the active
 	skin (ISkin::paintVstSlotFillCell / ISkin::paintVstSlotFillRail), the
-	same split VSTBusStrip uses. The host (VSTCardEditor) owns the
+	same split VSTBusStrip uses. A cell's size comes from the skin as well
+	(ISkin::vstSlotFillCellSize), measured in the fonts that skin draws with. The host (VSTCardEditor) owns the
 	semantics through VSTSlotFillModel: which rails exist, the effective
 	values, and what a pick means.
 */
@@ -115,7 +114,7 @@ protected:
 
 private:
 	void relayout();
-	int railHeight() const;
+	static int railHeight();
 
 	bool output = false;
 	bool collapsed = false;

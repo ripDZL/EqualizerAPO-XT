@@ -5,8 +5,6 @@
 */
 
 /*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-
 	Mechanical paint helpers shared by the skin TUs (skins, pickers,
 	reference cards, routing renderers). Nothing here carries a design
 	decision, so sharing them cannot breach the differentiation gate - a
@@ -95,9 +93,6 @@ inline QString cssColor(const QColor& color)
 	return color.name(color.alpha() < 255 ? QColor::HexArgb : QColor::HexRgb);
 }
 
-// Screen point on a circle around center. Qt-style angles: counter-clockwise
-// from 3 o'clock, and screen Y grows downward, so sin is subtracted. Pass the
-// negated clockwise sweep angle.
 // AXIS TICK LABEL BOXES.
 //
 // Every skin's analysis graph and EQ plot centres an x tick label on its grid
@@ -125,6 +120,9 @@ inline QRectF skinYTickLabelRect(double y, double left, double width, double hei
 	return QRectF(left, y - height / 2.0, width, height);
 }
 
+// Screen point on a circle around center. Qt-style angles: counter-clockwise
+// from 3 o'clock, and screen Y grows downward, so sin is subtracted. Pass the
+// negated clockwise sweep angle.
 inline QPointF skinArcPoint(const QPointF& center, double radius, double degrees)
 {
 	const double radians = qDegreesToRadians(degrees);

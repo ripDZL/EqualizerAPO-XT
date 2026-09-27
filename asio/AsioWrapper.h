@@ -42,6 +42,7 @@
 #include "asio/CallbackTrampolines.h"
 #include "asio/SampleCodec.h"
 #include "asio/StreamProcessor.h"
+#include "platform/windows/ComPtr.h"
 
 namespace eapo::asio
 {
@@ -122,6 +123,13 @@ namespace eapo::asio
 
 		ASIOError prepareChannels(ASIOBufferInfo* bufferInfos, long numChannels, long bufferSize);
 		void releaseChannels() noexcept;
+		// Unbinds the callback slot and waits up to two seconds for a
+		// callback already inside to leave. False when one is still inside;
+		// the caller must then not free what that callback may touch.
+		bool retireCallbacks(const char* during) noexcept;
+		// Whether a process() outcome leaves audio in the planes to write:
+		// always for Processed, and for Late from an adapter that pipelines.
+		bool planesCarryAudio(Outcome outcome) const noexcept;
 		bool fillFormat(long bufferSize);
 		void setError(const char* message) noexcept;
 
@@ -132,14 +140,14 @@ namespace eapo::asio
 		bool processorEnabled(Direction direction) const noexcept;
 
 		std::atomic<long> refCount_{1};
-		IASIO* target_;
+		winutil::ComPtr<IASIO> target_;
 		GUID wrapperClsid_;
 		std::wstring targetClsid_;
 		StreamOptions options_;
 		std::unique_ptr<IStreamProcessor> processor_;
 
 		std::atomic<State> state_{State::Loaded};
-		char errorMessage_[124] = {};
+		char errorMessage_[errorMessageBytes] = {};
 
 		ASIOCallbacks host_ = {};
 		bool hostPresent_ = false;

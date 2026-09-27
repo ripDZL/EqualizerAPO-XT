@@ -23,6 +23,7 @@
 #include <string>
 
 #include "platform/windows/Win32Resource.h"
+#include "filters/ConfigFileReference.h"
 
 class AbstractLibrary
 {
@@ -35,8 +36,15 @@ public:
 	virtual ~AbstractLibrary();
 
 	int initialize();
+	int initialize(const JudgedPath& path);
 	virtual std::wstring getLibPath() = 0;
 	virtual std::wstring getLoadPath();
+
+	// Holds a judged leaf against writers until the load: reopens it through
+	// the handle without write sharing and refuses a link, a folder or an
+	// empty file. ERROR_SUCCESS with held empty for a file on a share or on a
+	// volume without reparse points, where nothing can become a link.
+	static DWORD holdForLoad(HANDLE leaf, winutil::UniqueHandle& held);
 
 protected:
 	virtual bool loadFunctions() = 0;
@@ -46,7 +54,7 @@ protected:
 	winutil::UniqueModule module;
 
 private:
-	static unsigned short getFileArchitecture(const std::wstring& filePath);
+	static unsigned short getFileArchitecture(HANDLE file);
 
 	// Serialises the lazy module load. A single VSTPluginLibrary instance is
 	// shared (via getInstance) between the GUI thread and the AnalysisThread,

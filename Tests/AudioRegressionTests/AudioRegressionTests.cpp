@@ -32,7 +32,10 @@
 #include "services/logging/Logging.h"
 #include "audio/io/SndfileRAII.h"
 #include "platform/windows/Win32Resource.h"
+#include "platform/windows/WindowsPath.h"
+#include "Tests/AlignedMemoryGate.h"
 #include "Tests/TestHarness.h"
+#include "Tests/WavFixtures.h"
 
 #pragma comment(lib, "bcrypt.lib")
 
@@ -235,16 +238,7 @@ std::wstring toWide(const std::string& s)
 	return w;
 }
 
-std::wstring exeDirectory()
-{
-	wchar_t buf[MAX_PATH];
-	DWORD n = GetModuleFileNameW(nullptr, buf, MAX_PATH);
-	std::wstring path(buf, n);
-	size_t slash = path.find_last_of(L"\\/");
-	if (slash != std::wstring::npos)
-		path.resize(slash);
-	return path;
-}
+using pathutil::exeDirectory;
 
 void ensureDirectory(const std::wstring& path)
 {
@@ -306,7 +300,19 @@ Options parseOptions(int argc, char** argv)
 		else if (a == "--ref-dir") o.refDir = toWide(next());
 		else if (a == "--config-dir") o.configDir = toWide(next());
 		else if (a == "--out-dir") o.outDir = toWide(next());
-		else if (a == "--tolerance-db") o.toleranceDb = std::atof(next().c_str());
+		else if (a == "--tolerance-db")
+		{
+			// Strict: atof read "abc" as 0 dB, which silently loosened the gate.
+			const std::string text = next();
+			char* end = nullptr;
+			const double value = std::strtod(text.c_str(), &end);
+			if (text.empty() || end == nullptr || *end != '\0' || !std::isfinite(value))
+			{
+				fprintf(stderr, "Invalid --tolerance-db value: %s\n", text.c_str());
+				exit(2);
+			}
+			o.toleranceDb = value;
+		}
 		else if (a == "--equiv-ir") o.equivIrFiles.push_back(toWide(next()));
 		else if (a == "--help" || a == "-h") {
 			printf("Usage: AudioRegressionTests [options]\n");
@@ -390,6 +396,10 @@ struct CompareResult
 	double rmse;
 	double snrDb;
 	size_t sampleCount;
+	// Set when the output or the reference holds a NaN or an infinity. A NaN
+	// makes every "err > maxAbsError" comparison false, so without this an
+	// all-NaN output passed with maxAbsError 0 (audit #348 TD-21).
+	bool nonFinite;
 };
 
 CompareResult compareBuffers(const std::vector<float>& out, const std::vector<float>& ref, double toleranceDb)
@@ -410,6 +420,16 @@ CompareResult compareBuffers(const std::vector<float>& out, const std::vector<fl
 
 	for (size_t i = 0; i < r.sampleCount; ++i)
 	{
+		if (!std::isfinite(out[i]) || !std::isfinite(ref[i]))
+		{
+			r.passed = false;
+			r.nonFinite = true;
+			r.maxAbsError = std::numeric_limits<double>::infinity();
+			r.maxErrorIndex = i;
+			r.rmse = std::numeric_limits<double>::infinity();
+			r.snrDb = -std::numeric_limits<double>::infinity();
+			return r;
+		}
 		double err = std::fabs((double)out[i] - (double)ref[i]);
 		if (err > r.maxAbsError) {
 			r.maxAbsError = err;
@@ -488,26 +508,6 @@ std::vector<std::vector<double>> makeSyntheticIr(unsigned channels, unsigned fra
 		}
 	}
 	return ir;
-}
-
-bool writeIrWav(const std::wstring& path, const std::vector<std::vector<double>>& channels, unsigned sampleRate)
-{
-	const unsigned numCh = (unsigned)channels.size();
-	const unsigned frames = (unsigned)channels[0].size();
-	std::vector<double> interleaved((size_t)frames * numCh);
-	for (unsigned f = 0; f < frames; ++f)
-		for (unsigned c = 0; c < numCh; ++c)
-			interleaved[(size_t)f * numCh + c] = channels[c][f];
-
-	SF_INFO info = {};
-	info.samplerate = (int)sampleRate;
-	info.channels = (int)numCh;
-	info.format = SF_FORMAT_WAV | SF_FORMAT_DOUBLE;
-	sndfile::Handle file(sf_wchar_open(path.c_str(), SFM_WRITE, &info));
-	if (!file)
-		return false;
-	sf_writef_double(file.get(), interleaved.data(), (sf_count_t)frames);
-	return true;
 }
 
 bool writeTextFile(const std::wstring& path, const std::wstring& text)
@@ -762,7 +762,7 @@ void runAllEquivalenceBatteries(const Options& opts, bool& outFailed, unsigned& 
 	for (const auto& s : synth)
 	{
 		const std::wstring irPath = equivDir + L"\\" + toWide(s.label) + L"_ir.wav";
-		if (!writeIrWav(irPath, makeSyntheticIr(s.channels, synthFrames), sampleRate))
+		if (!test::writeWavFile(irPath, (int)sampleRate, makeSyntheticIr(s.channels, synthFrames)))
 		{
 			fprintf(stderr, "ERROR: could not write synthetic IR %S\n", irPath.c_str());
 			outFailed = true;
@@ -806,6 +806,17 @@ bool runCase(const TestCase& tc, const Options& opts, bool& outFailed)
 	if (tc.blockFrames == 0 || tc.frames % tc.blockFrames != 0)
 	{
 		fprintf(stderr, "  ERROR: blockFrames %u does not divide frames %u\n", tc.blockFrames, tc.frames);
+		outFailed = true;
+		return false;
+	}
+
+	// The engine treats a missing config file as an empty configuration and
+	// passes the signal through, and a pass-through case's reference equals its
+	// input (loudnesscorrection_bypassed), so without this the case stayed
+	// green with no config at all (audit #348 TD-71).
+	if (!pathutil::fileExists(configPath))
+	{
+		fprintf(stderr, "  ERROR: config file %S does not exist\n", configPath.c_str());
 		outFailed = true;
 		return false;
 	}
@@ -871,8 +882,11 @@ bool runCase(const TestCase& tc, const Options& opts, bool& outFailed)
 
 	CompareResult cr = compareBuffers(output, reference, opts.toleranceDb);
 	const char* verdict = cr.passed ? "PASS" : "FAIL";
-	printf("  %s  maxAbsError=%.3e (at %zu)  rmse=%.3e  snr=%.2f dB\n",
-		verdict, cr.maxAbsError, cr.maxErrorIndex, cr.rmse, cr.snrDb);
+	if (cr.nonFinite)
+		printf("  FAIL  non-finite sample at index %zu (output or reference)\n", cr.maxErrorIndex);
+	else
+		printf("  %s  maxAbsError=%.3e (at %zu)  rmse=%.3e  snr=%.2f dB\n",
+			verdict, cr.maxAbsError, cr.maxErrorIndex, cr.rmse, cr.snrDb);
 	if (!cr.passed) outFailed = true;
 	return cr.passed;
 }
@@ -884,6 +898,19 @@ int runAudioRegressionTests(int argc, char** argv)
 	Logging::set(stderr, false, false, false);
 
 	Options opts = parseOptions(argc, argv);
+
+	// The comparison must reject a non-finite sample; if this ever passes,
+	// every verdict below would be meaningless.
+	{
+		const std::vector<float> reference(4, 0.0f);
+		std::vector<float> poisoned(4, 0.0f);
+		poisoned[2] = std::numeric_limits<float>::quiet_NaN();
+		if (compareBuffers(poisoned, reference, opts.toleranceDb).passed)
+		{
+			fprintf(stderr, "AudioRegressionTests: self-check failed, a NaN sample compared as equal\n");
+			return EXIT_FAILURE;
+		}
+	}
 
 	printf("AudioRegressionTests\n");
 	printf("  variant     = %s\n", opts.variant.c_str());
@@ -935,7 +962,10 @@ int runAudioRegressionTests(int argc, char** argv)
 	test::Harness harness("AudioRegressionTests");
 	harness.expect(!anyFailed, "one or more regression cases failed (drift beyond tolerance or I/O error)");
 	harness.report();
-	return 0;
+	// Every engine in runCase and the batteries is a local that is gone by
+	// now, so the engine-buffer counters must balance (audit #348 TD-22/D1:
+	// this was the one suite that skipped the canary).
+	return test::reportAlignedMemoryBalance("AudioRegressionTests");
 }
 
 int main(int argc, char** argv)

@@ -1,12 +1,8 @@
 /*
 	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 Mephistos (DCinside)
 	Copyright (C) 2026 115dkk
 	SPDX-License-Identifier: GPL-2.0-or-later
-*/
-
-/*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-	Copyright (C) 2026 Mephistos (DCinside)
 */
 
 #include "PanelPreviewFeeder.h"
@@ -22,7 +18,7 @@ PanelPreviewFeeder::~PanelPreviewFeeder()
 	stop();
 }
 
-void PanelPreviewFeeder::start(VSTPluginInstance* effect)
+void PanelPreviewFeeder::start(VSTPluginInstance* effect, const VSTPreviewEndpoint& previewEndpoint)
 {
 	stop();
 
@@ -35,7 +31,9 @@ void PanelPreviewFeeder::start(VSTPluginInstance* effect)
 
 	PanelFeedEngine::Options options;
 	options.requireVst3EditorSession = true;
-	options.monitorEnabled = !qEnvironmentVariableIsSet("EAPO_DISABLE_PANEL_MONITOR");
+	options.previewEndpoint = previewEndpoint;
+	options.monitorEnabled = !previewEndpoint.isValid()
+		&& !qEnvironmentVariableIsSet("EAPO_DISABLE_PANEL_MONITOR");
 
 	if (engine.start(effect, options))
 		pumpTimer.start();

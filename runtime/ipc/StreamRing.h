@@ -62,6 +62,13 @@ namespace eapo::ipc
 	// under 128 MiB, so its uint32_t wire geometry cannot wrap.
 	constexpr uint32_t maxRingChannels = 64;
 	constexpr uint32_t maxRingFrames = 65536;
+	// The sample rates a ring may carry. The top is the WASAPI exclusive
+	// target's own ceiling (canSampleRate and setSampleRate refuse above
+	// 1 MHz), which also covers every ASIO driver rate up to 768 kHz; the
+	// bottom is far below the 8 kHz any audio endpoint runs at. A value
+	// outside, or not finite, is a corrupt or hostile header.
+	constexpr double minRingSampleRate = 1000.0;
+	constexpr double maxRingSampleRate = 1000000.0;
 
 	enum class RingState : uint32_t
 	{
@@ -126,6 +133,8 @@ namespace eapo::ipc
 	// Sizes both sides derive from the format alone.
 	namespace RingGeometry
 	{
+		// Frames, channels and the sample rate within the ring's bounds, and
+		// both strings NUL-terminated inside their fields.
 		bool validFormat(const eapo::asio::StreamFormat& format) noexcept;
 		uint32_t slotBytes(const eapo::asio::StreamFormat& format, eapo::asio::Direction direction) noexcept;
 		uint32_t totalBytes(const eapo::asio::StreamFormat& format) noexcept;
@@ -200,13 +209,18 @@ namespace eapo::ipc
 	class RingConsumer
 	{
 	public:
-		// Validates the header; valid() is false on a magic, version or size
-		// mismatch, in which case nothing else may be called but setState.
+		// Validates the header; valid() is false on a magic, version, format
+		// or geometry mismatch, in which case nothing else may be called but
+		// setState. The format is copied out of shared memory once, the slot
+		// geometry is computed from that copy and compared with the header,
+		// and only the computed values are used afterwards: a producer that
+		// rewrites the header mid-stream cannot move a slot.
 		RingConsumer(void* base, size_t bytes, const RingSync& sync) noexcept;
 
 		bool valid() const noexcept {return valid_;}
 		const RingHeader& header() const noexcept {return *header_;}
-		const eapo::asio::StreamFormat& format() const noexcept {return header_->format;}
+		// The copy taken at construction, not the shared header.
+		const eapo::asio::StreamFormat& format() const noexcept {return format_;}
 
 		void setConsumerPid(uint32_t pid) noexcept;
 		// Ready and Fault also signal the ready event.
@@ -218,16 +232,22 @@ namespace eapo::ipc
 			eapo::asio::Direction direction;
 			uint32_t sequence;
 			float* slot;
+			// For dispatch-latency diagnostics in the same process: the
+			// producer's QueryPerformanceCounter tick at the lane's latest
+			// publish, and how many blocks it published after this one
+			// (nonzero when the consumer is behind, and the tick is then
+			// that later block's).
+			LONGLONG publishTick;
+			uint32_t behind;
 		};
 
 		// Waits for work on either lane, the peer, or the timeout. Lanes are
 		// served in order, output first when both are pending. False means
 		// nothing to do: timeout, Closing, or the peer went away (check
-		// state() and peerGone()). spinUs is how long to poll before the
-		// kernel wait: a woken thread pays scheduler and C-state latency
-		// that a spinning one does not, and inside one buffer period that
-		// latency is most of a sync deadline.
-		bool acquire(Acquired& out, uint32_t timeoutMs, uint32_t spinUs = 0) noexcept;
+		// state() and peerGone()). It does not poll before the kernel wait:
+		// see ProAudioScope in EngineHostCore.cpp for what a spinning
+		// MMCSS thread measured.
+		bool acquire(Acquired& out, uint32_t timeoutMs) noexcept;
 		void release(const Acquired& acquired) noexcept;
 		bool peerGone() const noexcept {return peerGone_;}
 		// The processor the producer last published from, or -1.
@@ -238,6 +258,8 @@ namespace eapo::ipc
 
 		RingHeader* header_;
 		RingSync sync_;
+		eapo::asio::StreamFormat format_;
+		uint32_t slotOffset_[eapo::asio::directionCount][2] = {};
 		bool valid_ = false;
 		bool peerGone_ = false;
 		double ticksPerMicro_ = 0.0;

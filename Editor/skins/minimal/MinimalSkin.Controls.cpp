@@ -4,10 +4,6 @@
 	SPDX-License-Identifier: GPL-2.0-or-later
 */
 
-/*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-*/
-
 #include "MinimalSkin.h"
 
 #include <QFontMetricsF>
@@ -22,7 +18,7 @@
 
 namespace
 {
-void paintHighContrastKnob(QPainter& painter, const QRect& rect, const KnobState& state,
+void paintPrecisionKnob(QPainter& painter, const QRect& rect, const KnobState& state,
 	const SkinTokens& tokens)
 {
 	painter.setRenderHint(QPainter::Antialiasing);
@@ -196,8 +192,7 @@ namespace
 // rule), secondary (crown lines, window rules, the detent), travelled ink
 // (reading line and position tick: body text, accent while dragging,
 // secondary when disabled), promoted figure (one step above body text:
-// white on the dark console, full black on the light paper; mode is read
-// off the background's value because SkinTokens carries no dark flag).
+// white on the dark console and full black on the light paper).
 struct KnobInk
 {
 	QColor hairline;
@@ -311,9 +306,12 @@ void paintKnobReadout(QPainter& painter, const QRect& rect, const KnobState& sta
 // the surface moves with the pointer.
 void MinimalSkin::paintKnob(QPainter& painter, const QRect& rect, const KnobState& state, const SkinTokens& tokens) const
 {
-	if (tokens.highContrast)
+	if (tokens.highContrast || state.conventionalPresentation)
 	{
-		paintHighContrastKnob(painter, rect, state, tokens);
+		// The precision dial keeps all non-drum hosts unambiguous. High-contrast
+		// themes use it everywhere; Legacy Preamp opts in because its separate
+		// value box leaves a register drum without the figure it relies on.
+		paintPrecisionKnob(painter, rect, state, tokens);
 		return;
 	}
 
@@ -551,9 +549,9 @@ void MinimalSkin::paintVstBusSelector(QPainter& painter, const VstBusSelectorSta
 
 	const QRectF rect(state.rect);
 	QFont roleFont(tokens.monoFontFamily);
-	roleFont.setPixelSize(10);
+	roleFont.setPixelSize(11);
 	QFont valueFont(tokens.monoFontFamily);
-	valueFont.setPixelSize(12);
+	valueFont.setPixelSize(13);
 
 	QColor roleInk = withAlpha(QColor(tokens.mutedText), state.enabled ? 255 : 150);
 	QColor valueInk(state.enabled ? tokens.text : tokens.mutedText);
@@ -610,7 +608,7 @@ void MinimalSkin::paintVstBusFrame(QPainter& painter, const VstBusFrameState& st
 	painter.setRenderHint(QPainter::TextAntialiasing, true);
 
 	QFont monoFont(tokens.monoFontFamily);
-	monoFont.setPixelSize(11);
+	monoFont.setPixelSize(12);
 	painter.setFont(monoFont);
 	painter.setPen(withAlpha(QColor(tokens.mutedText), state.enabled ? 255 : 150));
 	painter.drawText(QRectF(state.jointRect), Qt::AlignCenter, QStringLiteral("->"));
@@ -633,7 +631,7 @@ void MinimalSkin::paintVstBusFrame(QPainter& painter, const VstBusFrameState& st
 		ink = withAlpha(ink, 150);
 
 	QFont verdictFont(tokens.monoFontFamily);
-	verdictFont.setPixelSize(10);
+	verdictFont.setPixelSize(11);
 	painter.setFont(verdictFont);
 	painter.setPen(ink);
 	QString text;
@@ -652,6 +650,34 @@ void MinimalSkin::paintVstBusFrame(QPainter& painter, const VstBusFrameState& st
 		QFontMetricsF(verdictFont).elidedText(text, Qt::ElideRight, state.verdictRect.width()));
 }
 
+namespace
+{
+// The fill cell's fonts, shared by the painter and the size it answers.
+// The role prints lowercase, so it is measured lowercase too.
+QFont minimalFillRoleFont(const SkinTokens& tokens)
+{
+	QFont font(tokens.monoFontFamily);
+	font.setPixelSize(11);
+	return font;
+}
+
+QFont minimalFillValueFont(const SkinTokens& tokens)
+{
+	QFont font(tokens.monoFontFamily);
+	font.setPixelSize(12);
+	return font;
+}
+}
+
+QSize MinimalSkin::vstSlotFillCellSize(const QString& role, const QString& value, const SkinTokens& tokens) const
+{
+	// The painter's line: 3 of margin, the role, 5, the channel, 4, the
+	// 5-wide caret, and the same 3 of margin after it.
+	const qreal roleWidth = QFontMetricsF(minimalFillRoleFont(tokens)).horizontalAdvance(role.toLower());
+	const qreal valueWidth = QFontMetricsF(minimalFillValueFont(tokens)).horizontalAdvance(value);
+	return QSize(qCeil(3.0 + roleWidth + 5.0 + valueWidth + 4.0 + 5.0 + 3.0), 20);
+}
+
 void MinimalSkin::paintVstSlotFillCell(QPainter& painter, const VstSlotFillCellState& state, const SkinTokens& tokens) const
 {
 	QPainterStateGuard guard(&painter);
@@ -660,10 +686,8 @@ void MinimalSkin::paintVstSlotFillCell(QPainter& painter, const VstSlotFillCellS
 	// Bare ink, the approved reading: lowercase role, mono channel, painted
 	// caret. No chrome; the states live entirely in the ink.
 	const QRectF rect(state.rect);
-	QFont roleFont(tokens.monoFontFamily);
-	roleFont.setPixelSize(10);
-	QFont valueFont(tokens.monoFontFamily);
-	valueFont.setPixelSize(11);
+	const QFont roleFont = minimalFillRoleFont(tokens);
+	const QFont valueFont = minimalFillValueFont(tokens);
 
 	QColor roleInk = withAlpha(QColor(tokens.mutedText), state.enabled ? 255 : 150);
 	QColor valueInk(state.silent || state.defaulted ? tokens.mutedText : tokens.text);
@@ -716,7 +740,7 @@ void MinimalSkin::paintVstSlotFillRail(QPainter& painter, const VstSlotFillRailS
 	if (state.latchRect.isNull())
 		return;
 	QFont latchFont(tokens.monoFontFamily);
-	latchFont.setPixelSize(10);
+	latchFont.setPixelSize(11);
 	painter.setFont(latchFont);
 	const QString token = QStringLiteral("fill");
 	const QRectF latch(state.latchRect);

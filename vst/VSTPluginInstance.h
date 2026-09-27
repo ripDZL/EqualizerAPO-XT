@@ -19,43 +19,30 @@
 
 #pragma once
 
-#include <array>
-#include <atomic>
-#include <cstdint>
-#include <string>
-#include <memory>
+// The public face of one hosted plug-in. The format-specific work sits behind
+// it in VST2Instance or VST3Instance (VSTFormatInstance.h), chosen once when
+// the instance is constructed; this header deliberately includes neither the
+// VST2 nor the VST3 SDK headers, so its callers do not compile them.
+
 #include <functional>
-#include <mutex>
+#include <memory>
 #include <optional>
+#include <string>
+#include <unordered_map>
 #include <vector>
-#include "aeffectx.h"
-#include "pluginterfaces/base/ibstream.h"
-#include "pluginterfaces/base/smartpointer.h"
-#include "pluginterfaces/vst/ivstaudioprocessor.h"
-#include "pluginterfaces/vst/ivsteditcontroller.h"
-#include "pluginterfaces/vst/ivstevents.h"
-#include "pluginterfaces/vst/ivsthostapplication.h"
-#include "pluginterfaces/vst/ivstmessage.h"
-#include "pluginterfaces/vst/ivstparameterchanges.h"
-#include "pluginterfaces/vst/ivstprocesscontext.h"
-#include "pluginterfaces/gui/iplugview.h"
 #include "platform/windows/Win32Resource.h"
 #include "VST3BusLayout.h"
 
+class VSTFormatInstance;
 class VSTPluginLibrary;
-
-struct VST2EffectDeleter
-{
-	void operator()(vst_effect_t* effect) const noexcept;
-};
-
-using VST2EffectPtr = std::unique_ptr<vst_effect_t, VST2EffectDeleter>;
 
 class VSTPluginInstance
 {
 public:
 	VSTPluginInstance(const std::shared_ptr<VSTPluginLibrary>& library, int processLevel);
 	~VSTPluginInstance();
+	VSTPluginInstance(const VSTPluginInstance&) = delete;
+	VSTPluginInstance& operator=(const VSTPluginInstance&) = delete;
 
 	bool initialize();
 
@@ -66,32 +53,33 @@ public:
 	// plugin afterwards spans at least channelCount channels, so a single
 	// instance can process the whole device width. numInputs()/numOutputs()
 	// reflect the negotiated result either way.
-	bool negotiateChannelCount(int channelCount);
+	bool negotiateChannelCount(int channelCount,
+		const std::vector<std::wstring>& channelNames);
 	// Proposes different input and output widths - a stereo input bus feeding
 	// a full-width output bus, the DAW-style layout upmixer plugins key their
 	// engine on. Returns true only when the plugin accepts both widths
 	// exactly; on rejection the plugin's own preferred layout is re-applied.
-	bool negotiateBusChannelCounts(int inputChannelCount, int outputChannelCount);
+	bool negotiateBusChannelCounts(int inputChannelCount, int outputChannelCount,
+		const std::vector<std::wstring>& inputChannelNames,
+		const std::vector<std::wstring>& outputChannelNames);
 	// Negotiates the logical contract used by VSTPlugin Input/Output. Explicit directions
 	// accept only arrangements belonging to that layout; Auto directions retain
 	// the existing device-width negotiation and may use the plug-in's current
 	// arrangement. No preferred-layout fallback is applied after a failure.
 	bool negotiateBusLayouts(VST3BusLayout inputLayout, VST3BusLayout outputLayout,
-		int automaticChannelCount);
+		int automaticChannelCount, const std::vector<std::wstring>& inputChannelNames,
+		const std::vector<std::wstring>& outputChannelNames);
 	// Logical names for the VST3 arrangements most recently reported by the
 	// processor. Unknown or vendor-specific arrangements intentionally remain
 	// empty so diagnostics never claim a layout from channel count alone.
 	std::optional<VST3BusLayout> getNegotiatedVST3InputLayout() const;
 	std::optional<VST3BusLayout> getNegotiatedVST3OutputLayout() const;
-	// Supplies semantic EAPO channel names for the next VST3 negotiation.
-	// The two-vector form supports asymmetric upmixer buses.
-	void setChannelNameHints(const std::vector<std::wstring>& channelNames);
-	void setBusChannelNameHints(const std::vector<std::wstring>& inputChannelNames,
-		const std::vector<std::wstring>& outputChannelNames);
 	const std::vector<int>& getVST3InputChannelMapping() const;
 	const std::vector<int>& getVST3OutputChannelMapping() const;
 	bool canReplacing() const;
 	bool isVST3() const;
+	bool canProcessNow() const;
+	bool hasProcessingFailure() const;
 	int uniqueID() const;
 	std::wstring getName() const;
 	int getUsedChannelCount() const;
@@ -105,18 +93,11 @@ public:
 	int getInitialDelay() const;
 
 	void prepareForProcessing(float sampleRate, int blockSize);
-	// Latched VST3 setup/start/process rejection; reset by a new preparation.
-	// A valid silent output (for example a denoiser gate) is not a failure.
-	bool hasProcessingFailure() const { return vst3ProcessingFailed.load(std::memory_order_relaxed); }
 	void writeToEffect(const std::wstring& chunkData, const std::unordered_map<std::wstring, float>& paramMap);
 	void readFromEffect(std::wstring& chunkData, std::unordered_map<std::wstring, float>& paramMap) const;
 
 	void startProcessing();
 	void processDoubleReplacing(double** inputArray, double** outputArray, int frameCount);
-	// Shared VST3 body behind both widths; defined in VSTPluginInstance.cpp.
-	template<typename SampleType>
-	void processVst3Replacing(SampleType** inputArray, SampleType** outputArray, int frameCount);
-
 	void processReplacing(float** inputArray, float** outputArray, int frameCount);
 	void process(float** inputArray, float** outputArray, int frameCount);
 	void stopProcessing();
@@ -125,129 +106,15 @@ public:
 	bool startEditing(HWND hWnd, short* width, short* height, double scaleFactor = 1.0);
 	void doIdle();
 	void stopEditing();
-	// Whether an open editor view currently holds the processor in the VST3
-	// Processing state (beginVST3EditorSession). The panel preview feeder
-	// keys its process() calls on this: outside the session the processor is
-	// deactivated and must not receive audio. Editor GUI-thread callers only,
-	// like the session transitions themselves.
-	bool vst3EditorSessionActive();
 
 	void setAutomateFunc(std::function<void()> func);
 	void onAutomate();
 
 	void setSizeWindowFunc(std::function<void(int, int)> func);
 	void onSizeWindow(int w, int h);
-	// VST_HOST_OPCODE_GET_TIME returns per-thread time info so editor/control
-	// callbacks cannot overwrite the audio-thread struct while it is in use.
-	vst_time_info* hostTimeInfo();
 
 private:
-	class VST3HostContext;
-	class VST3MemoryStream;
-	class VST3ParameterChanges;
-
-	// One GUI parameter edit waiting for the processor. The ring below is
-	// written by the edit path and drained by whoever runs the next process
-	// call; see queueVST3ParameterEdit for the threading contract.
-	struct PendingVST3ParameterEdit
-	{
-		Steinberg::Vst::ParamID id = 0;
-		Steinberg::Vst::ParamValue value = 0.0;
-	};
-
-	static constexpr unsigned vst3ParameterEditQueueSize = 1024;
-	static constexpr int vst3MaxArrangementCandidates = 4;
-
-	// Audit #250 F040: the VST2 loader distinguishes its failure modes so
-	// initialize() can log the actual reason (the old bool collapsed every
-	// failure into "an exception").
-	enum class Vst2LoadResult
-	{
-		Loaded,
-		Crashed,
-		NoEntryPoint,
-		WrongMagicNumber
-	};
-
-	Vst2LoadResult initializeVST2();
-	bool initializeVST3();
-	void releaseVST3();
-	void configureVST3Buses(int requestedChannelCount);
-	void configureVST3Buses(int requestedInputChannelCount, int requestedOutputChannelCount);
-	Steinberg::tresult setVST3MainBusArrangements(Steinberg::Vst::SpeakerArrangement inputArrangement,
-		Steinberg::Vst::SpeakerArrangement outputArrangement);
-	void applyVST3BusActivation();
-	static int semanticSpeakerArrangementCandidatesForChannelNames(const std::vector<std::wstring>& channelNames,
-		Steinberg::Vst::SpeakerArrangement* candidates);
-	static int speakerArrangementCandidatesForChannelCount(int count, const std::vector<std::wstring>& channelNames,
-		Steinberg::Vst::SpeakerArrangement* candidates);
-	static int speakerArrangementCandidatesForLayout(VST3BusLayout layout, int automaticChannelCount,
-		const std::vector<std::wstring>& channelNames, Steinberg::Vst::SpeakerArrangement currentArrangement,
-		Steinberg::Vst::SpeakerArrangement* candidates);
-	static bool arrangementMatchesLayout(Steinberg::Vst::SpeakerArrangement arrangement,
-		VST3BusLayout layout);
-	bool acceptedVST3BusMetadataIsConsistent() const;
-	bool refreshAcceptedVST3Arrangements();
-	void updateVST3ChannelMappings();
-	static bool buildVST3ChannelMapping(Steinberg::Vst::SpeakerArrangement arrangement,
-		const std::vector<std::wstring>& channelNames, std::vector<int>& mapping);
-	int vst3BusChannelCount(Steinberg::Vst::BusDirection direction) const;
-	void onVST3ParameterEdit(Steinberg::Vst::ParamID id, Steinberg::Vst::ParamValue value);
-	void queueVST3ParameterEdit(Steinberg::Vst::ParamID id, Steinberg::Vst::ParamValue value);
-	Steinberg::Vst::IParameterChanges* prepareVST3ParameterChanges();
-	void flushVST3ParameterChanges();
-	void beginVST3EditorSession();
-	void endVST3EditorSession();
-
 	std::shared_ptr<VSTPluginLibrary> library;
-	VST2EffectPtr effect;
-	Steinberg::IPtr<Steinberg::Vst::IComponent> vst3Component;
-	Steinberg::IPtr<Steinberg::Vst::IAudioProcessor> vst3Processor;
-	Steinberg::IPtr<Steinberg::Vst::IEditController> vst3Controller;
-	Steinberg::IPtr<Steinberg::Vst::IConnectionPoint> vst3ComponentConnection;
-	Steinberg::IPtr<Steinberg::Vst::IConnectionPoint> vst3ControllerConnection;
-	Steinberg::IPtr<Steinberg::IPlugView> vst3View;
-	bool vst3ViewAttached = false;
-	winutil::UniqueWindowHandle vst3EditorHostWindow;
-	Steinberg::IPtr<VST3HostContext> vst3HostContext;
-	std::unique_ptr<VST3ParameterChanges> vst3InputParameterChanges;
-	std::array<PendingVST3ParameterEdit, vst3ParameterEditQueueSize> vst3ParameterEditQueue{};
-	std::atomic<unsigned> vst3ParameterEditWrite{ 0 };
-	std::atomic<unsigned> vst3ParameterEditRead{ 0 };
-	std::mutex vst3LifecycleMutex;
-	std::atomic<bool> vst3ParameterFlushInProgress{ false };
-	int vst3InputBusCount = 0;
-	int vst3OutputBusCount = 0;
-	int vst3InputChannelCount = 0;
-	int vst3OutputChannelCount = 0;
-	Steinberg::Vst::SpeakerArrangement vst3InputArrangement = Steinberg::Vst::SpeakerArr::kEmpty;
-	Steinberg::Vst::SpeakerArrangement vst3OutputArrangement = Steinberg::Vst::SpeakerArr::kEmpty;
-	std::vector<std::wstring> vst3InputChannelNameHints;
-	std::vector<std::wstring> vst3OutputChannelNameHints;
-	std::vector<int> vst3InputChannelMapping;
-	std::vector<int> vst3OutputChannelMapping;
-	bool vst3SupportsDouble = false;
-	// Whether initialize() succeeded on the component / whether the
-	// controller is a separately created object. A single-component plug-in
-	// exposes IEditController from the already initialized component object,
-	// which must not be initialized or terminated a second time.
-	bool vst3ComponentInitialized = false;
-	bool vst3ControllerInitializedSeparately = false;
-	bool vst3Active = false;
-	// An open editor view holds the processor in the Processing state for the
-	// whole session, so parameter-flush process calls need no per-edit
-	// setActive/setProcessing cycling. Guarded by vst3LifecycleMutex.
-	bool vst3EditorSession = false;
-	std::atomic<bool> vst3Processing{ false };
-	std::atomic<bool> vst3ProcessingFailed{ false };
-	Steinberg::Vst::ProcessContext vst3ProcessContext = {};
-	Steinberg::Vst::TSamples vst3SamplePosition = 0;
-	std::function<void()> automateFunc;
-	std::function<void(int, int)> sizeWindowFunc;
-	double editorScaleFactor = 1.0;
-	float sampleRate = 0.0f;
-	int usedChannelCount = -1;
-	std::atomic<int64_t> vst2SamplePositionFrames{ 0 };
-	std::atomic<int> processLevel{ VST_HOST_ACTIVE_THREAD_UNKNOWN };
-	int language = 1;
+	// Never null: VST2Instance or VST3Instance, fixed for the instance's life.
+	std::unique_ptr<VSTFormatInstance> host;
 };

@@ -6,8 +6,6 @@
 */
 
 /*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-
 	Custom window chrome: the native Windows caption is removed (the window
 	keeps its WS_CAPTION/WS_THICKFRAME styles so DWM snap, animations and
 	native resize stay intact) and a skinnable TitleBar widget plus the menu
@@ -30,7 +28,7 @@
 #include <windowsx.h>
 
 #include "Editor/widgets/TitleBar.h"
-#include "Editor/helpers/EditorSettings.h"
+#include "services/settings/EditorSettings.h"
 #include "Editor/helpers/WindowFrameHitTest.h"
 #include "MainWindow.h"
 #include "ui_MainWindow.h"

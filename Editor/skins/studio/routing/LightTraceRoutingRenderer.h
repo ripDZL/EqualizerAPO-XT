@@ -5,8 +5,6 @@
 */
 
 /*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-
 	Studio (glass) skin's routing renderer: "Light Trace" - an etched circuit
 	of light on the card glass. Input channels are lit glass chips on the top
 	row, outputs on the bottom row, and every connection is a glowing cubic
@@ -15,7 +13,7 @@
 	state (rest/hover/selected/disabled) is a luminance ladder, never a second
 	hue. Replaces the legacy CopyFilterGUIScene reuse (opaque candy pills,
 	dead black wiring) that never spoke this skin's language. The working
-	state lives in StudioRoutingModel (widget-free, EditorLogicTests-pinned);
+	state lives in RoutingGridModel (widget-free, EditorLogicTests-pinned);
 	this class owns geometry, painting and interaction only.
 */
 
@@ -29,7 +27,7 @@
 
 #include "Editor/widgets/routing/IRoutingRenderer.h"
 #include "Editor/widgets/routing/RoutingFold.h"
-#include "Editor/widgets/routing/StudioRoutingModel.h"
+#include "Editor/widgets/routing/RoutingGridModel.h"
 #include "Editor/SkinTokens.h"
 
 class StudioRoutingView : public RoutingView
@@ -81,7 +79,7 @@ private:
 	void openFactorEditor(int trace);
 	void openChannelEditor();
 
-	StudioRoutingModel model;
+	RoutingGridModel model;
 	RoutingPortModel portModel;
 
 	// Channel fold: hidden ports keep their index but get a null rect, so the

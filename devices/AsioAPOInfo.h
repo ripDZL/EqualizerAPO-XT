@@ -27,8 +27,11 @@
 #include <vector>
 
 #include "asio/AsioRegistration.h"
+#include "asio/EntryOptions.h"
 #include "devices/AbstractAPOInfo.h"
 #include "services/registry/IRegistry.h"
+
+class RegistryTransaction;
 
 class AsioAPOInfo : public AbstractAPOInfo
 {
@@ -63,49 +66,51 @@ public:
 	const eapo::asio::AsioTarget& getTarget() const {return target;}
 	std::wstring getWrapperClsid() const;
 
+	// The Device Selector's options for this target (asio/EntryOptions.h).
+	// Both directions share them, since they share the wrapper record.
+	const eapo::asio::EntryOptions& getEntryOptions() const {return selected;}
+	void setEntryOptions(const eapo::asio::EntryOptions& options) {selected = options;}
+
 	// The synchronous mode (no extra buffer; a missed deadline passes the
-	// buffer through) as the Device Selector's option for this target. Both
-	// directions share the setting, since they share the wrapper record.
-	bool isSynchronous() const {return selectedSynchronous;}
-	void setSynchronous(bool synchronous) {selectedSynchronous = synchronous;}
+	// buffer through).
+	bool isSynchronous() const {return selected.synchronous;}
+	void setSynchronous(bool synchronous) {selected.synchronous = synchronous;}
 
 	// How much of the buffer period a synchronous buffer waits for the host
 	// before it passes through: 25 (the default), 50 or 75.
-	unsigned getDeadlinePercent() const {return selectedDeadlinePercent;}
-	void setDeadlinePercent(unsigned percent) {selectedDeadlinePercent = percent;}
+	unsigned getDeadlinePercent() const {return selected.deadlinePercent;}
+	void setDeadlinePercent(unsigned percent) {selected.deadlinePercent = percent;}
 
-	// Start the engine host at boot: one Run value shared by every target,
-	// kept while any installed target asks for it. Off by default.
-	bool isAutoStart() const {return selectedAutoStart;}
-	void setAutoStart(bool autoStart) {selectedAutoStart = autoStart;}
+	// Start the engine host at boot: one Run value shared by every entry,
+	// kept while any installed entry asks for it. Off by default.
+	bool isAutoStart() const {return selected.autoStart;}
+	void setAutoStart(bool autoStart) {selected.autoStart = autoStart;}
 
 	// Register the entry for 32-bit hosts too. Off by default, and not
 	// possible without the x86 wrapper beside the 64-bit one.
-	bool isHost32() const {return selectedHost32;}
-	void setHost32(bool host32) {selectedHost32 = host32;}
+	bool isHost32() const {return selected.host32;}
+	void setHost32(bool host32) {selected.host32 = host32;}
 	bool canHost32() const;
-
-	// Where the engine host publishes what it saw for a target.
-	static std::wstring factsKey(const std::wstring& targetClsid);
 
 private:
 	void loadState();
-	void refreshAutoStart();
-	std::wstring installDirectory() const;
-	std::wstring wrapper32Path() const;
+	// The product's install directory (the InstallPath value its install hook
+	// writes). The required form throws DeviceException when the value is
+	// missing, as the endpoint adapter does; the optional form answers empty.
+	static std::wstring requiredInstallDirectory(const IRegistry& from);
+	static std::wstring optionalInstallDirectory(const IRegistry& from);
+	// The bodies of the three operations, each inside the transaction
+	// ReportedOperation::run opens (audit #348 C2/TD-31).
+	void beginReport(DeviceInstallReport::Operation operation);
+	void installWithin(RegistryTransaction& plan);
+	void uninstallWithin(RegistryTransaction& plan);
 
 	eapo::asio::AsioTarget target;
 	bool input;
 	IRegistry& registry;
 	bool installed = false;
-	bool currentSynchronous = false;
-	bool selectedSynchronous = false;
-	unsigned currentDeadlinePercent = 25;
-	unsigned selectedDeadlinePercent = 25;
-	bool currentAutoStart = false;
-	bool selectedAutoStart = false;
-	bool currentHost32 = false;
-	bool selectedHost32 = false;
+	eapo::asio::EntryOptions current;
+	eapo::asio::EntryOptions selected;
 	unsigned channelCount = 0;
 	unsigned sampleRate = 0;
 };

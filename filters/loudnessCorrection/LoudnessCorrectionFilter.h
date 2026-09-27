@@ -42,6 +42,18 @@ public:
 		float attenuation = 1.0f;
 	};
 
+	// The low-shelf stage for one volume reading: the boost it applies and
+	// the preamp that makes room for it. Pure, so the three volume regions
+	// (below, at and above the reference point) can be tested directly.
+	struct LowShelf
+	{
+		double frequency = 75;
+		double q = 0.52;
+		double gain = 0.0;
+		double preAmp = 0.0;
+	};
+	static LowShelf lowShelfFor(const FilterParameters& parameters, double volume);
+
 	LoudnessCorrectionFilter(const FilterParameters& fParameters);
 	virtual ~LoudnessCorrectionFilter();
 	virtual bool getInPlace() {return true;}
@@ -68,6 +80,9 @@ private:
 
 	std::thread _parameterUpdateThread;
 	static void parameterUpdateThread(LoudnessCorrectionFilter* filter);
+	// Stops and joins the update thread if one runs; the destructor and a
+	// repeated initialize() both need it.
+	void stopParameterUpdateThread();
 	// Guards the stop flag and the 10 ms sleep of the parameter update thread
 	// only. The audio thread never touches this mutex; do not reuse it for the
 	// coefficient hand-off, which is what _coefficientSlots is for.

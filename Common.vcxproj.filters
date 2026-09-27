@@ -32,7 +32,10 @@
     <ClInclude Include="filters\ConvolutionFilter.h">
       <Filter>filters</Filter>
     </ClInclude>
-    <ClInclude Include="filters\ConvolutionFilePath.h">
+    <ClInclude Include="filters\ConfigPathPolicy.h">
+      <Filter>filters</Filter>
+    </ClInclude>
+    <ClInclude Include="filters\ConfigFileReference.h">
       <Filter>filters</Filter>
     </ClInclude>
     <ClInclude Include="filters\ConvolutionFilterFactory.h">
@@ -132,6 +135,9 @@
     <ClInclude Include="filters\VSTPluginCommand.h">
       <Filter>filters</Filter>
     </ClInclude>
+    <ClInclude Include="filters\VSTChannelPlan.h">
+      <Filter>filters</Filter>
+    </ClInclude>
     <ClInclude Include="filters\VSTPluginFilter.h">
       <Filter>filters</Filter>
     </ClInclude>
@@ -147,6 +153,9 @@
     <ClInclude Include="audio\ChannelLayout.h">
       <Filter>audio</Filter>
     </ClInclude>
+    <ClInclude Include="audio\SampleFormat.h">
+      <Filter>audio</Filter>
+    </ClInclude>
     <ClInclude Include="platform\windows\ComBoundary.h">
       <Filter>platform</Filter>
     </ClInclude>
@@ -160,6 +169,9 @@
       <Filter>services</Filter>
     </ClInclude>
     <ClInclude Include="filters\ConvolverMuteDiagnostics.h">
+      <Filter>filters</Filter>
+    </ClInclude>
+    <ClInclude Include="filters\ConvolverBank.h">
       <Filter>filters</Filter>
     </ClInclude>
     <ClInclude Include="services\registry\IRegistry.h">
@@ -178,6 +190,9 @@
       <Filter>dsp</Filter>
     </ClInclude>
     <ClInclude Include="dsp\FftwPlanningPolicy.h">
+      <Filter>dsp</Filter>
+    </ClInclude>
+    <ClInclude Include="dsp\DelayLine.h">
       <Filter>dsp</Filter>
     </ClInclude>
     <ClInclude Include="runtime\memory\AlignedMemory.h">
@@ -231,13 +246,31 @@
     <ClInclude Include="vst\VST3BusLayout.h">
       <Filter>vst</Filter>
     </ClInclude>
+    <ClInclude Include="vst\VST3Lifecycle.h">
+      <Filter>vst</Filter>
+    </ClInclude>
+    <ClInclude Include="vst\VST3SpeakerMapping.h">
+      <Filter>vst</Filter>
+    </ClInclude>
     <ClInclude Include="vst\VST3HostObjects.h">
       <Filter>vst</Filter>
     </ClInclude>
     <ClInclude Include="vst\VST3RefCounted.h">
       <Filter>vst</Filter>
     </ClInclude>
-    <ClInclude Include="vst\VSTPluginInstanceInternal.h">
+    <ClInclude Include="vst\VST3HostContext.h">
+      <Filter>vst</Filter>
+    </ClInclude>
+    <ClInclude Include="vst\VST3Instance.h">
+      <Filter>vst</Filter>
+    </ClInclude>
+    <ClInclude Include="vst\VST3MemoryStream.h">
+      <Filter>vst</Filter>
+    </ClInclude>
+    <ClInclude Include="vst\VSTChunkBase64.h">
+      <Filter>vst</Filter>
+    </ClInclude>
+    <ClInclude Include="vst\VSTFormatInstance.h">
       <Filter>vst</Filter>
     </ClInclude>
     <ClInclude Include="vst\VSTPluginLibrary.h">
@@ -263,6 +296,7 @@
     </ClInclude>
     <ClInclude Include="devices\VoicemeeterAPOInfo.h" />
     <ClInclude Include="devices\AbstractAPOInfo.h" />
+    <ClInclude Include="engine\ChannelRoutingPlan.h" />
     <ClInclude Include="engine\ConfigLoadTrace.h" />
     <ClInclude Include="engine\ConfigurationFileReader.h" />
     <ClInclude Include="devices\DeviceAPOInfo.h" />
@@ -317,7 +351,10 @@
     <ClCompile Include="filters\ConvolutionFilter.cpp">
       <Filter>filters</Filter>
     </ClCompile>
-    <ClCompile Include="filters\ConvolutionFilePath.cpp">
+    <ClCompile Include="filters\ConfigPathPolicy.cpp">
+      <Filter>filters</Filter>
+    </ClCompile>
+    <ClCompile Include="filters\ConfigFileReference.cpp">
       <Filter>filters</Filter>
     </ClCompile>
     <ClCompile Include="filters\ConvolutionFilterFactory.cpp">
@@ -417,6 +454,9 @@
     <ClCompile Include="filters\VSTPluginCommand.cpp">
       <Filter>filters</Filter>
     </ClCompile>
+    <ClCompile Include="filters\VSTChannelPlan.cpp">
+      <Filter>filters</Filter>
+    </ClCompile>
     <ClCompile Include="filters\VSTPluginFilter.cpp">
       <Filter>filters</Filter>
     </ClCompile>
@@ -433,9 +473,6 @@
       <Filter>filters\graphicEq</Filter>
     </ClCompile>
     <ClCompile Include="services\registry\ClsidRegistration.cpp">
-      <Filter>services</Filter>
-    </ClCompile>
-    <ClCompile Include="services\registry\IRegistry.cpp">
       <Filter>services</Filter>
     </ClCompile>
     <ClCompile Include="services\registry\RegistryTransaction.cpp">
@@ -477,19 +514,28 @@
     <ClCompile Include="vst\VST3PluginIIDs.cpp">
       <Filter>text</Filter>
     </ClCompile>
+    <ClCompile Include="vst\VST3Lifecycle.cpp">
+      <Filter>vst</Filter>
+    </ClCompile>
+    <ClCompile Include="vst\VST3SpeakerMapping.cpp">
+      <Filter>vst</Filter>
+    </ClCompile>
     <ClCompile Include="vst\VSTPluginInstance.cpp">
       <Filter>vst</Filter>
     </ClCompile>
-    <ClCompile Include="vst\VSTPluginInstance.Editor.cpp">
+    <ClCompile Include="vst\VST2Instance.cpp">
       <Filter>vst</Filter>
     </ClCompile>
-    <ClCompile Include="vst\VSTPluginInstance.State.cpp">
+    <ClCompile Include="vst\VST3Instance.cpp">
       <Filter>vst</Filter>
     </ClCompile>
-    <ClCompile Include="vst\VSTPluginInstance.VST2.cpp">
+    <ClCompile Include="vst\VST3Instance.Editor.cpp">
       <Filter>vst</Filter>
     </ClCompile>
-    <ClCompile Include="vst\VSTPluginInstance.VST3.cpp">
+    <ClCompile Include="vst\VST3Instance.Processing.cpp">
+      <Filter>vst</Filter>
+    </ClCompile>
+    <ClCompile Include="vst\VST3Instance.State.cpp">
       <Filter>vst</Filter>
     </ClCompile>
     <ClCompile Include="vst\VSTPluginLibrary.cpp">
@@ -499,6 +545,9 @@
       <Filter>libHybridConv-0.1.1</Filter>
     </ClCompile>
     <ClCompile Include="dsp\FftwPlanningPolicy.cpp">
+      <Filter>dsp</Filter>
+    </ClCompile>
+    <ClCompile Include="dsp\DelayLine.cpp">
       <Filter>dsp</Filter>
     </ClCompile>
     <ClCompile Include="parser\ParserExtensions.cpp">
@@ -519,12 +568,16 @@
     <ClCompile Include="devices\VoicemeeterAPOInfo.cpp" />
     <ClCompile Include="devices\AbstractAPOInfo.cpp" />
     <ClCompile Include="engine\ConfigurationFileReader.cpp" />
+    <ClCompile Include="devices\ApoRuntimeFacts.cpp" />
     <ClCompile Include="devices\DeviceAPOInfo.cpp" />
     <ClCompile Include="devices\DeviceAPOInfo.Install.cpp" />
     <ClCompile Include="devices\DeviceAPOInfo.Load.cpp" />
     <ClCompile Include="devices\DeviceAPOInfo.State.cpp" />
     <ClCompile Include="devices\DeviceAPOInfo.Uninstall.cpp" />
     <ClCompile Include="devices\DeviceInstallReport.cpp" />
+    <ClCompile Include="devices\DevicePlan.cpp" />
+    <ClCompile Include="devices\DeviceTestPlan.cpp" />
+    <ClCompile Include="engine\ChannelRoutingPlan.cpp" />
     <ClCompile Include="engine\FilterConfiguration.cpp" />
     <ClCompile Include="engine\FilterEngine.cpp" />
     <ClCompile Include="engine\FilterEngine.Configuration.cpp" />

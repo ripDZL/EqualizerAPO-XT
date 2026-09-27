@@ -5,8 +5,6 @@
 */
 
 /*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-
 	In-place channel multi-select for "Channel:" card rows. Replaces the
 	change-button-plus-dialog flow with checkable chips directly in the card
 	body: one chip per device channel, an ALL chip, chips for custom/virtual
@@ -36,8 +34,7 @@ public:
 	explicit ChannelCardEditor(const QString& parameters, QWidget* parent = nullptr);
 
 	void store(QString& command, QString& parameters) override;
-	void configureChannels(std::vector<std::wstring>& channelNames) override;
-	void configureSelectedChannels(std::vector<std::wstring>& selectedChannels) override;
+	void setChannelFlow(const ChannelFlowAtLine& flow) override;
 
 private slots:
 	void allToggled(bool checked);

@@ -5,8 +5,6 @@
 */
 
 /*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-
 	SubwooferRoutingCardView is the skin seam for the compact summary of a
 	SubwooferRouting command. The editor owns parsing, validation and actions;
 	the view owns only structure and presentation.
@@ -16,6 +14,8 @@
 
 #include <QString>
 #include <QWidget>
+
+#include "Editor/SkinTokens.h"
 
 class QAbstractButton;
 class QGridLayout;
@@ -92,7 +92,8 @@ class DefaultSubwooferRoutingCardView : public SubwooferRoutingCardView
 	Q_OBJECT
 
 public:
-	explicit DefaultSubwooferRoutingCardView(QWidget* parent = nullptr);
+	explicit DefaultSubwooferRoutingCardView(const SkinTokens& tokens,
+		QWidget* parent = nullptr);
 
 	void addActionButton(QAbstractButton* button) override;
 
@@ -103,6 +104,7 @@ private:
 	void addReadoutRow(int row, const QString& caption, QLabel*& valueLabel,
 		const QString& accessibleName, const QString& toolTip);
 
+	const SkinTokens skinTokens;
 	QGridLayout* grid = nullptr;
 	QHBoxLayout* actionLayout = nullptr;
 	QLabel* layoutValue = nullptr;

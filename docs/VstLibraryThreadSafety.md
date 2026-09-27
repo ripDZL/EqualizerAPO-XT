@@ -45,27 +45,40 @@ load/unload path is safe.
 ## The second scheme: per-instance VST3 synchronization
 
 The mutexes above guard library load/unload. A `VSTPluginInstance` hosting a
-VST3 plugin carries a second, independent synchronization scheme of its own
-(audit #275 TD-35; it previously existed only as code comments in
-`vst/VSTPluginInstance.cpp`, around lines 206-344):
+VST3 plugin carries a second, independent synchronization scheme of its own,
+held by the `VST3Instance` behind it (`vst/VST3Instance.h`; the facade picks
+`VST2Instance` or `VST3Instance` once, when it is constructed).
+`vst/VST3Lifecycle` owns the component's active, processing, editor-session and
+parameter-flush state plus the mutex that serializes their transitions. Process
+calls themselves do not take that mutex: the audio thread must not block on a
+mutex the GUI thread can hold.
 
-- **`vst3LifecycleMutex`** serializes the component lifecycle transitions
-  (activate/deactivate, processing start/stop) against the control thread.
-  Process calls themselves do not take it - the audio thread must not block
-  on a mutex the GUI thread can hold.
-- **`vst3Processing` (atomic)** tells the control thread whether the audio
-  side currently owns the component state. While it is set, a parameter edit
-  must not be persisted synchronously: the component only adopts the value
+- **`VST3Lifecycle::audioProcessing()`** tells the control thread whether the
+  audio side currently owns the component state. While it is true, a parameter
+  edit must not be persisted synchronously: the component only adopts the value
   when its next process call drains `inputParameterChanges`, so a synchronous
   save would persist the previous state.
+- **`VST3Lifecycle::canProcessNow()`** is the format-neutral readiness query used
+  by the panel feed through `VSTPluginInstance`. It is true while normal audio
+  processing or the VST3 editor session holds the processor in Processing state.
 - **The SPSC parameter-edit ring** (`vst3ParameterEdit{Write,Read}` atomics
-  over a 1024-slot ring) carries parameter edits from the single control
-  thread (the Editor GUI thread for `performEdit`/`writeToEffect`; in the
-  engine, the configuration loader before processing starts) to whichever
-  thread runs the next process call. A full ring drops the edit - the next
-  edit of the same control supersedes it anyway. The single-producer
-  assumption is a hosting contract: nothing may queue edits from two threads
-  at once.
+  over a 1024-slot ring in `VST3Instance`) carries parameter edits from the
+  single control thread (the Editor GUI thread for `performEdit`/`writeToEffect`;
+  in the engine, the configuration loader before processing starts) to
+  whichever thread runs the next process call. A full ring refuses a GUI
+  edit - the next edit of the same control supersedes it anyway. A state
+  restore (`writeToEffect`) instead drains the full ring with the idle flush,
+  on the control thread, and queues again; only when that flush cannot run
+  (audio is running, or a lifecycle transition holds it) are values left out,
+  and the restore logs how many. The single-producer assumption is a hosting
+  contract: nothing may queue edits from two threads at once.
+- **The host context** (`vst/VST3HostContext.h`) is refcounted and a plug-in
+  may keep it past the instance. `VST3Instance` detaches it before releasing
+  the plug-in (after the editor and processing have stopped); from then on
+  the calls that would reach the instance are refused. The detach is an
+  atomic pointer store on the control thread, so it stops later calls; like
+  every other host-context call, a call racing with the release on another
+  thread is outside the VST3 threading contract.
 
 When touching this area keep the two schemes distinct: the library mutexes
 protect *which modules exist*, the instance scheme protects *one component's

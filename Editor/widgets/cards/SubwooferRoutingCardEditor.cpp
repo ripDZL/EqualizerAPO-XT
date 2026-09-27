@@ -31,14 +31,14 @@
 #include "Editor/SkinManager.h"
 #include "Editor/skins/ISkin.h"
 #include "Editor/widgets/cards/SubwooferRoutingCardView.h"
+#include "Editor/widgets/subwooferrouting/SubwooferRoutingDefaults.h"
 #include "Editor/widgets/subwooferrouting/SubwooferRoutingEditorDialog.h"
+#include "Editor/widgets/subwooferrouting/SubwooferRoutingStateReads.h"
+#include "Editor/widgets/subwooferrouting/SubwooferRoutingUiState.h"
 #include "Editor/widgets/cards/FilterCardEditorRegistry.h"
 
 namespace
 {
-constexpr double kDefaultCrossoverHz = 80.0;
-constexpr double kButterworthQ = 0.7071067811865476;
-
 QString fromUtf8(const std::string& text)
 {
 	return QString::fromUtf8(text.data(), static_cast<int>(text.size()));
@@ -49,68 +49,6 @@ std::string toUtf8(const QString& text)
 	const QByteArray bytes = text.toUtf8();
 	return std::string(bytes.constData(),
 		static_cast<std::size_t>(bytes.size()));
-}
-
-subroute::PathStage polarityStage()
-{
-	return subroute::PolarityStage{false};
-}
-
-subroute::PathStage delayStage()
-{
-	return subroute::DelayStage{0.0};
-}
-
-subroute::PathStage equalizerSlotsStage()
-{
-	return subroute::EqualizerSlotsStage{};
-}
-
-subroute::Path makePath(const std::string& id,
-	subroute::PathKind kind,
-	const std::vector<subroute::SourceMixTerm>& sourceMix,
-	std::optional<subroute::BiquadType> crossoverType)
-{
-	subroute::Path path;
-	path.id = id;
-	path.kind = kind;
-	path.sourceMix = sourceMix;
-	path.chain.push_back(polarityStage());
-	if (crossoverType.has_value())
-	{
-		subroute::BiquadFilter filter;
-		filter.type = *crossoverType;
-		filter.frequencyHz = kDefaultCrossoverHz;
-		filter.q = kButterworthQ;
-		filter.gainDb = 0.0;
-		path.chain.push_back(subroute::BiquadStage{filter});
-	}
-	path.chain.push_back(delayStage());
-	path.chain.push_back(equalizerSlotsStage());
-	return path;
-}
-
-std::vector<std::string> usableChannelIds(
-	const std::vector<std::wstring>& channels)
-{
-	std::vector<std::string> result;
-	for (const std::wstring& channel : channels)
-	{
-		const std::string id = subwooferRoutingToUtf8(channel);
-		if (!id.empty() && subroute::isValidStableId(id)
-			&& std::find(result.begin(), result.end(), id) == result.end())
-		{
-			result.push_back(id);
-		}
-	}
-	return result;
-}
-
-bool isLfeId(const std::string& id)
-{
-	QString value = fromUtf8(id);
-	return value.compare(QStringLiteral("LFE"),
-		Qt::CaseInsensitive) == 0;
 }
 
 QString profilePayloadPath(QString text)
@@ -154,7 +92,7 @@ QString layoutLabel(const subroute::SubwooferRoutingState& state)
 	for (const subroute::PhysicalChannel& channel
 		: state.layout.channels)
 	{
-		if (isLfeId(channel.id))
+		if (subwooferroutingeditor::isLfeChannelId(channel.id))
 			lfeChannels++;
 	}
 
@@ -163,200 +101,11 @@ QString layoutLabel(const subroute::SubwooferRoutingState& state)
 	return QStringLiteral("%1.%2").arg(mainChannels).arg(lfeChannels);
 }
 
-const subroute::Path* representativeCrossoverPath(
-	const subroute::SubwooferRoutingState& state,
-	subroute::BiquadType type)
-{
-	for (const subroute::Path& path : state.paths)
-	{
-		for (const subroute::PathStage& stage : path.chain)
-		{
-			const subroute::BiquadStage* biquad =
-				std::get_if<subroute::BiquadStage>(&stage);
-			if (biquad != nullptr && biquad->filter.type == type)
-				return &path;
-		}
-	}
-	return nullptr;
-}
-
-const subroute::BiquadFilter* firstSection(
-	const subroute::Path& path, subroute::BiquadType type)
-{
-	for (const subroute::PathStage& stage : path.chain)
-	{
-		const subroute::BiquadStage* biquad =
-			std::get_if<subroute::BiquadStage>(&stage);
-		if (biquad != nullptr && biquad->filter.type == type)
-			return &biquad->filter;
-	}
-	return nullptr;
-}
-
-double sourceLfeGainDb(const subroute::Path& path)
-{
-	double gainDb = path.preGainDb + path.postGainDb;
-	if (!path.sourceMix.empty())
-	{
-		const double gain = std::abs(
-			path.sourceMix.front().gainLinear);
-		if (gain > 0.0)
-			gainDb += 20.0 * std::log10(gain);
-	}
-
-	for (const subroute::PathStage& stage : path.chain)
-	{
-		const subroute::GainStage* gain =
-			std::get_if<subroute::GainStage>(&stage);
-		if (gain != nullptr)
-			gainDb += gain->gainDb;
-	}
-	return gainDb;
-}
-
-subroute::PrepareSpec prepareSpecFor(
-	const subroute::SubwooferRoutingState& state,
-	unsigned sampleRate)
-{
-	subroute::PrepareSpec spec;
-	spec.sampleRate = sampleRate;
-	spec.maximumBlockSize = 1024;
-	spec.channelLayout.reserve(state.layout.channels.size());
-	for (const subroute::PhysicalChannel& channel : state.layout.channels)
-		spec.channelLayout.push_back(channel.id);
-	return spec;
-}
-
-double compiledTrimDb(const subroute::HeadroomAnalysis& analysis)
-{
-	return analysis.appliedTrimDb;
-}
-QString presetDisplayName(
-	const subroute::PresetDescriptor& preset)
-{
-	if (preset.id == subroute::kIssue246FrontRear41PresetId)
-		return SubwooferRoutingCardEditor::tr(
-			"Issue #246 - Front/Rear 4.1");
-
-	return SubwooferRoutingCardEditor::tr(
-		"Built-in preset: %1").arg(fromUtf8(preset.displayName));
-}
-
 unsigned tableSampleRate(FilterTable* table)
 {
 	const std::shared_ptr<AbstractAPOInfo> device =
 		table == nullptr ? nullptr : table->getSelectedDevice();
 	return device == nullptr ? 0 : device->getSampleRate();
-}
-}
-
-namespace subwooferroutingeditor
-{
-subroute::SubwooferRoutingState buildDefaultState(
-	const std::vector<std::wstring>& deviceChannels)
-{
-	std::vector<std::string> channels =
-		usableChannelIds(deviceChannels);
-	if (channels.size() < 2)
-		channels = {"L", "R"};
-
-	auto lfe = std::find_if(channels.begin(), channels.end(),
-		[](const std::string& id)
-		{
-			return isLfeId(id);
-		});
-
-	std::vector<std::string> mainChannels;
-	for (const std::string& id : channels)
-	{
-		if (!isLfeId(id))
-			mainChannels.push_back(id);
-	}
-	if (mainChannels.size() < 2)
-	{
-		channels = {"L", "R"};
-		mainChannels = channels;
-		lfe = channels.end();
-	}
-
-	std::string left = mainChannels[0];
-	std::string right = mainChannels[1];
-	for (const std::string& id : mainChannels)
-	{
-		const QString channel = fromUtf8(id);
-		if (channel.compare(QStringLiteral("L"),
-			Qt::CaseInsensitive) == 0)
-		{
-			left = id;
-		}
-		else if (channel.compare(QStringLiteral("R"),
-			Qt::CaseInsensitive) == 0)
-		{
-			right = id;
-		}
-	}
-
-	const bool hasLfe = lfe != channels.end();
-	const std::string lfeId = hasLfe ? *lfe : std::string();
-
-	subroute::SubwooferRoutingState state;
-	for (const std::string& id : channels)
-		state.layout.channels.push_back({id, id});
-
-	state.metadata.creatingApp = "Equalizer APO XT";
-	state.metadata.creatingAppVersion = "";
-	state.metadata.profileName = "";
-	state.headroom.mode = subroute::HeadroomMode::Auto;
-	state.headroom.manualTrimDb = 0.0;
-
-	const std::optional<subroute::BiquadType> mainCrossover =
-		hasLfe
-		? std::optional<subroute::BiquadType>(
-			subroute::BiquadType::HighPass)
-		: std::nullopt;
-
-	state.paths.push_back(makePath("FrontLeft",
-		subroute::PathKind::Main, {{left, 1.0}},
-		mainCrossover));
-	state.paths.push_back(makePath("FrontRight",
-		subroute::PathKind::Main, {{right, 1.0}},
-		mainCrossover));
-
-	subroute::SpeakerGroup group;
-	group.id = "Front";
-	group.displayName = "Front";
-	group.mainPathIds = {"FrontLeft", "FrontRight"};
-
-	if (hasLfe)
-	{
-		state.paths.push_back(makePath("FrontBass",
-			subroute::PathKind::Bass,
-			{{left, 1.0}, {right, 1.0}},
-			subroute::BiquadType::LowPass));
-		group.bassPathId = "FrontBass";
-
-		state.paths.push_back(makePath("SourceLFE",
-			subroute::PathKind::SourceLfe,
-			{{lfeId, 1.0}}, std::nullopt));
-	}
-
-	state.speakerGroups.push_back(group);
-
-	state.outputMatrix.push_back(
-		{left, subroute::OutputMode::Replace,
-			{{"FrontLeft", 0.0}}});
-	state.outputMatrix.push_back(
-		{right, subroute::OutputMode::Replace,
-			{{"FrontRight", 0.0}}});
-
-	if (hasLfe)
-	{
-		state.outputMatrix.push_back(
-			{lfeId, subroute::OutputMode::Replace,
-				{{"FrontBass", 0.0}, {"SourceLFE", 0.0}}});
-	}
-
-	return state;
 }
 }
 
@@ -420,7 +169,7 @@ SubwooferRoutingCardEditor::SubwooferRoutingCardEditor(
 		: subroute::builtInPresets())
 	{
 		QAction* action = presetMenu->addAction(
-			presetDisplayName(preset));
+			fromUtf8(subwooferroutingeditor::presetDisplayName(preset)));
 		const std::string presetId = preset.id;
 		connect(action, &QAction::triggered, this,
 			[this, presetId]()
@@ -548,12 +297,6 @@ void SubwooferRoutingCardEditor::store(
 		+ fromUtf8(*encoded.text);
 }
 
-void SubwooferRoutingCardEditor::configureChannels(
-	std::vector<std::wstring>& channelNames)
-{
-	Q_UNUSED(channelNames);
-}
-
 void SubwooferRoutingCardEditor::openFullEditor()
 {
 	if (!currentState.has_value())
@@ -663,34 +406,43 @@ void SubwooferRoutingCardEditor::refreshCard()
 		? fromUtf8(state.metadata.profileName)
 		: card.profileName;
 
-	const subroute::Path* highPassPath =
-		representativeCrossoverPath(state,
-			subroute::BiquadType::HighPass);
-	if (highPassPath != nullptr)
+	// The card summarizes the first speaker group with a high-pass and the
+	// first bass path with a low-pass, each read the way the full editor's
+	// row for it reads it (audit #348).
+	for (const subroute::SpeakerGroup& group : state.speakerGroups)
 	{
-		card.highPassHz = firstSection(*highPassPath,
-			subroute::BiquadType::HighPass)->frequencyHz;
+		const std::optional<double> highPassHz =
+			subwooferroutingeditor::groupHighPass(state, group);
+		if (!highPassHz.has_value())
+			continue;
+
+		card.highPassHz = *highPassHz;
 		const std::optional<subroute::CrossoverRecipe> recipe =
-			subroute::recognizeCrossover(*highPassPath,
-				subroute::BiquadType::HighPass);
+			subwooferroutingeditor::groupRecipe(state, group);
 		if (recipe.has_value())
 			card.highPassSlope = fromUtf8(
 				subroute::crossoverRecipeLabel(*recipe));
+		break;
 	}
 
-	const subroute::Path* lowPassPath =
-		representativeCrossoverPath(state,
-			subroute::BiquadType::LowPass);
-	if (lowPassPath != nullptr)
+	for (const subroute::Path& path : state.paths)
 	{
-		card.lowPassHz = firstSection(*lowPassPath,
-			subroute::BiquadType::LowPass)->frequencyHz;
+		if (path.kind != subroute::PathKind::Bass)
+			continue;
+
+		const std::optional<double> lowPassHz =
+			subwooferroutingeditor::pathLowPass(path);
+		if (!lowPassHz.has_value())
+			continue;
+
+		card.lowPassHz = *lowPassHz;
 		const std::optional<subroute::CrossoverRecipe> recipe =
-			subroute::recognizeCrossover(*lowPassPath,
+			subroute::recognizeCrossover(path,
 				subroute::BiquadType::LowPass);
 		if (recipe.has_value())
 			card.lowPassSlope = fromUtf8(
 				subroute::crossoverRecipeLabel(*recipe));
+		break;
 	}
 
 	for (const subroute::Path& path : state.paths)
@@ -716,7 +468,8 @@ void SubwooferRoutingCardEditor::refreshCard()
 		}
 
 		card.sourceLfePreserved = routed;
-		card.sourceLfeGainDb = sourceLfeGainDb(path);
+		card.sourceLfeGainDb =
+			subwooferroutingeditor::sourceLfeEffectiveGainDb(path);
 		break;
 	}
 
@@ -731,21 +484,14 @@ void SubwooferRoutingCardEditor::refreshCard()
 		// With no selected device the trim is still worth showing: the
 		// analysis barely moves with the sample rate (log sweep up to
 		// Nyquist), so a 48 kHz estimate beats an "unavailable" dead end.
-		const unsigned analysisRate =
-			deviceSampleRate > 0 ? deviceSampleRate : 48000;
-		const subroute::CompileResult compiled =
-			subroute::compile(state,
-				prepareSpecFor(state, analysisRate));
-		if (compiled.headroom.has_value())
-		{
-			card.headroomTrimDb =
-				compiledTrimDb(*compiled.headroom);
-		}
-		else
-		{
-			card.headroomTrimDb =
-				std::numeric_limits<double>::quiet_NaN();
-		}
+		// The UI state owns that rule, so the full editor and its response
+		// graph show this same number.
+		const std::optional<double> trimDb =
+			SubwooferRoutingUiState(state, deviceSampleRate)
+				.computedTrimDb();
+		card.headroomTrimDb = trimDb.has_value()
+			? *trimDb
+			: std::numeric_limits<double>::quiet_NaN();
 	}
 
 	view->setState(card);

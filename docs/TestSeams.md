@@ -9,8 +9,8 @@ untested UI model in the tree.
 
 `Tests/EditorLogicTests` is the seam for Editor logic: document and selection
 state live in widget-free models so this suite can verify them as a plain
-console binary. Two constraints define which sources may join its list
-(`EditorLogicTests.vcxproj`):
+console binary. Three constraints define which sources may join its list
+(`EditorLogicTests.vcxproj`), and a fourth rule says how they are compiled:
 
 1. **No Qt widget stack.** The binary links Qt6Core/Gui/Widgets import
    libraries but constructs no QApplication; sources must stand without the
@@ -22,6 +22,17 @@ console binary. Two constraints define which sources may join its list
 3. **No engine sources.** The suite links `Common.lib` whole-archive for the
    filter factories; adding an engine `.cpp` to the source list would define
    the same symbols twice and break the link.
+4. **No `EapoVariantArch`, by decision (audit #348).** The suite's own
+   sources, the Editor analysis code included (`Editor/analysis/*.cpp`), are
+   compiled for the baseline instruction set, while the shipped Editor is
+   built with the variant's flags. That is accepted: there is no per-variant
+   build of the EditorLogicTests sources. The per-variant DSP is covered by
+   the engine suites (HybridConvTests, EngineOrchestrationTests,
+   AudioRegressionTests), which opt into `EapoVariantArch` and run per
+   variant. The suite itself still runs only on legs whose variant executes
+   (`Build-Solution.ps1`), because the `Common.lib` it links carries the
+   variant's instructions; that decides whether the binary can start, not
+   which instruction set the analysis code is tested with.
 
 The consequence of (2) is a design convention, not just a build detail:
 
@@ -38,8 +49,47 @@ Precedents: `FilterListModel` (signal-free from the start) and
 
 - **HybridConvTests / EngineOrchestrationTests / AudioRegressionTests** are
   Qt-free consoles linking `Common.lib` whole-archive; shared scaffolding
-  lives in `Tests/Tests.props`, shared fixtures in `Tests/TestHarness.h`,
-  `Tests/TestDirectory.h` and `Tests/WavFixtures.h`.
+  lives in `Tests/Tests.props`.
 - **Widget-level behavior** (anything that genuinely needs moc or a live
   QApplication) is exercised by the Editor's own offscreen gates
   (`SkinGallery` and the `--*-test` flags), not by these suites.
+
+## Shared fixtures
+
+Each of these replaced private copies in the suites (audit #275 D5/TD-23
+created them, audit #348 D4/TD-72 moved the copies onto them). A suite that
+needs one of these jobs uses the header rather than writing its own.
+
+| Header | Job | Used by |
+|--------|-----|---------|
+| `Tests/TestHarness.h` | Assertions. `expectNear` compares with an absolute tolerance; `test::nearlyEqual` is the same comparison as a bool, for a check that folds several values (`a && b`, a loop verdict) into one. | every suite |
+| `Tests/TestDirectory.h` | One temporary directory per suite and process, deleting the files it tracked. | EngineOrchestrationTests (one directory for the whole executable), AsioTests, and in HybridConvTests: HybridConvTests, MultiConvolutionTests, ConfigPathPolicyTests, ChannelCommandTests |
+| `Tests/WavFixtures.h` | Writes a double-precision WAV, mono, interleaved or per channel. Returns false when the file does not open or a frame is not written; the caller fails the test (`require`). | HybridConvTests, MultiConvolutionTests, EngineOrchestrationTests, AudioRegressionTests |
+| `Tests/Vst3Bundle.h` | Wraps a staged VST3 module in a `.vst3` bundle (`Contents\<arch>-win\`). | Vst3HostTests, SubwooferRoutingVst3Tests |
+
+SubwooferRoutingEngineTests keeps its own directory fixture: it creates a
+fresh directory per fixture instance with a collision retry and checks both
+steps, which `TestDirectory` does not do.
+
+## EngineOrchestrationTests is one executable of topic files
+
+All sources share one `test::Harness`. `EngineOrchestrationTestSupport.h`
+declares the shared fixtures (the temporary directory, the one `writeConfig`,
+`testEngineSetup`/`initializeEngine`, `processDcBlock`) and every test
+function; `EngineOrchestrationTests.cpp` defines the fixtures and holds
+`main()` with the one call list, in a fixed order. The tests live by topic:
+
+| File | Topic |
+|------|-------|
+| `RuntimeUtilityTests.cpp` | COM boundary, log destinations, registry export header, SynchronizedState, ParallelExecutor, WeakValueCache |
+| `JudgedPathTests.cpp` | judged paths on a real file system (pins, attributes-only ancestors, refusals) |
+| `DeviceVocabularyTests.cpp` | install value names, device test pipe name, install-state comparison, Voicemeeter strips, process search |
+| `EngineLifecycleTests.cpp` | process() without a configuration, first-load publication, swap channel, channel expansion, crossfade, failed reload, config watcher |
+| `EngineRoutingTests.cpp` | Channel, Copy, MultiConvolution mapping, real BRIR crossfeed |
+| `ConfigLoadTests.cpp` | load trace, parse and setup errors, Include, network paths, registry port, analysis mode |
+
+The older files (`CaptureEngineTests.cpp`, `DeviceApoInfoTests.cpp`,
+`RegistryConformanceTests.cpp` and the rest) keep a `runXxxTests` runner each.
+A new test is declared in the support header and called from `main()`;
+`.github/scripts/Test-SourceSync.ps1` fails the build when a
+`void test...(test::Harness& ...)` function in this folder is never called.

@@ -5,8 +5,6 @@
 */
 
 /*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-
 	A registry port that remembers how to undo itself.
 
 	WHY THIS EXISTS. Installing Equalizer APO on one audio endpoint performs
@@ -131,7 +129,6 @@ public:
 
 	void writeValue(const std::wstring& key, const std::wstring& valuename, const std::wstring& value) override;
 	void writeDWORDValue(const std::wstring& key, const std::wstring& valuename, unsigned long value) override;
-	void writeMultiValue(const std::wstring& key, const std::wstring& valuename, const std::wstring& value) override;
 	void writeMultiValue(const std::wstring& key, const std::wstring& valuename, const std::vector<std::wstring>& values) override;
 	void deleteValue(const std::wstring& key, const std::wstring& valuename) override;
 

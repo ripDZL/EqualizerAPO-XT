@@ -1,16 +1,8 @@
 # Velopack Update Checks
 
-EqualizerAPO-XT publishes installers through the Velopack release job in GitHub Actions. Each channel emits `releases.x64-avx2.json`, `EqualizerAPO-XT-x64-avx2-...-full.nupkg`, the compatibility per-user `...-Setup.exe`, and a per-machine `EqualizerAPO-XT-<channel>-<channel>.msi`.
+EqualizerAPO-XT publishes installers through the Velopack release job in GitHub Actions. Velopack creates channel-specific assets such as `releases.x64-avx2.json`, `EqualizerAPO-XT-x64-avx2-<version>-x64-avx2-full.nupkg`, and `EqualizerAPO-XT-x64-avx2-x64-avx2-Setup.exe` (the channel appears twice because Velopack appends it to a pack id that already carries it; `.github/scripts/ReleaseAssets.psm1` owns the spelling).
 
-`UpdateChecker.exe` checks the latest GitHub Release for `ripDZL/EqualizerAPO-XT` instead of the upstream SourceForge version endpoint. Its `-a` automatic mode keeps the 24 hour check throttle and respects the locally skipped version. Note (audit #250 F073): nothing registers a logon scheduled task for it anymore - that registration left with the NSIS installer. Automatic checking today is the Editor's in-app Velopack update; UpdateChecker is a manual discovery/notification tool until a logon check is deliberately reintroduced.
-
-The update flow is:
-
-1. Detect the installed build channel.
-2. Request the latest GitHub Release.
-3. Prefer the matching Velopack feed asset, `releases.<channel>.json`.
-4. Read the newest `Full` package for the current channel and compare it with `version.h`.
-5. Apply the matching channel's Velopack update feed from the installed scope.
+The Editor's in-app Velopack update (below) is the only update path. It reads the channel's feed, `releases.<channel>.json`, from the latest GitHub Release of `115dkk/EqualizerAPO-XT`. The standalone `UpdateChecker.exe`, a notify-only tool that nothing started automatically after the NSIS installer left (audit #250 F073), was removed in audit #348.
 
 The channel is injected by CI with `EAPO_UPDATE_CHANNEL` during qmake builds. Current CI channels are:
 
@@ -23,7 +15,7 @@ The channel is injected by CI with `EAPO_UPDATE_CHANNEL` during qmake builds. Cu
 
 Local builds without an injected channel default to `x64-avx2` on x64 and `arm64-neon` on ARM64.
 
-APO installation and device registration run through the Velopack hooks the Editor handles (`--veloapp-install`, `--veloapp-updated`, etc.), which call `ApoRegistration`. The NSIS installer has been removed. The supported system-wide first install is the per-machine MSI (`vpk pack --msi --instLocation PerMachine`), not a copied per-user `current` folder.
+APO installation and device registration run through the Velopack hooks the Editor handles (`--veloapp-install`, `--veloapp-updated`, etc.), which call `ApoRegistration`. The NSIS installer has been removed.
 
 ## Editor in-app auto-update
 
@@ -33,12 +25,10 @@ The Editor embeds the native Velopack client (`velopack_libc`) and updates itsel
 2. About 60 seconds after start (only for Velopack installs), a background worker checks the GitHub release feed for the build's channel with `UpdateManager::CheckForUpdates()` and, if a newer build exists, downloads it with `DownloadUpdates()` into the Velopack staging area. The download runs off the GUI thread and never blocks shutdown.
 3. When the Editor exits with an update staged, it asks for elevation once and launches a short-lived elevated Editor coordinator. The coordinator reopens the staged package with `UpdatePendingRestart()`, calls `WaitExitThenApplyUpdates(info, silent: true, restart: false)`, and exits. The updater inherits that token, waits for the coordinator to close, swaps the files silently, and does not relaunch. The new version comes up on the next launch.
 
-The single elevation is required because the APO hooks write machine-wide registration. This applies to both legacy per-user setups and the new per-machine MSI install: before replacing `current`, the old `--veloapp-obsolete` hook must stop the Windows audio service so the loaded APO DLL no longer locks the directory. After replacement, the new `--veloapp-updated` hook writes the machine-wide APO registration and restarts the service. Running the updater from the elevated coordinator lets both hooks inherit the same administrator token instead of prompting once per hook.
+The single elevation is required even though Velopack itself is installed per-user. Before replacing `current`, the old `--veloapp-obsolete` hook must stop the Windows audio service so the loaded APO DLL no longer locks the directory. After replacement, the new `--veloapp-updated` hook writes the machine-wide APO registration and restarts the service. Running the updater from the elevated coordinator lets both hooks inherit the same administrator token instead of prompting once per hook.
 
-This logic lives in the owned `UpdateSession` module under `services/update/`. `VelopackBootstrap.cpp` is the SDK adapter, while `Editor/main.cpp` owns the session and decides whether an apply outcome should end the process. The channel is injected at build time with `EAPO_UPDATE_CHANNEL`, the same macro UpdateChecker uses.
+This logic lives in the owned `UpdateSession` module under `services/update/`. `VelopackBootstrap.cpp` is the SDK adapter, while `Editor/main.cpp` owns the session and decides whether an apply outcome should end the process. The channel is injected at build time with `EAPO_UPDATE_CHANNEL`.
 
-`UpdateChecker.exe` stays as a separate discovery/notification tool: run manually (or with `-a`), it checks the GitHub release feed and tells the user when a newer version is available; the Editor performs the actual download and apply.
-
-Tests for feed selection, channel matching, setup URL selection, and version comparison live in `Tests/EditorLogicTests`.
+Tests for the update session (publishing the staged version, launching the elevated coordinator, containing a background failure) live in `Tests/EditorLogicTests`.
 
 Reference: Velopack documents the release feed (`releases.{channel}.json`) and setup assets in its distribution overview: <https://docs.velopack.io/distributing/overview>.

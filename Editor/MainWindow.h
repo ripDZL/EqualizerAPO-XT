@@ -36,8 +36,7 @@
 #include "Editor/AnalysisThread.h"
 #include "Editor/widgets/EqGraphView.h"
 #include "services/registry/WindowsRegistry.h"
-
-#define EDITOR_PER_FILE_REGPATH EDITOR_REGPATH L"\\file-specific"
+#include "services/settings/EditorSettings.h"
 
 namespace Ui {
 class MainWindow;
@@ -66,13 +65,21 @@ class MainWindow : public QMainWindow
 	Q_OBJECT
 
 public:
+	// The analysis control bar's width cap beside a top/bottom graph, in
+	// unscaled pixels. MainWindow.ui writes the same 280 (Designer takes no
+	// constants) and names this constant beside it.
+	static constexpr int analysisControlBarWidth = 280;
+
 	explicit MainWindow(QDir configDir, const UpdateSession* updateSession, QWidget* parent = 0,
 		bool analysisLayoutTestMode = false);
 	~MainWindow();
 	void doChecks();
 	void runDeviceSelector();
 	void load(QString path);
-	void save(FilterTable* filterTable, QString path);
+	// Writes the table's lines to path. False when the file could not be
+	// written (the error was shown); callers keep the tab marked unsaved and
+	// its previous path then (audit #348 TD-07).
+	bool save(FilterTable* filterTable, QString path);
 	bool isEmpty();
 	bool shouldRestart();
 	void startAnalysis();
@@ -162,6 +169,12 @@ private:
 	FilterTable* currentFilterTable() const;
 	void forEachFilterTable(const std::function<void(int, FilterTable*)>& visitor) const;
 	void updateDirtyStatus();
+	// Adds or removes the tab title's unsaved-changes '*'.
+	void setTabDirty(int tabIndex, bool dirty);
+	// Runs an instant-mode save that is still waiting out its debounce, so
+	// closing a tab or the window inside that window does not drop the last
+	// edit. A failed save marks the tab unsaved.
+	void flushPendingInstantSave(int tabIndex);
 	// Grey the Edit-menu undo/redo entries out while the active tab's history
 	// has nothing to step to; without this they always render enabled and
 	// silently no-op, which reads as "undo/redo is gone".
@@ -208,6 +221,9 @@ private:
 	bool useCustomFrame = true;
 	// Bottom-centre notice for the staged auto-update (created on demand).
 	UpdateToast* updateToast = nullptr;
+	// Bottom-centre notice that the last analysis found a line whose filter could
+	// not be set up, so the configuration was not applied (created on demand).
+	UpdateToast* loadNotice = nullptr;
 	QTimer* updateNoticeTimer = nullptr;
 	const UpdateSession* updateSession = nullptr;
 	bool analysisLayoutTestMode = false;

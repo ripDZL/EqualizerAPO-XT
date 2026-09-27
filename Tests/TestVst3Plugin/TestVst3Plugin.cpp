@@ -63,12 +63,19 @@ bool rejectSetupMode = false;
 bool rejectStartMode = false;
 bool rejectProcessMode = false;
 bool optionalProcessingMode = false;
+bool latency512Mode = false;
+bool retainHandlerMode = false;
 std::atomic<int> upmixerComponentCount{0};
 std::atomic<int> upmixerProcessCount{0};
 std::atomic<unsigned long long> surround41AcceptedOutputArrangement{
 	static_cast<unsigned long long>(SpeakerArr::kStereo)
 };
 std::atomic<bool> zeroSampleFlushInProgress{false};
+// Every parameter change the processor received, over all process calls.
+std::atomic<int> receivedParameterChangeCount{0};
+// RetainHandler.vst3 mode: the component handler kept past the host's
+// setComponentHandler(nullptr), the way a misbehaving plug-in would.
+IComponentHandler* retainedHandler = nullptr;
 wchar_t loadedModulePath[MAX_PATH] = {};
 
 bool iidIs(const TUID iid, const FUID& expected)
@@ -512,6 +519,8 @@ public:
 			for (int32 parameterIndex = 0; parameterIndex < data.inputParameterChanges->getParameterCount(); ++parameterIndex)
 			{
 				IParamValueQueue* queue = data.inputParameterChanges->getParameterData(parameterIndex);
+				if (queue != nullptr && queue->getPointCount() > 0)
+					++receivedParameterChangeCount;
 				if (queue == nullptr || queue->getParameterId() != gainParamId || queue->getPointCount() == 0)
 					continue;
 				int32 sampleOffset = 0;
@@ -744,7 +753,10 @@ public:
 	{
 		return size == kSample32 || size == kSample64 ? kResultOk : kResultFalse;
 	}
-	uint32 PLUGIN_API getLatencySamples() override { return 0; }
+	// LatencyUpmixer.vst3 mode reports 512 samples of latency without adding
+	// any: the host test sees whether the compensation delays the channels
+	// the plugin did not write, and only those.
+	uint32 PLUGIN_API getLatencySamples() override { return latency512Mode ? 512 : 0; }
 	tresult PLUGIN_API setupProcessing(ProcessSetup& newSetup) override { setup = newSetup; return kResultOk; }
 	tresult PLUGIN_API setProcessing(TBool state) override
 	{
@@ -1068,6 +1080,11 @@ public:
 		if (handler != nullptr)
 		{
 			handler->addRef();
+			if (retainHandlerMode && retainedHandler == nullptr)
+			{
+				retainedHandler = handler;
+				retainedHandler->addRef();
+			}
 			IComponentHandler2* extendedHandler = nullptr;
 			hasExtendedHandler = handler->queryInterface(IComponentHandler2::iid,
 				reinterpret_cast<void**>(&extendedHandler)) == kResultOk && extendedHandler != nullptr;
@@ -1271,6 +1288,8 @@ extern "C" __declspec(dllexport) bool InitDll()
 	rejectStartMode = wcsstr(modulePath, L"RejectStart.vst3") != nullptr;
 	rejectProcessMode = wcsstr(modulePath, L"RejectProcess.vst3") != nullptr;
 	optionalProcessingMode = wcsstr(modulePath, L"OptionalProcessing.vst3") != nullptr;
+	latency512Mode = wcsstr(modulePath, L"LatencyUpmixer.vst3") != nullptr;
+	retainHandlerMode = wcsstr(modulePath, L"RetainHandler.vst3") != nullptr;
 	upmixerProcessCount.store(0);
 	surround41AcceptedOutputArrangement.store(
 		static_cast<unsigned long long>(SpeakerArr::kStereo));
@@ -1296,10 +1315,16 @@ extern "C" __declspec(dllexport) bool ExitDll()
 	surround41Mode = false;
 	surround41CineOnlyMode = false;
 	busInfoMismatchMode = false;
-factoryHostContextNotImplementedMode = false;
-sidechainBusMode = false;
-adaptingArrangementMode = false;
-toneGeneratorMode = false;
+	factoryHostContextNotImplementedMode = false;
+	sidechainBusMode = false;
+	adaptingArrangementMode = false;
+	toneGeneratorMode = false;
+	latency512Mode = false;
+	retainHandlerMode = false;
+	rejectSetupMode = false;
+	rejectStartMode = false;
+	rejectProcessMode = false;
+	optionalProcessingMode = false;
 	return true;
 }
 
@@ -1322,6 +1347,42 @@ extern "C" __declspec(dllexport) int GetUpmixerProcessCount()
 extern "C" __declspec(dllexport) unsigned long long GetSurround41AcceptedOutputArrangement()
 {
 	return surround41AcceptedOutputArrangement.load();
+}
+
+// In-process test hook: how many parameter changes the processor received,
+// so the host test can prove a large restored state reached it whole.
+extern "C" __declspec(dllexport) int GetReceivedParameterChangeCount()
+{
+	return receivedParameterChangeCount.load();
+}
+
+// In-process test hooks for RetainHandler.vst3 mode. The first calls the
+// handler the plug-in kept - performEdit, then IComponentHandler2::setDirty -
+// and returns -1 when none was kept, otherwise bit 0 set when performEdit was
+// accepted and bit 1 when setDirty was. The second drops the kept reference.
+extern "C" __declspec(dllexport) int CallRetainedComponentHandler()
+{
+	if (retainedHandler == nullptr)
+		return -1;
+	int accepted = 0;
+	if (retainedHandler->performEdit(gainParamId, 0.5) == kResultOk)
+		accepted |= 1;
+	IComponentHandler2* extendedHandler = nullptr;
+	if (retainedHandler->queryInterface(IComponentHandler2::iid,
+		reinterpret_cast<void**>(&extendedHandler)) == kResultOk && extendedHandler != nullptr)
+	{
+		if (extendedHandler->setDirty(true) == kResultOk)
+			accepted |= 2;
+		extendedHandler->release();
+	}
+	return accepted;
+}
+
+extern "C" __declspec(dllexport) void ReleaseRetainedComponentHandler()
+{
+	if (retainedHandler != nullptr)
+		retainedHandler->release();
+	retainedHandler = nullptr;
 }
 
 extern "C" __declspec(dllexport) IPluginFactory* PLUGIN_API GetPluginFactory()

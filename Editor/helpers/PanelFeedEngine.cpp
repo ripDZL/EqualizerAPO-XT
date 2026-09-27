@@ -1,12 +1,8 @@
 /*
 	This file is part of EqualizerAPO-XT, a system-wide equalizer.
+	Copyright (C) 2026 Mephistos (DCinside)
 	Copyright (C) 2026 115dkk
 	SPDX-License-Identifier: GPL-2.0-or-later
-*/
-
-/*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-	Copyright (C) 2026 Mephistos (DCinside)
 */
 
 #include "PanelFeedEngine.h"
@@ -198,7 +194,6 @@ struct PanelFeedEngine::EngineState
 {
 	VSTPluginInstance* effect = nullptr;
 	Options options;
-	bool isVst3 = false;
 	ProcessWidth width = ProcessWidth::Float32;
 	bool ownsProcessingState = false;
 	ComPtr<IMMDevice> device;
@@ -301,7 +296,11 @@ bool PanelFeedEngine::start(VSTPluginInstance* effect, const Options& options)
 	auto s = std::make_unique<EngineState>();
 	s->effect = effect;
 	s->options = options;
-	s->isVst3 = effect->isVST3();
+	// A selected endpoint is the fork's explicit microphone/device analyzer
+	// route. Never run the generated-signal monitor against it: a capture
+	// endpoint cannot render, and a selected render endpoint would feedback.
+	if (s->options.previewEndpoint.isValid())
+		s->options.monitorEnabled = false;
 	if (effect->canDoubleReplacing())
 		s->width = ProcessWidth::Double64;
 	else if (effect->canReplacing())
@@ -319,7 +318,14 @@ bool PanelFeedEngine::start(VSTPluginInstance* effect, const Options& options)
 		return false;
 	}
 
-	hr = enumerator->GetDefaultAudioEndpoint(eRender, eConsole, s->device.put());
+	if (s->options.previewEndpoint.isValid())
+	{
+		hr = enumerator->GetDevice(s->options.previewEndpoint.deviceId.c_str(), s->device.put());
+	}
+	else
+	{
+		hr = enumerator->GetDefaultAudioEndpoint(eRender, eConsole, s->device.put());
+	}
 	if (FAILED(hr) || !s->device)
 	{
 		LogF(L"Panel preview feed: no default render endpoint (0x%08lx)", hr);
@@ -352,7 +358,10 @@ bool PanelFeedEngine::start(VSTPluginInstance* effect, const Options& options)
 		return false;
 	}
 
-	hr = s->audioClient->Initialize(AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK,
+	const DWORD captureFlags = !s->options.previewEndpoint.isValid()
+		|| s->options.previewEndpoint.flow == VSTPreviewEndpointFlow::Render
+		? AUDCLNT_STREAMFLAGS_LOOPBACK : 0;
+	hr = s->audioClient->Initialize(AUDCLNT_SHAREMODE_SHARED, captureFlags,
 		captureBufferDuration, 0, s->mixFormat.get(), nullptr);
 	if (FAILED(hr))
 	{
@@ -386,23 +395,20 @@ bool PanelFeedEngine::start(VSTPluginInstance* effect, const Options& options)
 		return false;
 	}
 
-	TraceF(L"Panel preview feed: capturing %lu Hz, %u channels into %d/%d plugin channels (%hs), monitor %hs",
+	TraceF(L"Panel preview feed: capturing %lu Hz, %u channels into %d/%d plugin channels (%hs), monitor %hs%hs",
 		s->mixFormat->nSamplesPerSec, s->mixFormat->nChannels,
 		inputChannelCount, outputChannelCount,
 		s->width == ProcessWidth::Double64 ? "double64"
 		: s->width == ProcessWidth::Float32 ? "float32" : "float32-accumulate",
-		options.monitorEnabled ? "enabled" : "disabled");
+		s->options.monitorEnabled ? "enabled" : "disabled",
+		s->options.previewEndpoint.isValid() ? " (selected endpoint)" : "");
 
-	// A VST3 instance inside the Editor processes inside the editor session
-	// the caller is about to open (startEditing -> beginVST3EditorSession).
-	// A VST2 effect has no such session and would be fed while suspended, so
-	// the engine resumes it here and suspends it again in stop(). A headless
-	// VST3 harness has no editor session either; the engine then owns the
-	// activation the same way.
-	if (!s->isVst3 || !options.requireVst3EditorSession)
+	// A headless caller asks the feed to own processing. Editor panels wait
+	// for startEditing() to establish a process-ready session instead.
+	if (!options.requireVst3EditorSession && !effect->canProcessNow())
 	{
 		effect->startProcessing();
-		s->ownsProcessingState = true;
+		s->ownsProcessingState = effect->canProcessNow();
 	}
 
 	state = std::move(s);
@@ -517,11 +523,9 @@ bool PanelFeedEngine::tick()
 		return false;
 	EngineState& s = *state;
 
-	// A VST3 session whose view never attached (startEditing failed) holds
-	// no Processing state to feed; the capture is still drained so it does
-	// not pile up.
-	const bool processReady = !s.isVst3 || !s.options.requireVst3EditorSession
-		|| s.effect->vst3EditorSessionActive();
+	// VSTPluginInstance owns the format-specific processing-state rules. When
+	// it is not ready, capture is still drained so it does not pile up.
+	const bool processReady = s.effect->canProcessNow();
 
 	if (s.gate.state() == PanelMonitorGate::State::Render)
 		return renderTick(s, processReady);

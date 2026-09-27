@@ -20,7 +20,7 @@
 
 #include "runtime/memory/AlignedMemory.h"
 #include "MultiConvolutionCommand.h"
-#include "ConvolutionFilePath.h"
+#include "ConfigFileReference.h"
 #include "MultiConvolutionFilter.h"
 #include "filters/FilterFactoryRegistry.h"
 #include "MultiConvolutionFilterFactory.h"
@@ -43,9 +43,11 @@ FilterVector MultiConvolutionFilterFactory::createFilter(const wstring& configPa
 	if (cmd.path.empty())
 		return reportParseError(command, L"expected the path of an impulse response file after the mappings");
 
-	wstring absolutePath = ConvolutionFilePath::resolve(configPath, cmd.path);
-	if (absolutePath.empty())
+	ConfigFileReference::Target file = ConfigFileReference::target(configPath, cmd.path);
+	if (!file.refusal.empty())
+		return reportParseError(command, file.refusal);
+	if (file.path.empty())
 		return reportParseError(command, L"the impulse response file \"" + cmd.path + L"\" was not found");
 
-	return singleFilter(makeFilter<MultiConvolutionFilter>(cmd.mappings, absolutePath));
+	return singleFilter(makeFilter<MultiConvolutionFilter>(cmd.mappings, std::move(file.path)));
 }

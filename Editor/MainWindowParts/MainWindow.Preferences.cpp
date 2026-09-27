@@ -32,7 +32,7 @@
 #include "audio/ChannelLayout.h"
 #include "Editor/helpers/GUIChannelHelper.h"
 #include "Editor/helpers/GUIHelper.h"
-#include "Editor/helpers/EditorSettings.h"
+#include "services/settings/EditorSettings.h"
 #include "version.h"
 #include "Editor/import/LegacyMigration.h"
 #include "Editor/widgets/TitleBar.h"
@@ -139,7 +139,7 @@ void MainWindow::loadPreferences()
 	recentFiles.removeDuplicates();
 	updateRecentFiles();
 
-	QVariant languageValue = settings.value("language");
+	QVariant languageValue = settings.value(QLatin1String(EditorSettings::Keys::Language));
 	QLocale::Language language;
 	if (languageValue.isValid())
 		language = QLocale(languageValue.toString()).language();
@@ -508,15 +508,15 @@ void MainWindow::applyRedesignPreferences()
 	ui->analysisDockLayout->setDirection(dockOnRight
 		? QBoxLayout::TopToBottom : QBoxLayout::LeftToRight);
 
-	// Beside a top/bottom graph this is intentionally a compact 280px settings
-	// cell. Above a right-side graph that cap made the controls look like a
+	// Beside a top/bottom graph this is intentionally a compact settings cell
+	// (analysisControlBarWidth). Above a right-side graph that cap made the controls look like a
 	// clipped header stranded on the left. Let the same form fill the dock in
 	// that orientation, while preserving the compact horizontal layout.
 	QSizePolicy controlPolicy = ui->analysisControlBar->sizePolicy();
 	controlPolicy.setHorizontalPolicy(dockOnRight ? QSizePolicy::Expanding : QSizePolicy::Maximum);
 	ui->analysisControlBar->setSizePolicy(controlPolicy);
 	ui->analysisControlBar->setMaximumWidth(dockOnRight
-		? QWIDGETSIZE_MAX : GUIHelper::scale(280.0));
+		? QWIDGETSIZE_MAX : analysisControlBarWidth);
 
 	// The horizontal graph asks for 960px, which is a useful bottom-dock hint
 	// but a disastrous right-dock width: QMainWindow otherwise grants almost
@@ -526,9 +526,9 @@ void MainWindow::applyRedesignPreferences()
 	// the user's choice.
 	if (dockAreaChanged && dockOnRight)
 	{
-		const int minimumGraphDockWidth = GUIHelper::scale(320.0);
-		const int maximumGraphDockWidth = GUIHelper::scale(480.0);
-		const int filterWorkspaceFloor = GUIHelper::scale(520.0);
+		const int minimumGraphDockWidth = 320;
+		const int maximumGraphDockWidth = 480;
+		const int filterWorkspaceFloor = 520;
 		int preferredWidth = qBound(minimumGraphDockWidth, width() * 38 / 100,
 			maximumGraphDockWidth);
 		preferredWidth = qMin(preferredWidth,
@@ -551,8 +551,8 @@ void MainWindow::applyRedesignPreferences()
 // and none can undercut the others.
 void MainWindow::updateAnalysisDockFloor()
 {
-	const int floorWidth = GUIHelper::scale(296.0);
-	const int floorHeight = GUIHelper::scale(268.0);
+	const int floorWidth = 296;
+	const int floorHeight = 268;
 	QDockWidget* dock = ui->analysisDockWidget;
 	dock->setMinimumSize(0, 0);
 	const QSize content = dock->minimumSizeHint();

@@ -19,7 +19,7 @@
 #include "DeviceAPOInfoKeys.h"
 
 #include "services/registry/WindowsRegistry.h"
-#include "platform/windows/WindowsVersion.h"
+#include "services/logging/Logging.h"
 #include "asio/AsioRegistration.h"
 #include "asio/WrapperRecord.h"
 
@@ -31,6 +31,23 @@ using std::wstring;
 
 bool DeviceAPOInfo::load(const wstring& deviceGuid, wstring defaultDeviceGuid)
 {
+	if (!loadFromRegistry(deviceGuid))
+		return false;
+
+	if (defaultDeviceGuid == L"")
+		defaultDeviceGuid = getDefaultDevice(input);
+
+	GUID guid1, guid2;
+	if (SUCCEEDED(CLSIDFromString(deviceGuid.c_str(), &guid1)) && SUCCEEDED(CLSIDFromString(defaultDeviceGuid.c_str(), &guid2)))
+		defaultDevice = (guid1 == guid2) != 0;
+	else
+		defaultDevice = false;
+	return true;
+}
+
+bool DeviceAPOInfo::loadFromRegistry(const wstring& deviceGuid)
+{
+	defaultDevice = false;
 	wstring keyPath;
 	if (registry.keyExists(renderKeyPath L"\\" + deviceGuid))
 	{
@@ -76,15 +93,6 @@ bool DeviceAPOInfo::load(const wstring& deviceGuid, wstring defaultDeviceGuid)
 	if (channelMask == 0 && registry.valueExists(keyPath + L"\\Properties", channelMaskValueName))
 		channelMask = registry.readDWORDValue(keyPath + L"\\Properties", channelMaskValueName);
 
-	if (defaultDeviceGuid == L"")
-		defaultDeviceGuid = getDefaultDevice(input);
-
-	GUID guid1, guid2;
-	if (SUCCEEDED(CLSIDFromString(deviceGuid.c_str(), &guid1)) && SUCCEEDED(CLSIDFromString(defaultDeviceGuid.c_str(), &guid2)))
-		defaultDevice = (guid1 == guid2) != 0;
-	else
-		defaultDevice = false;
-
 	enhancementsDisabled = false;
 	if (registry.keyExists(keyPath + L"\\FxProperties") && registry.valueExists(keyPath + L"\\FxProperties", disableEnhancementsValueName))
 		enhancementsDisabled = registry.readDWORDValue(keyPath + L"\\FxProperties", disableEnhancementsValueName) != 0;
@@ -100,7 +108,8 @@ bool DeviceAPOInfo::load(const wstring& deviceGuid, wstring defaultDeviceGuid)
 	currentInstallState.useOriginalAPOPostMix = !input;
 	currentInstallState.allowSilentBufferModification = false;
 	currentInstallState.autoAdjust = true;
-	currentInstallState.exclusiveModeEq = false;
+	currentInstallState.asioEntry = false;
+	currentInstallState.asioEntryOptions = {};
 
 	if (!registry.keyExists(keyPath + L"\\FxProperties"))
 	{
@@ -239,34 +248,46 @@ bool DeviceAPOInfo::load(const wstring& deviceGuid, wstring defaultDeviceGuid)
 		}
 		else
 		{
-			if (WindowsVersion::isAtLeast(6, 3)) // Windows 8.1
-			{
-				// only use LFX/GFX if the audio driver supplied only those APOs
-				if (registry.keyExists(keyPath + L"\\FxProperties")
-					&& (registry.valueExists(keyPath + L"\\FxProperties", lfxGuidValueName) || registry.valueExists(keyPath + L"\\FxProperties", gfxGuidValueName))
-					&& !registry.valueExists(keyPath + L"\\FxProperties", sfxGuidValueName)
-					&& !registry.valueExists(keyPath + L"\\FxProperties", mfxGuidValueName)
-					&& !registry.valueExists(keyPath + L"\\FxProperties", efxGuidValueName)
-					&& !registry.valueExists(keyPath + L"\\FxProperties", multiSfxGuidValueName)
-					&& !registry.valueExists(keyPath + L"\\FxProperties", multiMfxGuidValueName)
-					&& !registry.valueExists(keyPath + L"\\FxProperties", multiEfxGuidValueName))
-					currentInstallState.installMode = INSTALL_LFX_GFX;
-				// bluetooth devices may be combined in Windows 11, EFX will not work then
-				else if (registry.valueExists(keyPath + L"\\Properties", combinedDeviceValueName))
-					currentInstallState.installMode = INSTALL_SFX_MFX;
-				else
-					currentInstallState.installMode = INSTALL_SFX_EFX;
-			}
+			// The minimum supported Windows is 10 1809, the oldest Qt 6.10 runs
+			// on, so the SFX/MFX/EFX slots (Windows 8.1 and newer) always exist;
+			// the branch that kept LFX/GFX for older systems is gone (audit #348
+			// TD-53).
+			// only use LFX/GFX if the audio driver supplied only those APOs
+			if (registry.keyExists(keyPath + L"\\FxProperties")
+				&& (registry.valueExists(keyPath + L"\\FxProperties", lfxGuidValueName) || registry.valueExists(keyPath + L"\\FxProperties", gfxGuidValueName))
+				&& !registry.valueExists(keyPath + L"\\FxProperties", sfxGuidValueName)
+				&& !registry.valueExists(keyPath + L"\\FxProperties", mfxGuidValueName)
+				&& !registry.valueExists(keyPath + L"\\FxProperties", efxGuidValueName)
+				&& !registry.valueExists(keyPath + L"\\FxProperties", multiSfxGuidValueName)
+				&& !registry.valueExists(keyPath + L"\\FxProperties", multiMfxGuidValueName)
+				&& !registry.valueExists(keyPath + L"\\FxProperties", multiEfxGuidValueName))
+				currentInstallState.installMode = INSTALL_LFX_GFX;
+			// bluetooth devices may be combined in Windows 11, EFX will not work then
+			else if (registry.valueExists(keyPath + L"\\Properties", combinedDeviceValueName))
+				currentInstallState.installMode = INSTALL_SFX_MFX;
+			else
+				currentInstallState.installMode = INSTALL_SFX_EFX;
 		}
 	}
 
 	// The ASIO entry is the endpoint's own wrapper record, keyed by the
 	// CLSID derived from the endpoint GUID; a driver record could never
-	// carry that CLSID, so the kind check is belt and braces.
+	// carry that CLSID, so the kind check is belt and braces. A record that
+	// cannot be read reads as no entry: it used to throw away everything
+	// read above, the APO's child APO and capture flag included (audit #348
+	// TD-47).
+	try
 	{
 		eapo::asio::WrapperRecord record;
-		currentInstallState.exclusiveModeEq = eapo::asio::WrapperRecords::read(registry, eapo::asio::AsioRegistration::wrapperClsidFor(deviceGuid), record)
+		currentInstallState.asioEntry = eapo::asio::WrapperRecords::read(registry, eapo::asio::AsioRegistration::wrapperClsidFor(deviceGuid), record)
 			&& record.targetKind == eapo::asio::TargetKind::WasapiExclusive;
+		if (currentInstallState.asioEntry)
+			currentInstallState.asioEntryOptions = eapo::asio::WrapperRecords::entryOptions(record);
+	}
+	catch (const RegistryError& e)
+	{
+		currentInstallState.asioEntry = false;
+		LogFStatic(L"Could not read the ASIO entry of endpoint %s: %s", deviceGuid.c_str(), e.getMessage().c_str());
 	}
 
 	return true;

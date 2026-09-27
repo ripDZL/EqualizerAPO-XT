@@ -4,10 +4,6 @@
 	SPDX-License-Identifier: GPL-2.0-or-later
 */
 
-/*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-*/
-
 #pragma once
 
 #include "Editor/skins/ISkin.h"
@@ -38,6 +34,8 @@ public:
 	void paintVstBusSelector(QPainter& painter, const VstBusSelectorState& state,
 		const SkinTokens& tokens) const override;
 	void paintVstBusFrame(QPainter& painter, const VstBusFrameState& state,
+		const SkinTokens& tokens) const override;
+	QSize vstSlotFillCellSize(const QString& role, const QString& value,
 		const SkinTokens& tokens) const override;
 	void paintVstSlotFillCell(QPainter& painter, const VstSlotFillCellState& state,
 		const SkinTokens& tokens) const override;

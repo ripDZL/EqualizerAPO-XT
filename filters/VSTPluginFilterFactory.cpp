@@ -23,6 +23,7 @@
 #include "services/logging/Logging.h"
 #include "VSTPluginCommand.h"
 #include "VSTPluginFilter.h"
+#include "filters/ConfigFileReference.h"
 #include "filters/FilterFactoryRegistry.h"
 #include "VSTPluginFilterFactory.h"
 
@@ -41,6 +42,10 @@ FilterVector VSTPluginFilterFactory::createFilter(const wstring& configPath, wst
 		if (!pluginCommand.valid)
 			return reportParseError(command, pluginCommand.error);
 
+		const auto target = ConfigFileReference::library(L"", pluginCommand.libraryPath, configPath);
+		if (!target.refusal.empty())
+			return reportParseError(command, target.refusal);
+
 		shared_ptr<VSTPluginLibrary> library = pluginCommand.libraryPath.empty()
 			? nullptr : VSTPluginLibrary::getInstance(pluginCommand.libraryPath);
 
@@ -52,7 +57,7 @@ FilterVector VSTPluginFilterFactory::createFilter(const wstring& configPath, wst
 		{
 			create = false;
 			TraceF(L"Adding VST plugin %s", library->getLibPath().c_str());
-			int res = library->initialize();
+			int res = library->initialize(target.path);
 			if (res < 0)
 			{
 				// These four were already diagnosed, but only into the log. They

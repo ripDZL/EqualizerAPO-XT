@@ -24,8 +24,9 @@ virtual void paintKnob(QPainter& painter, const QRect& rect,
 ```
 
 `KnobState` carries `value/minimum/maximum`, the resolved `ratio` (0..1), a
-`bipolar` flag, the optional centred `valueText`, and
-`enabled/hovered/dragging/focused`. Notes:
+`bipolar` flag, the optional centred `valueText`, the narrow
+`conventionalPresentation` request, and `enabled/hovered/dragging/focused`.
+Notes:
 
 - **Bipolar vs unipolar.** Gain knobs (Preamp card, BiQuad gain dial) set
   `bipolar = true`; frequency and Q dials stay unipolar. A skin must render
@@ -36,6 +37,11 @@ virtual void paintKnob(QPainter& painter, const QRect& rect,
   value in a separate spin box and map the dial to log-scaled steps, so
   painting `value` for them is wrong. Only paint a number when `valueText` is
   non-empty, or derive a display value from your own formatting of `ratio`.
+- **Conventional legacy host.** `conventionalPresentation` is for an existing
+  adjacent value box whose specialised skin control would otherwise be
+  ambiguous. `PreampFilterGUI` is the only current user: it requests the
+  precision circular dial in Minimal-derived themes instead of a numberless
+  register drum.
 - **Geometry.** Promoted legacy dials are 100x66; the card knob is 74x74. Keep
   the knob round by working inside a centred square (see the default
   implementation in `Editor/skins/ISkin.cpp`).
@@ -67,7 +73,9 @@ per range from the same constant so the surface moves with the pointer one
 to one (minimal's register drum). The law is pinned by `EditorLogicTests`
 (`KnobTravelTests.cpp`). `Editor --knob-specimen <outDir>` paints a skin's
 knob for staged states (hover, drag, focus, disabled, a 50px squeeze) that
-the gallery cannot stage.
+the gallery cannot stage. A conventional-presentation knob locks the gesture
+to `Rotary`, even under a VerticalDrag skin, so its visual and input law stay
+aligned; the specimen also includes the real 100x66 Legacy Preamp host.
 
 ## Command-row chrome hook
 
@@ -165,33 +173,16 @@ LegacyRows GraphicEQ GUI keeps the original QGraphicsView stack untouched.
 ## Skin theme data for satellite executables
 
 `Editor/skins/SkinThemeData.{h,cpp}` holds the behaviour-free half of the
-skin system: id aliases (`resolveId`), the five base token tables and their
-token variants, QSS resource
+skin system: id aliases (`resolveId`), the five token tables, QSS resource
 paths, the `@TOKEN@` substitution, the token → `QPalette` mapping and the
 Qt 6.10 combo-arrow override. The `ISkin` classes delegate their
-`tokens()`/`qssResource()` here, so the tables cannot drift. DeviceSelector
-compiles this unit and `CustomThemeStore` plus the aliased `.qss`/font resources
-(`DeviceSelector/DeviceSelectorSkins.qrc`), and wears the Editor's stored
-built-in or saved custom skin (`interface/skin`, default studio). A saved theme
-supplies its own token table while its `baseTheme` selects the shared QSS and
-painter grammar; LegacyRows applies its own compact token layer around the
-original row widgets.
-
-## LegacyRows heritage themes
-
-`SkinManager::applyHeritage(id, dark)` keeps the legacy row factories,
-promoted controls, plugin/graph behavior, and stock font engine. It applies
-the selected built-in or saved custom token table only to shared chrome,
-dialogs, row paint, and token-consuming painters.
-
-The custom title bar remains active unless `interface/nativeTitleBar` is set;
-Qt cannot colour the native Windows caption. `legacy-slate`, `legacy-blue`,
-`legacy-forest`, `legacy-bronze`, and `legacy-plum` use the Minimal/Precision
-grammar outside LegacyRows and supply their own heritage palette inside it.
-
-`Editor --skin-switch-test` verifies the dark Bronze palette and QMessageBox
-contrast. `EAPO_GALLERY_LEGACY=1` produces normal, disabled, and dialog shots
-for each selected legacy theme.
+`tokens()` here, so the tables cannot drift; an `ISkin::tokens` override
+reaches the painters only, because `applyToApplication` builds the QSS and
+palette from the table. DeviceSelector
+compiles this one unit plus the aliased `.qss`/font resources
+(`DeviceSelector/DeviceSelectorSkins.qrc`) and wears the Editor's stored
+skin (`interface/skin`, default studio; heritage mode keeps the native
+look).
 
 ## Reference-card view hook
 
@@ -379,8 +370,8 @@ each for the toolbar, title bar, menu bar and an open menu, two for the
 add-card row (`addrow` normal/hover), one for the insertion seam's hover
 reveal (`seam`) and one for the update toast (`toast`). Output names are
 stable: `<skin>_<dark|light>_<row>_<state>.png`,
-20 × 2 × (21 × 3 + 12) = 3,000 PNGs
-for the current full run; the run self-checks the count, so adding a gallery row needs
+5 × 2 × (21 × 3 + 12) = 750 PNGs
+for a full run; the run self-checks the count, so adding a gallery row needs
 no external count update. A row shot fails the render (non-zero exit) if a
 visible horizontal scrollbar is found inside the row — rows must fit the
 960px gallery viewport in every skin. Exit code 0 means every PNG was
@@ -427,10 +418,10 @@ inside it instead.
 Six files, and the first one is the only list of which skins exist.
 
 1. **`Editor/skins/SkinThemeData.cpp`** — add an entry to `roster()`: the id as it
-   will be stored in the registry, the base name of its `.qss` pair, its painter
-   base id, and its token function. Everything derived from the roster follows
-   automatically: the Editor's menu, the token and style-sheet lookups, Device
-   Selector's shot harness, and the `testTheSkinRosterIsTheOneList` check.
+   will be stored in the registry, the base name of its `.qss` pair, and its token
+   function. Everything derived from the roster follows automatically: the Editor's
+   menu, the token and style-sheet lookups, Device Selector's shot harness, and the
+   `testTheSkinRosterIsTheOneList` check.
 2. **`Editor/skins/<Name>Skin.cpp`** — the `ISkin` subclass, one translation unit
    per skin, plus its `<name>Skin()` accessor declared in `SkinSupport.h`.
 3. **`Editor/skins/Skins.cpp`** — one line in `implementationFor()` mapping the id
@@ -449,18 +440,6 @@ Six files, and the first one is the only list of which skins exist.
 And the constitution: **`docs/skins/<name>.md`** records what the skin is for and
 what it must not do. `docs/skins/README.md` says why that document exists before
 the code does.
-
-### Token variants
-
-A token variant is not a sixth form language. Its roster entry keeps a unique id
-and token function but names an existing self-rooting base through `paintBaseId`;
-its `qssBaseName` must name that base's sheet grammar. The Editor's delegating
-`ISkin` and Device Selector's painter both resolve through that same base, while
-the variant id remains responsible for its QSS and token values. A variant therefore
-needs no new `ISkin`, Device Selector painter, QSS pair, or separate constitution:
-the referenced base constitution governs its form. Extend the roster regression
-test with the exact variant/base mapping and include every variant in the device
-shot harness before treating the group as complete.
 
 Until this list existed, adding a skin meant editing eighteen places, and missing
 one did not fail. `resolveId()` returns `"studio"` for an id it does not know, so a

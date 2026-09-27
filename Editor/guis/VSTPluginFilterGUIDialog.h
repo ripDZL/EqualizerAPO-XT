@@ -39,7 +39,10 @@ public:
 
 	QPushButton* getApplyButton();
 	QCheckBox* getAutoApplyCheckBox();
-	bool hasPluginPanel() const;
+	// False when the plugin could not open its editor into the dialog (no
+	// editor, no view, attach refused). The caller must not show the dialog
+	// then: it would be an empty 400x300 frame (audit #348).
+	bool isEditorOpen() const { return editorOpen; }
 
 	void onSizeWindow(int w, int h);
 
@@ -50,5 +53,5 @@ private:
 	std::unique_ptr<Ui::VSTPluginFilterGUIDialog> ui;
 	// Non-owning: the dialog is stack-bound inside the effect owner's method.
 	VSTPluginInstance* effect;
-	bool panelOpened = false;
+	bool editorOpen = false;
 };

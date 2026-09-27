@@ -8,9 +8,9 @@
 	channel a CPU maps to, which asset that names, and how the sha256sum
 	checksums text is read. The Win32 work (CPUID/XGETBV gathering, WinHTTP,
 	BCrypt, process launch) stays in AutoInstaller.cpp; this unit only
-	decides. EditorLogicTests compiles AutoInstallerLogic.cpp directly, the
-	same pattern it uses for UpdateChecker's decision core, so PRs verify
-	logic the release-only installer build used to leave until release day.
+	decides. EditorLogicTests compiles AutoInstallerLogic.cpp directly, so
+	PRs verify logic the release-only installer build used to leave until
+	release day.
 
 	Like the installer itself this must stay free of project libraries: it
 	is std C++ plus the grammar header and version.h.
@@ -49,6 +49,11 @@ struct CpuFeatures
 
 // Most specific / newest first: arm64, avx10-1, avx512, avx2, avx, sse2.
 std::wstring channelForCpu(const CpuFeatures& features, int* outIndex = nullptr);
+
+// "x64-avx2" -> "64-bit x86 with AVX2" and so on, from the same table
+// channelForCpu reads. Unknown channels come back verbatim so a future
+// channel never renders as an empty line.
+std::wstring describeChannel(const std::wstring& channel);
 
 // Per-variant installer asset name; the shared grammar header explains the
 // doubled channel.

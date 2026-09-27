@@ -4,10 +4,6 @@
 	SPDX-License-Identifier: GPL-2.0-or-later
 */
 
-/*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-*/
-
 #include "BlockChipRoutingRenderer.h"
 
 #include <QMenu>
@@ -17,6 +13,7 @@
 #include <QFontMetrics>
 
 #include "Editor/SkinManager.h"
+#include "Editor/widgets/routing/RoutingGridModel.h"
 #include "Editor/widgets/routing/CopyRoutingAdapter.h"
 
 using std::vector;
@@ -79,7 +76,7 @@ static QFont uiFont(const SkinTokens& tokens, int px)
 
 QSize BlockChipView::sizeHint() const
 {
-	QFontMetrics fm(uiFont(skinTokens, 13));
+	QFontMetrics fm(uiFont(skinTokens, 14));
 	int maxW = 240;
 	for (int row : fold.visibleRows)
 	{
@@ -138,7 +135,7 @@ void BlockChipView::paintEvent(QPaintEvent*)
 		p.setBrush(destCol);
 		p.drawRoundedRect(QRect(block.left() + 6, y, 5, blockH), 2, 2);
 
-		QFont big = uiFont(skinTokens, 14);
+		QFont big = uiFont(skinTokens, 15);
 		big.setBold(true);
 		p.setFont(big);
 		QFontMetrics bfm(big);
@@ -150,7 +147,7 @@ void BlockChipView::paintEvent(QPaintEvent*)
 		p.drawText(QRect(x, y, 16, blockH), Qt::AlignCenter, QStringLiteral("="));
 		x += 22;
 
-		QFont chipFont = uiFont(skinTokens, 13);
+		QFont chipFont = uiFont(skinTokens, 14);
 		p.setFont(chipFont);
 		QFontMetrics fm(chipFont);
 
@@ -190,7 +187,7 @@ void BlockChipView::paintEvent(QPaintEvent*)
 			// (IR file channels) are ports, not virtual channels, so they keep
 			// the solid chip styling.
 			const QColor col(CopyRoutingAdapter::channelColor(ch));
-			const bool virt = !portModel.fixedSourceMode() && CopyRoutingAdapter::isVirtualChannel(ch);
+			const bool virt = !portModel.fixedSourceMode() && portModel.isVirtualChannel(ch);
 			const int fw = fm.horizontalAdvance(factorText);
 			const int cw = fm.horizontalAdvance(ch);
 			const int chipW = fw + cw + 18;
@@ -237,7 +234,7 @@ void BlockChipView::paintEvent(QPaintEvent*)
 		// A virtual channel's block can be removed: hovering the block shows a
 		// quiet × pill at its tail (device channels fold instead of leaving,
 		// so they never get one). Muted, small, never alarming.
-		if (CopyRoutingAdapter::isVirtualChannel(dest) && hoveredRow == r)
+		if (portModel.isVirtualChannel(dest) && hoveredRow == r)
 		{
 			const QRect xChip(x, y + (blockH - 22) / 2, 22, 22);
 			p.setPen(QPen(alpha(muted, 140), 1));
@@ -254,7 +251,7 @@ void BlockChipView::paintEvent(QPaintEvent*)
 	// step) and the dashed "add channel" chip (the not-hardware-backed
 	// grammar shared with the per-block [+]).
 	const int y = gap + fold.visibleRows.size() * (blockH + gap);
-	QFont chipFont = uiFont(skinTokens, 12);
+	QFont chipFont = uiFont(skinTokens, 13);
 	p.setFont(chipFont);
 	QFontMetrics fm(chipFont);
 	int x = 8;
@@ -295,10 +292,7 @@ void BlockChipView::mousePressEvent(QMouseEvent* event)
 		if (h.rect.contains(event->pos()))
 		{
 			const QString channel = QString::fromStdWString(workingAssignments[h.row].targetChannel);
-			for (int i = pinnedChannels.size() - 1; i >= 0; i--)
-				if (pinnedChannels[i].compare(channel, Qt::CaseInsensitive) == 0)
-					pinnedChannels.removeAt(i);
-			const bool changed = RoutingFold::removeChannel(workingAssignments, channel);
+			const bool changed = RoutingGridModel::removeChannel(workingAssignments, pinnedChannels, channel);
 			refold();
 			if (changed)
 				emit routingChanged();
@@ -472,22 +466,9 @@ void BlockChipView::commitEditor()
 	QString raw = editor->text().trimmed();
 	editor->hide();
 
-	if (row >= (int)workingAssignments.size() || si >= (int)workingAssignments[row].sourceSum.size())
+	if (!RoutingGridModel::commitChip(workingAssignments, row, si, raw,
+		RoutingGridModel::sourceChannels(workingAssignments, deviceChannels, portModel.fixedSources)))
 		return;
-
-	if (raw.isEmpty())
-	{
-		// Clearing the factor removes the source chip, mirroring the
-		// crosspoint / patch-bay grids.
-		Assignment& a = workingAssignments[row];
-		a.sourceSum.erase(a.sourceSum.begin() + si);
-		refold();
-		emit routingChanged();
-		return;
-	}
-
-	Assignment::Summand& s = workingAssignments[row].sourceSum[si];
-	CopyRoutingAdapter::parseFactorToken(raw, s);
 	refold();
 	emit routingChanged();
 }
@@ -516,14 +497,8 @@ void BlockChipView::commitChannelEditor()
 
 	const QString name = channelEditor->text().trimmed();
 	channelEditor->hide();
-	if (!RoutingFold::isValidChannelName(name))
-		return;
-
-	// An existing channel just gets its block back; a new name becomes a
-	// virtual channel block. No routingChanged: a fresh target has no sum yet
-	// and the serializer skips empty targets.
-	CopyRoutingAdapter::ensureTargetChannel(workingAssignments, pinnedChannels, name);
-	refold();
+	if (RoutingGridModel::addChannel(workingAssignments, pinnedChannels, name))
+		refold();
 }
 
 RoutingView* BlockChipRoutingRenderer::create(const vector<Assignment>& assignments,

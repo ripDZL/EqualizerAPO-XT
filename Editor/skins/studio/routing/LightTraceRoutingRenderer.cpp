@@ -4,10 +4,6 @@
 	SPDX-License-Identifier: GPL-2.0-or-later
 */
 
-/*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-*/
-
 #include "Editor/skins/studio/routing/LightTraceRoutingRenderer.h"
 #include "Editor/skins/shared/SkinPaint.h"
 
@@ -21,14 +17,13 @@
 #include <QPainterPathStroker>
 
 #include "Editor/SkinManager.h"
-#include "Editor/helpers/GUIHelper.h"
 #include "Editor/widgets/routing/CopyRoutingAdapter.h"
 
 using std::vector;
 
 namespace
 {
-int sc(int px) { return GUIHelper::scale(px); }
+int sc(int px) { return px; }
 
 // is-dark / withAlphaF live in the shared SkinPaint.h.
 }
@@ -41,7 +36,7 @@ StudioRoutingView::StudioRoutingView(const vector<Assignment>& assignments,
 	// even if their last trace is deleted.
 	pinnedChannels(RoutingFold::referencedTargets(assignments))
 {
-	StudioRoutingModel::PortConfig config;
+	RoutingGridModel::PortConfig config;
 	config.fixedSources = portModel.fixedSources;
 	config.allowFactors = portModel.allowFactors;
 	model.load(assignments, channelNames, config);
@@ -96,10 +91,10 @@ void StudioRoutingView::relayout()
 	const int traceZone = sc(72);
 
 	QFont sans(t.fontFamily);
-	sans.setPixelSize(sc(11));
+	sans.setPixelSize(sc(12));
 	sans.setBold(true);
 	QFont mono(t.monoFontFamily);
-	mono.setPixelSize(sc(11));
+	mono.setPixelSize(sc(12));
 	const QFontMetrics sansFm(sans);
 	const QFontMetrics monoFm(mono);
 
@@ -114,7 +109,7 @@ void StudioRoutingView::relayout()
 	hiddenOutputs = 0;
 	QVector<bool> inputLit(inputPorts.size(), false);
 	QVector<bool> outputLit(outputPorts.size(), false);
-	for (const StudioRoutingModel::Trace& trace : model.traces())
+	for (const RoutingGridModel::Trace& trace : model.traces())
 	{
 		if (trace.input >= 0 && trace.input < inputLit.size())
 			inputLit[trace.input] = true;
@@ -210,11 +205,11 @@ void StudioRoutingView::relayout()
 	// traces that converge on one output (the 0.28..0.72 spread).
 	traceShapes.clear();
 	QHash<int, int> perOutput;
-	for (const StudioRoutingModel::Trace& trace : model.traces())
+	for (const RoutingGridModel::Trace& trace : model.traces())
 		if (trace.input >= 0)
 			perOutput[trace.output]++;
 	QHash<int, int> seen;
-	for (const StudioRoutingModel::Trace& trace : model.traces())
+	for (const RoutingGridModel::Trace& trace : model.traces())
 	{
 		TraceShape shape;
 		if (trace.input >= 0 && trace.input < inputRects.size()
@@ -242,7 +237,7 @@ void StudioRoutingView::relayout()
 				const double tPos = n <= 1 ? 0.5 : 0.28 + 0.44 * k / (n - 1);
 				const QPointF center = shape.path.pointAtPercent(tPos);
 				QFont labelFont(t.monoFontFamily);
-				labelFont.setPixelSize(sc(10));
+				labelFont.setPixelSize(sc(11));
 				const QSizeF size = QFontMetrics(labelFont).size(0, shape.labelText)
 					+ QSizeF(sc(12), sc(6));
 				shape.labelRect = QRectF(center.x() - size.width() / 2,
@@ -340,7 +335,7 @@ void StudioRoutingView::paintEvent(QPaintEvent*)
 		}
 	};
 
-	const QVector<StudioRoutingModel::Trace>& traces = model.traces();
+	const QVector<RoutingGridModel::Trace>& traces = model.traces();
 	for (int pass = 0; pass < 3; pass++)
 	{
 		for (int i = 0; i < traceShapes.size(); i++)
@@ -361,7 +356,7 @@ void StudioRoutingView::paintEvent(QPaintEvent*)
 	// is how the top-to-bottom flow states its direction (no arrowheads).
 	QVector<bool> inputLit(inputRects.size(), false);
 	QVector<bool> outputLit(outputRects.size(), false);
-	for (const StudioRoutingModel::Trace& trace : traces)
+	for (const RoutingGridModel::Trace& trace : traces)
 	{
 		if (trace.input >= 0 && trace.input < inputLit.size())
 			inputLit[trace.input] = true;
@@ -394,17 +389,17 @@ void StudioRoutingView::paintEvent(QPaintEvent*)
 	// type-badge alpha formula, hover raises luminance one step, disabled
 	// switches the pane off.
 	QFont sans(t.fontFamily);
-	sans.setPixelSize(sc(11));
+	sans.setPixelSize(sc(12));
 	sans.setBold(true);
 	QFont mono(t.monoFontFamily);
-	mono.setPixelSize(sc(11));
+	mono.setPixelSize(sc(12));
 
 	auto drawChip = [&](const QRect& rect, bool inputRow, int index) {
 		const QString label = chipLabel(inputRow, index);
 		const bool isConst = inputRow && model.constInput(index);
 		const bool monoChip = (inputRow && portModel.fixedSourceMode()) || isConst;
 		const bool hovered = lit && hoveredChip == index && hoveredChipIsInput == inputRow;
-		const bool virt = !monoChip && CopyRoutingAdapter::isVirtualChannel(label);
+		const bool virt = !monoChip && portModel.isVirtualChannel(label);
 
 		QColor ink = monoChip ? QColor(t.text) : QColor(CopyRoutingAdapter::channelColor(label));
 		if (!dark && !monoChip)
@@ -469,7 +464,7 @@ void StudioRoutingView::paintEvent(QPaintEvent*)
 		// of leaving, so they never get one).
 		const QString label = chipLabel(false, i);
 		if (lit && hoveredChip == i && !hoveredChipIsInput
-			&& CopyRoutingAdapter::isVirtualChannel(label))
+			&& portModel.isVirtualChannel(label))
 		{
 			const QRect chip = outputRects[i];
 			const QRect xr(chip.right() - sc(7), chip.top() - sc(7), sc(14), sc(14));
@@ -489,7 +484,7 @@ void StudioRoutingView::paintEvent(QPaintEvent*)
 	if (model.allowFactors())
 	{
 		QFont labelFont(t.monoFontFamily);
-		labelFont.setPixelSize(sc(10));
+		labelFont.setPixelSize(sc(11));
 		p.setFont(labelFont);
 		for (int i = 0; i < traceShapes.size(); i++)
 		{
@@ -532,7 +527,7 @@ void StudioRoutingView::paintEvent(QPaintEvent*)
 		p.setBrush(withAlphaF(accent, fillA));
 		p.drawRoundedRect(revealRect, sc(8), sc(8));
 		QFont revealFont(t.monoFontFamily);
-		revealFont.setPixelSize(sc(11));
+		revealFont.setPixelSize(sc(12));
 		p.setFont(revealFont);
 		QColor ink = accent;
 		ink.setAlpha(revealHovered ? 255 : 200);
@@ -579,7 +574,7 @@ void StudioRoutingView::paintEvent(QPaintEvent*)
 	if (traces.isEmpty() && lit && !dragging)
 	{
 		QFont hintFont(t.fontFamily);
-		hintFont.setPixelSize(sc(11));
+		hintFont.setPixelSize(sc(12));
 		p.setFont(hintFont);
 		p.setPen(withAlphaF(QColor(t.mutedText), 0.78));
 		const QRect zone(0, sc(8) + sc(22), width(), sc(72));
@@ -620,7 +615,7 @@ int StudioRoutingView::traceAt(const QPoint& pos) const
 
 bool StudioRoutingView::chipHasTrace(bool inputRow, int index) const
 {
-	for (const StudioRoutingModel::Trace& trace : model.traces())
+	for (const RoutingGridModel::Trace& trace : model.traces())
 		if ((inputRow && trace.input == index)
 			|| (!inputRow && trace.output == index))
 			return true;
@@ -642,9 +637,7 @@ void StudioRoutingView::mousePressEvent(QMouseEvent* event)
 	if (!removeRect.isNull() && removeRect.contains(event->pos()) && removeChip >= 0)
 	{
 		const QString channel = model.outputPorts().value(removeChip);
-		for (int i = pinnedChannels.size() - 1; i >= 0; i--)
-			if (pinnedChannels[i].compare(channel, Qt::CaseInsensitive) == 0)
-				pinnedChannels.removeAt(i);
+		RoutingGridModel::removePin(pinnedChannels, channel);
 		const bool changed = model.removeChannel(channel);
 		selectedTraces.clear();
 		hoveredTrace = -1;
@@ -776,7 +769,7 @@ void StudioRoutingView::mouseReleaseEvent(QMouseEvent* event)
 
 	// Plain click: select every trace touching this chip.
 	selectedTraces.clear();
-	const QVector<StudioRoutingModel::Trace>& traces = model.traces();
+	const QVector<RoutingGridModel::Trace>& traces = model.traces();
 	for (int i = 0; i < traces.size(); i++)
 		if ((fromInput && traces[i].input == fromChip)
 			|| (!fromInput && traces[i].output == fromChip))
@@ -833,7 +826,7 @@ void StudioRoutingView::changeEvent(QEvent* event)
 
 void StudioRoutingView::openFactorEditor(int trace)
 {
-	const QVector<StudioRoutingModel::Trace>& traces = model.traces();
+	const QVector<RoutingGridModel::Trace>& traces = model.traces();
 	if (trace < 0 || trace >= traces.size())
 		return;
 
@@ -852,7 +845,7 @@ void StudioRoutingView::openFactorEditor(int trace)
 		const QPointF center = traceShapes.value(trace).path.pointAtPercent(0.5);
 		rect = QRectF(center.x() - sc(28), center.y() - sc(11), sc(56), sc(22));
 	}
-	const StudioRoutingModel::Trace& data = traces[trace];
+	const RoutingGridModel::Trace& data = traces[trace];
 	factorEditor->setGeometry(rect.toRect().adjusted(-sc(4), -sc(2), sc(4), sc(2)));
 	factorEditor->setText(QString::number(data.factor) + (data.isDecibel ? QStringLiteral(" dB") : QString()));
 	factorEditor->show();
@@ -871,7 +864,8 @@ void StudioRoutingView::commitFactorEditor()
 	const QString text = factorEditor->text();
 	factorEditor->hide();
 
-	model.setFactorText(trace, text);
+	if (!model.setFactorText(trace, text))
+		return;
 	selectedTraces.clear();
 	hoveredTrace = -1;
 	relayout();
@@ -900,15 +894,8 @@ void StudioRoutingView::commitChannelEditor()
 
 	const QString name = channelEditor->text().trimmed();
 	channelEditor->hide();
-	if (!RoutingFold::isValidChannelName(name))
-		return;
-
-	// No routingChanged: a fresh output has no sum yet, and the serializer
-	// skips empty targets. Pinning keeps the new chip lit while it has no
-	// trace yet.
-	model.addOutput(name);
-	CopyRoutingAdapter::pinChannel(pinnedChannels, name);
-	relayout();
+	if (model.addChannel(pinnedChannels, name))
+		relayout();
 }
 
 RoutingView* LightTraceRoutingRenderer::create(const vector<Assignment>& assignments,

@@ -10,11 +10,12 @@
 #include <malloc.h>
 
 #include "asio/EngineHostCore.h"
+#include "asio/HostProtocol.h"
 
 namespace eapo::asio
 {
-	ThreadHostLink::ThreadHostLink(bool proAudio)
-		: proAudio_(proAudio)
+	ThreadHostLink::ThreadHostLink(bool proAudio, uint32_t traceSlowUs)
+		: proAudio_(proAudio), traceSlowUs_(traceSlowUs)
 	{
 	}
 
@@ -36,71 +37,65 @@ namespace eapo::asio
 			return false;
 		}
 		std::memset(region_, 0, bytes);
-		for (int i = 0; i < 5; i++)
-			events_[i] = CreateEventW(nullptr, i == 4 ? TRUE : FALSE, FALSE, nullptr);
-		hostGone_ = CreateEventW(nullptr, TRUE, FALSE, nullptr);
-		producerGone_ = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+		for (unsigned i = 0; i < RingEvents::count; i++)
+		{
+			events_[i].reset(CreateEventW(nullptr, RingEvents::table[i].manualReset ? TRUE : FALSE, FALSE, nullptr));
+			if (!events_[i])
+			{
+				error = "the stream events could not be created";
+				close(session);
+				return false;
+			}
+		}
+		hostGone_.reset(CreateEventW(nullptr, TRUE, FALSE, nullptr));
+		if (!hostGone_)
+		{
+			error = "the host liveness event could not be created";
+			close(session);
+			return false;
+		}
+		producerGone_.reset(CreateEventW(nullptr, TRUE, FALSE, nullptr));
+		if (!producerGone_)
+		{
+			error = "the producer liveness event could not be created";
+			close(session);
+			return false;
+		}
 
 		session.ringBase = region_;
 		session.ringBytes = bytes;
-		session.sync.work[0] = events_[0];
-		session.sync.work[1] = events_[1];
-		session.sync.done[0] = events_[2];
-		session.sync.done[1] = events_[3];
-		session.sync.ready = events_[4];
-		session.sync.peer = hostGone_;
+		session.sync = RingEvents::toSync(events_, hostGone_.get());
 		session.hostPid = GetCurrentProcessId();
 
-		eapo::ipc::RingSync consumerSync = session.sync;
-		consumerSync.peer = producerGone_;
+		const eapo::ipc::RingSync consumerSync = RingEvents::toSync(events_, producerGone_.get());
 		kill_ = false;
+		hold_ = false;
 		ServeOptions serve;
 		serve.configPath = options.configPath;
 		serve.proAudio = proAudio_;
-		serve.spinPeriods = proAudio_ ? 1.0 : 0.0;
+		serve.traceSlowUs = traceSlowUs_;
 		serve.idleWaitMs = 100;
+		serve.readyTimeoutMs = options.readyTimeoutMs;
+		serve.abandon = &kill_;
+		serve.hold = &hold_;
 		void* base = region_;
 		thread_ = std::thread([this, base, bytes, consumerSync, serve] {
-			// The producer formats the header after open() returns; wait for
-			// Announced before validating.
-			eapo::ipc::RingHeader* header = static_cast<eapo::ipc::RingHeader*>(base);
-			while (ReadAcquire(&header->state) == static_cast<LONG>(eapo::ipc::RingState::Empty) && !kill_.load())
-			{
-				if (WaitForSingleObject(consumerSync.peer, 5) == WAIT_OBJECT_0)
-					break;
-			}
-			if (!kill_.load())
-			{
-				eapo::ipc::RingConsumer consumer(base, bytes, consumerSync);
-				if (kill_.load())
-					return;
-				ServeOptions local = serve;
-				local.abandon = &kill_;
-				EngineHostCore::serveStream(consumer, local, GetCurrentProcessId());
-			}
-			SetEvent(hostGone_);
+			EngineHostCore::attachAndServe(base, bytes, consumerSync, serve, GetCurrentProcessId());
+			SetEvent(hostGone_.get());
 		});
 		return true;
 	}
 
 	void ThreadHostLink::close(HostSession& session) noexcept
 	{
-		if (producerGone_ != nullptr)
-			SetEvent(producerGone_);
+		if (producerGone_)
+			SetEvent(producerGone_.get());
 		if (thread_.joinable())
 			thread_.join();
-		for (HANDLE& event : events_)
-		{
-			if (event != nullptr)
-				CloseHandle(event);
-			event = nullptr;
-		}
-		if (hostGone_ != nullptr)
-			CloseHandle(hostGone_);
-		if (producerGone_ != nullptr)
-			CloseHandle(producerGone_);
-		hostGone_ = nullptr;
-		producerGone_ = nullptr;
+		for (winutil::UniqueHandle& event : events_)
+			event.reset();
+		hostGone_.reset();
+		producerGone_.reset();
 		if (region_ != nullptr)
 			_aligned_free(region_);
 		region_ = nullptr;
@@ -110,5 +105,10 @@ namespace eapo::asio
 	void ThreadHostLink::killHost() noexcept
 	{
 		kill_ = true;
+	}
+
+	void ThreadHostLink::holdHost(bool held) noexcept
+	{
+		hold_ = held;
 	}
 }

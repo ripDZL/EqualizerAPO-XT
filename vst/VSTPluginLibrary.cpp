@@ -26,6 +26,7 @@
 #include "VST3HostObjects.h"
 #include "VST3RefCounted.h"
 #include "platform/windows/Win32Resource.h"
+#include "platform/windows/WindowsPath.h"
 #include "pluginterfaces/base/futils.h"
 #include "pluginterfaces/vst/ivstaudioprocessor.h"
 #include "pluginterfaces/vst/ivsthostapplication.h"
@@ -95,20 +96,23 @@ static std::mutex& instanceMapMutex()
 	return mutex;
 }
 
+static wstring canonicalAbsolutePath(const wstring& path)
+{
+	DWORD length = GetFullPathNameW(path.c_str(), 0, nullptr, nullptr);
+	if (length == 0)
+		return path;
+	vector<wchar_t> absolute(length);
+	const DWORD written = GetFullPathNameW(path.c_str(), length, absolute.data(), nullptr);
+	return written > 0 && written < length ? wstring(absolute.data(), written) : path;
+}
+
 std::shared_ptr<VSTPluginLibrary> VSTPluginLibrary::getInstance(const wstring& libPath)
 {
 	// The picker returns a bundle, but saved configurations may point at the
 	// inner module. Windows loads both as one DLL: they must share InitDll,
 	// the factory host context, and ExitDll too. Keep the original display path.
-	wstring key = resolveVST3ModulePath(libPath);
-	DWORD length = GetFullPathNameW(key.c_str(), 0, nullptr, nullptr);
-	if (length > 0)
-	{
-		vector<wchar_t> absolute(length);
-		DWORD written = GetFullPathNameW(key.c_str(), length, absolute.data(), nullptr);
-		if (written > 0 && written < length)
-			key.assign(absolute.data(), written);
-	}
+	wstring key = canonicalAbsolutePath(libPath);
+	key = canonicalAbsolutePath(resolveVST3ModulePath(key));
 	CharLowerBuffW(key.data(), static_cast<DWORD>(key.size()));
 	lock_guard<mutex> lock(instanceMapMutex());
 
@@ -154,12 +158,8 @@ wstring VSTPluginLibrary::getDefaultPluginPath()
 			// VSTPlugins folder beside the executable; installed systems have
 			// the registry value and never take this path.
 			LogFStatic(L"%s - falling back to the executable directory for VST plugins", e.getMessage().c_str());
-			wchar_t modulePath[MAX_PATH];
-			modulePath[0] = L'\0';
-			GetModuleFileNameW(nullptr, modulePath, MAX_PATH);
-			wstring exePath = modulePath;
-			size_t separator = exePath.find_last_of(L'\\');
-			defaultPluginPath = (separator != wstring::npos ? exePath.substr(0, separator) : L".") + L"\\VSTPlugins";
+			const wstring exeDirectory = pathutil::exeDirectory();
+			defaultPluginPath = (exeDirectory.empty() ? wstring(L".") : exeDirectory) + L"\\VSTPlugins";
 		}
 	}
 
@@ -173,7 +173,7 @@ std::wstring VSTPluginLibrary::getLibPath()
 
 std::wstring VSTPluginLibrary::getLoadPath()
 {
-	return loadPath;
+	return resolveVST3ModulePath(libPath);
 }
 
 bool VSTPluginLibrary::isVST3() const
@@ -311,42 +311,11 @@ VSTPluginLibrary::VSTPluginLibrary(const wstring& libPath)
 	_wsplitpath_s(libPath.c_str(), NULL, 0, NULL, 0, NULL, 0, extension, _MAX_EXT);
 	vst3PathHint = _wcsicmp(extension, L".vst3") == 0;
 	vst3 = vst3PathHint;
-	if (vst3PathHint)
-		loadPath = resolveVST3ModulePath(libPath);
+	// Bundle discovery happens only inside the judged, handle-relative walk.
 }
 
 wstring VSTPluginLibrary::resolveVST3ModulePath(const wstring& libPath)
 {
-	DWORD attributes = GetFileAttributesW(libPath.c_str());
-	if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0)
-		return libPath;
-
-#if defined(_M_ARM64)
-	const wchar_t* platformDir = L"arm64-win";
-#elif defined(_WIN64)
-	const wchar_t* platformDir = L"x86_64-win";
-#else
-	const wchar_t* platformDir = L"x86-win";
-#endif
-
-	// Audit #250 F031: the path comes from a user-written config line, and
-	// a >= MAX_PATH value used to trip wcscpy_s's invalid-parameter handler
-	// and terminate the process. Build the paths dynamically instead - a
-	// too-long path then simply fails to resolve.
-	std::wstring platformBase = libPath;
-	while (!platformBase.empty()
-		&& (platformBase.back() == L'\\' || platformBase.back() == L'/'))
-	{
-		platformBase.pop_back();
-	}
-	platformBase += L"\\Contents\\";
-	platformBase += platformDir;
-
-	WIN32_FIND_DATAW findData;
-	winutil::UniqueFindHandle find(
-		FindFirstFileW((platformBase + L"\\*.vst3").c_str(), &findData));
-	if (!find)
-		return libPath;
-
-	return platformBase + L"\\" + findData.cFileName;
+	const auto target = ConfigFileReference::library(L"", libPath, L"");
+	return target.path.empty() ? libPath : target.path.path();
 }

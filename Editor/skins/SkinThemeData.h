@@ -5,16 +5,14 @@
 */
 
 /*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-
 	The data half of the skin system: id aliases, per-skin colour/metric token
 	tables, QSS resource paths, the @TOKEN@ substitution and the token-derived
 	widget palette. Everything here is behaviour-free (no pickers, renderers or
 	chrome painters), so satellite executables - first user: DeviceSelector -
 	can compile this single unit plus the .qss resources and wear the exact
 	skin the user picked in the Editor, without linking the Editor's widget
-	stack. The full ISkin classes delegate their tokens()/qssResource() here,
-	so the tables cannot drift apart.
+	stack. The full ISkin classes delegate their tokens() here, so the tables
+	cannot drift apart.
 */
 
 #pragma once
@@ -140,6 +138,13 @@ bool modesAreDistinct(const SkinTokens& light, const SkinTokens& dark);
 // system tooltip from falling back to the platform's light defaults.
 QString tooltipOverride(const SkinTokens& tokens);
 
+// The heritage (legacy rows) palette: classic light values for the custom
+// painters that consume tokens, over Studio's light table for everything it
+// does not set. Not in the roster, because heritage is not a selectable skin;
+// it lives here so the Editor's HeritageSkin and Device Selector's heritage
+// theme read one palette.
+SkinTokens heritageTokens();
+
 // The ":/skins/..." QSS resource path for the id, honouring the historical
 // precision_* file names of the minimal skin.
 QString qssResource(const QString& id, bool dark);
@@ -151,6 +156,10 @@ QString qssResource(const QString& id, bool dark);
 // it previously had to spell the palette value out by hand, which meant a token
 // change did not reach it. QSS has no variables and its rgba() wants numbers, so
 // this is the only way a sheet can hold a token at partial alpha.
+//
+// @FONT_STACK@ and @MONO_STACK@ expand to a whole font-family value: the
+// skin's body or monospace face followed by the bundled fallback families,
+// so the ten sheets do not each spell the fallback list out.
 QString substituteTokens(QString qss, const SkinTokens& tokens);
 
 // Token-derived QPalette for the widgets QSS does not cover (item views,

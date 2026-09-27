@@ -27,6 +27,7 @@
 
 #include "vst/VSTPluginInstance.h"
 #include "vst/VSTPluginLibrary.h"
+#include "ConfigFileReference.h"
 #include "VSTPluginCommand.h"
 
 using std::vector;
@@ -38,13 +39,7 @@ wstring resolveLibraryReference(const wstring& libraryReference)
 {
 	if (libraryReference.empty())
 		return L"";
-	if (!PathIsRelativeW(libraryReference.c_str()))
-		return libraryReference;
-
-	wstring pluginPath = VSTPluginLibrary::getDefaultPluginPath();
-	while (!pluginPath.empty() && (pluginPath.back() == L'\\' || pluginPath.back() == L'/'))
-		pluginPath.pop_back();
-	return pluginPath + L"\\" + libraryReference;
+	return ConfigFileReference::resolveLibrary(VSTPluginLibrary::getDefaultPluginPath(), libraryReference);
 }
 
 wstring quoteCommandToken(const wstring& token, bool force = false)
@@ -81,6 +76,24 @@ bool parseFloatToken(const wstring& token, float& value)
 bool parseFiniteFloatToken(const wstring& token, float& value)
 {
 	return parseFloatToken(token, value) && std::isfinite(value);
+}
+
+// Whether a legacy "<key> <value>" token is a number rather than the name in
+// a "ParamName <name> <value>" triple: a digit, optionally after a sign and
+// a decimal point ("0.5", "-0.5", ".5", "+1", "-.5"). The first-digit test
+// this replaced sent "-0.5" and ".5" down the name branch, which dropped the
+// parameter and filed the next token's value under the name "-0.5" (audit
+// #348). wcstof alone would also take "inf" and "nan", which begin real
+// parameter names ("Input Gain"), so the test stays on the leading
+// characters.
+bool isLegacyNumber(const wstring& value)
+{
+	size_t at = 0;
+	if (at < value.size() && (value[at] == L'-' || value[at] == L'+'))
+		at++;
+	if (at < value.size() && value[at] == L'.')
+		at++;
+	return at < value.size() && std::iswdigit(value[at]);
 }
 
 bool splitChannelFill(const wstring& value, vector<wstring>& fill)
@@ -362,6 +375,10 @@ VSTPluginCommand VSTPluginCommand::parse(const wstring& /*configPath*/, const ws
 		}
 		else
 		{
+			// Keep the legacy shifted-token fallback, but parse every accepted
+			// numeric spelling through the finite, full-token parser. In
+			// particular, signed and leading-decimal values are valid values, not
+			// mistaken parameter names.
 			float parameterValue = 0.0f;
 			if (!parseFloatToken(value, parameterValue))
 			{

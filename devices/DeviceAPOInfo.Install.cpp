@@ -18,6 +18,7 @@
 #include "DeviceAPOInfo.h"
 #include "VoicemeeterAPOInfo.h"
 #include "DeviceAPOInfoKeys.h"
+#include "ReportedOperation.h"
 
 #include "services/logging/Logging.h"
 #include "services/registry/WindowsRegistry.h"
@@ -41,33 +42,8 @@ void DeviceAPOInfo::install()
 void DeviceAPOInfo::runReported(DeviceInstallReport::Operation operation,
 	const std::function<void(RegistryTransaction&)>& steps)
 {
-	RegistryTransaction plan(registry);
 	beginReport(operation);
-
-	try
-	{
-		steps(plan);
-	}
-	catch (const RegistryError& e)
-	{
-		failReport(plan, e.getMessage());
-		throw;
-	}
-	catch (const DeviceException& e)
-	{
-		failReport(plan, e.getMessage());
-		throw;
-	}
-	catch (...)
-	{
-		// Whatever it was, the endpoint still has to be put back and the report
-		// still has to say what happened before the caller sees the exception.
-		failReport(plan, L"an exception of an unexpected type");
-		throw;
-	}
-
-	plan.commit();
-	finishReport(plan);
+	ReportedOperation::run(registry, lastOperationReport, steps);
 }
 
 void DeviceAPOInfo::beginReport(DeviceInstallReport::Operation operation)
@@ -82,15 +58,14 @@ void DeviceAPOInfo::beginReport(DeviceInstallReport::Operation operation)
 	// originalApoGuids is what load() found on the endpoint, so it is the record
 	// of the state before this operation - which is exactly what a reader needs
 	// to understand the rest of the report.
-	report.fxPropertiesExisted = originalApoGuids[0] != APOGUID_NOKEY;
+	report.fxPropertiesExisted = hasDriverEffectChain();
 	if (report.fxPropertiesExisted)
 	{
-		static const wchar_t* const slotNames[] = {L"LFX", L"GFX", L"SFX", L"MFX", L"EFX"};
 		for (unsigned i = 0; i < allGuidValueNameCount; i++)
 		{
 			// APOGUID_NOVALUE means the slot was empty, which is not worth a line.
 			if (originalApoGuids[i] != APOGUID_NOVALUE && !originalApoGuids[i].empty())
-				report.driverSlots.push_back(wstring(slotNames[i]) + L" = " + originalApoGuids[i]);
+				report.driverSlots.push_back(wstring(apoSlotNames[i]) + L" = " + originalApoGuids[i]);
 		}
 	}
 
@@ -116,54 +91,8 @@ void DeviceAPOInfo::beginReport(DeviceInstallReport::Operation operation)
 	lastOperationReport = report;
 }
 
-void DeviceAPOInfo::finishReport(RegistryTransaction& plan)
-{
-	lastOperationReport.outcome = DeviceInstallReport::Outcome::Succeeded;
-	lastOperationReport.appliedOperations = plan.appliedOperations();
-	lastOperationReport.permissionsWidened = !plan.isFullyReversible();
-
-	// The summary is worth a log line every time: it is how a support request
-	// about a device that stopped working can be tied to the moment it was
-	// installed. The registry detail goes behind trace, because it is long and
-	// only interesting once something is wrong.
-	LogF(L"%s", lastOperationReport.toSummaryLine().c_str());
-	for (const wstring& line : lastOperationReport.toLines())
-		TraceF(L"%s", line.c_str());
-}
-
-void DeviceAPOInfo::failReport(RegistryTransaction& plan, const wstring& failure)
-{
-	// Roll back here rather than letting the destructor do it, because the
-	// report has to carry what the rollback could not put back, and the
-	// destructor runs after this function is done.
-	plan.rollback();
-
-	lastOperationReport.outcome = DeviceInstallReport::Outcome::Failed;
-	lastOperationReport.failure = failure;
-	lastOperationReport.appliedOperations = plan.appliedOperations();
-	lastOperationReport.rollbackFailures = plan.rollbackFailures();
-	lastOperationReport.permissionsWidened = !plan.isFullyReversible();
-
-	// A failure is logged in full: this is the block a user is asked for when
-	// they report that installing did nothing, and until now there was nothing
-	// to ask for.
-	for (const wstring& line : lastOperationReport.toLines())
-		LogF(L"%s", line.c_str());
-}
-
 namespace
 {
-wstring endpointWrapper32Path(const wstring& installPath)
-{
-// Every x64 package carries the Win32 wrapper. ARM64 and non-64-bit builds do
-// not, so their endpoint entries must remain in the native registry view.
-#if defined(_M_ARM64) || !defined(_WIN64)
-	return wstring();
-#else
-	return installPath + L"\\x86\\EqualizerAPOAsio.dll";
-#endif
-}
-
 std::vector<wstring> processingModesFor(bool input)
 {
 	if (input)
@@ -175,7 +104,7 @@ std::vector<wstring> processingModesFor(bool input)
 void DeviceAPOInfo::applyAsioEntry(RegistryTransaction& plan)
 {
 	removeAsioEntry(plan);
-	if (!selectedInstallState.exclusiveModeEq || (!selectedInstallState.installPreMix && !selectedInstallState.installPostMix))
+	if (!selectedInstallState.asioEntry || (!selectedInstallState.installPreMix && !selectedInstallState.installPostMix))
 		return;
 
 	// The wrapper DLL beside the product; the value the install hook writes.
@@ -195,8 +124,14 @@ void DeviceAPOInfo::applyAsioEntry(RegistryTransaction& plan)
 		record.renderEndpoint = deviceGuid;
 	record.options.processOutput = !input;
 	record.options.processInput = input;
+	eapo::asio::WrapperRecords::setEntryOptions(record, selectedInstallState.asioEntryOptions);
 	eapo::asio::WrapperRecords::write(plan, record);
-	eapo::asio::AsioRegistration::registerWrapper(plan, target, installPath + L"\\EqualizerAPOAsio.dll", endpointWrapper32Path(installPath));
+	// The 32-bit view only when asked for and when the x86 wrapper is there
+	// to point at, the same rule as an ASIO driver row's.
+	eapo::asio::AsioRegistration::registerWrapper(plan, target, eapo::asio::AsioRegistration::wrapperDllPath(installPath),
+		record.register32 && eapo::asio::AsioRegistration::wrapper32Shipped(installPath)
+			? eapo::asio::AsioRegistration::wrapper32DllPath(installPath) : L"");
+	eapo::asio::AsioRegistration::refreshAutoStart(plan, installPath);
 	lastOperationReport.asioEntry = eapo::asio::AsioRegistration::entryNameFor(target.name);
 }
 
@@ -205,6 +140,15 @@ void DeviceAPOInfo::removeAsioEntry(RegistryTransaction& plan)
 	const eapo::asio::AsioTarget target = eapo::asio::AsioRegistration::endpointTarget(deviceGuid, connectionName, deviceName);
 	eapo::asio::AsioRegistration::unregisterWrapper(plan, target);
 	eapo::asio::WrapperRecords::remove(plan, eapo::asio::AsioRegistration::wrapperClsidFor(deviceGuid));
+	// The entry may have been the last one asking for the host at boot.
+	const wstring installPath = plan.valueExists(APP_REGPATH, L"InstallPath") ? plan.readValue(APP_REGPATH, L"InstallPath") : L"";
+	eapo::asio::AsioRegistration::refreshAutoStart(plan, installPath);
+}
+
+bool DeviceAPOInfo::canHostAsio32() const
+{
+	const wstring installPath = registry.valueExists(APP_REGPATH, L"InstallPath") ? registry.readValue(APP_REGPATH, L"InstallPath") : L"";
+	return eapo::asio::AsioRegistration::wrapper32Shipped(installPath);
 }
 
 void DeviceAPOInfo::installWithin(RegistryTransaction& plan)

@@ -10,11 +10,10 @@
 
 	Deliberately NOT driven here: the full install()/uninstall() hooks
 	(they restart services, run icacls and write Public Start Menu entries
-	on the machine running the tests) and uninstallAllDeviceApos (its
-	default-device lookup goes through COM device enumeration, which
-	DeviceApoInfoTests already avoids by loading devices directly). The
-	per-device uninstall semantics are covered in DeviceApoInfoTests; the
-	pieces here are the registry role those hooks delegate to.
+	on the machine running the tests). The device sweep they call,
+	uninstallAllDeviceApos, takes an injected default-device lookup and is
+	driven in DeviceApoInfoTests next to the per-device uninstall semantics;
+	the pieces here are the registry role those hooks delegate to.
 
 	String comparisons use expect(a == b): the harness's expectEqual
 	streams its operands into a narrow ostream, which std::wstring cannot.
@@ -31,7 +30,9 @@
 #include "services/registry/WindowsRegistry.h"
 #include "Tests/TestHarness.h"
 
-#include "FakeRegistry.h"
+#include "Tests/FakeRegistry.h"
+
+#include "EngineOrchestrationTestSupport.h"
 
 namespace
 {
@@ -41,14 +42,11 @@ const std::wstring appKey = APP_REGPATH;
 const std::wstring audioKey = L"HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Audio";
 
 // A scratch directory for the F034 contract (ConfigPath must exist when the
-// registry role reports Success). Callers remove it when done.
+// registry role reports Success). The folder does not exist yet: the
+// registry role has to create it. Callers remove it when done.
 std::wstring makeScratchDir()
 {
-	wchar_t tempPath[MAX_PATH] = {};
-	if (GetTempPathW(MAX_PATH, tempPath) == 0)
-		return std::wstring();
-	return std::wstring(tempPath) + L"eapo-aporeg-test-"
-		+ std::to_wstring(GetCurrentProcessId());
+	return testDirectory() + L"\\aporeg-config";
 }
 
 void removeScratchDir(const std::wstring& dir)
@@ -181,6 +179,12 @@ void testClsidTreeFailuresReachTheCallerForRollback(test::Harness& harness)
 
 void runApoRegistrationTests(test::Harness& harness)
 {
+	harness.expect(ApoRegistration::shouldGrantInstallAccess(),
+		"already-elevated install with no hand-off keeps both legacy grants");
+	harness.expect(ApoRegistration::shouldGrantInstallAccess(false),
+		"failed or absent preparation keeps both legacy grants");
+	harness.expectFalse(ApoRegistration::shouldGrantInstallAccess(true),
+		"prepared install skips both elevated recursive grants");
 	testInstallRegistryWritesTheAppVocabulary(harness);
 	testInstallRegistryNeverOverwritesUserValues(harness);
 	testCleanupRemovesTheFlagButOnlyEmptyKeys(harness);

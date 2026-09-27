@@ -21,8 +21,8 @@
 
 #include <vector>
 
+#include "dsp/DelayLine.h"
 #include "engine/IFilter.h"
-#include "runtime/memory/AlignedMemory.h"
 
 #pragma AVRT_VTABLES_BEGIN
 class DelayFilter : public IFilter
@@ -34,15 +34,10 @@ public:
 	std::vector<std::wstring> initialize(float sampleRate, unsigned maxFrameCount, std::vector<std::wstring> channelNames) override;
 	void process(double** output, double** input, unsigned frameCount) override;
 
-	double getDelay() const;
-	bool getIsMs() const;
-
 private:
 	double delay;
 	bool isMs;
-	unsigned bufferLength = 0;
 	unsigned channelCount = 0;
-	std::vector<AlignedMemory::UniqueAllocation<double>> buffers;
-	unsigned bufferOffset = 0;
+	DelayLine delayLine;
 };
 #pragma AVRT_VTABLES_END

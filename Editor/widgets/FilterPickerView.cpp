@@ -4,10 +4,6 @@
 	SPDX-License-Identifier: GPL-2.0-or-later
 */
 
-/*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-*/
-
 #include "FilterPickerView.h"
 
 #include <QApplication>
@@ -17,7 +13,6 @@
 #include <QMouseEvent>
 #include <QVBoxLayout>
 
-#include "Editor/helpers/GUIHelper.h"
 #include "FilterCommandCatalog.h"
 
 QString filterTemplateDescription(const QString& rawLine)
@@ -193,8 +188,8 @@ DefaultFilterPickerView::DefaultFilterPickerView(QWidget* parent)
 	layout->addWidget(listWidget, 1);
 	bindListPicker(searchEdit, listWidget, Qt::UserRole, [this]() { rebuildList(); });
 
-	setMinimumWidth(GUIHelper::scale(300.0));
-	setMaximumHeight(GUIHelper::scale(420.0));
+	setMinimumWidth(300);
+	setMaximumHeight(420);
 }
 
 void DefaultFilterPickerView::entriesChanged()

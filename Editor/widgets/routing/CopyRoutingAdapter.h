@@ -5,8 +5,6 @@
 */
 
 /*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-
 	CopyRoutingAdapter is the single, skin-independent place that converts a
 	Copy command's parameter string to/from the engine's std::vector<Assignment>
 	(filters/CopyFilter.h) and derives a display-oriented crosspoint matrix view
@@ -41,13 +39,9 @@ public:
 		const QString& channel);
 	static void pinChannel(QStringList& pinnedChannels, const QString& channel);
 
-	// True for channels that are not part of the standard physical layout
-	// (the upmix scratch channels such as VSL/VRR). Used to style them as
-	// dashed "virtual" badges.
-	static bool isVirtualChannel(const QString& channel);
-
 	// Fixed display colour for a channel (physical channels have a stable hue;
-	// virtual channels reuse their base colour or a neutral slate).
+	// virtual channels reuse their base colour or a neutral slate). Forwards
+	// to ChannelIdentity, the palette the header badges share.
 	static QString channelColor(const QString& channel);
 
 	// ── Crosspoint matrix view ─────────────────────────────────────────────

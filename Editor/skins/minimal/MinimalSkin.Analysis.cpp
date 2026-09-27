@@ -4,10 +4,6 @@
 	SPDX-License-Identifier: GPL-2.0-or-later
 */
 
-/*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-*/
-
 #include "MinimalSkin.h"
 
 #include <QFontMetrics>
@@ -164,7 +160,7 @@ void MinimalSkin::paintAnalysisGraph(QPainter& painter, const AnalysisGraphState
 	// both finishes - a terminal's error field is dim red, not neon.
 	QPainterPath overshoot;
 	const bool overshootValid = state.clipping && state.zeroY > plotTop + 1.0;
-	const bool darkSheet = ground.lightness() < 128;
+	const bool darkSheet = tokens.dark;
 	if (overshootValid)
 	{
 		// One closed block per printed piece of the trace. Clipping is a

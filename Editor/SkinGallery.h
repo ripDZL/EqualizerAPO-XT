@@ -5,8 +5,6 @@
 */
 
 /*
-	This file is part of EqualizerAPO-XT, a system-wide equalizer.
-
 	Offscreen screenshot gallery for the skin program. For each requested skin
 	and dark/light mode it renders representative filter card rows (a simple
 	filter, a shelf filter with its three knobs, an Include row, a VST row) in
@@ -17,6 +15,9 @@
 	--skin-gallery <outDir> [--skin-gallery-skins id,id,...]. Used by the skin
 	agents and CI to prove appearance-preserving changes (pixel-identical
 	before/after) and to build judging contact sheets.
+
+	The implementation lives in Editor/gallery/, one file per scene family,
+	over the shared scaffolding in gallery/GallerySupport.h.
 */
 
 #pragma once
@@ -109,6 +110,12 @@ bool armAnalysisLayoutProbe(MainWindow& window, const QString& screenshotPath);
 // dock, walks the five skins on the live MainWindow and reports dock
 // minimums plus the physical font face serving Korean chrome text.
 bool armSkinMetricsProbe(MainWindow& window);
+
+// Entry point behind --window-shot <outDir> (diagnostic): grabs the live
+// MainWindow, loaded from the positional config, once per skin and mode
+// (dark/light) for whole-window composition reviews. Restores the user's
+// skin choice before exiting.
+bool armWindowShotProbe(MainWindow& window, const QStringList& arguments);
 
 // Entry point behind --knob-specimen <outDir> (diagnostic): paints a
 // skin's knob for staged states at 3x and 1x, dark and light.

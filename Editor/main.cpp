@@ -20,12 +20,12 @@
 #include <cstdio>
 #include <cstdlib>
 #include "text/WideString.h"
-#include "platform/windows/TextEncoding.h"
 #include "services/registry/RegistryPaths.h"
 #include <cstring>
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include <QTranslator>
 #include <QApplication>
@@ -63,6 +63,8 @@
 #include "vst/VSTPluginInstance.h"
 #include "vst/VSTPluginLibrary.h"
 #include "services/logging/Logging.h"
+#include "services/logging/TaggedLogger.h"
+#include "platform/windows/CommandLineQuoting.h"
 #include "runtime/memory/AlignedMemory.h"
 #include "services/install/ApoRegistration.h"
 #include "services/registry/WindowsRegistry.h"
@@ -74,10 +76,10 @@
 #include "services/update/VelopackBootstrap.h"
 #include "dsp/FftwPlanningPolicy.h"
 #include "version.h"
-#include "helpers/QtAppBootstrap.h"
+#include "platform/qt/QtAppBootstrap.h"
 #include "Editor/helpers/CrashHandler.h"
 #include "Editor/helpers/GUIHelper.h"
-#include "Editor/helpers/EditorSettings.h"
+#include "services/settings/EditorSettings.h"
 #include "Editor/skins/SkinThemeData.h"
 #include "Editor/widgets/ThemeEditorDialog.h"
 
@@ -85,7 +87,7 @@
 namespace
 {
 // The VST round-trip self test lives with the other offscreen gates in
-// SkinGallery.cpp (audit #275 B7).
+// Editor/gallery/GallerySelfTests.cpp (audit #275 B7).
 
 bool matchesHook(const char* arg, const char* name)
 {
@@ -120,39 +122,21 @@ std::string configuredUpdateChannel()
 #endif
 }
 
-std::wstring widenArg(const char* arg)
-{
-	if (arg == nullptr)
-		return std::wstring();
-	return wintext::toWideString(std::string(arg), CP_UTF8);
-}
+constexpr logging::TaggedLogger logLine(L"Editor");
 
-std::wstring buildArgumentLine(int argc, char* argv[])
+// This process's arguments after the program name, as the command line
+// carried them. The CRT's argv is in the ANSI code page, so a path it could
+// not represent was already lost before any widening (audit #348 TD-53).
+std::vector<std::wstring> wideArgumentsAfterProgramName()
 {
-	std::wstring line;
+	std::vector<std::wstring> arguments;
+	int argc = 0;
+	winutil::UniqueLocalPtr<wchar_t*> argv(CommandLineToArgvW(GetCommandLineW(), &argc));
+	if (!argv)
+		return arguments;
 	for (int i = 1; i < argc; i++)
-	{
-		std::wstring piece = widenArg(argv[i]);
-		if (i > 1)
-			line.push_back(L' ');
-		bool needsQuote = piece.empty() || piece.find_first_of(L" \t\"") != std::wstring::npos;
-		if (needsQuote)
-		{
-			line.push_back(L'"');
-			for (wchar_t ch : piece)
-			{
-				if (ch == L'"')
-					line.push_back(L'\\');
-				line.push_back(ch);
-			}
-			line.push_back(L'"');
-		}
-		else
-		{
-			line += piece;
-		}
-	}
-	return line;
+		arguments.push_back(argv.get()[i]);
+	return arguments;
 }
 
 // Re-launches this exe elevated with the same arguments, waits, and returns
@@ -160,16 +144,36 @@ std::wstring buildArgumentLine(int argc, char* argv[])
 // user's security context, while APO registration needs HKLM access. The
 // Editor's in-app update path elevates Update.exe once before either update
 // hook, so this per-hook fallback is not reached during that flow.
-int relaunchElevatedAndWait(int argc, char* argv[])
+int relaunchElevatedAndWait()
 {
 	std::wstring exePath = pathutil::exePath();
 	if (exePath.empty())
 	{
-		LogFStatic(L"[Editor] GetModuleFileName failed (gle=%lu)", GetLastError());
+		logLine(L"ERR", L"GetModuleFileName failed (gle=%lu)", GetLastError());
 		return 1;
 	}
 
-	std::wstring parameters = buildArgumentLine(argc, argv);
+	auto arguments = wideArgumentsAfterProgramName();
+	// Last occurrence wins on the elevated side, so an incoming value cannot
+	// override the environment of the process actually requesting elevation.
+	if (std::find(arguments.begin(), arguments.end(), L"--veloapp-install") != arguments.end()
+		|| std::find(arguments.begin(), arguments.end(), L"--veloapp-updated") != arguments.end())
+	{
+		EqAPO::Import::LegacyMigration::Handoff details;
+		const auto outcome = EqAPO::Import::LegacyMigration::prepareHookStep(pathutil::exeDirectory(), &details);
+		logLine(L"INFO", L"Unelevated migration preparation: %s", outcome.c_str());
+		arguments.push_back(L"--caller-localappdata");
+		arguments.push_back(qEnvironmentVariable("LOCALAPPDATA").toStdWString());
+		arguments.push_back(L"--caller-migration-outcome");
+		arguments.push_back(outcome);
+		arguments.push_back(L"--caller-migrated-from");
+		arguments.push_back(details.migratedFrom);
+		arguments.push_back(L"--caller-migrated-files");
+		arguments.push_back(details.migratedFiles);
+		arguments.push_back(L"--caller-install-grants-prepared");
+		arguments.push_back(details.installGrantsPrepared ? L"1" : L"0");
+	}
+	std::wstring parameters = winutil::joinCommandLineArguments(arguments);
 
 	SHELLEXECUTEINFOW info;
 	ZeroMemory(&info, sizeof(info));
@@ -183,7 +187,7 @@ int relaunchElevatedAndWait(int argc, char* argv[])
 	if (!ShellExecuteExW(&info))
 	{
 		DWORD gle = GetLastError();
-		LogFStatic(L"[Editor] ShellExecuteEx(runas) failed (gle=%lu)", gle);
+		logLine(L"ERR", L"ShellExecuteEx(runas) failed (gle=%lu)", gle);
 		// ERROR_CANCELLED (1223) means the user declined UAC.
 		return gle == ERROR_CANCELLED ? 1223 : 1;
 	}
@@ -213,7 +217,9 @@ int handleVelopackHook(int argc, char* argv[])
 		return -1;
 
 	if (!AudioEngineAccess::isElevated())
-		return relaunchElevatedAndWait(argc, argv);
+		return relaunchElevatedAndWait();
+
+	const auto callerLocalAppData = EqAPO::Import::LegacyMigration::parseHandoff(wideArgumentsAfterProgramName());
 
 	for (int i = 1; i < argc; i++)
 	{
@@ -224,19 +230,19 @@ int handleVelopackHook(int argc, char* argv[])
 		std::wstring exeDir = pathutil::exeDirectory();
 		if (matchesHook(arg, "--veloapp-install"))
 		{
-			auto rc = ApoRegistration::install(exeDir);
+			auto rc = ApoRegistration::install(exeDir, systemRegistry(), callerLocalAppData.installGrantsPrepared);
 			// The trusted config root: adopt the stable folder, or migrate a
 			// legacy Equalizer APO / volatile current\config tree into it.
 			if (rc == ApoRegistration::Result::Success)
-				EqAPO::Import::LegacyMigration::runElevatedHookStep(exeDir);
+				EqAPO::Import::LegacyMigration::runElevatedHookStep(exeDir, callerLocalAppData);
 			return rc == ApoRegistration::Result::Success ? 0 : static_cast<int>(rc);
 		}
 		if (matchesHook(arg, "--veloapp-updated"))
 		{
 			ApoRegistration::stopAudioService();
-			auto rc = ApoRegistration::install(exeDir);
+			auto rc = ApoRegistration::install(exeDir, systemRegistry(), callerLocalAppData.installGrantsPrepared);
 			if (rc == ApoRegistration::Result::Success)
-				EqAPO::Import::LegacyMigration::runElevatedHookStep(exeDir);
+				EqAPO::Import::LegacyMigration::runElevatedHookStep(exeDir, callerLocalAppData);
 			ApoRegistration::startAudioService();
 			return rc == ApoRegistration::Result::Success ? 0 : static_cast<int>(rc);
 		}
@@ -247,8 +253,24 @@ int handleVelopackHook(int argc, char* argv[])
 		}
 		if (matchesHook(arg, "--veloapp-uninstall"))
 		{
-			auto rc = ApoRegistration::uninstall(exeDir);
-			return rc == ApoRegistration::Result::Success ? 0 : static_cast<int>(rc);
+			// The device sweep reports per-item failures and does not throw
+			// them, and uninstall() restarts the audio service on every path;
+			// this guard keeps anything else from ending the hook in the crash
+			// handler instead of with an exit code (audit #348 TD-02).
+			try
+			{
+				auto rc = ApoRegistration::uninstall(exeDir);
+				return rc == ApoRegistration::Result::Success ? 0 : static_cast<int>(rc);
+			}
+			catch (const RegistryError& e)
+			{
+				logLine(L"ERR", L"uninstall hook failed: %s", e.getMessage().c_str());
+			}
+			catch (const std::exception& e)
+			{
+				logLine(L"ERR", L"uninstall hook failed: %S", e.what());
+			}
+			return static_cast<int>(ApoRegistration::Result::DeviceUninstallFailed);
 		}
 	}
 	return -1;
@@ -256,14 +278,18 @@ int handleVelopackHook(int argc, char* argv[])
 
 void launchDeviceSelector(const std::wstring& exeDir)
 {
-	std::wstring deviceSelector = exeDir;
-	if (!deviceSelector.empty() && deviceSelector.back() != L'\\' && deviceSelector.back() != L'/')
-		deviceSelector.push_back(L'\\');
-	deviceSelector += L"DeviceSelector.exe";
+	const std::wstring deviceSelector = pathutil::joinPath(exeDir, L"DeviceSelector.exe");
 
 	HINSTANCE result = ShellExecuteW(nullptr, L"open", deviceSelector.c_str(), L"/i", exeDir.c_str(), SW_SHOWNORMAL);
+	// The Editor is a GUI-subsystem program, so the stderr line this used to
+	// write went nowhere and a first run that never opened the Device Selector
+	// left no trace (audit #348 TD-49).
 	if (reinterpret_cast<INT_PTR>(result) <= 32)
-		fwprintf(stderr, L"DeviceSelector launch failed (code=%lld)\n", static_cast<long long>(reinterpret_cast<INT_PTR>(result)));
+	{
+		const DWORD gle = GetLastError();
+		logLine(L"ERR", L"DeviceSelector launch failed for %s (code=%lld, gle=%lu)", deviceSelector.c_str(),
+			static_cast<long long>(reinterpret_cast<INT_PTR>(result)), gle);
+	}
 }
 }
 
@@ -284,6 +310,7 @@ int main(int argc, char* argv[])
 	// coordinator writes, so there is one place to look rather than two.
 	if (!Logging::useUserFile(L"Editor.log", true, false, false))
 		Logging::useDefaultApoLog();
+	QtAppBootstrap::installMessageHandler();
 
 	int hookResult = handleVelopackHook(argc, argv);
 	if (hookResult >= 0)
@@ -302,10 +329,10 @@ int main(int argc, char* argv[])
 		const std::wstring reportPath = InstallDiagnostics::writeReport();
 		if (reportPath.empty())
 		{
-			LogFStatic(L"[Editor] the diagnostics report could not be written");
+			logLine(L"ERR", L"the diagnostics report could not be written");
 			return 1;
 		}
-		LogFStatic(L"[Editor] diagnostics written to %s", reportPath.c_str());
+		logLine(L"INFO", L"diagnostics written to %s", reportPath.c_str());
 		return 0;
 	}
 
@@ -342,18 +369,24 @@ int main(int argc, char* argv[])
 	FftwPlanningPolicy::ensurePlannerThreadSafe();
 
 	// Anchor the Qt plugin search to the executable's directory; shared with
-	// DeviceSelector and UpdateChecker.
+	// DeviceSelector.
 	QtAppBootstrap::addExecutableRelativePluginPath();
 
 	// High-DPI: let Qt scale the whole UI by the monitor's device pixel ratio,
-	// and pin the logical DPI to 96 (AA_Use96Dpi) so GUIHelper::scale becomes a
-	// no-op — Qt's device pixel ratio is then the single scaling source and we
-	// avoid double scaling. PassThrough keeps fractional factors like 150%
+	// and pin the logical DPI to 96 (AA_Use96Dpi) so the code's pixel values need
+	// no DPI factor of their own — Qt's device pixel ratio is then the single
+	// scaling source and we avoid double scaling (the GUIHelper::scale helpers
+	// were identities under this and are gone, audit #348 F7). PassThrough keeps
+	// fractional factors like 150%
 	// exact instead of rounding them to 100%/200%.
 	QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
 	QCoreApplication::setAttribute(Qt::AA_Use96Dpi);
 
 	bool restart;
+	// Velopack reports the first run for the whole process, so an in-process
+	// restart (language or interface-mode switch) of the first session used
+	// to open Device Selector a second time (audit #348).
+	bool firstRunHandled = false;
 	do
 	{
 		// LegacyRows is a whole presentation, not just a row widget: the
@@ -480,15 +513,9 @@ int main(int argc, char* argv[])
 		QTranslator editorTranslator;
 		QtAppBootstrap::installTranslators(application, QStringLiteral("Editor"), qtTranslator, editorTranslator);
 
-		// Without a registry value the old fallback was the process CWD, which
-		// silently edits whatever folder the Editor was launched from; prefer
-		// the stable XT config root when it exists.
-		QString stableRoot = EqAPO::Import::LegacyMigration::stableConfigRoot();
-		QString configPath = !stableRoot.isEmpty() && QDir(stableRoot).exists()
-			? stableRoot : QDir::currentPath();
-		if (systemRegistry().keyExists(APP_REGPATH) && systemRegistry().valueExists(APP_REGPATH, L"ConfigPath"))
-			configPath = QString::fromStdWString(systemRegistry().readValue(APP_REGPATH, L"ConfigPath"));
-		QDir configDir(configPath);
+		// HKLM ConfigPath, else the stable XT config root, else the working
+		// directory: the same rule the file dialog's sidebar uses.
+		QDir configDir(EqAPO::Import::LegacyMigration::configRoot(systemRegistry()));
 
 		if (!systemRegistry().keyExists(USER_REGPATH))
 			systemRegistry().createKey(USER_REGPATH);
@@ -499,8 +526,11 @@ int main(int argc, char* argv[])
 		if (!systemRegistry().keyExists(EDITOR_PER_FILE_REGPATH))
 			systemRegistry().createKey(EDITOR_PER_FILE_REGPATH);
 
+		// The analysis-layout and window-shot probes ignore saved geometry, dock
+		// layout and open files, then load only the positional config.
 		const bool analysisLayoutTestRequested =
-			application.arguments().contains(QStringLiteral("--analysis-layout-test"));
+			application.arguments().contains(QStringLiteral("--analysis-layout-test"))
+			|| application.arguments().contains(QStringLiteral("--window-shot"));
 		MainWindow w(configDir, updateSession.get(), nullptr, analysisLayoutTestRequested);
 		w.show();
 
@@ -531,6 +561,20 @@ int main(int argc, char* argv[])
 		vstPanelFeedOption.setValueName(QStringLiteral("durationMs"));
 		vstPanelFeedOption.setFlags(QCommandLineOption::HiddenFromHelp);
 		parser.addOption(vstPanelFeedOption);
+		// Whole-window captures per skin/mode (SkinGallery::armWindowShotProbe);
+		// the sub-options are registered so the parser accepts them.
+		QCommandLineOption windowShotOption(QStringLiteral("window-shot"));
+		windowShotOption.setValueName(QStringLiteral("outDir"));
+		windowShotOption.setFlags(QCommandLineOption::HiddenFromHelp);
+		parser.addOption(windowShotOption);
+		for (const char* name : { "window-shot-skins", "window-shot-modes", "window-shot-dock",
+			"window-shot-width", "window-shot-height", "window-shot-dock-size", "window-shot-select" })
+		{
+			QCommandLineOption sub(QString::fromLatin1(name));
+			sub.setValueName(QStringLiteral("value"));
+			sub.setFlags(QCommandLineOption::HiddenFromHelp);
+			parser.addOption(sub);
+		}
 		parser.process(application);
 		QStringList args = parser.positionalArguments();
 		if (!analysisLayoutTestRequested && args.isEmpty() && w.isEmpty())
@@ -539,11 +583,11 @@ int main(int argc, char* argv[])
 		for (const QString& arg : args)
 			w.load(configDir.absoluteFilePath(arg));
 
-		bool firstRun = VelopackBootstrap::isFirstRun();
+		const bool firstRun = !firstRunHandled && VelopackBootstrap::isFirstRun();
 		if (parser.isSet(analysisLayoutOption))
 		{
 			// The probe itself lives with the other offscreen gates in
-			// SkinGallery.cpp (audit #275 B7); it arms the timers and later
+			// Editor/gallery/GalleryProbes.cpp (audit #275 B7); it arms the timers and later
 			// exits the event loop with the verdict.
 			if (!SkinGallery::armAnalysisLayoutProbe(w, parser.value(analysisLayoutOption)))
 				return 1;
@@ -551,6 +595,11 @@ int main(int argc, char* argv[])
 		else if (parser.isSet(skinMetricsOption))
 		{
 			if (!SkinGallery::armSkinMetricsProbe(w))
+				return 1;
+		}
+		else if (parser.isSet(windowShotOption))
+		{
+			if (!SkinGallery::armWindowShotProbe(w, application.arguments()))
 				return 1;
 		}
 		else if (parser.isSet(vstPanelFeedOption))
@@ -563,7 +612,10 @@ int main(int argc, char* argv[])
 		else if (parser.isSet(stormOption))
 			SkinSwitchStorm::run(w);  // storm sessions skip doChecks: its modal warnings would stall the timer
 		else if (firstRun)
+		{
 			launchDeviceSelector(pathutil::exeDirectory());
+			firstRunHandled = true;
+		}
 		else
 			w.doChecks();
 
@@ -604,7 +656,7 @@ int main(int argc, char* argv[])
 			return 0;
 		}
 		if (outcome == UpdateApplyOutcome::Failed)
-			LogFStatic(L"[Editor] staged update could not be applied");
+			logLine(L"ERR", L"staged update could not be applied");
 	}
 
 	return result;
