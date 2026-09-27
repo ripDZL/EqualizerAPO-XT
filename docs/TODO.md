@@ -6,7 +6,7 @@
 
 - [x] Reproduce and repair the Minimal-derived Legacy Preamp striped-drum regression with a deterministic 100x66 knob specimen. The legacy host now requests the token-aware precision dial and rotary drag; 112 dark/light specimen renders and Theme Lab pass.
 - [x] Install the v2.54.31 UI follow-up as an Editor-only overlay at the exact AVX-512 Program Files target, with a rollback copy and before/after hashes proving config, engine, VST3 routing, and Qt platform unchanged.
-- [x] User manually verified the installed Preamp overlay: the Minimal-derived Legacy dial is clear, circular, and usable. User approved updating `beta`.
+- [x] User manually verified the installed Preamp overlay: the Minimal-derived Legacy dial is clear, circular, and usable. The tested merge `a44d03f5` is pushed to `beta`.
 - [ ] Retain the separate real VST3-chain, microphone-continuity, and latency acceptance before any `main` promotion or release.
 
 - [x] Reproduce and repair VST3 path-alias lifetime, explicit processing rejection, and optional startup-notification bugs; 170 host checks and real RNNoise/FabFilter/Clear OSS synthetic mono tests pass.

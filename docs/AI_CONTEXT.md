@@ -1,6 +1,6 @@
 # AI Context
 
-- 2026-09-27 manual UI acceptance: user confirmed the Editor-only Legacy Preamp dial overlay looks good. The candidate is approved to update `beta`; preserve the separate VST3/microphone/latency acceptance boundary before any later `main` promotion or release.
+- 2026-09-27 manual UI acceptance and beta promotion: user confirmed the Editor-only Legacy Preamp dial overlay looks good. The tested v2.54.31 merge was committed as `a44d03f5` and normal-fast-forward pushed to `origin/beta` from `26e2a0bb`; no `main` or release action. Preserve the separate VST3/microphone/latency acceptance boundary before any later `main` promotion or release.
 
 - 2026-09-27 user-approved UI follow-up overlay: backed up the installed `Editor.exe` to `artifacts\install-backups\v25431-legacy-preamp-knob-20260927-114913`, then replaced only `C:\Program Files\EqualizerAPO-XT-x64-avx512\current\Editor.exe` with the rebuilt AVX-512 `2.54.31.0` file (installed SHA-256 `58F29C2069A0855CF8889DCA87B1E4C865BBCD9139BD06B8A66C881E99850973`). `config.txt`, `EqualizerAPO.dll`, VST3 routing bundle, and Qt platform DLL remain hash-identical; Windows Audio stayed Running and no Editor was launched. Manual gate: inspect the Preamp dial in Minimal-derived Legacy themes and retain the existing VST3/microphone/latency acceptance before any beta/main/release action.
 

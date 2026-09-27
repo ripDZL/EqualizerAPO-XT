@@ -1,6 +1,6 @@
 # Session Summary
 
-- 2026-09-27: User manually checked the installed Legacy Preamp dial overlay and reported it good, then authorized updating the fork branch. The candidate can now be committed and fast-forward-pushed to `beta`; do not promote `main` or release because the broader VST3/microphone/latency acceptance remains separate.
+- 2026-09-27: User manually checked the installed Legacy Preamp dial overlay and reported it good, then authorized updating the fork branch. Committed the candidate as merge `a44d03f5` and normal-fast-forward pushed `origin/beta` from `26e2a0bb`; no `main` or release change. The broader VST3/microphone/latency acceptance remains separate.
 
 - 2026-09-27: User approved the local UI follow-up installation. With Editor closed, created `artifacts\install-backups\v25431-legacy-preamp-knob-20260927-114913\Editor.exe` and overlaid only the rebuilt AVX-512 `Editor.exe` at `C:\Program Files\EqualizerAPO-XT-x64-avx512\current\Editor.exe`. Its version remains `2.54.31.0`; installed SHA-256 `58F29C2069A0855CF8889DCA87B1E4C865BBCD9139BD06B8A66C881E99850973` equals the candidate. `config.txt`, `EqualizerAPO.dll`, VST3 routing, and `qwindows.dll` are hash-identical before/after; Windows Audio is Running and no product process was started. Next: user manually switch through Minimal-derived Legacy themes and confirm each Preamp dial is round/readable with rotary drag. Existing VST3/microphone/latency gate remains; do not push beta, touch main, or release without separate approval.
 
