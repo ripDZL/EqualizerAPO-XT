@@ -1,8 +1,10 @@
 # TODO
 
+- [ ] Push the 2026-09-30 `2.54.31.0` CI-only repair from `codex/v25431-build-fix` to beta normally, dispatch all six variants, and require exact-commit green CI. No main/release/install authority in this request; keep newer v2.54.32/33 local work separate.
+
 - [x] Integrate tagged upstream `v2.54.31` (`00f578cd`) into isolated local candidate `codex/upstream-v25431-beta` over `origin/beta` `26e2a0bb`, retaining fork VST recovery, selected-endpoint preview, themes, and distribution identity. Local native/UI/gallery validation is green.
 - [x] Package and install-test the v2.54.31 candidate: the unsigned local AVX-512 MSI is hash-verified at `C:\Program Files\EqualizerAPO-XT-x64-avx512\current`; config and update-pause marker are preserved, and Windows Audio is Running.
-- [ ] User manually test installed v2.54.31: real VST3 chain (including conflicting plug-ins), selected-microphone live preview, microphone continuity in recording/chat apps, and latency. Do not push beta, touch `main`, or create a release until accepted.
+- [ ] User manually test installed v2.54.31: real VST3 chain (including conflicting plug-ins), selected-microphone live preview, microphone continuity in recording/chat apps, and latency. Beta CI-only push/build is explicitly approved; do not promote `main` or create a release until accepted and separately approved.
 
 - [x] Reproduce and repair the Minimal-derived Legacy Preamp striped-drum regression with a deterministic 100x66 knob specimen. The legacy host now requests the token-aware precision dial and rotary drag; 112 dark/light specimen renders and Theme Lab pass.
 - [x] Install the v2.54.31 UI follow-up as an Editor-only overlay at the exact AVX-512 Program Files target, with a rollback copy and before/after hashes proving config, engine, VST3 routing, and Qt platform unchanged.

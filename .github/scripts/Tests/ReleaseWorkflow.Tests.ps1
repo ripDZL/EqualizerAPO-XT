@@ -18,8 +18,18 @@ Describe "release workflow target commit" {
     It "allows a manually versioned main build to publish after a skipped version bump" {
         $releaseBlock = [regex]::Match($workflow, "(?ms)^\s{2}create-release:.*?^\s{4}permissions:")
         $releaseBlock.Success | Should -BeTrue
-        $condition = "(?s)if:\s*always\(\)\s*&&\s*github\.event_name\s*==\s*'push'\s*&&\s*github\.ref\s*==\s*'refs/heads/main'\s*&&\s*needs\.build\.result\s*==\s*'success'"
+        # YAML's folded scalar marker is formatting, not part of the condition.
+        $condition = "(?s)if:\s*(?:>-\s*)?always\(\)\s*&&\s*github\.event_name\s*==\s*'push'\s*&&\s*github\.ref\s*==\s*'refs/heads/main'\s*&&\s*needs\.build\.result\s*==\s*'success'"
         [regex]::IsMatch($releaseBlock.Value, $condition) | Should -BeTrue
+        $releaseBlock.Value | Should -Match "\(\s*needs\.version-bump\.result\s*==\s*'success'\s*\|\|\s*needs\.version-bump\.result\s*==\s*'skipped'\s*\)"
+    }
+
+    It "requires every blocking gate to pass before publishing" {
+        $releaseBlock = [regex]::Match($workflow, "(?ms)^\s{2}create-release:.*?^\s{4}permissions:")
+        $releaseBlock.Success | Should -BeTrue
+        foreach ($gate in @("build", "memcheck", "capture-gate", "cppcheck", "pester")) {
+            $releaseBlock.Value | Should -Match "&&\s*needs\.$gate\.result\s*==\s*'success'"
+        }
     }
 
     It "builds a same-version prerelease promotion even when version.h is unchanged" {

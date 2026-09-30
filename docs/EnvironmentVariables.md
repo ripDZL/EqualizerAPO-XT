@@ -32,6 +32,10 @@ them unset.
   `EAPO_GALLERY_VST3_UPMIXER` — the test plug-ins the gallery's VST cards
   load (`TestVst2Plugin`, `TestVst3Plugin`, and a copy of the latter named
   `Upmixer.vst3`); `Invoke-EditorOffscreenTest.ps1` sets them.
+- `EAPO_VST3_EDITOR_PANEL_PROBE` — an existing VST3 plug-in path for
+  `--selftest-vst3-panel`, which exercises both Legacy and Modern Open panel
+  actions. Use the Windows Qt backend; offscreen cannot observe the native
+  modal panel. This variable has no effect during normal Editor startup.
 
 ## Editor field switches
 

@@ -1,5 +1,8 @@
 # Progress
 
+- [x] 2026-09-30 reproduced all three beta run `36356683619` blockers locally. Documented `EAPO_VST3_EDITOR_PANEL_PROBE`; release-workflow tests accept folded YAML while explicitly retaining every success gate and the skipped-version-bump allowance; endpoint ASIO tests pin default native-only registration, explicit x86 opt-in, and no dangling registration when the DLL is absent. No production source/version change.
+- [x] Local beta repair preflight: Pester 5.6.1 147/147; SourceSync, VariantSync, SkinModules; all five memory suites under v143 ASan (Engine 1,732, Asio 513, audio regressions 31/31, all engine allocation balances zero). Evidence: ignored `artifacts/ci-preflight/memcheck-v143.log`. Exact six-variant v145/ARM64 CI remains the next gate; live plug-in preview remains unverified.
+
 - [x] 2026-09-27 user manually accepted the Minimal-derived Legacy Preamp dial overlay as good. Committed the tested v2.54.31 merge as `a44d03f5` and normal-fast-forward pushed it to `origin/beta`; `main` and releases remain untouched. The separate VST3/microphone/latency acceptance remains required before either.
 
 - [x] 2026-09-27 installed the user-approved AVX-512 UI follow-up as an Editor-only overlay at `C:\Program Files\EqualizerAPO-XT-x64-avx512\current\Editor.exe`; version is `2.54.31.0` and installed SHA-256 matches the rebuilt candidate. Rollback copy: `artifacts\install-backups\v25431-legacy-preamp-knob-20260927-114913\Editor.exe`. Config, engine, VST3 routing, and Qt platform files remain hash-identical; Windows Audio stayed Running and Editor was not launched. No commit, push, beta/main, or release action.
