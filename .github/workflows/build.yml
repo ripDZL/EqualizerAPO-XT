@@ -224,6 +224,14 @@ jobs:
         # host-architecture spelling ('x64'/'arm64') for exactly this purpose.
         msbuild-architecture: ${{ matrix.msvcdevplatform }}
 
+    # SDK audiomediatypecrt.lib needs atls.lib even without direct ATL use.
+    # ARM64 builds use v143 alongside the runner's newer VS 2026 toolchain.
+    - name: Ensure ARM64 v143 ATL
+      if: matrix.platform == 'ARM64'
+      timeout-minutes: 15
+      shell: pwsh
+      run: ./.github/scripts/Ensure-Arm64Atl.ps1
+
     # Supply-chain pins: the prebuilt binary dependencies (and velopack_libc)
     # are downloaded from a pinned release tag and verified against the SHA-256
     # recorded in .github/simd-variants.psd1, so a new upload to those personal

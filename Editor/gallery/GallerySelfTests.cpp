@@ -808,6 +808,7 @@ int SkinGallery::runRoutingEditTest()
 	{
 		const QString name = skin->id();
 		SkinManager::instance()->applySkin(name, true);
+		const QString base = SkinManager::instance()->baseSkinId();
 		QScrollArea scrollArea;
 		scrollArea.resize(960, 720);
 		QList<FilterCardRow*> rows = buildRows(scrollArea, configPath,
@@ -848,7 +849,7 @@ int SkinGallery::runRoutingEditTest()
 			const QString before = lineText(scrollArea, 0);
 			// A bare word is a channel in the step-list grammar, so qualify
 			// infinity as a factor there rather than testing a valid name.
-			commit(name == QLatin1String("minimal") && invalid == QLatin1String("inf")
+			commit(base == QLatin1String("minimal") && invalid == QLatin1String("inf")
 				? QStringLiteral("inf*L") : invalid);
 			check(notifications == 0, QStringLiteral("%1: rejected routing text emitted a change").arg(name));
 			check(lineText(scrollArea, 0) == before,
@@ -858,7 +859,7 @@ int SkinGallery::runRoutingEditTest()
 		check(notifications == 1, QStringLiteral("%1: INV did not emit exactly one change").arg(name));
 		check(lineText(scrollArea, 0) == QStringLiteral("Copy: VC=-1.0*L"),
 			QStringLiteral("%1: INV did not invert the source").arg(name));
-		if (name == QLatin1String("soft") || name == QLatin1String("minimal"))
+		if (base == QLatin1String("soft") || base == QLatin1String("minimal"))
 		{
 			commit(QStringLiteral("L"));
 			check(lineText(scrollArea, 0) == QStringLiteral("Copy: VC=L"),

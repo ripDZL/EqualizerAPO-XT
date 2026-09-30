@@ -1,6 +1,8 @@
 # TODO
 
-- [ ] Push the 2026-09-30 `2.54.31.0` CI-only repair from `codex/v25431-build-fix` to beta normally, dispatch all six variants, and require exact-commit green CI. No main/release/install authority in this request; keep newer v2.54.32/33 local work separate.
+- [x] Push the 2026-09-30 `2.54.31.0` CI-only repair `300b1ef3` to beta normally and dispatch all six variants.
+- [x] Diagnose both run `36730189033` failures; fix alias-aware routing test and provision matching v143 ARM64 ATL. Rebuilt local routing test is green; hosted ARM64 remains unverified.
+- [ ] Push the scoped follow-up to beta and dispatch fresh six-variant `2.54.31.0` CI with `regenerate_references=false`; require exact-commit green before artifacts. No main/release/install authority; preserve separate dirty v2.54.32/33 work.
 
 - [x] Integrate tagged upstream `v2.54.31` (`00f578cd`) into isolated local candidate `codex/upstream-v25431-beta` over `origin/beta` `26e2a0bb`, retaining fork VST recovery, selected-endpoint preview, themes, and distribution identity. Local native/UI/gallery validation is green.
 - [x] Package and install-test the v2.54.31 candidate: the unsigned local AVX-512 MSI is hash-verified at `C:\Program Files\EqualizerAPO-XT-x64-avx512\current`; config and update-pause marker are preserved, and Windows Audio is Running.
