@@ -15,6 +15,8 @@ Develop and test ordinary changes through `beta`. Do not send ordinary work dire
 
 ## Beta prerelease
 
+Beta build-only requests: push the accepted candidate normally, then explicitly dispatch `build.yml` on `beta` with `regenerate_references=false`; beta pushes alone do not start this workflow. Confirm its `head_sha` is the pushed commit and all six variants are included. Do not tag/publish/promote from a build-only request; retain the user's requested testing period before further approval.
+
 After a green `beta` run and explicit release approval:
 
 1. Use the next unused `vX.Y.Z-beta.N` tag and the exact green commit.

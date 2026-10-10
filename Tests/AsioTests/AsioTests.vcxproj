@@ -81,9 +81,12 @@ if exist "$(MUPARSERX_LIB)\*.dll" copy /Y "$(MUPARSERX_LIB)\*.dll" "$(OutDir)"</
     <ClCompile Include="StreamRingTests.cpp" />
     <ClCompile Include="DaemonTests.cpp" />
     <ClCompile Include="DeviceRecordTests.cpp" />
+    <ClCompile Include="ReceiverKeepaliveTests.cpp" />
+    <ClCompile Include="..\..\EqualizerAPOHost\KeepaliveFill.cpp" />
     <ClCompile Include="..\FakeAsioDriver\FakeAsio.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\EqualizerAPOHost\KeepaliveFill.h" />
     <ClInclude Include="..\..\asio\AsioSdk.h" />
     <ClInclude Include="..\..\asio\AsioWrapper.h" />
     <ClInclude Include="..\..\asio\DriverNameText.h" />
@@ -101,6 +104,7 @@ if exist "$(MUPARSERX_LIB)\*.dll" copy /Y "$(MUPARSERX_LIB)\*.dll" "$(OutDir)"</
     <ClInclude Include="..\..\asio\WrapperRecord.h" />
     <ClInclude Include="..\..\runtime\ipc\StreamRing.h" />
     <ClInclude Include="..\AsioSupport\HostStub.h" />
+    <ClInclude Include="..\AsioSupport\LatencyMatch.h" />
     <ClInclude Include="..\FakeRegistry.h" />
     <ClInclude Include="..\FakeAsioDriver\FakeAsio.h" />
     <ClInclude Include="..\FakeAsioDriver\FakeAsioControl.h" />

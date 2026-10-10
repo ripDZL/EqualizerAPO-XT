@@ -32,7 +32,10 @@ using std::string;
 
 namespace
 {
-constexpr ULONGLONG atomicCommitRetryWindowMs = 250;
+// The audio engine can retain a no-delete handle while it reloads an active
+// included configuration. Keep the replacement atomic, but give that bounded
+// reload enough time to finish before surfacing a real permanent-lock error.
+constexpr ULONGLONG atomicCommitRetryWindowMs = 1500;
 
 void logWriteFailure(const QString& path, const wchar_t* stage, const QString& message)
 {
@@ -109,9 +112,13 @@ ConfigFileCodec::ReadResult ConfigFileCodec::readConfig(const QString& path)
 
 ConfigFileCodec::WriteResult ConfigFileCodec::writeConfig(const QString& path, const QList<QString>& lines)
 {
+	return writeBytes(path, encodeLines(lines));
+}
+
+ConfigFileCodec::WriteResult ConfigFileCodec::writeBytes(const QString& path, const QByteArray& byteArray)
+{
 	WriteResult result;
 
-	QByteArray byteArray = encodeLines(lines);
 	result.totalBytes = byteArray.length();
 
 	int commitFailures = 0;

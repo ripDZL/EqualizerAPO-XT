@@ -84,6 +84,47 @@ void testConfigFileCodecRetriesAtomicReplaceAfterReaderCloses()
 		"the retry atomically commits the complete replacement");
 }
 
+void testConfigFileCodecRetriesAtomicReplaceAfterSlowReaderCloses()
+{
+	QTemporaryDir dir;
+	requireTrue(dir.isValid(), "slow atomic-save retry test creates a temporary directory");
+
+	QString path = QDir::toNativeSeparators(dir.filePath("config.txt"));
+	QFile original(path);
+	requireTrue(original.open(QIODevice::WriteOnly), "slow atomic-save retry test creates the original file");
+	requireTrue(original.write("original") == 8, "slow atomic-save retry test writes the original contents");
+	original.close();
+
+	// The audio engine can still be parsing an included configuration after the
+	// editor begins an atomic replacement.  This is the same no-delete reader
+	// used by the engine-side path policy, but it lives long enough to exceed
+	// the old short editor retry budget.
+	winutil::UniqueHandle reader(CreateFileW(
+		path.toStdWString().c_str(),
+		GENERIC_READ,
+		FILE_SHARE_READ,
+		nullptr,
+		OPEN_EXISTING,
+		FILE_ATTRIBUTE_NORMAL,
+		nullptr));
+	requireTrue(static_cast<bool>(reader), "slow atomic-save retry test holds the engine-style read handle");
+
+	std::thread releaseReader([reader = std::move(reader)]() mutable {
+		Sleep(750);
+		reader.reset();
+	});
+	ConfigFileCodec::WriteResult result = ConfigFileCodec::writeConfig(
+		path, QList<QString>() << "replacement");
+	releaseReader.join();
+
+	expectTrue(result.opened, "writeConfig waits for a bounded engine-side configuration read to finish");
+
+	QFile committed(path);
+	requireTrue(committed.open(QIODevice::ReadOnly), "slow atomic-save retry test opens the committed file");
+	expectEqual(QString::fromUtf8(committed.readAll()), "replacement",
+		"the delayed retry atomically commits the complete replacement");
+}
+
 void testConfigFileCodecPreservesExistingFileWhenAtomicReplaceFails()
 {
 	QTemporaryDir dir;
@@ -115,6 +156,46 @@ void testConfigFileCodecPreservesExistingFileWhenAtomicReplaceFails()
 	QFile preserved(path);
 	requireTrue(preserved.open(QIODevice::ReadOnly), "atomic-save test reopens the original file");
 	expectEqual(QString::fromUtf8(preserved.readAll()), "original", "failed atomic replacement preserves the original contents");
+}
+
+void testConfigFileCodecAtomicByteRestore()
+{
+	QTemporaryDir dir;
+	requireTrue(dir.isValid(), "byte restore creates an isolated directory");
+	const QString path = QDir::toNativeSeparators(dir.filePath("snapshot.txt"));
+	// A snapshot may contain an ANSI byte, mixed line endings and a BOM. None
+	// may be normalized when restoring an existing user's file.
+	const QByteArray bytes = QByteArray::fromHex("efbbbf23e90a6e6578740d0a");
+	const ConfigFileCodec::WriteResult initial = ConfigFileCodec::writeBytes(path, bytes);
+	requireTrue(initial.opened, "the byte writer creates a complete atomic snapshot");
+	QFile contents(path);
+	requireTrue(contents.open(QIODevice::ReadOnly), "the byte restore opens its snapshot");
+	expectTrue(contents.readAll() == bytes, "byte restore preserves encoding and line endings exactly");
+	contents.close();
+
+	winutil::UniqueHandle reader(CreateFileW(path.toStdWString().c_str(), GENERIC_READ,
+		FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+	requireTrue(static_cast<bool>(reader), "byte restore holds a temporary no-delete reader");
+	std::thread releaseReader([reader = std::move(reader)]() mutable {
+		Sleep(750);
+		reader.reset();
+	});
+	const QByteArray next = bytes + QByteArray("tail\n");
+	const ConfigFileCodec::WriteResult restored = ConfigFileCodec::writeBytes(path, next);
+	releaseReader.join();
+	expectTrue(restored.opened, "byte restore waits for a bounded reader to close");
+	requireTrue(contents.open(QIODevice::ReadOnly), "byte restore reopens the committed snapshot");
+	expectTrue(contents.readAll() == next, "the delayed byte restore remains byte-exact");
+	contents.close();
+
+	winutil::UniqueHandle blocker(CreateFileW(path.toStdWString().c_str(), 0,
+		FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+	requireTrue(static_cast<bool>(blocker), "byte restore blocks replacement while permitting in-place writes");
+	const ConfigFileCodec::WriteResult denied = ConfigFileCodec::writeBytes(path, bytes);
+	blocker.reset();
+	expectFalse(denied.opened, "byte restore refuses a persistent replacement lock");
+	requireTrue(contents.open(QIODevice::ReadOnly), "byte restore reads the preserved target after failure");
+	expectTrue(contents.readAll() == next, "failed byte restore never truncates the target");
 }
 
 void testConfigFileCodecRejectsPartialRead()

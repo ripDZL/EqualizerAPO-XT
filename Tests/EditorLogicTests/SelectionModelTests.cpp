@@ -3,7 +3,8 @@
 	Copyright (C) 2026 115dkk
 	SPDX-License-Identifier: GPL-2.0-or-later
 
-	Card selection models: Channel, Device and Stage. Each model must write
+	Card selection models: Channel, Device and Stage, and the NewChannel
+	card's name list and the Send card's state. Each model must write
 	the same bytes the legacy dialogs produced for an equivalent selection,
 	so every check here is a serialization identity.
 */
@@ -17,6 +18,8 @@
 
 #include "Editor/widgets/cards/ChannelSelectionModel.h"
 #include "Editor/widgets/cards/DeviceSelectionModel.h"
+#include "Editor/widgets/cards/NewChannelListModel.h"
+#include "Editor/widgets/cards/SendCardModel.h"
 #include "Editor/widgets/cards/StageSelectionModel.h"
 
 #include "EditorLogicTestSupport.h"
@@ -201,4 +204,120 @@ void testStageSelectionModel()
 	expectEqual(model.serialize(), "", "an empty selection serializes empty (matches no stage)");
 	model.setSelected("capture", true);
 	expectEqual(model.serialize(), "capture", "a single selection writes just its token");
+}
+
+void testNewChannelListModel()
+{
+	// The NewChannel card's list: names are parsed and upper-cased by the
+	// engine's own codec, each carries the engine's verdict against the
+	// device, and an addition is all or nothing.
+	NewChannelListModel model;
+	model.setDeviceChannels({L"L", L"R", L"C", L"LFE", L"RL", L"RR"});
+
+	model.load("vc, VRL  vc");
+	expectEqual(model.names().join(' '), "VC VRL", "names are upper-cased and kept once");
+	expectEqual(model.serialize(), "VC VRL", "the line is written with single spaces");
+	expectFalse(model.hasProblems(), "virtual names have no problem");
+
+	NewChannelListModel::AddOutcome added = model.add("vx, VC");
+	expectEqual(added.added.join(' '), "VX", "an already listed name is skipped quietly");
+	expectTrue(added.rejected.isEmpty(), "nothing was refused");
+	expectEqual(model.serialize(), "VC VRL VX", "added names follow the existing ones");
+
+	NewChannelListModel::AddOutcome refused = model.add("VY SL");
+	expectEqual(refused.rejected, "SL", "an alias of a device channel is refused");
+	expectTrue(refused.problem == NewChannelCommand::Problem::DeviceChannel, "the refusal says why");
+	expectTrue(refused.added.isEmpty(), "one refused name adds none of them");
+	expectEqual(model.serialize(), "VC VRL VX", "a refused addition leaves the list alone");
+
+	expectTrue(model.add("2X").problem == NewChannelCommand::Problem::StartsWithDigit, "a leading digit is refused");
+	expectTrue(model.add("All").problem == NewChannelCommand::Problem::ReservedAll, "ALL is refused in any case");
+	expectTrue(model.add("A=B").problem == NewChannelCommand::Problem::SeparatorCharacter, "a Copy separator is refused");
+	expectFalse(NewChannelListModel::problemText(NewChannelCommand::Problem::DeviceChannel).isEmpty(),
+		"every problem has card wording");
+	expectTrue(NewChannelListModel::problemText(NewChannelCommand::Problem::None).isEmpty(),
+		"no problem, no wording");
+
+	// A name the engine refuses stays as written, flagged, until removed.
+	model.load("VC L");
+	expectEqual(model.serialize(), "VC L", "a refused name in the file is kept");
+	expectTrue(model.problem("L") == NewChannelCommand::Problem::DeviceChannel, "and flagged");
+	expectTrue(model.hasProblems(), "the list reports the problem");
+	model.remove("L");
+	expectFalse(model.hasProblems(), "removing it clears the problem");
+	expectEqual(model.serialize(), "VC", "the remaining name is written");
+}
+
+void testSendCardModel()
+{
+	// The Send card's state: targets exclude the device itself, a target the
+	// machine lacks stays as written, the latency field reads back what it
+	// shows, and the warning names the first thing that keeps the line from
+	// working.
+	const QString own = "{11111111-1111-1111-1111-111111111111}";
+	const QString other = "{22222222-2222-2222-2222-222222222222}";
+	std::vector<SendCardModel::Endpoint> endpoints(2);
+	endpoints[0].guid = own;
+	endpoints[0].name = "Playback 1/2";
+	endpoints[0].channels = {L"L", L"R"};
+	endpoints[1].guid = other.toUpper();
+	endpoints[1].name = "Playback 3/4";
+	endpoints[1].channels = {L"L", L"R"};
+	endpoints[1].receives = true;
+
+	SendCardModel model;
+	expectTrue(model.load(""), "the picker's empty template loads");
+	model.setEndpoints(own, endpoints);
+	requireEqual(int(model.targets().size()), 1, "the device itself is not a target");
+	expectEqual(model.targets()[0].guid, other, "targets carry the canonical GUID");
+	expectEqual(model.targetIndex(), -1, "no target is written yet");
+	expectFalse(model.warning().isEmpty(), "an empty line asks for a target");
+	expectEqual(model.serialize(), "", "an empty card writes nothing after the colon");
+
+	model.setTarget(other);
+	expectEqual(model.targetIndex(), 0, "choosing a target selects it");
+	expectFalse(model.warning().isEmpty(), "a line without a connection is called out");
+	std::vector<Assignment> routed(2);
+	routed[0].targetChannel = L"L";
+	routed[0].sourceSum.push_back({1.0, false, L"SUB1"});
+	routed[1].targetChannel = L"R";  // a seeded row with an empty sum
+	model.setAssignments(routed);
+	requireEqual(int(model.assignments().size()), 1, "rows with an empty sum are not written");
+	expectTrue(model.warning().isEmpty(), "a connected line to a receiving endpoint is fine");
+	expectEqual(model.serialize(), other + " L=SUB1", "the line names the target and the routing");
+
+	expectTrue(model.setLatencyText("13.33"), "milliseconds without a unit");
+	expectEqual(model.latencyText(), "13.33", "milliseconds read back as typed");
+	expectTrue(model.setLatencyText("960 samples"), "whole samples with a unit");
+	expectEqual(model.latencyText(), "960 samples", "samples read back with their unit");
+	expectFalse(model.setLatencyText("1.5 samples"), "a fraction of a sample is refused");
+	expectFalse(model.setLatencyText("-3"), "a negative latency is refused");
+	expectEqual(model.latencyText(), "960 samples", "a refused entry leaves the latency alone");
+	expectTrue(model.setLatencyText(""), "an empty field restores the default");
+	expectEqual(model.latencyText(), "", "the default shows as an empty field");
+
+	model.setMode(SendCommand::Mode::Replace);
+	model.setCompensate(false);
+	SendCardModel reread;
+	expectTrue(reread.load(model.serialize()), "the written line loads again");
+	expectTrue(reread.mode() == SendCommand::Mode::Replace, "the mode survives the round trip");
+	expectFalse(reread.compensate(), "compensation off survives the round trip");
+
+	// The receiver's Send option is off: the line works only while something
+	// else plays there, and the card says so.
+	endpoints[1].receives = false;
+	model.setEndpoints(own, endpoints);
+	expectFalse(model.warning().isEmpty(), "a target without the Send option is called out");
+
+	// A target this machine does not have stays selectable as written.
+	SendCardModel foreign;
+	expectTrue(foreign.load("{33333333-3333-3333-3333-333333333333} L=L"), "a line to another machine's endpoint loads");
+	foreign.setEndpoints(own, endpoints);
+	expectEqual(foreign.targetIndex(), int(foreign.targets().size()) - 1, "the unknown target is listed last");
+	expectFalse(foreign.targetKnown(), "and known to be unknown");
+	expectFalse(foreign.warning().isEmpty(), "the card says the endpoint is missing");
+
+	QString error;
+	expectFalse(model.load("not-a-guid L=L", &error), "a malformed line does not load");
+	expectFalse(error.isEmpty(), "and says why");
 }

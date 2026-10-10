@@ -32,6 +32,10 @@ QString minimalTypeGlyph(const QString& type)
 		return QStringLiteral("[]");
 	if (type == QStringLiteral("copy"))
 		return QStringLiteral("->");
+	if (type == QStringLiteral("newchannel"))
+		return QStringLiteral("+");
+	if (type == QStringLiteral("send"))
+		return QStringLiteral("=>");
 	if (type == QStringLiteral("comment"))
 		return QStringLiteral("#");
 	if (type == QStringLiteral("spacer"))

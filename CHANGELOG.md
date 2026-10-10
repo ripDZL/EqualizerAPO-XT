@@ -8,11 +8,135 @@ fork started on 2026-05-22.
 
 Versions are bumped automatically by CI from Conventional Commits message
 types, so some version numbers were skipped (1.7, 1.9, 1.12.1, 1.14, 1.16,
-1.23, 1.25, 2.30.1, 2.31, 2.32, and 2.53 were never released). Tags up to v1.10.1 carried a `-main.<run>` suffix; from v1.11.0 on,
+1.23, 1.25, 2.30.1, 2.31, 2.32, 2.53, and 2.55.0 were never released). Tags up to v1.10.1 carried a `-main.<run>` suffix; from v1.11.0 on,
 tags are clean `vX.Y.Z` names. Installers for every version are on the
 [Releases page](https://github.com/115dkk/EqualizerAPO-XT/releases).
 
 ## Unreleased
+
+## v2.57.3 — 2026-10-06
+
+- **Fewer lights that mean nothing, and one light colour per part.** The
+  card fold button no longer lights up on every open card. In the dark
+  Rack skin, buttons under the pointer, pressed, latched or focused now
+  light in the same bronze as the selected unit frame; amber stays on the
+  lamps. In Studio, a lit card's edge now runs round all four sides, a
+  selected card no longer dims under the pointer, a focused band row keeps
+  its own colour, and the dark knob shows its track instead of a floating
+  arc. Light mode greys now carry their skin's colour temperature, and the
+  graph rulers and GraphicEQ nodes follow the editor's light or dark
+  choice instead of the Windows setting ([#414](https://github.com/115dkk/EqualizerAPO-XT/pull/414)).
+- **The card picker has one highlight, and the pointer moves it.** Moving
+  the pointer onto an entry selects it the same way the arrow keys do, in
+  every skin ([#414](https://github.com/115dkk/EqualizerAPO-XT/pull/414)).
+- **Focus and the scroll position stay put.** Clicking inside a tall card,
+  folding a card, undo, paste, removing a card and closing the card picker
+  no longer jump the list or send keyboard focus to another card or the
+  first control. Scrolling the list with the wheel no longer takes focus
+  from a field being typed in ([#414](https://github.com/115dkk/EqualizerAPO-XT/pull/414)).
+
+## v2.57.2 — 2026-10-05
+
+- **The analysis graph redraws about twice as fast after an edit.** With a
+  VST3 upmixer and eight convolution lines at an analysis resolution of
+  262144, the time from an edit to the new curve dropped from about 1.8 s
+  to 0.9 s. A save no longer waits a second debounce before the analysis
+  starts, a run that a newer edit made obsolete stops early, and the
+  analysis now feeds the chain 16384-frame blocks instead of two blocks as
+  long as the resolution, so it processes only the latency plus the
+  resolution. The drawn response is the same
+  ([#412](https://github.com/115dkk/EqualizerAPO-XT/pull/412)).
+
+## v2.57.1 — 2026-10-04
+
+- **ASIO games can pick 64 or 128 on a device whose fastest exclusive
+  period is 3 ms.** An endpoint's ASIO entry (**Use in ASIO apps**) refused
+  any buffer below the device's smallest exclusive period rounded up to a
+  power of two, so on a USB DAC with a 3 ms minimum a game set to 128
+  frames could not open the stream. The entry now accepts buffers down to an
+  eighth of that size, never below 32. The device still runs at its own
+  smallest period and plays the game's buffers two, four or eight at a time,
+  so the sound comes out exactly as late as at that period; what changes is
+  that the smaller setting is no longer refused
+  ([#410](https://github.com/115dkk/EqualizerAPO-XT/pull/410)). Checked on a
+  virtual cable whose smallest size is 128 frames: 64 and 32 frames each
+  played every buffer for five seconds. Not tried in a game.
+
+## v2.57.0 — 2026-10-03
+
+- **New command `Send:` hands channels to another playback endpoint.** An
+  interface that Windows shows as several stereo endpoints, such as a Topping
+  E4x4 Pre (Playback 1/2 and Playback 3/4), can now be driven from one
+  configuration: `Send: {GUID of Playback 3/4} L=SUB1 R=SUB2` on Playback 1/2
+  plays SUB1 and SUB2 on the outputs of Playback 3/4, through that endpoint's
+  own equalizer. By default this endpoint's channels are delayed by the same
+  latency so both play in time (`Compensate=`), the received channels are
+  mixed into what the receiver plays (`Mode=Replace` overwrites them), and the
+  latency is two processing periods (`Latency=` in ms or samples). Send works
+  between playback endpoints of the audio service, in the post-mix stage. The
+  Device Selector has a new **Send** option for the receiving endpoint: it
+  keeps a silent stream open there from logon through `EqualizerAPOHost.exe`,
+  so the receiver plays what it is sent even when no program plays on it. The
+  Editor has a Send card in every skin with an endpoint list, the routing in
+  the skin's routing view, the latency, the compensation switch and the mode
+  ([#409](https://github.com/115dkk/EqualizerAPO-XT/pull/409)). Tested
+  with unit tests, two engines in one process, and `EqualizerAPO.dll` hosted
+  twice by ApoHostProbe for two playback endpoints, where the receiving
+  endpoint played the sender's tone at 0.0 dB. It was not run inside the
+  audio service with two real endpoints, and whether the audio service runs
+  the receiver for the keepalive stream's zero-filled buffers was not
+  measured (a registry switch to dither the stream is there if it does not;
+  see docs/features/send.md).
+
+## v2.56.0 — 2026-10-03
+
+- **v2.55.0 was not published; this release carries its changes.** GitHub
+  moved the ARM64 build machines to a Visual Studio 2026 image that lacks the
+  ATL library the ARM64 build used, so the v2.55.0 build failed before any
+  installer was made. ARM64 now builds with the same compiler version as x64
+  ([#408](https://github.com/115dkk/EqualizerAPO-XT/pull/408)). The `NewChannel:`
+  command listed under v2.55.0 ships in this release.
+
+## v2.55.0 — 2026-10-03
+
+- **New command `NewChannel:` creates virtual channels and selects them.**
+  `NewChannel: VC VRL VRR` declares silent channels the device does not have
+  and adds them to the current selection, so a `VSTPlugin:` line below can
+  fill them through `OutputChannels` and a `Copy:` line can mix them back
+  into the device's channels. `Copy: VC=0` already made such a channel, but
+  it did not select it, the Editor refused to write it, and `Copy: VC=1`
+  copies channel 1 instead. Names are upper-cased; a name that starts with a
+  digit, is `ALL`, contains a Copy separator or is a channel of the device
+  makes the engine skip the whole line and log why. The Editor has a card for
+  the line in every skin, with one chip per name and the reason when the
+  engine would skip it, and the picker offers it next to Copy
+  ([#407](https://github.com/115dkk/EqualizerAPO-XT/pull/407)).
+  Tested with engine, Editor-logic and VST3 host unit tests and an audio
+  regression case; the cards were checked in the offscreen skin gallery, not
+  on a live device.
+
+## v2.54.32 — 2026-09-27
+
+- **Include reads files in the configuration folder again.** From v2.54.23,
+  an Include line that named a file in the default configuration folder
+  (`%LOCALAPPDATA%\EqualizerAPO-XT\config`), even a file beside config.txt,
+  was refused and its filters were not applied; config.txt itself still
+  loaded. Giving the LOCAL SERVICE account read access to the folders above
+  worked around it, and is no longer needed. The audio engine checks a path
+  one folder at a time (#394), and the account it runs as may not open the
+  profile folders above the configuration folder (`C:\Users\<name>`,
+  `AppData`, `Local`, `EqualizerAPO-XT`), not even to read their attributes,
+  so the check stopped at the first of them. It now opens the folder below
+  such a folder with the folder's name in the path, and checks from the
+  handle it opened that the file is on a local drive. Convolution,
+  MultiConvolution, SubwooferRouting profiles and VSTPlugin libraries under
+  the profile were refused for the same reason and are fixed with it
+  ([#406](https://github.com/115dkk/EqualizerAPO-XT/pull/406)). Tested with
+  unit tests that give the test thread the service account's view of the
+  disk (a restricted token), and once against an installed configuration
+  folder; the audio service itself was not run. If a folder the engine cannot
+  open is a link to a network share, the engine follows it and reaches the
+  share before refusing it; that case was not tested, for want of a share.
 
 ## v2.54.31 — 2026-09-26
 

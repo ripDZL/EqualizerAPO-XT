@@ -66,6 +66,10 @@ public:
 	// joined with CRLF and encoded as UTF-8 (no trailing newline).
 	static WriteResult writeConfig(const QString& path, const QList<QString>& lines);
 
+	// Restores an exact byte snapshot through the same atomic, bounded writer;
+	// unlike writeConfig, this does not normalize encoding or line endings.
+	static WriteResult writeBytes(const QString& path, const QByteArray& bytes);
+
 	// Pure, file-system-free transforms, exposed for reuse and testing.
 	// decodeLines splits the raw file bytes into lines, stripping a trailing CR
 	// and decoding UTF-8 with a system-ANSI (CP_ACP) fallback on invalid UTF-8.

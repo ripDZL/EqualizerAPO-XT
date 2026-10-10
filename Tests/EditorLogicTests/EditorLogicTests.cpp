@@ -118,6 +118,8 @@ int main(int argc, char** argv)
 		testDeviceSelectionModel();
 		testMultiConvolutionRoutingAdapter();
 		testStageSelectionModel();
+		testNewChannelListModel();
+		testSendCardModel();
 		testRoutingGridModelPorts();
 		testRoutingGridModel();
 		testRoutingFold();
@@ -140,8 +142,10 @@ int main(int argc, char** argv)
 		testKnobTravelLaw();
 		testConfigFileCodec();
 		testConfigFileCodecRetriesAtomicReplaceAfterReaderCloses();
+		testConfigFileCodecRetriesAtomicReplaceAfterSlowReaderCloses();
 		testConfigFileCodecPreservesExistingFileWhenAtomicReplaceFails();
 		testConfigFileCodecRejectsPartialRead();
+		testConfigFileCodecAtomicByteRestore();
 		testMemoryHelperConstructReleasesStorageWhenConstructorThrows();
 		testUpdateSessionPublishesStagedVersionAfterJoin();
 		testUpdateSessionLaunchesElevatedCoordinatorWithoutApplyingDirectly();

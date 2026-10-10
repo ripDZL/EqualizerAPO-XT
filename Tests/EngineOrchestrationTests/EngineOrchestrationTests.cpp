@@ -150,11 +150,15 @@ int runEngineOrchestrationTests()
 	testParallelExecutor(harness);
 	testConfigWatcherBackoffAndPathRefresh(harness);
 	testConfigWatcherRegistryKeyIsQuietUntilChanged(harness);
+	runSendSeamTests(harness);
+	runSendRingTests(harness);
+	runSendTests(harness);
 	runConfigurationFileReaderTests(harness);
 	runSampleIoTests(harness);
 	runApoFormatTests(harness);
 	testChannelSelectorRouting(harness);
 	testCopySwapsChannels(harness);
+	runNewChannelTests(harness);
 	testMultiConvolutionIgnoresChannelSelection(harness);
 	testConfigSwapCrossfades(harness);
 	testFailedConfigLoadKeepsActiveConfiguration(harness);

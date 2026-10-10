@@ -1,8 +1,46 @@
 # TODO
 
+- [ ] User-authorized normal v2.57.3.0 beta commit/push and exact-commit full six-variant workflow dispatch; record SHA/run, then require CI green.
+- [ ] User's requested couple-of-days test: recording/chat continuity, live-preview stability, save/reopen persistence and errors. Keep working installation/configs unchanged; main/release need separate approval.
+- [x] Post-install v2.57.3 diagnostic Mastering-only mic activity confirmed by user; no live changes. Pro-Q/full-chain/preview/latency and sustained stability remain unaccepted.
+- [x] Pro-Q alone with original saved state reproduces live mic mute; Clear/Mastering alone passed.
+- [x] Restore diagnostic copy to prior Mastering-only stage; original preset/backup/root/runtime/device unchanged.
+- [x] Saved/fresh candidate-host offline probes both produce audio; correct suffix-based VST2 assumption (dual-export DLL, probed VST3). Installed audio-service fault still not reproduced offline.
+- [x] User confirms actual mic recovery on restored Mastering-only diagnostic (`yes working again`); no live file changes this turn.
+- [x] Fresh/default Pro-Q alone also mutes; exact previously accepted Mastering-only diagnostic restored via authorized guarded rollback. Original preset/backup/root/runtime/device/services unchanged.
+- [x] Actual recovery after latest Mastering-only rollback confirmed by user (`yes mircrophone is back`); no live changes this turn.
+- [x] Approved Pro-Q diagnostic build prepared: unsigned AVX-512 v2.57.3 MSI, numeric lifecycle/results/bounded level counters, no stored audio/per-buffer logs. Related tests, offline Pro-Q and rejection fixtures pass; 78 packaged payload hashes verified. Installed v2.51.0/config unchanged.
+- [x] Installation approved; complete active runtime/config backed up and hashes verified. MSI not run: old-version uninstall would restart audio and remove current device APO assignments.
+- [x] Explicit upgrade/audio/device-restoration approval received; v2.57.3 diagnostic MSI installed at canonical root, both assignments exact, all24 configs unchanged, both services Running. Upgrade/file repair exit0; 78 deployed payload hashes verified.
+- [x] Approved real Pro-Q re-test/service-license correction: post-reboot fresh802/802 succeeds but emits zero; existing LicenseText copied to LOCAL SERVICE + Audiosrv restart restores fresh800/800 and saved801/801 nonzero,0 sampled silent-with-input. Mastering-only rollback/recovery pass;78 files/24 configs/four keys unchanged. Evidence: `artifacts/proq-diagnostic-20261010/license-retest-20261010-064316-f42d16a5/`.
+- [x] Approved temporary original full-chain test/exact rollback:801/801 and1400/1400 Pro-Q successful calls,0 sampled silent-with-input/rejected/nonfinite, nonzero real IN1 output. Original preset untouched; Mastering-only restored. Evidence: `artifacts/proq-diagnostic-20261010/full-chain-retest-20261010T105742Z/`.
+- [x] User approved activation for manual test; original enabled chain left active in diagnostic copy `E3242E6A...`; original preset/root unchanged. Receipt `artifacts/proq-diagnostic-20261010/full-chain-retest-20261010T105742Z/MANUAL-ACTIVATION.json`.
+- [x] User reports `seemsgood` after requested full-chain microphone/live-preview test; record basic manual acceptance only. Working chain remains enabled; original/root/runtime hashes unchanged. Receipt `artifacts/proq-diagnostic-20261010/full-chain-retest-20261010T105742Z/USER-RESULT.json`.
+- [x] Approved diagnostics cleanup and normal v2.57.3.0 local v143 AVX-512 build/tests/package complete; runtime semantics/pending fixes preserved. Five suites, nine synthetic plugin cases, VST/panel tests and scoped Standards/Spec reviews pass. `artifacts/v2573-clean-candidate-20261010T135658Z/`.
+- [x] Approved clean-install/audio interruption complete at canonical Program Files current root; fresh106-file backup/same-product repair/source filename compatibility verified, exit0. All78 clean deployed hashes/24 configs/four keys/support files/license preserved. `artifacts/v2573-clean-candidate-20261010T135658Z/install-run-20261010-102552-31c67324/RESULT.md`.
+- [x] CLEAN normal runtime: user reports microphone works and stays usable while disabling plugins individually (2026-10-10). Specific plugins/apps not named; do not infer RNNoise/ReaFIR coverage.
+- [x] CLEAN normal runtime: user confirms "live preview still works" (2026-10-10, recorded14:52:40 UTC); no per-plugin/app coverage inferred.
+- [ ] Confirm recording/chat on CLEAN normal runtime; use ACTIVE `IN1-plugin-isolation-20261010.txt` tab. Preserve newer edits to both that file and `New Simple 4-12-26.txt`, including current enable states; no auto Include restoration, commit/push/release.
+- [ ] Separate remaining coverage: two unelevated ACL branches, hosted v145/ARM64, measured latency/sustained stability, disabled RNNoise/ReaFIR.
+- [ ] Installer follow-up (not implemented): prevent major-upgrade device removal/legacy SFX-MFX resurrection and missing same-version support files. Current installation recovered via exact snapshots and same-product force-file MSI repair; retain logs/tests before any proposed source repair.
+
+- [x] Actual IN1 pass-through acceptance: user reports mic no longer muted and shows speech activity while EAPO remains attached.
+- [x] Approved individual saved-state isolation complete: Clear/Mastering work; Pro-Q alone mutes; Mastering restoration recovers mic.
+
+- [x] Explicitly approved temporary live-chain bypass: root Include commented, other configs/settings and IN1 attachment unchanged. Offline pass-through check passes.
+- [x] User accepted IN1 pass-through activity with APO attached; preserve guarded rollback, no new speaking/capture tests.
+
+- [x] User-approved complete config backup verified (23 originals); live bypass and individual-copy testing were subsequently approved. Exact backup in `docs/Microphone-Regression-2573.md`.
+
+- [x] October 10 pass-through isolation: user-confirmed IN1 activity with current installed v2.51.0 still attached. Saved-chain processing implicates a plug-in/state/interaction rather than universally broken APO pass-through; continue current stage above, no automatic device/service/install changes.
+
+- [x] Current v2.57.3 candidate: finish local native/Qt, workflow/source/UI/VST regression gates and Standards/Spec review; document unverified native ARM64/v145 gates. Prepare and inspect local AVX-512 test package without installing.
+- [x] 2026-10-09 verify the user-installed v2.57.3 payload at `C:\Program Files\EqualizerAPO-XT-x64-avx512\current`: three installed primary binaries match the local test payload. This agent did not install it.
+- [x] Resolve the isolated main-IN1 mute: missing Pro-Q4 registration under LOCAL SERVICE corrected with explicit approval; normal v2.57.3 mic/individual-disable/live-preview now accepted by user. Multi-day acceptance/CI remain separate; see `docs/Microphone-Regression-2573.md`.
+
 - [x] Push the 2026-09-30 `2.54.31.0` CI-only repair `300b1ef3` to beta normally and dispatch all six variants.
 - [x] Diagnose both run `36730189033` failures; fix alias-aware routing test and provision matching v143 ARM64 ATL. Rebuilt local routing test is green; hosted ARM64 remains unverified.
-- [ ] Push the scoped follow-up to beta and dispatch fresh six-variant `2.54.31.0` CI with `regenerate_references=false`; require exact-commit green before artifacts. No main/release/install authority; preserve separate dirty v2.54.32/33 work.
+- [x] Prior v2.54.31 CI follow-up was normally pushed as `1d14cbff`; run `36740403333` is green. Its v143 ARM workaround is superseded by the current tagged v2.57.3 v145 policy. Preserve the separate dirty v2.54.32/33 work.
 
 - [x] Integrate tagged upstream `v2.54.31` (`00f578cd`) into isolated local candidate `codex/upstream-v25431-beta` over `origin/beta` `26e2a0bb`, retaining fork VST recovery, selected-endpoint preview, themes, and distribution identity. Local native/UI/gallery validation is green.
 - [x] Package and install-test the v2.54.31 candidate: the unsigned local AVX-512 MSI is hash-verified at `C:\Program Files\EqualizerAPO-XT-x64-avx512\current`; config and update-pause marker are preserved, and Windows Audio is Running.

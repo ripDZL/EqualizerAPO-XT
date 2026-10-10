@@ -65,8 +65,23 @@ Current work areas:
    in the Device Selector. Measured on a virtual cable locally and on CI;
    the study, with the low-latency answer, is in
    [docs/architecture/wasapi-exclusive-study.md](docs/architecture/wasapi-exclusive-study.md).
-   Remaining: hardware beyond the cable, and one entry that pairs a device's
-   playback and recording endpoints.
+   Buffers below the device's smallest period open too, so the 64 or 128
+   that rhythm games recommend is no longer refused
+   ([#410](https://github.com/115dkk/EqualizerAPO-XT/pull/410)). Remaining:
+   hardware beyond the cable, a real game, and one entry that pairs a
+   device's playback and recording endpoints.
+10. Virtual channels and sending audio to another endpoint. `NewChannel:`
+    declares silent virtual channels and adds them to the selection, so an
+    upmixer plug-in can write to channels the device does not have
+    ([#407](https://github.com/115dkk/EqualizerAPO-XT/pull/407)). `Send:`
+    hands channels to the APO of another playback endpoint in the same audio
+    engine, for interfaces such as the Topping E4x4 Pre that Windows shows as
+    several stereo endpoints; the Device Selector's Send option keeps the
+    receiving endpoint running
+    ([#409](https://github.com/115dkk/EqualizerAPO-XT/pull/409),
+    [docs/features/send.md](docs/features/send.md)). Remaining: measurements
+    on a real multi-endpoint interface, and latency that follows the
+    receiver's period (`Latency=Auto`).
 
 ## Features
 
@@ -98,6 +113,8 @@ Current work areas:
   built-in preset reproducing issue #246's original chain sample for sample.
   The same MIT-licensed DSP core also ships as the standalone
   `EAPO XT Subwoofer Routing` VST3 plugin, exchanging the identical JSON state.
+- Send between endpoints: `Send: {endpoint} L=SUB1 R=SUB2` hands channels to the equalizer of another playback endpoint of the same computer, delays this endpoint's own channels to match, and can mix into or replace what the receiver plays. The Device Selector's Send option keeps the receiving endpoint processing even when nothing plays on it.
+- Virtual channels by name: `NewChannel: VC VRL VRR` declares silent channels the device does not have and adds them to the channel selection, so a VST upmixer's extra outputs have somewhere to go before a `Copy:` line mixes them back into the device's channels.
 - Native VST3 hosting through the Steinberg VST3 SDK (MIT-licensed pluginterfaces), with 64-bit (double) processing where the plug-in supports it. Channel layouts are negotiated from the actual channel names, so a 4.1 system negotiates as 4.1 instead of being mislabeled 5.0.
 - Explicit asymmetric VST3 main buses through `VSTPlugin: Library "...\\Plugin.vst3" Input Stereo Output 7.1`. Input and output independently support Auto, Mono, Stereo, 4.0, 4.1, 5.0, 5.1, 6.1, 7.1, 7.1.2, and 7.1.4; rejected VST3 contracts safely pass audio through instead of silently choosing another width, while VST2 ignores the layout keys. See the [configuration reference](https://github.com/115dkk/EqualizerAPO-XT/wiki/Configuration-reference#vstplugin-bus-layouts).
 - Portable SIMD kernels written once with [Google Highway](https://github.com/google/highway) and compiled per variant: SSE2, AVX, AVX2, AVX-512, and AVX10.1 on x64, NEON on ARM64.

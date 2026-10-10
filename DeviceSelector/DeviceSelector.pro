@@ -108,3 +108,15 @@ build_pass:CONFIG(debug, debug|release) {
 QMAKE_LFLAGS += /MANIFESTUAC:\"level=\'requireAdministrator\' uiAccess=\'false\'\"
 
 RC_FILE = DeviceSelector.rc
+
+# qmake's generated resource rule tracks only the .rc file, not headers it
+# includes. Version bumps therefore rebuilt DeviceSelector.cpp but could leave
+# the embedded Windows version resource stale. Add the canonical header to the
+# same .res target so an incremental release build always re-runs rc.exe.
+build_pass:CONFIG(debug, debug|release) {
+    device_selector_version_resource.target = debug/DeviceSelector.res
+} else {
+    device_selector_version_resource.target = release/DeviceSelector.res
+}
+device_selector_version_resource.depends = ../version.h
+QMAKE_EXTRA_TARGETS += device_selector_version_resource

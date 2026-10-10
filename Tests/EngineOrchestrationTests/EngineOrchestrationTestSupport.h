@@ -76,11 +76,23 @@ void testFailedConfigLoadKeepsActiveConfiguration(test::Harness& harness);
 void testConfigWatcherBackoffAndPathRefresh(test::Harness& harness);
 void testConfigWatcherRegistryKeyIsQuietUntilChanged(test::Harness& harness);
 
+// SendRingTests.cpp
+void runSendRingTests(test::Harness& harness);
+
+// SendSeamTests.cpp
+void runSendSeamTests(test::Harness& harness);
+
+// SendTests.cpp
+void runSendTests(test::Harness& harness);
+
 // EngineRoutingTests.cpp
 void testChannelSelectorRouting(test::Harness& harness);
 void testCopySwapsChannels(test::Harness& harness);
 void testMultiConvolutionIgnoresChannelSelection(test::Harness& harness);
 void testRealBrirCrossfeed(test::Harness& harness);
+
+// NewChannelTests.cpp
+void runNewChannelTests(test::Harness& harness);
 
 // ConfigLoadTests.cpp
 void testConfigLoadTrace(test::Harness& harness);
