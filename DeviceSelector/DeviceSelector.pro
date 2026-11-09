@@ -1,8 +1,7 @@
 #-------------------------------------------------
 #
-# DeviceSelector qmake project for CI builds
-# This allows building DeviceSelector with qmake in CI
-# while keeping the .vcxproj for local Visual Studio development
+# DeviceSelector qmake project. This is the only build description for
+# DeviceSelector, locally and in CI.
 #
 #-------------------------------------------------
 
@@ -22,7 +21,9 @@ PRECOMPILED_HEADER = stdafx.h
 SOURCES += \
 	../platform/qt/QtAppBootstrap.cpp \
 	../Editor/skins/CustomThemeStore.cpp \
+	../platform/qt/HoverProgress.cpp \
 	../Editor/skins/SkinThemeData.cpp \
+	../Editor/skins/rack/RackSkinDetail.cpp \
 	main.cpp \
 	DeviceListDelegate.cpp \
 	DeviceSelector.cpp \
@@ -32,6 +33,7 @@ SOURCES += \
 	OpacityIconEngine.cpp \
 	PreviewDevices.cpp \
 	ReceiveThread.cpp \
+	ResidentHostLauncher.cpp \
 	SkinButton.cpp \
 	skins/DeviceSkinPainter.cpp \
 	skins/StudioDeviceSkin.cpp \
@@ -50,7 +52,12 @@ SOURCES += \
 HEADERS += \
 	../platform/qt/QtAppBootstrap.h \
 	../Editor/skins/CustomThemeStore.h \
+	../platform/qt/HoverProgress.h \
+	../platform/qt/MotionPreference.h \
+	../platform/qt/ScrollBarPolicy.h \
 	../Editor/skins/SkinThemeData.h \
+	../Editor/skins/rack/RackSkinDetail.h \
+	../Editor/skins/rack/RackPalette.h \
 	DeviceListDelegate.h \
 	DeviceSelector.h \
 	DeviceTestDialog.h \
@@ -59,6 +66,7 @@ HEADERS += \
 	OpacityIconEngine.h \
 	PreviewDevices.h \
 	ReceiveThread.h \
+	ResidentHostLauncher.h \
 	SkinButton.h \
 	skins/DeviceSkinPainter.h \
 	../services/windows/WindowsService.h \
@@ -120,3 +128,14 @@ build_pass:CONFIG(debug, debug|release) {
 }
 device_selector_version_resource.depends = ../version.h
 QMAKE_EXTRA_TARGETS += device_selector_version_resource
+HEADERS += \
+	../devices/AsioEntryWriter.h \
+	../devices/EndpointProbe.h \
+	../platform/windows/TokenPrivilege.h \
+	../platform/windows/WellKnownSids.h \
+	../platform/windows/ComError.h \
+	../platform/windows/ConsoleOutput.h \
+	../platform/windows/ElevatedLaunch.h \
+	../platform/windows/TimeStamp.h \
+	../services/windows/ServiceWait.h \
+	../services/install/InstallWaitBudget.h

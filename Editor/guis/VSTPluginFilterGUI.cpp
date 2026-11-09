@@ -17,11 +17,8 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-#include <QFileInfo>
-#include "services/registry/RegistryPaths.h"
+#include <QDir>
 #include "Editor/widgets/cards/FileReferenceController.h"
-#include <QFileDialog>
-#include <QSettings>
 #include <QAction>
 #include <QBrush>
 #include <QCheckBox>
@@ -29,6 +26,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMenu>
+#include <QSignalBlocker>
 #include <QStringList>
 
 #include "filters/VSTPluginCommand.h"
@@ -42,6 +40,14 @@
 using std::unordered_map;
 using std::wstring;
 
+namespace
+{
+QString defaultPluginsDirectory()
+{
+	return QString::fromStdWString(VSTPluginLibrary::getDefaultPluginPath());
+}
+}
+
 VSTPluginFilterGUI::VSTPluginFilterGUI(std::shared_ptr<VSTPluginLibrary> library, const std::wstring& chunkData, const std::unordered_map<std::wstring, float>& paramMap,
 	bool stereoInput, const std::optional<VST3BusContract>& busContract,
 	const VSTPreviewEndpoint& previewEndpoint,
@@ -54,12 +60,8 @@ VSTPluginFilterGUI::VSTPluginFilterGUI(std::shared_ptr<VSTPluginLibrary> library
 	ui->frame->setVisible(false);
 	updatePermissionWarning();
 
-	QString absolutePath = QString::fromStdWString(library->getLibPath());
-	QDir pluginsDir(QString::fromStdWString(VSTPluginLibrary::getDefaultPluginPath()));
-	QString relativePath = QDir::toNativeSeparators(pluginsDir.relativeFilePath(absolutePath));
-	if (relativePath.startsWith(QDir::toNativeSeparators("../../")))
-		relativePath = absolutePath;
-	ui->pathLineEdit->setText(relativePath);
+	ui->pathLineEdit->setText(FileReferenceController::displayPathForLibrary(
+		QString::fromStdWString(library->getLibPath()), defaultPluginsDirectory()));
 
 	QMenu* menu = new QMenu(ui->optionsButton);
 	menu->setToolTipsVisible(true);
@@ -122,29 +124,29 @@ VSTPluginFilterGUI::VSTPluginFilterGUI(std::shared_ptr<VSTPluginLibrary> library
 	connect(session.get(), &VSTPluginSession::statusChanged, this, &VSTPluginFilterGUI::showStatus);
 	connect(session.get(), &VSTPluginSession::stateChanged, this, &VSTPluginFilterGUI::pluginStateChanged);
 	connect(session.get(), &VSTPluginSession::automated, this, &VSTPluginFilterGUI::pluginStateChanged);
+	connect(session.get(), &VSTPluginSession::embedStateChanged, this, &VSTPluginFilterGUI::embedStateChanged);
 	connect(session.get(), &VSTPluginSession::sizeRequested, this, [this](int w, int h) {
 		ui->frame->setFixedSize(w, h);
+	});
+	// The status label gives way to the embedded panel.
+	session->setEmbedHost(ui->frame, [this](bool shown) {
+		ui->frame->setVisible(shown);
+		ui->statusLabel->setVisible(!shown);
 	});
 }
 
 VSTPluginFilterGUI::~VSTPluginFilterGUI()
 {
-	if (session->instance() != nullptr)
-	{
-		if (session->embedded())
-			on_embedAction_toggled(false);
-	}
+	if (session->instance() != nullptr && session->embedded())
+		on_embedAction_toggled(false);
 }
 
 void VSTPluginFilterGUI::store(QString& command, QString& parameters)
 {
 	command = "VSTPlugin";
 
-	QString absolutePath = QString::fromStdWString(session->library()->getLibPath());
-	QDir pluginsDir(QString::fromStdWString(VSTPluginLibrary::getDefaultPluginPath()));
-	QString relativePath = QDir::toNativeSeparators(pluginsDir.relativeFilePath(absolutePath));
-	if (relativePath.startsWith(QDir::toNativeSeparators("../../")))
-		relativePath = absolutePath;
+	QString relativePath = FileReferenceController::displayPathForLibrary(
+		QString::fromStdWString(session->library()->getLibPath()), defaultPluginsDirectory());
 
 	if (relativePath.contains(" "))
 		relativePath = "\"" + relativePath + "\"";
@@ -328,10 +330,10 @@ void VSTPluginFilterGUI::loadPreferences(const QVariantMap& prefs)
 	}
 
 	if (prefs.value("embed").toBool())
-		// will also call initPlugin
+		// The toggle requests the load before embedding.
 		ui->embedAction->setChecked(true);
 	else
-		session->initPlugin();
+		session->requestPlugin();
 }
 
 void VSTPluginFilterGUI::storePreferences(QVariantMap& prefs)
@@ -353,8 +355,7 @@ void VSTPluginFilterGUI::on_openPanelButton_clicked()
 		return;
 	}
 
-	session->initPlugin();
-	session->openDialog(this);
+	session->requestPanel(this);
 }
 
 void VSTPluginFilterGUI::pluginStateChanged()
@@ -369,85 +370,51 @@ void VSTPluginFilterGUI::pluginStateChanged()
 void VSTPluginFilterGUI::showStatus()
 {
 	const VSTPluginSession::Status& status = session->status();
-	const QColor color = status.critical ? QColor(Qt::red) : QColor(Qt::black);
+	const QColor color = status.critical && !status.loading ? QColor(Qt::red) : QColor(Qt::black);
 	QPalette palette = ui->statusLabel->palette();
 	palette.setColor(QPalette::Active, QPalette::WindowText, color);
 	palette.setColor(QPalette::Inactive, QPalette::WindowText, color);
 	ui->statusLabel->setPalette(palette);
-	ui->statusLabel->setText(status.text);
+	ui->statusLabel->setText(status.loading ? tr("Loading plugin...") : status.text);
+	ui->openPanelButton->setEnabled(!session->loading());
 	updateBusControls();
 }
 
 void VSTPluginFilterGUI::on_pathLineEdit_editingFinished()
 {
 	if (session->libraryDiffers(ui->pathLineEdit->text()))
-	{
-		if (session->instance() != nullptr && ui->embedAction->isChecked())
-			on_embedAction_toggled(false);
 		session->replaceLibrary(ui->pathLineEdit->text());
-
-		updateModel();
-		updatePermissionWarning();
-
-		if (ui->embedAction->isChecked())
-			on_embedAction_toggled(true);
-	}
 }
 
 void VSTPluginFilterGUI::on_selectButton_clicked()
 {
-	QDir pluginsDir(QString::fromStdWString(VSTPluginLibrary::getDefaultPluginPath()));
-
-	QSettings settings(QString::fromWCharArray(EDITOR_REGPATH), QSettings::NativeFormat);
-	QString lastDir = settings.value("vst/lastDir", "").toString();
-	if (lastDir == "")
-		lastDir = pluginsDir.absolutePath();
-
-	QFileInfo fileInfo(lastDir);
-	QString path = ui->pathLineEdit->text();
-	if (path.length() > 0)
-		fileInfo.setFile(pluginsDir, path);
-
-	QFileDialog dialog(this, tr("Select VST plugin"), fileInfo.absoluteFilePath(), "*.dll *.vst3");
-	dialog.setFileMode(QFileDialog::ExistingFile);
-	dialog.setNameFilter(tr("VST plugins (*.dll *.vst3)"));
-	GUIHelper::enableVst3BundleSelection(dialog);
-	if (path.length() > 0)
-		dialog.selectFile(fileInfo.fileName());
-	if (dialog.exec() == QDialog::Accepted)
+	const QString pluginsDirectory = defaultPluginsDirectory();
+	const QString absolutePath = FileReferenceController::chooseVstLibrary(this,
+		tr("Select VST plugin"), tr("VST plugins (*.dll *.vst3)"), ui->pathLineEdit->text(),
+		pluginsDirectory, /*skinned=*/ false);
+	if (!absolutePath.isEmpty())
 	{
-		QString absolutePath = dialog.selectedFiles().first();
-		settings.setValue("vst/lastDir", QDir::toNativeSeparators(QFileInfo(absolutePath).absolutePath()));
-		ui->pathLineEdit->setText(FileReferenceController::displayPathForBaseDirectory(pluginsDir.absolutePath(), absolutePath));
+		ui->pathLineEdit->setText(FileReferenceController::displayPathForBaseDirectory(
+			QDir(pluginsDirectory).absolutePath(), absolutePath));
 		on_pathLineEdit_editingFinished();
 	}
 }
 
 void VSTPluginFilterGUI::on_embedAction_toggled(bool checked)
 {
-	session->initPlugin();
+	session->requestEmbed(checked);
+}
 
-	const bool enable = checked && session->instance() != nullptr;
-	if (enable != session->embedded())
+void VSTPluginFilterGUI::embedStateChanged()
+{
+	// A checked action without a live or waiting embed (plugin missing, or
+	// crashed while opening the panel) would claim a panel that is not
+	// shown; drop the check so the button reads "Open panel" again.
+	if (ui->embedAction->isChecked() && !session->embedded() && !session->embedPending())
 	{
-		// The frame is shown before the session embeds into it; the status
-		// label gives way to it, and both return when embedding failed
-		// (reported through the status).
-		ui->frame->setVisible(enable);
-		ui->statusLabel->setVisible(!enable);
-		if (!session->setEmbedded(enable, ui->frame))
-		{
-			ui->frame->setVisible(false);
-			ui->statusLabel->setVisible(true);
-		}
-	}
-
-	// A checked action without a live embed (plugin missing or crashed while
-	// opening the panel) would claim a panel that is not shown; drop the
-	// check so the button reads "Open panel" again. The recursive toggle is
-	// a no-op because embedded already matches.
-	if (checked && !session->embedded() && ui->embedAction->isChecked())
+		const QSignalBlocker blocker(ui->embedAction);
 		ui->embedAction->setChecked(false);
+	}
 
 	// The button stays visible while embedded - it is the way out. Hiding it
 	// left the embed removable only through the options menu, which read as

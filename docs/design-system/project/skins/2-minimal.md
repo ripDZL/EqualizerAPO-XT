@@ -28,6 +28,8 @@ hover는 배경 한 스텝 상승, 그게 전부다. selected는 본문 잉크 �
 
 `EAPO Mono` 단일이고 이탤릭은 없다. 캡션은 대문자와 자간으로 구분한다. 강조는 굵기나 밝기로 만들고 크기를 키우지 않는다. 숫자 칼럼은 0패딩으로 폭을 고정하고, 좁은 폭에서 긴 값을 만나면 잘라내지 않고 폰트를 줄인다.
 
+`EAPO Mono`의 굵기는 Regular, Medium, SemiBold, Bold 넷이고 시트는 모든 위젯에 500을 준다. 업스트림 DM Mono는 Medium까지라 SemiBold와 Bold는 디자이너의 Light→Medium 방향으로 마스터를 외삽해 만든 면이다(PR #434, `Editor/fonts/make-mono-weights.py`). 13px 잉크는 DM Sans의 Medium→SemiBold(+17%), Medium→Bold(+31%) 단계와 맞춘다. 채널 토큰(Copy 목록과 헤더의 채널 범위)은 SemiBold로 찍는다. 처음에는 Medium을 반 픽셀 겹쳐 찍어 같은 굵기를 냈다(PR #431).
+
 ## 채널 잉크
 
 콘솔 그라운드에서 채워진 칩은 GUI 배지 어휘라서 채널은 맨 잉크로 인쇄한다. `minimal-ch-*` 표는 공유 팔레트의 단순 탈색이 아니라 ANSI/base16 색상 가족에 다시 배치한 설계 표(이웃 간 최소 24도)이고, SBL·SBR은 빈 색상환 구역(violet 300, olive 95)으로 옮겼다. 라이트 값은 모두 그라운드 대비 4.3:1 이상이다. 표 밖의 채널(ALL, 번호 채널)은 `channel-neutral`을 같은 명도로 누른 `minimal-ch-neutral`로 인쇄하고, 장치에 없는 가상 채널은 같은 잉크에 1px 파선 테두리를 두른다.

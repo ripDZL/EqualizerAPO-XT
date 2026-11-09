@@ -29,6 +29,12 @@
 #include "audio/ChannelLayout.h"
 #include "services/registry/WindowsRegistry.h"
 #include "FilterTable.h"
+#include "FilterTemplate.h"
+#include "IFilterGUI.h"
+#include "IFilterGUIFactory.h"
+#include "devices/DeviceAPOInfo.h"
+#include "Editor/widgets/FilterCardModel.h"
+#include "Editor/widgets/FilterPickerView.h"
 
 using std::list;
 using std::max;
@@ -44,7 +50,7 @@ using std::wstring;
 void FilterTable::cut()
 {
 	copy();
-	deleteSelectedLines();
+	removeSelectedLines();
 }
 
 void FilterTable::copy()
@@ -100,6 +106,14 @@ int FilterTable::insertLinesFromMimeData(const QMimeData* mimeData, int dropRow)
 }
 
 void FilterTable::deleteSelectedLines()
+{
+	const int count = int(model.selected().size());
+	removeSelectedLines();
+	if (count > 0)
+		emit linesRemoved(count);
+}
+
+void FilterTable::removeSelectedLines()
 {
 	// A single-row deletion keeps every other row widget alive and splices
 	// just one out of the grid. Multi-row deletions (and the frozen legacy

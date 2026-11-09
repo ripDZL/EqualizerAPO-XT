@@ -33,13 +33,22 @@ permissions:
 
 env:
   BUILD_CONFIGURATION: Release
+  # Audit #422 TD-16: tool versions the jobs below pin, stated once.
+  PYTHON_VERSION: '3.12'
+  CPPCHECK_VERSION: '2.21.0'
+  PESTER_VERSION: '5.6.1'
+  # SHA-256 of pester.5.6.1.nupkg as the gallery's package CDN serves it;
+  # its module files match a gallery install of 5.6.1 byte for byte.
+  PESTER_NUPKG_SHA256: '37b3749f69accead67c366d81508977f62afc7cbb9c4db88c3a255a1f0b20da5'
+  NUMPY_VERSION: '2.3.2'
 
 jobs:
   version-bump:
     # Run on every main push EXCEPT:
-    #   • pushes the bump job itself made — those carry [skip ci] which already
-    #     stops GitHub from triggering a new workflow, but we guard explicitly
-    #     in case that behaviour ever changes.
+    #   • pushes the bump job itself made — those carry [skip ci], which stops
+    #     GitHub from triggering a new workflow (the push uses a deploy key,
+    #     which would otherwise start one), but we guard explicitly in case
+    #     that behaviour ever changes.
     #   • manual `chore(version):` commits — when a maintainer sets a specific
     #     version we keep their value and just build/release with it.
     if: |
@@ -48,8 +57,10 @@ jobs:
       && !contains(github.event.head_commit.message, '[skip ci]')
       && !startsWith(github.event.head_commit.message, 'chore(version):')
     runs-on: windows-2025-vs2026
+    # The bump push authenticates with the RELEASE_DEPLOY_KEY deploy key, not
+    # the workflow token, so the token only needs to read.
     permissions:
-      contents: write
+      contents: read
     outputs:
       bumped_sha: ${{ steps.commit.outputs.sha }}
       base_version: ${{ steps.commit.outputs.base_version }}
@@ -61,13 +72,18 @@ jobs:
       bumped: ${{ steps.commit.outputs.bumped }}
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       with:
         fetch-depth: 0
-        # Persist the credentials so the bump push uses GITHUB_TOKEN as expected.
-        # Note: GITHUB_TOKEN pushes do NOT retrigger workflows, which is why we
-        # do the build/release in the same workflow run (downstream jobs check
+        # The bump is pushed over SSH with this write deploy key: main's
+        # "Required checks" ruleset requires every PR check and lets only
+        # deploy keys through, and the bump commit has no checks of its own
+        # (GitHub does not accept GitHub Actions as a ruleset bypass actor on a
+        # personal repository). A deploy-key push would start workflows, which
+        # the [skip ci] in the bump commit message prevents; the build and
+        # release still run in this same workflow run (downstream jobs check
         # out bumped_sha).
+        ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
         persist-credentials: true
 
     - name: Bump version
@@ -108,11 +124,18 @@ jobs:
           # automates (CLAUDE.md).
           $releaseDate = [DateTime]::UtcNow.ToString('yyyy-MM-dd')
           .\.github\scripts\Update-Changelog.ps1 -Version $baseVersion -Date $releaseDate
+          # Audit #422 TD-03: each git call is checked. A rejected push used to
+          # leave bumped=true with a SHA that existed only on this runner, so
+          # the build job failed later on an unrelated checkout error and the
+          # version.h/CHANGELOG edits were lost.
           git add version.h CHANGELOG.md CHANGELOG.ko.md
-          # [skip ci] keeps any future GitHub change from triggering a second run on
+          if ($LASTEXITCODE -ne 0) { throw "git add of the version bump failed" }
+          # [skip ci] keeps the deploy-key push from starting a second run on
           # this commit; the current workflow keeps going regardless.
           git commit -m "chore(version): bump version [skip ci]"
+          if ($LASTEXITCODE -ne 0) { throw "git commit of the version bump failed" }
           git push
+          if ($LASTEXITCODE -ne 0) { throw "git push of the version bump failed" }
           "bumped=true" >> $env:GITHUB_OUTPUT
         }
         elseif ($releaseRequired) {
@@ -128,6 +151,7 @@ jobs:
         }
 
         $sha = (& git rev-parse HEAD).Trim()
+        if ($LASTEXITCODE -ne 0) { throw "git rev-parse HEAD failed" }
 
         Write-Host "Bumped HEAD: $sha"
         Write-Host "Base version: $baseVersion"
@@ -158,7 +182,7 @@ jobs:
       primary_artifact: ${{ steps.gen.outputs.primary_artifact }}
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
     - name: Lint variant consumers against the manifest
       shell: pwsh
@@ -204,7 +228,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       with:
         # On main, the bump job pushed a new commit using GITHUB_TOKEN which does
         # not retrigger workflows. Pulling that commit explicitly ensures the
@@ -213,7 +237,7 @@ jobs:
         ref: ${{ needs.version-bump.outputs.bumped_sha || github.sha }}
 
     - name: Add MSBuild to PATH
-      uses: microsoft/setup-msbuild@v3
+      uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3.0.0
       with:
         # setup-msbuild compares this input CASE-SENSITIVELY against 'x64'/'arm64'
         # and silently falls back to the 32-bit x86 MSBuild on any other value.
@@ -288,13 +312,15 @@ jobs:
         .\.github\scripts\Initialize-DepsEnvironment.ps1 -DepsPath "${{ github.workspace }}\deps"
 
     - name: Setup Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
       with:
-        python-version: '3.12'
+        python-version: ${{ env.PYTHON_VERSION }}
 
-    # Install Qt for Editor and DeviceSelector. The aqt install
-    # (concurrency 1: parallel extraction raced intermittently) lives in
-    # .github/scripts/Provisioning.psm1, shared with setup-build.ps1 (TD015).
+    # Install Qt for Editor and DeviceSelector. Install-QtSdk reads Qt's
+    # online repository directly (aqtinstall cannot read the Qt 6.12 layout)
+    # and checks every archive against the SHA-256 pins in simd-variants.psd1;
+    # it lives in .github/scripts/Provisioning.psm1, shared with
+    # setup-build.ps1 (TD015).
     - name: Install Qt
       shell: pwsh
       run: |
@@ -308,7 +334,8 @@ jobs:
         echo "$qtRoot\bin" >> $env:GITHUB_PATH
         Write-Host "QT_ROOT=$qtRoot"
 
-    # Build the solution (excluding Qt VS Tools projects which will be built separately)
+    # The MSBuild projects; the Qt apps are qmake projects and build in the
+    # next steps.
     - name: Build solution
       shell: pwsh
       run: |
@@ -341,13 +368,14 @@ jobs:
     # test tools, not product, so they travel as their own artifact.
     - name: Upload capture probes (primary variant)
       if: matrix.primary == true
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: capture-probes
         path: |
           Tests/ApoHostProbe/${{ matrix.platform }}/Release/ApoHostProbe.exe
           Tests/CaptureProbe/${{ matrix.platform }}/Release/CaptureProbe.exe
           Tests/AsioProbe/${{ matrix.platform }}/Release/AsioProbe.exe
+          Tests/TestVst2Plugin/${{ matrix.platform }}/Release/TestVst2Plugin.dll
         if-no-files-found: error
         retention-days: 14
 
@@ -381,7 +409,7 @@ jobs:
 
     - name: Upload audio regression outputs
       if: matrix.can_execute == true
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: audio-regression-output-${{ matrix.simd_variant }}
         path: Tests/AudioRegressionTests/output
@@ -390,7 +418,7 @@ jobs:
 
     - name: Upload audio regression references (primary variant)
       if: matrix.primary == true
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: audio-regression-references
         path: Tests/AudioRegressionTests/references
@@ -438,7 +466,7 @@ jobs:
       shell: pwsh
       run: |
         & .\.github\scripts\Invoke-EditorOffscreenTest.ps1 `
-          -WorkspaceRoot "${{ github.workspace }}" -Gate selftest-vst
+          -WorkspaceRoot "${{ github.workspace }}" -Gate selftest-vst -Platform "${{ matrix.platform }}"
 
     # The header power toggle and the row-editor construction policy: every
     # valid line keeps a real editor through load and an off/on round trip
@@ -450,7 +478,7 @@ jobs:
       shell: pwsh
       run: |
         & .\.github\scripts\Invoke-EditorOffscreenTest.ps1 `
-          -WorkspaceRoot "${{ github.workspace }}" -Gate power-toggle
+          -WorkspaceRoot "${{ github.workspace }}" -Gate power-toggle -Platform "${{ matrix.platform }}"
 
     # The routing views' inline edits and the ALL chips: the minimal step
     # list must keep its source hint after a source is added, open a source
@@ -464,7 +492,20 @@ jobs:
       shell: pwsh
       run: |
         & .\.github\scripts\Invoke-EditorOffscreenTest.ps1 `
-          -WorkspaceRoot "${{ github.workspace }}" -Gate routing-edit
+          -WorkspaceRoot "${{ github.workspace }}" -Gate routing-edit -Platform "${{ matrix.platform }}"
+
+    # The custom title bar must stay draggable once a native child window
+    # covers it (an embedded VST panel makes Qt turn the chrome host native).
+    # WM_NCHITTEST needs real Win32 windows, so this gate alone runs on the
+    # windows platform plugin; the probe sends the messages itself and never
+    # moves the runner's pointer.
+    - name: Run frame hit-test probe (windows platform)
+      if: matrix.primary == true
+      timeout-minutes: 5
+      shell: pwsh
+      run: |
+        & .\.github\scripts\Invoke-EditorOffscreenTest.ps1 `
+          -WorkspaceRoot "${{ github.workspace }}" -Gate frame-hittest -Platform "${{ matrix.platform }}"
 
     # A hard step timeout on every gate: if the Editor ever blocks on a
     # fatal-error dialog again, the job must fail in minutes, not hang for
@@ -491,7 +532,7 @@ jobs:
       shell: pwsh
       run: |
         & .\.github\scripts\Invoke-EditorOffscreenTest.ps1 `
-          -WorkspaceRoot "${{ github.workspace }}" -Gate skin-switch
+          -WorkspaceRoot "${{ github.workspace }}" -Gate skin-switch -Platform "${{ matrix.platform }}"
 
     - name: Run analysis dock layout test (offscreen)
       if: matrix.primary == true
@@ -499,7 +540,15 @@ jobs:
       shell: pwsh
       run: |
         & .\.github\scripts\Invoke-EditorOffscreenTest.ps1 `
-          -WorkspaceRoot "${{ github.workspace }}" -Gate analysis-layout
+          -WorkspaceRoot "${{ github.workspace }}" -Gate analysis-layout -Platform "${{ matrix.platform }}"
+
+    - name: Run plug-in load responsiveness test (offscreen)
+      if: matrix.primary == true
+      timeout-minutes: 5
+      shell: pwsh
+      run: |
+        & .\.github\scripts\Invoke-EditorOffscreenTest.ps1 `
+          -WorkspaceRoot "${{ github.workspace }}" -Gate plugin-load -Platform "${{ matrix.platform }}"
 
     - name: Run card move test (offscreen)
       if: matrix.primary == true
@@ -507,7 +556,7 @@ jobs:
       shell: pwsh
       run: |
         & .\.github\scripts\Invoke-EditorOffscreenTest.ps1 `
-          -WorkspaceRoot "${{ github.workspace }}" -Gate card-move
+          -WorkspaceRoot "${{ github.workspace }}" -Gate card-move -Platform "${{ matrix.platform }}"
 
     - name: Run card selection test (offscreen)
       if: matrix.primary == true
@@ -515,30 +564,33 @@ jobs:
       shell: pwsh
       run: |
         & .\.github\scripts\Invoke-EditorOffscreenTest.ps1 `
-          -WorkspaceRoot "${{ github.workspace }}" -Gate card-selection
+          -WorkspaceRoot "${{ github.workspace }}" -Gate card-selection -Platform "${{ matrix.platform }}"
 
     - name: Upload skin gallery
       if: matrix.primary == true
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: skin-gallery
         path: |
           skin-gallery/*.png
           readability-legacy-gallery/*.png
+        if-no-files-found: error
 
     - name: Upload analysis dock layout proof
       if: matrix.primary == true
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: analysis-layout
         path: analysis-layout/*
+        if-no-files-found: error
 
     - name: Upload card selection proof
       if: matrix.primary == true
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: card-selection
         path: card-selection/*
+        if-no-files-found: error
 
     # Keep the debug symbols of every shipped program as a run artifact:
     # field crash minidumps can only be symbolized against the PDB of the
@@ -553,7 +605,7 @@ jobs:
           -SimdVariant "${{ matrix.simd_variant }}"
 
     - name: Upload debug symbols
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: symbols-${{ matrix.platform }}-${{ matrix.simd_variant }}
         path: symbols/
@@ -575,7 +627,7 @@ jobs:
     # second folder list here is how generic/ and networkinformation/ went
     # silently missing from releases (audit #275 TD-11).
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: EqualizerAPO-${{ matrix.platform }}-${{ matrix.simd_variant }}
         path: ${{ github.workspace }}\artifacts\EqualizerAPO-${{ matrix.platform }}-${{ matrix.simd_variant }}\
@@ -586,7 +638,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
     # cppcheck is built from a pinned release tag instead of apt because the
     # apt package version drifts with the runner image and the finding set
@@ -594,15 +646,15 @@ jobs:
     # against the same version developers run locally.
     - name: Cache cppcheck
       id: cache-cppcheck
-      uses: actions/cache@v6
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/cppcheck-install
-        key: cppcheck-2.21.0-${{ runner.os }}
+        key: cppcheck-${{ env.CPPCHECK_VERSION }}-${{ runner.os }}
 
-    - name: Build cppcheck 2.21.0
+    - name: Build cppcheck ${{ env.CPPCHECK_VERSION }}
       if: steps.cache-cppcheck.outputs.cache-hit != 'true'
       run: |
-        git clone --depth 1 --branch 2.21.0 https://github.com/danmar/cppcheck.git "$HOME/cppcheck-src"
+        git clone --depth 1 --branch "$CPPCHECK_VERSION" https://github.com/danmar/cppcheck.git "$HOME/cppcheck-src"
         cmake -S "$HOME/cppcheck-src" -B "$HOME/cppcheck-build" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$HOME/cppcheck-install"
         cmake --build "$HOME/cppcheck-build" -j"$(nproc)"
         cmake --install "$HOME/cppcheck-build"
@@ -618,8 +670,11 @@ jobs:
     #   exception types, filters) are intentionally implicit upstream.
     # - LocalAllocCalled: LocalAlloc/LocalFree pairs are mandated by the
     #   Win32 security APIs used (SetEntriesInAcl, GetNamedSecurityInfoW).
-    # - unknownMacro on the VST3 host files: QUERY_INTERFACE comes from
-    #   the VST3 SDK under deps/, which is excluded from analysis.
+    # - information is enabled so a stale inline suppression surfaces as
+    #   unmatchedSuppression (audit #422 TD-42); the two information ids
+    #   that are not findings are switched off: normalCheckLevelMaxBranches
+    #   only notes that --check-level=exhaustive would follow more branches,
+    #   and checkersReport is the run's checker count.
     # - unusedStructMember on FilterEngine.Process.cpp: the IoTraits label and
     #   I/O members are consumed inside the processImpl member template;
     #   cppcheck does not analyze template instantiations, so it reports every
@@ -634,13 +689,13 @@ jobs:
     - name: Run cppcheck
       run: |
         "$HOME/cppcheck-install/bin/cppcheck" \
-          --enable=warning,style,performance,portability \
+          --enable=warning,style,performance,portability,information \
           --inline-suppr \
           --library=qt \
           --library=windows \
-          --suppress=missingIncludeSystem \
+          --suppress=normalCheckLevelMaxBranches \
+          --suppress=checkersReport \
           --suppress=unusedFunction \
-          --suppress=unmatchedSuppression \
           --suppress=cstyleCast \
           --suppress=shadowFunction \
           --suppress=shadowVariable \
@@ -649,7 +704,6 @@ jobs:
           --suppress=postfixOperator \
           --suppress=noExplicitConstructor \
           --suppress=LocalAllocCalled \
-          --suppress=unknownMacro:vst/VSTPluginLibrary.cpp \
           --suppress=unusedStructMember:engine/FilterEngine.Process.cpp \
           --suppress=uninitMemberVarNoCtor:libHybridConv-0.1.1/* \
           --suppress=*:deps/* \
@@ -669,7 +723,7 @@ jobs:
 
     - name: Upload cppcheck report
       if: always()
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: cppcheck-report
         path: cppcheck-report.txt
@@ -692,10 +746,10 @@ jobs:
     runs-on: windows-2025-vs2026
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
     - name: Add MSBuild to PATH
-      uses: microsoft/setup-msbuild@v3
+      uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3.0.0
       with:
         msbuild-architecture: x64
 
@@ -733,9 +787,9 @@ jobs:
         .\.github\scripts\Initialize-DepsEnvironment.ps1 -DepsPath "${{ github.workspace }}\deps"
 
     - name: Setup Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
       with:
-        python-version: '3.12'
+        python-version: ${{ env.PYTHON_VERSION }}
 
     # EditorLogicTests links Qt6Core/Gui/Widgets; the other suites are Qt-free.
     - name: Install Qt
@@ -772,7 +826,7 @@ jobs:
     runs-on: windows-2025-vs2026
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
     - name: Install Pester 5
       shell: pwsh
@@ -785,9 +839,12 @@ jobs:
         # '-source'", then "Unable to resolve package source"). So: prefer
         # PSResourceGet, which talks to the gallery without nuget.exe, fall
         # back to PowerShellGet with the repository re-registered, and give
-        # the pair three rounds before failing the gate.
+        # the pair three rounds before failing the gate. The gallery itself
+        # went down on 2026-10-23 (site and API answering 404) while its
+        # package CDN kept serving, so the last resort downloads the package
+        # from the CDN and unpacks it only when it matches the pinned hash.
         $ErrorActionPreference = "Stop"
-        $version = "5.6.1"
+        $version = $env:PESTER_VERSION
         $installers = @(
           @{ Name = "PSResourceGet"; Run = {
             Install-PSResource Pester -Version $version -Repository PSGallery -TrustRepository -Scope CurrentUser -Reinstall -Quiet -ErrorAction Stop
@@ -798,6 +855,18 @@ jobs:
             }
             Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
             Install-Module Pester -RequiredVersion $version -Force -SkipPublisherCheck -Scope CurrentUser -ErrorAction Stop
+          } },
+          @{ Name = "Gallery CDN"; Run = {
+            $archive = Join-Path $env:RUNNER_TEMP "pester.$version.zip"
+            Invoke-WebRequest "https://cdn.powershellgallery.com/packages/pester.$version.nupkg" -OutFile $archive -ErrorAction Stop
+            $hash = (Get-FileHash $archive -Algorithm SHA256).Hash
+            if ($hash -ne $env:PESTER_NUPKG_SHA256) { throw "pester.$version.nupkg is $hash, not the pinned $env:PESTER_NUPKG_SHA256" }
+            $target = Join-Path ([Environment]::GetFolderPath("MyDocuments")) "PowerShell\Modules\Pester\$version"
+            Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction SilentlyContinue
+            Expand-Archive -LiteralPath $archive -DestinationPath $target -Force
+            foreach ($packaging in "_rels", "package", "[Content_Types].xml", "Pester.nuspec") {
+              Remove-Item -LiteralPath (Join-Path $target $packaging) -Recurse -Force -ErrorAction SilentlyContinue
+            }
           } }
         )
         $installed = $false
@@ -820,13 +889,13 @@ jobs:
           }
           if (-not $installed -and $round -lt 3) { Start-Sleep -Seconds 30 }
         }
-        if (-not $installed) { throw "Pester $version could not be installed from the PowerShell Gallery" }
+        if (-not $installed) { throw "Pester $version could not be installed from the PowerShell Gallery or its CDN" }
 
-    - name: Run Bump-Version tests
+    - name: Run the build-script tests (Pester)
       shell: pwsh
       run: |
         $ErrorActionPreference = "Stop"
-        Import-Module Pester -RequiredVersion 5.6.1
+        Import-Module Pester -RequiredVersion $env:PESTER_VERSION
         $config = New-PesterConfiguration
         $config.Run.Path = ".github/scripts/Tests"
         $config.Run.Exit = $true
@@ -837,7 +906,7 @@ jobs:
 
     - name: Upload Pester results
       if: always()
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: pester-results
         path: pester-results.xml
@@ -858,17 +927,17 @@ jobs:
     if: always() && needs.build.result == 'success' && github.event_name != 'pull_request'
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
     - name: Download per-variant audio outputs
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
         pattern: audio-regression-output-*
         path: artifacts
 
     - name: Install numpy
       # Audit #250 F060: pinned like the rest of the toolchain.
-      run: python3 -m pip install --quiet numpy==2.3.2
+      run: python3 -m pip install --quiet "numpy==$NUMPY_VERSION"
 
     - name: Compare SIMD variants
       env:
@@ -897,16 +966,16 @@ jobs:
     timeout-minutes: 30
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
     - name: Download the primary build artifact
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
         name: ${{ needs.prepare-matrix.outputs.primary_artifact }}
         path: artifacts/${{ needs.prepare-matrix.outputs.primary_artifact }}
 
     - name: Download the capture probes
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
         name: capture-probes
         path: artifacts/capture-probes
@@ -914,7 +983,7 @@ jobs:
     - name: Run the capture gate
       shell: pwsh
       run: |
-        $probes = Get-ChildItem -Path "${{ github.workspace }}\artifacts\capture-probes" -Recurse -Filter "*.exe"
+        $probes = Get-ChildItem -Path "${{ github.workspace }}\artifacts\capture-probes" -Recurse -Include "*.exe", "*.dll"
         $probeDir = Join-Path "${{ github.workspace }}" "artifacts\capture-probes-flat"
         New-Item -ItemType Directory -Force -Path $probeDir | Out-Null
         foreach ($probe in $probes) { Copy-Item -LiteralPath $probe.FullName -Destination $probeDir -Force }
@@ -926,20 +995,168 @@ jobs:
 
     - name: Upload capture gate snapshots
       if: always()
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: capture-gate-snapshots
         path: ${{ runner.temp }}\capture-gate
         retention-days: 30
         if-no-files-found: warn
 
+  # The panel input gate: a user's path through a VST plugin panel, with real
+  # OS input. Build-DpfTestPlugins.ps1 builds DPF-Plugins' 3 Band EQ and MVerb
+  # (VST2 and VST3) from pinned sources outside the checkout and puts Mesa's
+  # software OpenGL beside them and beside Editor.exe: a hosted runner has no
+  # GPU, and on its GDI OpenGL 1.1 DPF editors draw nothing. Then
+  # Invoke-PanelInputGate.ps1 opens each panel in Editor.exe, drags controls
+  # with SendInput, presses OK and Save, and checks the saved state, a reopened
+  # panel, and what Benchmark renders from the saved line, with a background
+  # drag as the negative control. Until #437 the VST3 cases failed here: the
+  # Editor passed panel edits to an idle DPF processor through a zero-sample
+  # call DPF ignores.
+  # The asan leg runs the same scenario against an Editor compiled with
+  # AddressSanitizer, the memory gate for the Editor's own code on that path
+  # (memcheck rebuilds the MSBuild suites; the Qt app is not among them). Any
+  # ASan report fails it. UI Automation needs Windows PowerShell 5.1, hence
+  # `shell: powershell` for the gate step. create-release waits for both legs.
+  panel-input-gate:
+    needs: [build, prepare-matrix]
+    runs-on: windows-2025-vs2026
+    if: always() && needs.build.result == 'success'
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        editor: [release, asan]
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+    - name: Download the primary build artifact
+      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+      with:
+        name: ${{ needs.prepare-matrix.outputs.primary_artifact }}
+        path: artifacts/${{ needs.prepare-matrix.outputs.primary_artifact }}
+
+    # The asan leg compiles the Editor itself, with the dependencies and Qt
+    # the memcheck job provisions.
+    - name: Download dependency release assets
+      if: matrix.editor == 'asan'
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = "Stop"
+        Import-Module "${{ github.workspace }}\.github\scripts\Provisioning.psm1" -Force
+
+        $manifest = Import-PowerShellDataFile -Path "${{ github.workspace }}\.github\simd-variants.psd1"
+        $downloads = Get-DependencyDownloadSpec -Manifest $manifest `
+          -DepsRoot "${{ github.workspace }}\deps" `
+          -Platform "x64" `
+          -Simd "avx2"
+        Invoke-DependencyDownload -Downloads $downloads `
+          -DownloadRoot "${{ github.workspace }}\deps\_downloads"
+        Invoke-DependencyDownload -Downloads (Get-SdkDownloadSpec -Manifest $manifest -DepsRoot "${{ github.workspace }}\deps") `
+          -DownloadRoot "${{ github.workspace }}\deps\_downloads"
+
+    - name: Clone pinned source dependencies
+      if: matrix.editor == 'asan'
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = "Stop"
+        Import-Module "${{ github.workspace }}\.github\scripts\Provisioning.psm1" -Force
+        $manifest = Import-PowerShellDataFile -Path "${{ github.workspace }}\.github\simd-variants.psd1"
+        Install-PinnedSourceDependency -Manifest $manifest -DepsRoot "${{ github.workspace }}\deps"
+
+    - name: Setup dependency structures
+      if: matrix.editor == 'asan'
+      shell: pwsh
+      run: |
+        .\.github\scripts\Initialize-DepsEnvironment.ps1 -DepsPath "${{ github.workspace }}\deps"
+
+    - name: Setup Python
+      if: matrix.editor == 'asan'
+      uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install Qt
+      if: matrix.editor == 'asan'
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = "Stop"
+        Import-Module "${{ github.workspace }}\.github\scripts\Provisioning.psm1" -Force
+
+        $qtRoot = Install-QtSdk -WorkspaceRoot "${{ github.workspace }}" -Platform "x64"
+
+        echo "QT_ROOT=$qtRoot" >> $env:GITHUB_ENV
+        echo "$qtRoot\bin" >> $env:GITHUB_PATH
+
+    - name: Build the Editor with AddressSanitizer
+      if: matrix.editor == 'asan'
+      shell: pwsh
+      run: |
+        & "${{ github.workspace }}\.github\scripts\Build-QtApps.ps1" `
+          -WorkspaceRoot "${{ github.workspace }}" `
+          -Platform "x64" `
+          -SimdVariant "avx2" `
+          -QtArchFlag "/arch:AVX2" `
+          -MsvcDevPlatform "x64" `
+          -UpdateChannel "x64-avx2" `
+          -AddressSanitizer
+
+    # The shipped program folder, with the ASan Editor (and the ASan runtime
+    # Build-QtApps.ps1 put beside it) over the shipped one on the asan leg.
+    - name: Stage the program folder
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = "Stop"
+        $artifact = "${{ github.workspace }}\artifacts\${{ needs.prepare-matrix.outputs.primary_artifact }}"
+        $app = Join-Path "${{ runner.temp }}" "panel-input-app"
+        Copy-Item -LiteralPath $artifact -Destination $app -Recurse
+        if ("${{ matrix.editor }}" -eq "asan") {
+          Copy-Item -Path "${{ github.workspace }}\build-Editor-x64-asan\release\*" -Destination $app -Recurse -Force
+        }
+        echo "PANEL_INPUT_APP=$app" >> $env:GITHUB_ENV
+
+    - name: Build the DPF test plugins
+      shell: pwsh
+      run: |
+        & "${{ github.workspace }}\.github\scripts\Build-DpfTestPlugins.ps1" `
+          -WorkspaceRoot "${{ github.workspace }}" `
+          -Root "${{ runner.temp }}\dpf-test-plugins" `
+          -MesaDestination $env:PANEL_INPUT_APP
+
+    - name: Run the panel input gate
+      shell: powershell
+      env:
+        GALLIUM_DRIVER: llvmpipe
+      run: |
+        $asanLogs = if ("${{ matrix.editor }}" -eq "asan") { "${{ runner.temp }}\panel-input-asan" } else { $null }
+        & "${{ github.workspace }}\.github\scripts\Invoke-PanelInputGate.ps1" `
+          -WorkspaceRoot "${{ github.workspace }}" `
+          -AppDirectory $env:PANEL_INPUT_APP `
+          -PluginManifest "${{ runner.temp }}\dpf-test-plugins\dpf-plugins.json" `
+          -WorkDirectory "${{ runner.temp }}\panel-input-work" `
+          -SnapshotDirectory "${{ runner.temp }}\panel-input-gate" `
+          -AsanLogDirectory $asanLogs
+        exit $LASTEXITCODE
+
+    - name: Upload panel input gate snapshots
+      if: always()
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: panel-input-gate-${{ matrix.editor }}
+        path: ${{ runner.temp }}\panel-input-gate
+        retention-days: 30
+        if-no-files-found: warn
+
   # The release waits for every blocking gate (audit #348 D5). main has no
   # branch protection, so these needs are what keeps a red memcheck, capture
-  # gate, cppcheck or Pester run from publishing installers and a Velopack
+  # gate, panel input gate, cppcheck or Pester run from publishing installers and a Velopack
   # feed. New-ReleaseNotes.ps1 reads this list to say what the release waited
   # for. The cross-variant comparison is not a gate; it runs alongside.
+  # Keep `needs:` a one-line [a, b] list at this indent: New-ReleaseNotes.ps1
+  # finds it with a regex, and a block list or a moved key fails the release.
   create-release:
-    needs: [build, version-bump, memcheck, capture-gate, cppcheck, pester]
+    needs: [build, version-bump, memcheck, capture-gate, panel-input-gate, cppcheck, pester]
     runs-on: windows-2025-vs2026
     if: >-
       always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -947,6 +1164,7 @@ jobs:
       && (needs.version-bump.result == 'success' || needs.version-bump.result == 'skipped')
       && needs.memcheck.result == 'success'
       && needs.capture-gate.result == 'success'
+      && needs.panel-input-gate.result == 'success'
       && needs.cppcheck.result == 'success'
       && needs.pester.result == 'success'
     permissions:
@@ -955,13 +1173,13 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       with:
         # Pick up the bumped version.h, not the pre-bump SHA that triggered the run.
         ref: ${{ needs.version-bump.outputs.bumped_sha || github.sha }}
 
     - name: Download build artifacts
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
         pattern: EqualizerAPO-*
         path: ${{ github.workspace }}\release-input
@@ -970,7 +1188,7 @@ jobs:
     # builds the per-variant binaries; this front-door installer is a single
     # architecture-agnostic binary built once here).
     - name: Add MSBuild to PATH
-      uses: microsoft/setup-msbuild@v3
+      uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3.0.0
 
     - name: Resolve release version
       id: version

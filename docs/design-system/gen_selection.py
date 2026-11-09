@@ -27,18 +27,33 @@ CSS = '''
   .skin-soft .opt.master { background: var(--card); font-weight: 700; }
   .skin-soft .opt.q { background: transparent; border: 1px dotted var(--border); }
   .skin-soft .lane .cap { text-transform: none; letter-spacing: 0; font-size: 12px; font-weight: 500; }
-  /* rack: latching caps; engaged = latch-down with the amber backlight */
+  /* rack: latching caps. Dark: a routed Device chip latches down in the bronze of the header caps, an engaged Stage
+     chip wears a 2px bronze bar along its top, and a taken Channel seat lights the amber lamp window under its cap
+     (a real lamp). Light keeps the amber latch on all three. Values are rack_dark.qss / rack_light.qss. */
   .skin-rack .opt { background: linear-gradient(180deg, #2c333a, #1b2126); border: 1px solid #11161a; border-top-color: #3e474f; border-radius: 3px;
     text-transform: uppercase; letter-spacing: 1px; font-size: 11px; font-weight: 700; }
   [data-theme="light"] .skin-rack .opt { background: linear-gradient(180deg, var(--card-hover), var(--card)); border-color: var(--seam); border-top-color: #fff8; }
-  .skin-rack .opt.on { background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 22%, #1b2126), color-mix(in srgb, var(--accent) 35%, #2c333a)); border-color: var(--accent); border-top-color: #11161a; color: var(--accent); padding-top: 1px; box-shadow: inset 0 2px 3px rgba(0,0,0,.5); }
+  .skin-rack .opt.on { background: linear-gradient(180deg, #282319, #363024); border-color: #8c8578; border-top-color: #1c1912; border-bottom-color: #4e483b; color: var(--text); padding-top: 1px; }
+  .skin-rack .seats .opt.on { background: linear-gradient(180deg, #161b1f, #242b31); border-color: #11161a; border-top-color: #0c1013; border-bottom: 2px solid var(--accent); color: #ffe9c8; }
+  .skin-rack .lane .opt.on { background: linear-gradient(180deg, #363024, #282319); border-color: #8c8578; border-top: 2px solid #8c8578; color: var(--text); padding-top: 0; }
+  [data-theme="light"] .skin-rack .opt.on { background: linear-gradient(180deg, #e8c887, #f6e4bd); border-color: var(--accent); border-top-color: #b98f3e; border-bottom-color: #f0e4c9; color: #4a2e00; }
+  [data-theme="light"] .skin-rack .seats .opt.on { background: linear-gradient(180deg, #d8cfbb, #e6dfcf); border-color: #afa288; border-top-color: #b8ac92; border-bottom: 2px solid var(--accent); color: #4a2e00; }
+  [data-theme="light"] .skin-rack .lane .opt.on { background: linear-gradient(180deg, #f1e4c6, #f0d9a2); border-color: var(--accent); border-top: 2px solid var(--accent); color: #4a2e00; }
   .skin-rack .opt.q { background: color-mix(in srgb, var(--card) 70%, black); color: var(--muted); }
   .skin-rack .opt.master.on { border-color: var(--accent2); color: var(--accent2); background: linear-gradient(180deg, color-mix(in srgb, var(--accent2) 18%, #1b2126), color-mix(in srgb, var(--accent2) 28%, #2c333a)); }
-  /* matrix: cells; engaged = accent-tinted cell with the accent rule */
-  .skin-matrix .opt { background: var(--bg); border: 1px solid var(--border); border-radius: 0; }
-  .skin-matrix .opt.on { background: color-mix(in srgb, var(--accent) 22%, var(--bg)); border-color: var(--accent); }
-  .skin-matrix .opt.master { text-transform: uppercase; letter-spacing: 1px; font-size: 11px; }
-  .skin-matrix .opt.q { border-color: transparent; font-family: var(--mono); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; }
+  /* matrix: one box per surface (rule 9). Device and Channel chips are sunken fill tiles with no rule at rest, Stage
+     chips are transparent function cells; engaged = accent tint (alpha .26) with the accent rule. The reveal toggle
+     is a transparent mono caption; the add-a-channel entry (and a virtual channel or an uninstalled device) is
+     unfilled over a dashed rule. */
+  .skin-matrix .opt { height: 32px; padding: 0 10px; background: var(--graph); border: 1px solid transparent; border-radius: 0; font-size: 13.33px; font-weight: 500; }
+  [data-theme="light"] .skin-matrix .opt { background: var(--surface); } /* matrix_light.qss DeviceChip/ChannelChip #EBEBEB */
+  .skin-matrix .opt.on { background: color-mix(in srgb, var(--accent) 26%, transparent); border-color: var(--accent); }
+  .skin-matrix .opt.master { color: var(--muted); text-transform: uppercase; letter-spacing: 1px; font-size: 12px; font-weight: 600; }
+  .skin-matrix .opt.q { background: transparent; color: var(--muted); font-family: var(--mono); font-weight: 500; text-transform: uppercase; letter-spacing: 1px; font-size: 12px; }
+  .skin-matrix .seats .opt { min-width: 32px; font-family: var(--mono); font-weight: 700; letter-spacing: 1px; }
+  .skin-matrix .seats .opt.q { text-transform: none; font-weight: 500; border-bottom: 1px dashed var(--border); }
+  .skin-matrix .lane .opt { background: transparent; padding: 0 16px; text-transform: uppercase; letter-spacing: 1.5px; font-size: 12px; font-weight: 600; }
+  .skin-matrix .lane .opt.on { background: color-mix(in srgb, var(--accent) 28%, transparent); }
 '''
 ARROW = '<svg class="arrow" viewBox="0 0 14 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 5h11"/><path d="M8 1.5L12 5 8 8.5"/></svg>'
 
@@ -47,7 +62,10 @@ def device(skin):
             '<span class="opt on">Speakers</span><span class="opt">Headphones</span><span class="opt on">Microphone</span></div>')
 
 def channel(skin):
-    return '<div class="opts"><span class="opt master">ALL</span><span class="opt on">L</span><span class="opt on">R</span><span class="opt q">Add channel</span></div>'
+    # matrix seats its channel chips as mono coordinate cells and rack lights a lamp window under each taken seat,
+    # so the strip names itself for those skins' CSS
+    opts = 'opts seats' if skin in ('matrix', 'rack') else 'opts'
+    return f'<div class="{opts}"><span class="opt master">ALL</span><span class="opt on">L</span><span class="opt on">R</span><span class="opt q">Add channel</span></div>'
 
 def stage(skin):
     return (f'<div class="lane"><span class="cap">Playback</span><span class="opt on">Pre-mix</span>{ARROW}<span class="opt on">Post-mix</span></div>'

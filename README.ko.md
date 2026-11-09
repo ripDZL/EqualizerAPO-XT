@@ -14,10 +14,19 @@ EqualizerAPO-XT는 Windows용 시스템 전체 이퀄라이저인 [Equalizer APO
 
 지금 진행 중인 작업은 다음과 같습니다.
 
-1. 격주 자동 코드 감사가 찾아낸 문제를 처리합니다. 미뤄 두었던 아키텍처
-   작업으로 업데이트 세션의 테스트 이음새, 깊어진 픽커·카드 기반, 루트 헬퍼
-   짬통을 대신하는 도메인 모듈까지 마련했습니다
-   ([#264](https://github.com/115dkk/EqualizerAPO-XT/pull/264)).
+1. 격주 자동 코드 감사가 찾아낸 문제를 처리합니다. 2026-10-15 감사
+   ([#422](https://github.com/115dkk/EqualizerAPO-XT/issues/422))는 PR 하나
+   ([#423](https://github.com/115dkk/EqualizerAPO-XT/pull/423))에서
+   처리했습니다. 컴파일러 경고가 있으면 빌드가 실패하도록 바꿨고, 엔진, ASIO,
+   VST, Editor 코드에 흩어져 있던 같은 규칙의 사본을 한 곳으로 모았으며, 랙
+   스킨의 브러시 레시피를 하나로 합쳤습니다. 후속으로 스테레오 읽기 변환을
+   개선했습니다. 로컬 i5-12600KF에서 480프레임을 변환하는 데 걸린 시간은
+   SSE2 수정 전 217ns에서 수정 후 120ns로 줄었습니다. ARM64 CI에서는 새 경계
+   시험을 통과했고 141~142ns를 기록했습니다. 이전 CI의 277ns와 비교한 수치이며,
+   같은 기계에서 조건을 통제한 비교는 아닙니다. 일치하는 DLL과 PDB로 실제 명령을
+   확인한 결과, NEON으로 채널을 분리하고 기존의 스택 저장·재읽기를 없앴습니다.
+   다른 SIMD 변형의 읽기 커널은 유지합니다
+   ([#425](https://github.com/115dkk/EqualizerAPO-XT/pull/425)).
 2. 커뮤니티 피드백 라운드를 반영해 Editor 스킨을 다듬습니다. 다섯 스킨은
    공용 동작을 유지하면서 시각 작업이 각 스킨 안에 머물도록 전용 모듈과 자동
    경계 검사를 갖췄습니다. 최근 작업에서는 오른쪽 분석 그래프의 처음 너비를
@@ -32,6 +41,13 @@ EqualizerAPO-XT는 Windows용 시스템 전체 이퀄라이저인 [Equalizer APO
    쓰고, Clarity는 가장 높은 대비를 우선합니다.
 3. 위상과 시간. 분석 그래프가 크기·위상·그룹 지연을 전환하고, 올패스 필터에 전용 카드와 1차 섹션이 생겼으며, `Delay`와 올패스가 픽커의 'Phase & Time' 분류로 묶였습니다. 올패스는 음량을 전혀 바꾸지 않으므로 크기만 그리는 그래프로는 볼 수 없는 필터였습니다([#228](https://github.com/115dkk/EqualizerAPO-XT/issues/228), [docs/features/phase-and-time.md](docs/features/phase-and-time.md)).
 4. 프로그래밍 계열 설정 명령(`If:`/`ElseIf:`/`Else:`/`EndIf:`/`Eval:`) 전용 에디터 — 완료. 다섯 스킨이 분석 판정으로 블록을 각자의 계기로 표현하고, 픽커가 이 명령들을 삽입하며, 계수 직접 입력 IIR 줄과 백틱 인라인 식이 든 줄도 각자의 카드를 유지합니다([#178](https://github.com/115dkk/EqualizerAPO-XT/pull/178), [#182](https://github.com/115dkk/EqualizerAPO-XT/pull/182), [#183](https://github.com/115dkk/EqualizerAPO-XT/pull/183), [#184](https://github.com/115dkk/EqualizerAPO-XT/pull/184)).
+
+   `Eval: inL=1;inR=2`처럼 세미콜론으로 나눈 기존 수식도 읽습니다. SECS의 채널
+   매핑을 비롯해 원본 Equalizer APO의 구형 파서에 맞춰 작성한 설정과 호환됩니다.
+   FIR 샘플레이트는 여전히 장치와 같아야 합니다.
+   [재현 결과와 호환 처리](docs/architecture/legacy-expression-separators.md)에
+   확인 범위를 정리했습니다
+   ([#426](https://github.com/115dkk/EqualizerAPO-XT/pull/426)).
 5. 서브우퍼 라우팅([#246](https://github.com/115dkk/EqualizerAPO-XT/issues/246)) — 핵심 기능은 완료됐습니다. `SubwooferRouting:` 명령, MIT SubwooferRoutingCore DSP 라이브러리, 독립 실행형 VST3 플러그인, 4.1 호스트 협상 수정, 다섯 스킨 각각의 카드 계기, 그리고 두 라우팅 행렬과 응답 뷰를 갖춘 전체 편집기까지 들어갔습니다. 남은 후속 작업은 연결된 프로필 파일로의 변경 사항 되쓰기(현재는 행을 인라인 상태로 전환), audition/solo 오버라이드, 새 문자열의 한국어 번역, 전용 VST3 편집기 화면(현재는 호스트의 일반 파라미터 화면)입니다.
 6. VST3 버스 레이아웃 명시([#216](https://github.com/115dkk/EqualizerAPO-XT/issues/216)) — 비대칭 입출력, 4.1, 엄격한 실패 처리, VST2에서의 조용한 무시를 포함한 백엔드 `VSTPlugin:` `Input`/`Output` 문법과 결정적 호스트 테스트를 마쳤습니다. Qt Editor에도 플러그인 이름 옆에 Input/Output 선택기가 들어갔습니다. 다섯 스킨이 각자의 시각 언어로 그리고, 판정 램프가 실제 체결된 버스를 알려 주며, VST2 잠금·잔존 키 제거와 구형 `StereoInput` 이전까지 처리합니다([#265](https://github.com/115dkk/EqualizerAPO-XT/pull/265)). 이번 라운드에서는 협상된 슬롯에 임의 설정 채널을 넣는 슬롯별 채널 채우기(`InputChannels`/`OutputChannels`, 지정하지 않은 채널은 그대로 통과)와 레거시 행의 Input/Output 드롭다운이 들어갔고([#290](https://github.com/115dkk/EqualizerAPO-XT/pull/290)), 채우기 목록의 편집기가 모든 스킨에 들어갔습니다. 카드 안의 레일 두 줄이 슬롯별 채널 드롭다운을 들고 라인의 `Channel:`/`Copy:` 흐름을 따르며, 양쪽 레일이 있으면 접기 스위치가 붙고, 레거시 표시에는 콤보 행이 들어갑니다([#292](https://github.com/115dkk/EqualizerAPO-XT/pull/292)).
 7. ASIO([#310](https://github.com/115dkk/EqualizerAPO-XT/issues/310)) —
@@ -128,7 +144,7 @@ EqualizerAPO-XT는 Windows용 시스템 전체 이퀄라이저인 [Equalizer APO
 
 ## 빌드
 
-프로젝트는 Visual Studio, Qt, Velopack과 몇 가지 외부 라이브러리를 사용합니다. [setup-build.ps1](setup-build.ps1)을 실행하면 로컬 빌드에 필요한 것(바이너리 의존성, 헤더 전용 체크아웃, Qt 6.10.1)이 모두 준비됩니다. 수동 배치 방법은 [docs/LocalDependencySetup.md](docs/LocalDependencySetup.md)에 있습니다.
+프로젝트는 Visual Studio, Qt, Velopack과 몇 가지 외부 라이브러리를 사용합니다. [setup-build.ps1](setup-build.ps1)을 실행하면 로컬 빌드에 필요한 것(바이너리 의존성, 헤더 전용 체크아웃, Qt 6.12.0)이 모두 준비됩니다. 수동 배치 방법은 [docs/LocalDependencySetup.md](docs/LocalDependencySetup.md)에 있습니다.
 
 미리 빌드된 의존성은 아래 저장소에서 받습니다. 이 저장소들은 TheFireKahuna가 같은 태그로 올린 릴리스를 바이트 단위로 똑같이 옮겨 둔 것이고, 각 파일의 SHA-256은 `.github/simd-variants.psd1`에 고정되어 있습니다.
 
@@ -177,6 +193,7 @@ Qt 도구는 CI에서도, 문서화된 로컬 설정에서도 qmake로 빌드합
 - **스위트:** `EditorLogicTests`와 `HybridConvTests`(단위 테스트), `EngineOrchestrationTests`(엔진 라우팅, 설정 교체, 장치와 레지스트리 동작), `AudioRegressionTests`(엔진 출력을 커밋된 기준값과 비교하며 CI에서는 SIMD 변형끼리도 비교), `AsioTests`(ASIO 래퍼, 호스트 연결, 엔진 호스트)가 있습니다.
 - **픽스처:** `TestVst2Plugin`과 `TestVst3Plugin`(VST2·VST3 호스트를 시험하는 자체 플러그인), `FakeAsioDriver`(래퍼 테스트용 ASIO 드라이버), `AsioSupport`(공용 테스트 헤더)가 있습니다.
 - **프로브:** `VstPreviewProbe`(`vst3-preview-probe` 워크플로가 실제 엔드포인트에서 패널 실시간 미리 듣기를 확인), `AsioProbe`(ASIO 프로브 게이트), 가상 케이블 러너에서 캡처 게이트를 돌리는 `ApoHostProbe`와 `CaptureProbe`가 있습니다.
+- **패널 입력 게이트:** `.github/scripts/Invoke-PanelInputGate.ps1`이 DPF-Plugins의 3 Band EQ와 MVerb(VST2와 VST3, `Build-DpfTestPlugins.ps1`이 고정한 소스에서 빌드) 패널을 Editor에서 열고, 실제 마우스 입력으로 조작부를 끈 뒤 OK와 Save를 누릅니다. 그런 다음 저장된 상태, 다시 연 패널, 저장된 줄로 Benchmark가 낸 소리를 확인합니다. CI는 출시본 Editor와 AddressSanitizer로 빌드한 Editor 두 가지로 돌립니다.
 
 변형별 테스트 정책은 [docs/SimdBuildMatrix.md](docs/SimdBuildMatrix.md)에 있습니다.
 
@@ -195,3 +212,20 @@ ASIO is a trademark and software of Steinberg Media Technologies GmbH.
 ## Special Thanks
 
 - **Mephistos (DCinside)** - Editor의 VST3 플러그인 패널에서 레벨 미터와 그래프가 살아나지 않는 원인을 진단하고, 동작하는 WASAPI 루프백 패치를 GPL로 공개했으며, 수정 검증에 쓰인 Open-XTC 플러그인을 제공해 주셨습니다. 패널 프리뷰 피드(`Editor/helpers/PanelPreviewFeeder`)는 이 기여에서 파생되었습니다.
+
+## 구걸
+
+개발자는 돈이 필요합니다.\
+이 프로그램이 좋다고 생각하시면 한 푼만 주십시오...
+
+**지금 모으는 돈:** EV 인증서, 딱 한 번 $359. 개인 BRIR로 헤드폰에서 Dolby Atmos를 듣는 새 앱의 드라이버를 Microsoft 서명으로 내기 위한 비용입니다. 이게 있으면 Secure Boot를 끄지 않고 설치되는 앱을 낼 수 있습니다. (현재 $0 / $359)
+
+**그 앱은 지금 개발 중입니다:** [spatial-audio-softreceiver](https://github.com/115dkk/spatial-audio-softreceiver)
+
+**초과분은 이렇게 씁니다:**
+
+- AI 구독료
+- AI 개발사들이 요구하는 하드웨어 키 비용
+- 개발자의 집값 대출 상환에 보탬
+
+[GitHub Sponsors](https://github.com/sponsors/115dkk)

@@ -15,8 +15,10 @@
 #include <QCheckBox>
 #include <QCoreApplication>
 #include <QDir>
+#include <QEvent>
 #include <QFileInfo>
 #include <QLocale>
+#include <QPointer>
 #include <QPushButton>
 #include <QStringList>
 #include <QWidget>
@@ -26,6 +28,7 @@
 
 #include "services/security/AudioEngineAccess.h"
 #include "Editor/guis/VSTPluginFilterGUIDialog.h"
+#include "Editor/helpers/PluginLoadQueue.h"
 #include "Editor/helpers/VstChunkScan.h"
 #include "Editor/helpers/VSTPopupLivePreviewPolicy.h"
 
@@ -102,84 +105,133 @@ void VSTPluginSession::setLiveAnalyzerFeedEnabled(bool enabled)
 		previewFeeder.stop();
 }
 
+bool VSTPluginSession::loading() const
+{
+	return currentStatus.loading;
+}
+
 void VSTPluginSession::initPlugin()
 {
-	if (effect != nullptr)
+	if (effect != nullptr || loading())
 		return;
 
-	// Each text keeps the translation context of the row it was written for;
-	// the card shows a missing library as a state, not as text.
-	const bool card = row == Row::Card;
-	currentStatus = Status();
-	if (pluginLibrary->getLibPath() == L"")
+	if (pluginLibrary->getLibPath().empty())
 	{
+		// The card shows a missing library as a state, not as text.
+		currentStatus = Status();
 		currentStatus.libraryMissing = true;
 		currentStatus.critical = true;
-		if (!card)
+		if (row == Row::Legacy)
 			currentStatus.text = QCoreApplication::translate("VSTPluginFilterGUI", "No file selected.");
+		emit statusChanged();
+		finishPendingReplacement();
+		return;
+	}
+
+	applyLoadResult(VSTPluginLibrary::load(pluginLibrary->getLibPath()).status);
+}
+
+void VSTPluginSession::requestPlugin()
+{
+	if (effect != nullptr || loading())
+		return;
+
+	if (pluginLibrary->getLibPath().empty())
+	{
+		initPlugin();
+		finishLoad();
+		return;
+	}
+
+	// A library this process holds already needs no file system work. Any
+	// other, a missing one included, is judged and loaded on the loader
+	// thread: telling whether the file is there reaches the file system,
+	// which may be an unreachable share (audit #422 TD-04).
+	if (!PluginLoadQueue::isPending(pluginLibrary.get()) && pluginLibrary->isLoadedNow())
+	{
+		initPlugin();
+		finishLoad();
+		return;
+	}
+
+	currentStatus = Status();
+	currentStatus.loading = true;
+	emit statusChanged();
+
+	const unsigned generation = loadGeneration;
+	QPointer<VSTPluginSession> guard(this);
+	PluginLoadQueue::enqueue(pluginLibrary, [guard, generation](int result) {
+		if (guard.isNull() || guard->loadGeneration != generation)
+			return;
+		guard->currentStatus.loading = false;
+		guard->applyLoadResult(result);
+		guard->finishLoad();
+	});
+}
+
+int VSTPluginSession::pendingLoads()
+{
+	return PluginLoadQueue::pendingCount();
+}
+
+bool VSTPluginSession::waitForPendingLoads(int timeoutMs)
+{
+	return PluginLoadQueue::waitForPendingLoads(timeoutMs);
+}
+
+void VSTPluginSession::applyLoadResult(int result)
+{
+	const bool card = row == Row::Card;
+	currentStatus = Status();
+	if (result < 0)
+	{
+		currentStatus.critical = true;
+
+		switch (result)
+		{
+		case AbstractLibrary::FILE_NOT_FOUND:
+			currentStatus.libraryMissing = true;
+			if (!card)
+				currentStatus.text = QCoreApplication::translate("VSTPluginFilterGUI", "File not found.");
+			break;
+		case AbstractLibrary::LOADING_FAILED:
+			currentStatus.text = QCoreApplication::translate("VSTPluginFilterGUI", "Library could not be loaded.");
+			break;
+		case AbstractLibrary::FUNCTIONS_MISSING:
+			currentStatus.text = QCoreApplication::translate("VSTPluginFilterGUI", "Library does not contain needed functions.");
+			break;
+		case AbstractLibrary::WRONG_ARCHITECTURE:
+		{
+#ifdef _WIN64
+			int bitDepth = 64;
+#else
+			int bitDepth = 32;
+#endif
+			currentStatus.text = QCoreApplication::translate("VSTPluginFilterGUI",
+				"Library has the wrong architecture. Only %1-bit libraries are supported.").arg(bitDepth);
+			break;
+		}
+		}
 	}
 	else
 	{
-		int result = pluginLibrary->initialize();
-		if (result < 0)
+		effect = VSTPluginInstance::create(pluginLibrary, 1);
+		if (effect->initialize())
 		{
-			currentStatus.critical = true;
-
-			switch (result)
-			{
-			case AbstractLibrary::FILE_NOT_FOUND:
-				currentStatus.libraryMissing = true;
-				if (!card)
-					currentStatus.text = QCoreApplication::translate("VSTPluginFilterGUI", "File not found.");
-				break;
-			case AbstractLibrary::LOADING_FAILED:
-				currentStatus.text = card
-					? QCoreApplication::translate("VSTCardEditor", "Library could not be loaded.")
-					: QCoreApplication::translate("VSTPluginFilterGUI", "Library could not be loaded.");
-				break;
-			case AbstractLibrary::FUNCTIONS_MISSING:
-				currentStatus.text = card
-					? QCoreApplication::translate("VSTCardEditor", "Library does not contain needed functions.")
-					: QCoreApplication::translate("VSTPluginFilterGUI", "Library does not contain needed functions.");
-				break;
-			case AbstractLibrary::WRONG_ARCHITECTURE:
-			{
-#ifdef _WIN64
-				int bitDepth = 64;
-#else
-				int bitDepth = 32;
-#endif
-				currentStatus.text = (card
-					? QCoreApplication::translate("VSTCardEditor", "Library has the wrong architecture. Only %1-bit libraries are supported.")
-					: QCoreApplication::translate("VSTPluginFilterGUI", "Library has the wrong architecture. Only %1-bit libraries are supported."))
-					.arg(bitDepth);
-				break;
-			}
-			}
+			effect->setLanguage(QLocale().language() == QLocale::German ? 2 : 1);
+			effect->setAutomateFunc([this]() { onAutomate(); });
+			currentStatus.text = QString::fromStdWString(effect->getName());
 		}
 		else
 		{
-			effect = std::make_unique<VSTPluginInstance>(pluginLibrary, 1);
-			if (effect->initialize())
-			{
-				effect->setLanguage(QLocale().language() == QLocale::German ? 2 : 1);
-				effect->setAutomateFunc([this]() { onAutomate(); });
-
-				currentStatus.text = QString::fromStdWString(effect->getName());
-			}
-			else
-			{
-				effect.reset();
-
-				currentStatus.critical = true;
-				currentStatus.text = card
-					? QCoreApplication::translate("VSTCardEditor", "Plugin crashed during initialization.")
-					: QCoreApplication::translate("VSTPluginFilterGUI", "Plugin crashed during initialization.");
-			}
+			effect.reset();
+			currentStatus.critical = true;
+			currentStatus.text = QCoreApplication::translate("VSTPluginFilterGUI", "Plugin crashed during initialization.");
 		}
 	}
 
 	emit statusChanged();
+	finishPendingReplacement();
 }
 
 bool VSTPluginSession::libraryDiffers(const QString& writtenPath) const
@@ -189,25 +241,123 @@ bool VSTPluginSession::libraryDiffers(const QString& writtenPath) const
 
 void VSTPluginSession::replaceLibrary(const QString& writtenPath)
 {
-	int oldId = 0;
-	if (effect != nullptr)
-	{
-		oldId = effect->uniqueID();
-		effect.reset();
-	}
+	// The embed option outlives the switch: the panel closes without an
+	// embedStateChanged (the option stays on), and the new plug-in embeds
+	// below, now or once its load lands.
+	const bool keepEmbed = isEmbedded || intent.embedPending();
+	applyEmbed(false);
+	intent.replacementStarted();
+
+	// A replacement that lands before the previous one finished compares
+	// against the plug-in the row started from, not the one never loaded.
+	if (!replacementPending)
+		replacementOldId = effect != nullptr ? effect->uniqueID() : 0;
+	effect.reset();
+	replacementPending = true;
 
 	QDir pluginsDir(QString::fromStdWString(VSTPluginLibrary::getDefaultPluginPath()));
 	QString path = writtenPath;
 	if (path.length() > 0)
 		path = QDir::toNativeSeparators(QFileInfo(pluginsDir, writtenPath).absoluteFilePath());
 	pluginLibrary = VSTPluginLibrary::getInstance(path.toStdWString());
-	initPlugin();
+	loadGeneration++;
+	currentStatus = Status();
+	requestPlugin();
+	if (keepEmbed)
+		requestEmbed(true);
+}
 
-	if (effect == nullptr || oldId == 0 || effect->uniqueID() != oldId)
+void VSTPluginSession::finishLoad()
+{
+	const VSTPanelIntent::Completion done = intent.loadFinished(effect != nullptr);
+	if (done.storeLine)
+		emit stateChanged();
+	emit loadFinished();
+	if (done.embed)
+		requestEmbed(true);
+	else if (done.dropEmbed)
+		emit embedStateChanged();
+	QWidget* dialogParent = pendingDialogParent;
+	pendingDialogParent = nullptr;
+	if (done.openDialogUnlessEmbedded && effect != nullptr && !isEmbedded && dialogParent != nullptr)
+		openDialog(dialogParent);
+}
+
+void VSTPluginSession::setEmbedHost(QWidget* host, std::function<void(bool shown)> showHost)
+{
+	embedHost = host;
+	showEmbedHost = std::move(showHost);
+}
+
+void VSTPluginSession::requestEmbed(bool enable)
+{
+	if (!enable)
+		intent.dropEmbed();
+	else if (effect == nullptr)
 	{
-		currentChunkData = L"";
+		requestPlugin();
+		if (loading())
+		{
+			// The saved embed preference holds while the library loads.
+			intent.parkEmbed();
+			emit embedStateChanged();
+			return;
+		}
+	}
+	applyEmbed(enable && effect != nullptr);
+	emit embedStateChanged();
+}
+
+bool VSTPluginSession::embedPending() const
+{
+	return intent.embedPending();
+}
+
+bool VSTPluginSession::requestPanel(QWidget* dialogParent)
+{
+	// The panel is already on screen inside the row; opening the dialog on
+	// top would steal the embedded view's window (startEditing recreates the
+	// view for the dialog and the row would keep showing nothing).
+	if (isEmbedded)
+		return false;
+
+	if (effect == nullptr)
+	{
+		// Parked before the request: a load that completes at once opens the
+		// dialog from finishLoad.
+		intent.parkDialog();
+		pendingDialogParent = dialogParent;
+		requestPlugin();
+		return true;
+	}
+
+	openDialog(dialogParent);
+	return false;
+}
+
+void VSTPluginSession::applyEmbed(bool enable)
+{
+	if (enable == isEmbedded)
+		return;
+	// The host is shown before the panel embeds into it, and hidden again
+	// when embedding failed (reported through the status).
+	if (showEmbedHost)
+		showEmbedHost(enable);
+	if (!setEmbedded(enable, embedHost) && showEmbedHost)
+		showEmbedHost(false);
+}
+
+void VSTPluginSession::finishPendingReplacement()
+{
+	if (!replacementPending)
+		return;
+	replacementPending = false;
+	if (effect == nullptr || replacementOldId == 0 || effect->uniqueID() != replacementOldId)
+	{
+		currentChunkData.clear();
 		currentParamMap.clear();
 	}
+	replacementOldId = 0;
 }
 
 void VSTPluginSession::openDialog(QWidget* dialogParent)
@@ -264,6 +414,11 @@ bool VSTPluginSession::setEmbedded(bool enable, QWidget* host)
 		if (embedPlugin(host))
 		{
 			acquirePanelProcessing();
+			// Moving to a display with another scale changes the top-level
+			// window's device pixel ratio; eventFilter re-scales the panel.
+			embeddedScale = host->devicePixelRatioF();
+			scaleWatchWindow = host->window();
+			scaleWatchWindow->installEventFilter(this);
 			effect->setSizeWindowFunc([this](int width, int height) {
 				if (isEmbedded)
 					emit sizeRequested(width, height);
@@ -281,6 +436,9 @@ bool VSTPluginSession::setEmbedded(bool enable, QWidget* host)
 	else
 	{
 		previewFeeder.stop();
+		if (scaleWatchWindow)
+			scaleWatchWindow->removeEventFilter(this);
+		scaleWatchWindow = nullptr;
 		if (effect != nullptr)
 		{
 			releasePanelProcessing();
@@ -291,6 +449,25 @@ bool VSTPluginSession::setEmbedded(bool enable, QWidget* host)
 			this, &VSTPluginSession::onIdle);
 	}
 	return isEmbedded;
+}
+
+bool VSTPluginSession::eventFilter(QObject* watched, QEvent* event)
+{
+	if (event->type() == QEvent::DevicePixelRatioChange && watched == scaleWatchWindow.data()
+		&& isEmbedded && effect != nullptr)
+	{
+		// The window's own ratio: the event reports its change, while the
+		// embedded native child may not have taken the new screen yet.
+		const double scale = scaleWatchWindow->devicePixelRatioF();
+		if (!qFuzzyCompare(scale, embeddedScale))
+		{
+			embeddedScale = scale;
+			// The plug-in lays out again and asks for its new size through
+			// sizeRequested.
+			effect->setEditorScale(scale);
+		}
+	}
+	return QObject::eventFilter(watched, event);
 }
 
 QString VSTPluginSession::libraryPermissionWarning() const
@@ -312,13 +489,9 @@ QString VSTPluginSession::chunkPermissionWarning() const
 	const QStringList files = vstChunkUnreadablePaths(currentChunkData);
 	if (files.isEmpty())
 		return QString();
-	return (row == Row::Card
-		? QCoreApplication::translate("VSTCardEditor", "The plugin seemingly accesses these files not readable by the audio service:\n"
-			"%0\n"
-			"Change the file permissions or copy the files to the config directory.")
-		: QCoreApplication::translate("VSTPluginFilterGUI", "The plugin seemingly accesses these files not readable by the audio service:\n"
-			"%0\n"
-			"Change the file permissions or copy the files to the config directory."))
+	return QCoreApplication::translate("VSTPluginFilterGUI", "The plugin seemingly accesses these files not readable by the audio service:\n"
+		"%0\n"
+		"Change the file permissions or copy the files to the config directory.")
 		.arg(files.join("\n"));
 }
 
@@ -421,8 +594,6 @@ void VSTPluginSession::reportPanelCrash()
 {
 	currentStatus.critical = true;
 	currentStatus.libraryMissing = false;
-	currentStatus.text = row == Row::Card
-		? QCoreApplication::translate("VSTCardEditor", "Plugin crashed when opening panel.")
-		: QCoreApplication::translate("VSTPluginFilterGUI", "Plugin crashed when opening panel.");
+	currentStatus.text = QCoreApplication::translate("VSTPluginFilterGUI", "Plugin crashed when opening panel.");
 	emit statusChanged();
 }

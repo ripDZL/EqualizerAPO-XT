@@ -12,106 +12,71 @@
 
 #include "SkinGallery.h"
 #include "Editor/gallery/GallerySupport.h"
-#include <numbers>
-// For the two gates moved out of main.cpp (audit #275 B7): the VST
-// round-trip self test and the analysis layout probe.
-#include <optional>
-#include <unordered_map>
-#include <QBoxLayout>
-#include <QDockWidget>
-#include <QFileInfo>
-#include <QLocale>
-#include <QStyle>
-#include <QTimer>
-#include "filters/VSTPluginFilter.h"
-#include "filters/VSTPluginFilterFactory.h"
-#include "guis/VSTPluginFilterGUI.h"
-#include "widgets/cards/VSTCardEditor.h"
-#include "widgets/cards/VSTSlotFillRail.h"
-#include "MainWindow.h"
-#include "diagnostics/ToolbarPixelProbe.h"
-#include "widgets/MainToolbarKit.h"
-#include "SubwooferRouting/Preset.h"
-#include "SubwooferRouting/StateCodec.h"
-#include "widgets/subwooferrouting/SubwooferRoutingDefaults.h"
 
 #include <cmath>
 #include <complex>
 #include <cstdio>
 #include <cstdlib>
 #include <memory>
+#include <numbers>
 
+#include <QAction>
 #include <QApplication>
 #include <QCheckBox>
+#include <QColor>
 #include <QComboBox>
-#include <QDataStream>
+#include <QDialog>
 #include <QDir>
 #include <QElapsedTimer>
 #include <QEnterEvent>
+#include <QEvent>
 #include <QEventLoop>
 #include <QFile>
 #include <QFileDialog>
-#include <QFileInfo>
 #include <QFrame>
-#include <QGraphicsScene>
-#include <QGraphicsView>
 #include <QGridLayout>
 #include <QHBoxLayout>
-#include <QImage>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
-#include <QLocale>
-#include <QMainWindow>
 #include <QMenu>
 #include <QMenuBar>
-#include <QMouseEvent>
 #include <QPixmap>
 #include <QPointer>
 #include <QRadioButton>
-#include <QToolButton>
 #include <QScrollArea>
 #include <QScrollBar>
-#include <QScreen>
 #include <QSpinBox>
-#include <QString>
 #include <QStringList>
-#include <QTemporaryDir>
-#include <QTimer>
+#include <QStyleOption>
 #include <QToolBar>
+#include <QToolButton>
 #include <QTranslator>
 #include <QTreeView>
 #include <QUrl>
 
-#define WIN32_LEAN_AND_MEAN
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-
 #include "Editor/FilterTable.h"
+#include "Editor/MainWindow.h"
 #include "Editor/SkinManager.h"
-#include "Editor/guis/CopyFilterGUI.h"
+#include "Editor/analysis/AnalysisMetric.h"
+#include "Editor/analysis/AnalysisResponse.h"
 #include "Editor/helpers/GUIHelper.h"
 #include "Editor/skins/ISkin.h"
 #include "Editor/skins/Skins.h"
 #include "Editor/widgets/AddCardRow.h"
 #include "Editor/widgets/EqGraphView.h"
-#include "Editor/widgets/SegmentedControl.h"
-#include "Editor/analysis/AnalysisMetric.h"
-#include "Editor/analysis/AnalysisResponse.h"
-#include "filters/BiQuad.h"
-#include "Editor/skins/shared/SkinFileIcons.h"
 #include "Editor/widgets/FilterCardRow.h"
-#include "Editor/widgets/CommandRowFrame.h"
 #include "Editor/widgets/FilterInsertSeam.h"
 #include "Editor/widgets/FilterPickerView.h"
-#include "Editor/widgets/SkinComboBox.h"
+#include "Editor/widgets/SegmentedControl.h"
 #include "Editor/widgets/TitleBar.h"
 #include "Editor/widgets/UpdateToast.h"
-#include "Editor/widgets/subwooferrouting/SubwooferRoutingEditorDialog.h"
-#include "Editor/widgets/cards/SubwooferRoutingCardEditor.h"
 #include "Editor/widgets/routing/IRoutingRenderer.h"
+#include "Editor/widgets/subwooferrouting/SubwooferRoutingDefaults.h"
+#include "Editor/widgets/subwooferrouting/SubwooferRoutingEditorDialog.h"
+#include "SubwooferRouting/Preset.h"
+#include "engine/ConfigLoadTrace.h"
+#include "filters/BiQuad.h"
 
 using namespace SkinGalleryDetail;
 
@@ -135,7 +100,7 @@ const QList<GalleryScenario>& galleryScenarios()
 {
 	static const QList<GalleryScenario> scenarios = {
 		{ QStringLiteral("picker"), { QStringLiteral("normal"), QStringLiteral("hover"),
-			QStringLiteral("empty"), QStringLiteral("phasetime") } },
+			QStringLiteral("empty"), QStringLiteral("phasetime"), QStringLiteral("control") } },
 		{ QStringLiteral("srdialog"), { QStringLiteral("default"),
 			QStringLiteral("preset"), QStringLiteral("expanded") } },
 		{ QStringLiteral("toolbar"), { QStringLiteral("normal") } },
@@ -147,6 +112,7 @@ const QList<GalleryScenario>& galleryScenarios()
 		{ QStringLiteral("seam"), { QStringLiteral("hover") } },
 		{ QStringLiteral("toast"), { QStringLiteral("normal") } },
 		{ QStringLiteral("loadnotice"), { QStringLiteral("normal") } },
+		{ QStringLiteral("removalnotice"), { QStringLiteral("normal") } },
 		{ QStringLiteral("filedialog"), { QStringLiteral("normal") } },
 		{ QStringLiteral("graph"), { QStringLiteral("normal"), QStringLiteral("cursor"),
 			QStringLiteral("phase"), QStringLiteral("groupdelay") } },
@@ -390,6 +356,36 @@ int assertNoHorizontalScrollBar(QWidget* row, const QString& skinId, const QStri
 	return 0;
 }
 
+// Value gate: every spin box must show its text. Qt 6.12.0 collapsed the edit
+// field of a button-less spin box to 1px and started a buttoned one at x = 0
+// under the frame (QTBUG-151308, worked around in SpinBoxEditFieldFix); every
+// value cell rendered empty and the gallery still passed. These are the two
+// signatures, so a Qt bump that brings either back fails here.
+int assertSpinBoxTextVisible(QWidget* row, const QString& skinId, const QString& mode,
+	const QString& rowName, const QString& state)
+{
+	int failures = 0;
+	for (QAbstractSpinBox* box : row->findChildren<QAbstractSpinBox*>())
+	{
+		const QLineEdit* edit = box->findChild<QLineEdit*>();
+		if (!box->isVisible() || edit == nullptr)
+			continue;
+		QStyleOption option;
+		option.initFrom(box);
+		const QRect contents = box->style()->subElementRect(QStyle::SE_FrameContents, &option, box);
+		const bool collapsed = edit->width() <= 1;
+		const bool underFrame = edit->x() == 0 && contents.left() > 0;
+		if (collapsed || underFrame)
+		{
+			qWarning("SkinGallery: spin box %s in row %s_%s_%s_%s hides its text (edit field %d,%d %dx%d, frame contents from x %d)",
+				qPrintable(box->objectName()), qPrintable(skinId), qPrintable(mode), qPrintable(rowName),
+				qPrintable(state), edit->x(), edit->y(), edit->width(), edit->height(), contents.left());
+			failures++;
+		}
+	}
+	return failures;
+}
+
 bool saveGrab(QWidget* row, const QDir& outDir, const QString& skinId, const QString& mode,
 	const QString& rowName, const QString& state)
 {
@@ -440,6 +436,7 @@ int renderStates(const QDir& outDir, const QString& skinId, const QString& mode,
 		}
 
 		failures += assertNoHorizontalScrollBar(row, skinId, mode, rows[i].name, QStringLiteral("normal"));
+		failures += assertSpinBoxTextVisible(row, skinId, mode, rows[i].name, QStringLiteral("normal"));
 		failures += saveGrab(row, outDir, skinId, mode, rows[i].name, QStringLiteral("normal")) ? 0 : 1;
 		setHoverEquivalent(row, true);
 		failures += assertNoHorizontalScrollBar(row, skinId, mode, rows[i].name, QStringLiteral("hover"));
@@ -495,6 +492,12 @@ int renderSkin(const QDir& outDir, const QString& skinId, const QString& configP
 		picker->galleryShowcase(FilterPickerView::GalleryShowcase::PhaseAndTimeSearch);
 		QApplication::processEvents();
 		failures += saveGrab(picker, outDir, skinId, mode, QStringLiteral("picker"), QStringLiteral("phasetime")) ? 0 : 1;
+		// The Control group: the templates named "Name (Description)", so
+		// the shot judges how the skin prints the description beside the
+		// name (the Matrix board never opens on this bus by itself).
+		picker->galleryShowcase(FilterPickerView::GalleryShowcase::ControlSearch);
+		QApplication::processEvents();
+		failures += saveGrab(picker, outDir, skinId, mode, QStringLiteral("picker"), QStringLiteral("control")) ? 0 : 1;
 		delete picker;
 	}
 
@@ -755,6 +758,19 @@ int renderSkin(const QDir& outDir, const QString& skinId, const QString& configP
 		toast->showMessage(QStringLiteral("This configuration was not applied: the filter on line 12 of room.txt could not be prepared. Equalizer APO keeps playing the previous settings."), 0);
 		QApplication::processEvents();
 		failures += saveGrab(toast, outDir, skinId, mode, QStringLiteral("loadnotice"), QStringLiteral("normal")) ? 0 : 1;
+	}
+
+	// The removal notice (#456): the toast with its one action button, which
+	// takes the Undo action's own label.
+	{
+		QWidget host;
+		host.resize(960, 90);
+		host.setAutoFillBackground(true);
+		UpdateToast* toast = new UpdateToast(&host);
+		host.show();
+		toast->showMessage(QStringLiteral("Filter removed."), 0, QStringLiteral("Undo"), QStringLiteral("Ctrl+Z"), []() {});
+		QApplication::processEvents();
+		failures += saveGrab(toast, outDir, skinId, mode, QStringLiteral("removalnotice"), QStringLiteral("normal")) ? 0 : 1;
 	}
 
 	// Every stateful form control the skins restyle, in every state that has

@@ -44,6 +44,7 @@ EqualizerAPO-XT는 Windows용 시스템 전체 이퀄라이저인 Equalizer APO 
 - `Setup/`: 설치 시 함께 들어가는 기본 설정 파일입니다.
 - `.github/workflows/build.yml`: CI 빌드와 설치 파일 생성 파이프라인입니다.
 - `version.h`: 릴리스 버전의 기준 파일입니다.
+- `TECH_DEBT_AUDIT.md`: 격주 감사가 끝날 때마다 CI가 커밋하는 최신 기술 부채 감사입니다. 다음 감사가 이 파일을 기준 결과로 읽으므로 손으로 고치지 않습니다.
 - `uncrustify.cfg`, `reformat.bat`: C/C++ 코드 포맷 기준과 실행 스크립트입니다.
 - `Wiki/`: 기존 사용자 문서 자료입니다.
 - `deps/`, `Qt/`, `build-*/`: 로컬 빌드 산출물입니다. `.gitignore`로 제외되므로 커밋하지 않습니다.
@@ -61,7 +62,7 @@ C++ 프로젝트는 Visual Studio 2022/2026 계열 도구와 Windows SDK 10.0을
 다음 의존성이 필요합니다.
 
 - **Visual Studio 2022 Build Tools** (혹은 2026): `Microsoft.VisualStudio.Component.VC.Tools.x86.x64`, `Microsoft.VisualStudio.Component.VC.ATL`을 반드시 포함합니다. ATL이 없으면 `EqualizerAPO.dll` 링크 단계에서 `atls.lib`를 찾지 못해 실패합니다.
-- **Python 3.x**: Qt 설치용 `aqtinstall`을 받기 위해 필요합니다.
+- **Python 3.x**: `7z`가 없는 PC에서 Qt 아카이브를 `py7zr`로 풀 때 씁니다.
 - **외부 라이브러리**: 저장소에 포함되지 않습니다. `deps/` 아래에 다음 구조로 배치합니다.
 
 ```
@@ -81,7 +82,7 @@ deps/
 
 x64 AVX2 변형의 바이너리 자산은 CI에서 사용하는 GitHub Release에서 받아 압축을 풉니다. SSE2/AVX 변형은 vcpkg로 빌드합니다. 자세한 설치 절차와 자동화 스크립트는 [setup-build.ps1](setup-build.ps1)에 있습니다.
 
-- **Qt 6.10.1 (MSVC 2022 x64)**: `Qt/6.10.1/msvc2022_64/`에 설치합니다. `python -m aqt install-qt windows desktop 6.10.1 win64_msvc2022_64 --archives qtbase qttools qtsvg qttranslations`로 받습니다.
+- **Qt 6.12.0 (MSVC 2022 x64)**: `Qt/6.12.0/msvc2022_64/`에 설치합니다. `setup-build.ps1`(내부적으로 `Provisioning.psm1`의 `Install-QtSdk`)이 Qt 온라인 저장소에서 `qtbase`, `qttools`, `qtsvg`, `qttranslations` 아카이브를 받아 `simd-variants.psd1`의 SHA-256 핀과 대조한 뒤 풉니다. aqtinstall은 Qt 6.12의 저장소 구조를 읽지 못해 쓰지 않습니다.
 
 ### 빌드 명령
 
@@ -100,7 +101,7 @@ foreach ($project in $plan.Projects) {
     /p:MUPARSERX_INCLUDE=$root\deps\muparserx\parser /p:MUPARSERX_LIB=$root\deps\muparserx\build\Release `
     /p:LIBSNDFILE_INCLUDE=$root\deps\libsndfile\include /p:LIBSNDFILE_LIB=$root\deps\libsndfile\build\Release `
     /p:TCLAP_ROOT=$root\deps\tclap /p:VST3_SDK=$root\deps\vst3sdk /p:HIGHWAY_INCLUDE=$root\deps\highway `
-    /p:ASIO_SDK=$root\deps\asiosdk\ASIOSDK /p:QT_ROOT=$root\Qt\6.10.1\msvc2022_64
+    /p:ASIO_SDK=$root\deps\asiosdk\ASIOSDK /p:QT_ROOT=$root\Qt\6.12.0\msvc2022_64
   if ($LASTEXITCODE -ne 0) { throw "Build failed for $project" }
 }
 ```
@@ -111,14 +112,16 @@ Qt 프로젝트는 `VsDevCmd.bat`로 환경을 잡은 뒤 빌드합니다. `lrel
 
 ```powershell
 # VS 환경 임포트 후
-$env:PATH = "Qt\6.10.1\msvc2022_64\bin;$env:PATH"
+$env:PATH = "Qt\6.12.0\msvc2022_64\bin;$env:PATH"
 mkdir build-Editor-x64; cd build-Editor-x64
 lrelease ..\Editor\Editor.pro
 qmake ..\Editor\Editor.pro -r "CONFIG+=release" "EAPO_UPDATE_CHANNEL=x64-avx2" "EAPO_SIMD_FLAGS=/arch:AVX2"
 nmake
 ```
 
-`DeviceSelector`도 같은 절차로 빌드합니다.
+`DeviceSelector`도 같은 절차로 빌드합니다. 위 절차는 빠른 반복용이고, CI가 배포하는 것과 같은 Editor(`CONFIG+=force_debug_info`, `windeployqt` 포함)가 필요하면 `setup-build.ps1`이 마지막에 출력하는 `Build-Solution.ps1`과 `Build-QtApps.ps1` 호출을 그대로 씁니다.
+
+MSBuild 제품과 스위트는 경고를 오류로 다룹니다(`Directory.Build.props`의 `/WX`). 의존성 헤더는 external로 컴파일해 경고를 끄므로, 새 경고는 이 저장소의 코드에서 나온 것입니다.
 
 ### 테스트 실행
 
@@ -153,6 +156,8 @@ CI annotation도 작업 범위입니다. warning이나 notice가 다음 릴리�
 cppcheck job은 베이스라인 0 기준의 차단 게이트입니다. CI는 cppcheck 2.21.0을 태그 고정으로 소스 빌드해 쓰므로, 로컬에서도 같은 버전으로 build.yml의 cppcheck 호출 플래그를 그대로 사용하면 결과가 재현됩니다. 새 발견은 코드로 고치는 것이 기본이고, 정당한 거짓 양성만 근거 주석과 함께 inline 또는 job 수준 suppress로 처리합니다. 정책적으로 억제한 규칙(cstyleCast, shadow*, useStlAlgorithm, postfixOperator, noExplicitConstructor, LocalAllocCalled)의 근거는 build.yml의 주석에 있습니다.
 
 memcheck job은 동적 메모리 게이트입니다. 런타임 테스트 스위트를 MSVC AddressSanitizer(`/p:EnableASAN=true`, 컨테이너 주석 비활성, WPO 끔)로 재빌드해 실행하며, 힙 위반(use-after-free, 오버플로, 이중 해제)은 ASan 리포트가 프로세스를 중단시켜 Red가 됩니다. 엔진 버퍼 누수는 각 테스트 바이너리가 종료 시 검사하는 AlignedMemory 카나리아(Tests/AlignedMemoryGate.h)가 Red로 만듭니다. Windows MSVC에는 LeakSanitizer가 없어 전체 힙 누수 검출은 제공되지 않습니다. 성능 계약 테스트는 `__SANITIZE_ADDRESS__`에서 스스로 빠집니다. 빌드/실행 절차는 .github/scripts/Invoke-MemcheckTests.ps1에 있고, 로컬 재현도 같은 스크립트로 합니다(플래그 전환 시 /t:rebuild 필수).
+
+panel-input-gate job은 사용자가 플러그인 패널을 조작해 저장하는 흐름을 실제 OS 입력으로 확인하는 게이트입니다. `Build-DpfTestPlugins.ps1`이 DPF-Plugins의 3 Band EQ와 MVerb(VST2, VST3)를 고정 커밋으로 저장소 밖에서 빌드하고, GPU가 없는 러너에서 DPF 편집기가 그려지도록 고정한 Mesa llvmpipe를 플러그인과 Editor 옆에 둡니다. `Invoke-PanelInputGate.ps1`(Windows PowerShell 5.1, UI Automation과 SendInput)은 패널을 열어 조작부를 끌고 OK와 Save를 누른 뒤 저장된 상태, 다시 연 패널의 픽셀, Benchmark 렌더를 확인하며, 배경 끌기가 음성 대조입니다. asan 갈래는 `Build-QtApps.ps1 -AddressSanitizer`로 빌드한 Editor로 같은 시나리오를 돌려, memcheck가 다루지 않는 Qt 앱 코드의 힙 위반을 잡습니다. 결과 그림과 summary.json은 `panel-input-gate-<갈래>` 아티팩트에 남습니다.
 
 테스트를 건너뛰는 판단은 명시적인 이유가 있어야 합니다. GitHub-hosted x64 runner가 AVX-512/AVX10.1 실행을 보장하지 않아 `HybridConvTests` 실행을 건너뛰는 경우처럼, 빌드는 유지하되 런타임 실행만 제한합니다.
 

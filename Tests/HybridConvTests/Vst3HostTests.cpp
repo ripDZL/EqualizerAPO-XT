@@ -33,7 +33,7 @@
 // After VSTPluginLibrary.h: the VST3 SDK defines a VST_VERSION macro that
 // would otherwise break the enum of the same name in the VST2 aeffectx.h.
 #include "pluginterfaces/vst/vstspeaker.h"
-#include "Tests/TestHarness.h"
+#include "../TestHarness.h"
 #include "Tests/Vst3Bundle.h"
 #include "platform/windows/WindowsPath.h"
 #include "Tests/TestVst3Plugin/TestVst3Protocol.h"
@@ -44,7 +44,7 @@ using std::wstring;
 
 namespace
 {
-test::Harness harness("Vst3HostTests");
+test::HarnessAccess harness;
 
 using testvst3::PluginState;
 
@@ -105,7 +105,7 @@ struct CombinedStateParameter
 // Audit #348 TD-48: the stream a plug-in reads and writes its state through
 // takes positions from the plug-in, so a wild one must not turn into an
 // allocation or a copy past the plug-in's buffer.
-void testMemoryStreamBounds()
+TEST_CASE(Vst3HostTests, testMemoryStreamBounds)
 {
 	using Steinberg::IBStream;
 	using Steinberg::int32;
@@ -153,7 +153,7 @@ void testRestoreBeyondEditRing(const wstring& directory)
 {
 	const wstring bundle = prepareBundle(directory, L"ParameterFloodBundle.vst3", L"ParameterFlood.vst3");
 	shared_ptr<VSTPluginLibrary> library = VSTPluginLibrary::getInstance(bundle);
-	harness.require(!bundle.empty() && library->initialize() >= 0, "parameter-flood VST3 module initializes");
+	harness.require(!bundle.empty() && VSTPluginLibrary::load(library->getLibPath()).status >= 0, "parameter-flood VST3 module initializes");
 	typedef int (*CountFunc)();
 	HMODULE module = GetModuleHandleW(L"ParameterFlood.vst3");
 	CountFunc receivedChanges = module != nullptr
@@ -162,7 +162,8 @@ void testRestoreBeyondEditRing(const wstring& directory)
 	if (receivedChanges == nullptr)
 		return;
 
-	VSTPluginInstance instance(library, 2);
+	auto instanceOwner = VSTPluginInstance::create(library, 2);
+	VSTPluginInstance& instance = *instanceOwner;
 	harness.require(instance.initialize(), "parameter-flood component initializes");
 
 	constexpr uint32_t parameterCount = 1500;
@@ -197,6 +198,64 @@ void testRestoreBeyondEditRing(const wstring& directory)
 		"the value after the 1023rd restored parameter is applied");
 }
 
+// A DPF-based plug-in returns from a zero-sample process call before it reads
+// the parameter changes. An editor edit must still reach its component before
+// the configuration state is saved, or the saved ChunkData keeps the old value.
+void testEditorEditWithoutZeroSampleFlush(const wstring& directory)
+{
+	const wstring bundle = prepareBundle(directory, L"IgnoreParameterFlushBundle.vst3", L"IgnoreParameterFlush.vst3");
+	shared_ptr<VSTPluginLibrary> library = VSTPluginLibrary::getInstance(bundle);
+	harness.require(!bundle.empty() && VSTPluginLibrary::load(library->getLibPath()).status >= 0,
+		"flush-ignoring VST3 module initializes");
+	auto instanceOwner = VSTPluginInstance::create(library, 2);
+	VSTPluginInstance& instance = *instanceOwner;
+	harness.require(instance.initialize(), "flush-ignoring component initializes");
+	instance.prepareForProcessing(48000.0f, 16);
+
+	HWND parent = CreateWindowExW(0, L"STATIC", L"VST3 flush test parent", WS_OVERLAPPED,
+		0, 0, 640, 480, nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
+	harness.require(parent != nullptr, "flush test parent is created");
+	short width = 0;
+	short height = 0;
+	harness.require(instance.startEditing(parent, &width, &height, 1.0), "flush-ignoring editor attaches");
+	HWND hostWindow = GetWindow(parent, GW_CHILD);
+	HWND pluginWindow = hostWindow != nullptr ? GetWindow(hostWindow, GW_CHILD) : nullptr;
+	harness.require(pluginWindow != nullptr, "flush-ignoring editor creates its child window");
+	wstring automatedChunk;
+	instance.setAutomateFunc([&instance, &automatedChunk]() {
+		std::unordered_map<wstring, float> parameters;
+		instance.readFromEffect(automatedChunk, parameters);
+	});
+	SendMessageW(pluginWindow, WM_APP + 77, 0, 0);
+	PluginState edited;
+	edited.gain = 0.25;
+	harness.expectTrue(automatedChunk == encodeState(edited),
+		"an editor edit reaches a component that ignores zero-sample calls before the state is saved");
+	instance.stopEditing();
+	DestroyWindow(parent);
+}
+
+// A factory may implement IPluginFactory3 but decline setHostContext, as the
+// Kilohearts factory does. The fixture reads the knob in InitDll, so clear it
+// immediately after the library load and before creating the component.
+void testFactoryHostContextNotImplemented(const wstring& directory)
+{
+	SetEnvironmentVariableW(L"EAPO_TEST_VST3_HOST_CONTEXT", L"notimpl");
+	const wstring bundle = prepareBundle(directory,
+		L"HostContextNotImplBundle.vst3", L"HostContextNotImpl.vst3");
+	shared_ptr<VSTPluginLibrary> library = bundle.empty()
+		? shared_ptr<VSTPluginLibrary>() : VSTPluginLibrary::getInstance(bundle);
+	const int loadStatus = library != nullptr
+		? VSTPluginLibrary::load(library->getLibPath()).status : AbstractLibrary::LOADING_FAILED;
+	SetEnvironmentVariableW(L"EAPO_TEST_VST3_HOST_CONTEXT", nullptr);
+
+	harness.require(loadStatus >= 0,
+		"a VST3 factory may return kNotImplemented from setHostContext (#455)");
+	auto instance = VSTPluginInstance::create(library, 2);
+	harness.expectTrue(instance->initialize(),
+		"a component initializes after its factory declines setHostContext (#455)");
+}
+
 // Audit #348 TD-48: a plug-in that keeps the host's component handler and
 // calls it after the instance is gone must be refused, not let into freed
 // memory.
@@ -204,7 +263,7 @@ void testHostContextDetach(const wstring& directory)
 {
 	const wstring bundle = prepareBundle(directory, L"RetainHandlerBundle.vst3", L"RetainHandler.vst3");
 	shared_ptr<VSTPluginLibrary> library = VSTPluginLibrary::getInstance(bundle);
-	harness.require(!bundle.empty() && library->initialize() >= 0, "handler-retaining VST3 module initializes");
+	harness.require(!bundle.empty() && VSTPluginLibrary::load(library->getLibPath()).status >= 0, "handler-retaining VST3 module initializes");
 	typedef int (*CallFunc)();
 	typedef void (*ReleaseFunc)();
 	HMODULE module = GetModuleHandleW(L"RetainHandler.vst3");
@@ -218,7 +277,8 @@ void testHostContextDetach(const wstring& directory)
 
 	int automateCalls = 0;
 	{
-		VSTPluginInstance instance(library, 2);
+		auto instanceOwner = VSTPluginInstance::create(library, 2);
+		VSTPluginInstance& instance = *instanceOwner;
 		harness.require(instance.initialize(), "handler-retaining component initializes");
 		instance.setAutomateFunc([&automateCalls]() { automateCalls++; });
 		harness.expectEqual(callRetained(), 3, "the handler accepts edit and dirty calls while the instance lives");
@@ -231,16 +291,17 @@ void testHostContextDetach(const wstring& directory)
 }
 }
 
-void runVst3HostTests()
+TEST_CASE(Vst3HostTests, runVst3HostTests)
 {
 	const wstring directory = exeDirectory();
 	const wstring bundle = directory.empty() ? wstring() : prepareBundle(directory);
 	if (bundle.empty())
 	{
 		harness.expectFalse(bundle.empty(), "companion VST3 module is available");
-		harness.report();
-		return;
+return;
 	}
+
+	testFactoryHostContextNotImplemented(directory);
 
 	shared_ptr<VSTPluginLibrary> library = VSTPluginLibrary::getInstance(bundle);
 	harness.require(library != nullptr, "bundle resolves to a library");
@@ -249,7 +310,7 @@ void runVst3HostTests()
 		const auto judged = ConfigFileReference::library(L"", bundle, L"");
 		harness.require(judged.refusal.empty() && judged.path.leaf() != nullptr,
 			"bundle module is discovered and pinned through directory handles");
-		harness.expectTrue(library->initialize(judged.path) >= 0, "Windows VST3 module loads while the complete bundle path is pinned");
+		harness.expectTrue(VSTPluginLibrary::load(library->getLibPath(), &judged.path).status >= 0, "Windows VST3 module loads while the complete bundle path is pinned");
 	}
 	harness.expectTrue(library->getFactory() != nullptr, "VST3 factory is available after module initialization");
 
@@ -257,14 +318,14 @@ void runVst3HostTests()
 	// Releasing either spelling must not shut down the other one's live module.
 	const wstring aliasBundle = prepareBundle(directory, L"AliasBundle.vst3", L"Alias.vst3");
 	auto aliasLibrary = VSTPluginLibrary::getInstance(aliasBundle);
-	harness.expectTrue(aliasLibrary->initialize() >= 0, "alias lifecycle module loads");
+	harness.expectTrue(VSTPluginLibrary::load(aliasLibrary->getLibPath()).status >= 0, "alias lifecycle module loads");
 	{
 		auto innerLibrary = VSTPluginLibrary::getInstance(test::vst3BundleModulePath(aliasBundle, L"Alias.vst3"));
 		harness.expectTrue(innerLibrary == aliasLibrary, "bundle and inner module share one lifecycle owner");
-		harness.expectTrue(innerLibrary->initialize() >= 0, "inner module alias loads");
+		harness.expectTrue(VSTPluginLibrary::load(innerLibrary->getLibPath()).status >= 0, "inner module alias loads");
 	}
-	VSTPluginInstance afterAliasRelease(aliasLibrary, 2);
-	harness.expectTrue(afterAliasRelease.initialize(), "releasing a path alias keeps the remaining module usable");
+	auto afterAliasRelease = VSTPluginInstance::create(aliasLibrary, 2);
+	harness.expectTrue(afterAliasRelease->initialize(), "releasing a path alias keeps the remaining module usable");
 	wstring caseAlias = test::vst3BundleModulePath(aliasBundle, L"Alias.vst3");
 	CharUpperBuffW(caseAlias.data(), static_cast<DWORD>(caseAlias.size()));
 	harness.expectTrue(VSTPluginLibrary::getInstance(caseAlias) == aliasLibrary,
@@ -276,7 +337,7 @@ void runVst3HostTests()
 	{
 		const wstring failureBundle = prepareBundle(directory, (wstring(failureName) + L".bundle.vst3").c_str(), failureName);
 		auto failureLibrary = VSTPluginLibrary::getInstance(failureBundle);
-		harness.expectTrue(failureLibrary->initialize() >= 0, "failure fixture module loads");
+		harness.expectTrue(VSTPluginLibrary::load(failureLibrary->getLibPath()).status >= 0, "failure fixture module loads");
 		// Exercise split double, combined double, and split float processors.
 		for (int scenario = 0; scenario < 3; ++scenario)
 		{
@@ -304,7 +365,7 @@ void runVst3HostTests()
 
 	const wstring optionalProcessingBundle = prepareBundle(directory, L"OptionalProcessingBundle.vst3", L"OptionalProcessing.vst3");
 	auto optionalProcessingLibrary = VSTPluginLibrary::getInstance(optionalProcessingBundle);
-	harness.expectTrue(optionalProcessingLibrary->initialize() >= 0, "optional processing notification module loads");
+	harness.expectTrue(VSTPluginLibrary::load(optionalProcessingLibrary->getLibPath()).status >= 0, "optional processing notification module loads");
 	for (double gain : {0.5, 0.0, 0.25})
 	{
 		PluginState state;
@@ -321,29 +382,29 @@ void runVst3HostTests()
 			"optional setProcessing notification keeps the effect active, including intentional silence");
 	}
 	{
-		VSTPluginInstance optionalEditor(optionalProcessingLibrary, 2);
-		harness.expectTrue(optionalEditor.initialize(), "optional notification editor instance initializes");
+		auto optionalEditor = VSTPluginInstance::create(optionalProcessingLibrary, 2);
+		harness.expectTrue(optionalEditor->initialize(), "optional notification editor instance initializes");
 		HWND parent = CreateWindowExW(0, L"STATIC", L"optional VST3 notification", WS_OVERLAPPED,
 			0, 0, 640, 480, nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
 		short width = 0, height = 0;
-		harness.expectTrue(parent != nullptr && optionalEditor.startEditing(parent, &width, &height),
+		harness.expectTrue(parent != nullptr && optionalEditor->startEditing(parent, &width, &height),
 			"optional notification editor opens");
-		harness.expectTrue(optionalEditor.canProcessNow(),
+		harness.expectTrue(optionalEditor->canProcessNow(),
 			"optional notification keeps native-panel processing available");
-		optionalEditor.stopEditing();
+		optionalEditor->stopEditing();
 		DestroyWindow(parent);
 	}
 
 	const wstring sidechainBusBundle = prepareBundle(directory, L"SidechainBusBundle.vst3", L"SidechainBus.vst3");
 	shared_ptr<VSTPluginLibrary> sidechainBusLibrary = VSTPluginLibrary::getInstance(sidechainBusBundle);
 	harness.expectTrue(!sidechainBusBundle.empty() && sidechainBusLibrary != nullptr
-		&& sidechainBusLibrary->initialize() >= 0,
+		&& VSTPluginLibrary::load(sidechainBusLibrary->getLibPath()).status >= 0,
 		"VST3 component with an inactive sidechain bus library initializes");
 	{
-		VSTPluginInstance sidechainBusInstance(sidechainBusLibrary, 2);
-		harness.expectTrue(!sidechainBusBundle.empty() && sidechainBusInstance.initialize(),
+		auto sidechainBusInstance = VSTPluginInstance::create(sidechainBusLibrary, 2);
+		harness.expectTrue(!sidechainBusBundle.empty() && sidechainBusInstance->initialize(),
 			"VST3 component with an inactive sidechain bus initializes");
-		harness.expectTrue(sidechainBusInstance.negotiateBusLayouts(VST3BusLayout::Stereo,
+		harness.expectTrue(sidechainBusInstance->negotiateBusLayouts(VST3BusLayout::Stereo,
 			VST3BusLayout::Stereo, 2,
 			vst3BusLayoutChannelNames(VST3BusLayout::Stereo),
 			vst3BusLayoutChannelNames(VST3BusLayout::Stereo)),
@@ -354,20 +415,20 @@ void runVst3HostTests()
 		L"AdaptedArrangementBundle.vst3", L"AdaptedArrangement.vst3");
 	shared_ptr<VSTPluginLibrary> adaptedArrangementLibrary = VSTPluginLibrary::getInstance(adaptedArrangementBundle);
 	harness.expectTrue(!adaptedArrangementBundle.empty() && adaptedArrangementLibrary != nullptr
-		&& adaptedArrangementLibrary->initialize() >= 0,
+		&& VSTPluginLibrary::load(adaptedArrangementLibrary->getLibPath()).status >= 0,
 		"VST3 component that adapts a proposed bus layout library initializes");
 	{
-		VSTPluginInstance adaptedArrangementInstance(adaptedArrangementLibrary, 2);
-		harness.expectTrue(adaptedArrangementInstance.initialize(),
+		auto adaptedArrangementInstance = VSTPluginInstance::create(adaptedArrangementLibrary, 2);
+		harness.expectTrue(adaptedArrangementInstance->initialize(),
 			"VST3 component that adapts a proposed bus layout initializes");
-		harness.expectTrue(adaptedArrangementInstance.negotiateBusLayouts(VST3BusLayout::Surround71,
+		harness.expectTrue(adaptedArrangementInstance->negotiateBusLayouts(VST3BusLayout::Surround71,
 			VST3BusLayout::Surround71, 8,
 			vst3BusLayoutChannelNames(VST3BusLayout::Surround71),
 			vst3BusLayoutChannelNames(VST3BusLayout::Surround71)),
 			"VST3 host accepts a supported layout adapted after a false proposal result");
-		harness.expectEqual(adaptedArrangementInstance.numInputs(), 8,
+		harness.expectEqual(adaptedArrangementInstance->numInputs(), 8,
 			"VST3 host reads back the adapted input layout");
-		harness.expectEqual(adaptedArrangementInstance.numOutputs(), 8,
+		harness.expectEqual(adaptedArrangementInstance->numOutputs(), 8,
 			"VST3 host reads back the adapted output layout");
 	}
 
@@ -376,13 +437,13 @@ void runVst3HostTests()
 	shared_ptr<VSTPluginLibrary> optionalFactoryHostContextLibrary = optionalFactoryHostContextBundle.empty()
 		? nullptr : VSTPluginLibrary::getInstance(optionalFactoryHostContextBundle);
 	const bool optionalFactoryHostContextInitialized = optionalFactoryHostContextLibrary != nullptr
-		&& optionalFactoryHostContextLibrary->initialize() >= 0;
+		&& VSTPluginLibrary::load(optionalFactoryHostContextLibrary->getLibPath()).status >= 0;
 	harness.expectTrue(optionalFactoryHostContextInitialized,
 		"VST3 factory remains loadable when optional factory host context is not implemented");
 	if (optionalFactoryHostContextInitialized)
 	{
-		VSTPluginInstance optionalFactoryHostContextInstance(optionalFactoryHostContextLibrary, 2);
-		harness.expectTrue(optionalFactoryHostContextInstance.initialize(),
+		auto optionalFactoryHostContextInstance = VSTPluginInstance::create(optionalFactoryHostContextLibrary, 2);
+		harness.expectTrue(optionalFactoryHostContextInstance->initialize(),
 			"VST3 component remains usable when factory host context is not implemented");
 	}
 
@@ -391,19 +452,20 @@ void runVst3HostTests()
 	if (CopyFileW(stagedVst3Module.c_str(), rawVst3Module.c_str(), FALSE) != FALSE)
 	{
 		shared_ptr<VSTPluginLibrary> rawVst3Library = VSTPluginLibrary::getInstance(rawVst3Module);
-		harness.expectTrue(rawVst3Library->initialize() >= 0 && rawVst3Library->isVST3(),
+		harness.expectTrue(VSTPluginLibrary::load(rawVst3Library->getLibPath()).status >= 0 && rawVst3Library->isVST3(),
 			"loaded module ABI recognizes VST3 even when the file extension is .dll");
 		VSTPluginFilterFactory rawFactory;
 		wstring rawCommand = L"VSTPlugin";
 		wstring rawParameters = L"Library \"" + rawVst3Module
 			+ L"\" Input Stereo Output Stereo";
-		harness.expectEqual(rawFactory.createFilter(L"raw-vst3.txt", rawCommand, rawParameters).size(),
+		harness.expectEqual(rawFactory.createFilter(L"raw-vst3.txt", rawCommand, rawParameters).filters.size(),
 			(size_t)1, "VSTPlugin Input/Output accepts a loaded raw .dll VST3 module");
 	}
 	else
 		harness.expectTrue(false, "raw VST3 module copy is available for ABI detection");
 
-	VSTPluginInstance instance(library, 2);
+	auto instanceOwner = VSTPluginInstance::create(library, 2);
+	VSTPluginInstance& instance = *instanceOwner;
 	harness.expectTrue(instance.initialize(), "VST3 component initializes with mandatory host services");
 	harness.expectEqual(instance.numInputs(), 2, "VST3 component reports stereo input");
 	harness.expectEqual(instance.numOutputs(), 2, "VST3 component reports stereo output");
@@ -446,6 +508,19 @@ void runVst3HostTests()
 		"VST3 editor receives restored component state");
 	harness.expectTrue(wstring(editorTitle).find(L"Scale 1.50") != wstring::npos,
 		"VST3 editor receives the host content scale factor");
+	int scaledWidth = 0;
+	int scaledHeight = 0;
+	instance.setSizeWindowFunc([&scaledWidth, &scaledHeight](int w, int h) {
+		scaledWidth = w;
+		scaledHeight = h;
+	});
+	harness.expectTrue(instance.setEditorScale(2.0), "attached VST3 editor accepts a monitor scale change");
+	GetWindowTextW(pluginWindow, editorTitle, 128);
+	harness.expectTrue(scaledWidth == 180 && scaledHeight == 110,
+		"VST3 monitor scale change reports the logical editor size (360x220 / 2)");
+	harness.expectTrue(wstring(editorTitle).find(L"Scale 2.00") != wstring::npos,
+		"attached VST3 editor receives the changed content scale factor");
+	instance.setSizeWindowFunc(nullptr);
 	wstring automatedChunk;
 	int automateCallCount = 0;
 	instance.setAutomateFunc([&instance, &automatedChunk, &automateCallCount]() {
@@ -526,7 +601,8 @@ void runVst3HostTests()
 	harness.expectFalse(IsWindow(pluginWindow) != FALSE, "VST3 editor child is destroyed on close");
 	DestroyWindow(parent);
 
-	VSTPluginInstance singleComponentInstance(library, 2);
+	auto singleComponentInstanceOwner = VSTPluginInstance::create(library, 2);
+	VSTPluginInstance& singleComponentInstance = *singleComponentInstanceOwner;
 	harness.expectTrue(singleComponentInstance.initialize(), "single-component VST3 initializes");
 	singleComponentInstance.writeToEffect(encodedState, std::unordered_map<wstring, float>());
 	HWND singleParent = CreateWindowExW(0, L"STATIC", L"single-component VST3 parent", WS_OVERLAPPED,
@@ -541,9 +617,10 @@ void runVst3HostTests()
 
 	const wstring controllerBundle = prepareBundle(directory, L"ControllerStateBundle.vst3", L"ControllerState.vst3");
 	shared_ptr<VSTPluginLibrary> controllerLibrary = VSTPluginLibrary::getInstance(controllerBundle);
-	harness.expectTrue(!controllerBundle.empty() && controllerLibrary->initialize() >= 0,
+	harness.expectTrue(!controllerBundle.empty() && VSTPluginLibrary::load(controllerLibrary->getLibPath()).status >= 0,
 		"separate VST3 module initializes for controller-state restore");
-	VSTPluginInstance controllerStateInstance(controllerLibrary, 2);
+	auto controllerStateInstanceOwner = VSTPluginInstance::create(controllerLibrary, 2);
+	VSTPluginInstance& controllerStateInstance = *controllerStateInstanceOwner;
 	harness.expectTrue(controllerStateInstance.initialize(),
 		"split VST3 controller initializes for private-state restore");
 	controllerStateInstance.writeToEffect(componentAndControllerState, std::unordered_map<wstring, float>());
@@ -572,9 +649,10 @@ void runVst3HostTests()
 	const wstring controllerOnlyRestoreBundle = prepareBundle(directory,
 		L"ControllerOnlyRestoreBundle.vst3", L"ControllerOnlyRestore.vst3");
 	shared_ptr<VSTPluginLibrary> controllerOnlyRestoreLibrary = VSTPluginLibrary::getInstance(controllerOnlyRestoreBundle);
-	harness.expectTrue(!controllerOnlyRestoreBundle.empty() && controllerOnlyRestoreLibrary->initialize() >= 0,
+	harness.expectTrue(!controllerOnlyRestoreBundle.empty() && VSTPluginLibrary::load(controllerOnlyRestoreLibrary->getLibPath()).status >= 0,
 		"separate VST3 module initializes for controller-only state restore");
-	VSTPluginInstance controllerOnlyRestoreInstance(controllerOnlyRestoreLibrary, 2);
+	auto controllerOnlyRestoreInstanceOwner = VSTPluginInstance::create(controllerOnlyRestoreLibrary, 2);
+	VSTPluginInstance& controllerOnlyRestoreInstance = *controllerOnlyRestoreInstanceOwner;
 	harness.expectTrue(controllerOnlyRestoreInstance.initialize(),
 		"split VST3 controller initializes for controller-only state restore");
 	controllerOnlyRestoreInstance.writeToEffect(controllerOnlyState, std::unordered_map<wstring, float>());
@@ -597,7 +675,8 @@ void runVst3HostTests()
 	controllerOnlyRestoreInstance.stopEditing();
 	DestroyWindow(controllerOnlyParent);
 
-	VSTPluginInstance floatOnlyInstance(library, 2);
+	auto floatOnlyInstanceOwner = VSTPluginInstance::create(library, 2);
+	VSTPluginInstance& floatOnlyInstance = *floatOnlyInstanceOwner;
 	harness.expectTrue(floatOnlyInstance.initialize() && !floatOnlyInstance.canDoubleReplacing(),
 		"32-bit-only VST3 component initializes with the float processing path");
 	floatOnlyInstance.prepareForProcessing(48000.0f, 16);
@@ -620,10 +699,11 @@ void runVst3HostTests()
 		L"RejectComponentBundle.vst3", L"RejectComponent.vst3");
 	shared_ptr<VSTPluginLibrary> rejectedComponentLibrary = VSTPluginLibrary::getInstance(rejectedComponentBundle);
 	HANDLE invalidTerminate = CreateEventW(nullptr, TRUE, FALSE, testvst3::invalidTerminateEvent);
-	harness.expectTrue(!rejectedComponentBundle.empty() && rejectedComponentLibrary->initialize() >= 0,
+	harness.expectTrue(!rejectedComponentBundle.empty() && VSTPluginLibrary::load(rejectedComponentLibrary->getLibPath()).status >= 0,
 		"VST3 module remains loadable when its component rejects initialization");
 	{
-		VSTPluginInstance rejectedComponentInstance(rejectedComponentLibrary, 2);
+		auto rejectedComponentInstanceOwner = VSTPluginInstance::create(rejectedComponentLibrary, 2);
+		VSTPluginInstance& rejectedComponentInstance = *rejectedComponentInstanceOwner;
 		harness.expectFalse(rejectedComponentInstance.initialize(),
 			"VST3 component initialization failures are reported");
 	}
@@ -635,16 +715,16 @@ void runVst3HostTests()
 
 	const wstring rejectedBundle = prepareBundle(directory, L"RejectInitBundle.vst3", L"RejectInit.vst3");
 	shared_ptr<VSTPluginLibrary> rejectedLibrary = VSTPluginLibrary::getInstance(rejectedBundle);
-	harness.expectTrue(!rejectedBundle.empty() && rejectedLibrary->initialize() < 0,
+	harness.expectTrue(!rejectedBundle.empty() && VSTPluginLibrary::load(rejectedLibrary->getLibPath()).status < 0,
 		"VST3 module initialization failures are reported");
-	harness.expectTrue(rejectedLibrary->initialize() < 0,
+	harness.expectTrue(VSTPluginLibrary::load(rejectedLibrary->getLibPath()).status < 0,
 		"failed VST3 module initialization remains failed when retried");
 
 	const wstring exitBundle = prepareBundle(directory, L"ExitInitBundle.vst3", L"ExitInit.vst3");
 	const wstring exitMarker = test::vst3BundleModulePath(exitBundle, L"ExitInit.vst3") + L".exit";
 	{
 		shared_ptr<VSTPluginLibrary> exitLibrary = VSTPluginLibrary::getInstance(exitBundle);
-		harness.expectTrue(!exitBundle.empty() && exitLibrary->initialize() >= 0,
+		harness.expectTrue(!exitBundle.empty() && VSTPluginLibrary::load(exitLibrary->getLibPath()).status >= 0,
 			"successful VST3 module is ready for lifecycle teardown");
 	}
 	harness.expectTrue(GetFileAttributesW(exitMarker.c_str()) != INVALID_FILE_ATTRIBUTES,
@@ -659,7 +739,7 @@ void runVst3HostTests()
 	// speakers play" failure reported by users.
 	const wstring upmixerBundle = prepareBundle(directory, L"UpmixerBundle.vst3", L"TestVst3Upmixer.vst3");
 	shared_ptr<VSTPluginLibrary> upmixerLibrary = VSTPluginLibrary::getInstance(upmixerBundle);
-	harness.expectTrue(!upmixerBundle.empty() && upmixerLibrary->initialize() >= 0,
+	harness.expectTrue(!upmixerBundle.empty() && VSTPluginLibrary::load(upmixerLibrary->getLibPath()).status >= 0,
 		"upmixer VST3 module initializes");
 
 	typedef int (*UpmixerCountFunc)();
@@ -672,7 +752,8 @@ void runVst3HostTests()
 	harness.expectTrue(upmixerProcessCount != nullptr, "upmixer process counter is exported");
 
 	{
-		VSTPluginInstance upmixerProbe(upmixerLibrary, 2);
+		auto upmixerProbeOwner = VSTPluginInstance::create(upmixerLibrary, 2);
+		VSTPluginInstance& upmixerProbe = *upmixerProbeOwner;
 		harness.expectTrue(upmixerProbe.initialize(), "upmixer VST3 component initializes");
 		const std::vector<wstring> stereoNames = vst3BusLayoutChannelNames(VST3BusLayout::Stereo);
 		const std::vector<wstring> surround71Names = vst3BusLayoutChannelNames(VST3BusLayout::Surround71);
@@ -1022,7 +1103,7 @@ void runVst3HostTests()
 		const wstring latencyBundle = prepareBundle(directory,
 			L"LatencyUpmixerBundle.vst3", L"TestVst3LatencyUpmixer.vst3");
 		shared_ptr<VSTPluginLibrary> latencyLibrary = VSTPluginLibrary::getInstance(latencyBundle);
-		harness.expectTrue(!latencyBundle.empty() && latencyLibrary->initialize() >= 0,
+		harness.expectTrue(!latencyBundle.empty() && VSTPluginLibrary::load(latencyLibrary->getLibPath()).status >= 0,
 			"latency-reporting VST3 module initializes");
 
 		const auto latencyStreamMatches = [&latencyLibrary](unsigned blockSize)
@@ -1072,10 +1153,11 @@ void runVst3HostTests()
 	const wstring mismatchBundle = prepareBundle(directory,
 		L"BusInfoMismatchBundle.vst3", L"TestVst3BusInfoMismatch.vst3");
 	shared_ptr<VSTPluginLibrary> mismatchLibrary = VSTPluginLibrary::getInstance(mismatchBundle);
-	harness.expectTrue(!mismatchBundle.empty() && mismatchLibrary->initialize() >= 0,
+	harness.expectTrue(!mismatchBundle.empty() && VSTPluginLibrary::load(mismatchLibrary->getLibPath()).status >= 0,
 		"bus-info mismatch VST3 module initializes");
 	{
-		VSTPluginInstance mismatchProbe(mismatchLibrary, 2);
+		auto mismatchProbeOwner = VSTPluginInstance::create(mismatchLibrary, 2);
+		VSTPluginInstance& mismatchProbe = *mismatchProbeOwner;
 		harness.expectTrue(mismatchProbe.initialize(), "bus-info mismatch component initializes");
 		harness.expectFalse(mismatchProbe.negotiateBusLayouts(VST3BusLayout::Stereo,
 			VST3BusLayout::Surround71, 8,
@@ -1088,7 +1170,7 @@ void runVst3HostTests()
 	const wstring surround41Bundle = prepareBundle(directory,
 		L"Surround41Bundle.vst3", L"TestVst3Surround41.vst3");
 	shared_ptr<VSTPluginLibrary> surround41Library = VSTPluginLibrary::getInstance(surround41Bundle);
-	harness.expectTrue(!surround41Bundle.empty() && surround41Library->initialize() >= 0,
+	harness.expectTrue(!surround41Bundle.empty() && VSTPluginLibrary::load(surround41Library->getLibPath()).status >= 0,
 		"Surround41 VST3 module initializes");
 
 	typedef unsigned long long (*Surround41ArrangementFunc)();
@@ -1100,7 +1182,8 @@ void runVst3HostTests()
 		"Surround41 accepted-arrangement probe is exported");
 
 	{
-		VSTPluginInstance surround41Probe(surround41Library, 2);
+		auto surround41ProbeOwner = VSTPluginInstance::create(surround41Library, 2);
+		VSTPluginInstance& surround41Probe = *surround41ProbeOwner;
 		const std::vector<wstring> surround41Channels = {L"L", L"R", L"LFE", L"RL", L"RR"};
 		harness.expectTrue(surround41Probe.initialize(), "Surround41 VST3 component initializes");
 		harness.expectTrue(surround41Probe.negotiateChannelCount(5, surround41Channels),
@@ -1125,7 +1208,8 @@ void runVst3HostTests()
 	}
 
 	{
-		VSTPluginInstance surround50Probe(surround41Library, 2);
+		auto surround50ProbeOwner = VSTPluginInstance::create(surround41Library, 2);
+		VSTPluginInstance& surround50Probe = *surround50ProbeOwner;
 		const std::vector<wstring> surround50Channels = {L"L", L"R", L"C", L"RL", L"RR"};
 		harness.expectTrue(surround50Probe.initialize(), "Surround41 component reinitializes for 5.0");
 		harness.expectTrue(surround50Probe.negotiateChannelCount(5, surround50Channels),
@@ -1141,7 +1225,7 @@ void runVst3HostTests()
 	shared_ptr<VSTPluginLibrary> surround41CineOnlyLibrary =
 		VSTPluginLibrary::getInstance(surround41CineOnlyBundle);
 	harness.expectTrue(!surround41CineOnlyBundle.empty()
-		&& surround41CineOnlyLibrary->initialize() >= 0,
+		&& VSTPluginLibrary::load(surround41CineOnlyLibrary->getLibPath()).status >= 0,
 		"4.1 Cine-only VST3 module initializes");
 	HMODULE surround41CineOnlyModule = GetModuleHandleW(L"TestVst3Surround41CineOnly.vst3");
 	Surround41ArrangementFunc surround41CineOnlyAcceptedArrangement = surround41CineOnlyModule != nullptr
@@ -1150,7 +1234,8 @@ void runVst3HostTests()
 	harness.expectTrue(surround41CineOnlyAcceptedArrangement != nullptr,
 		"4.1 Cine-only accepted-arrangement probe is exported");
 	{
-		VSTPluginInstance cineOnlyProbe(surround41CineOnlyLibrary, 2);
+		auto cineOnlyProbeOwner = VSTPluginInstance::create(surround41CineOnlyLibrary, 2);
+		VSTPluginInstance& cineOnlyProbe = *cineOnlyProbeOwner;
 		harness.expectTrue(cineOnlyProbe.initialize(), "4.1 Cine-only component initializes");
 		harness.expectTrue(cineOnlyProbe.negotiateBusLayouts(VST3BusLayout::Surround41,
 			VST3BusLayout::Surround41, 5,
@@ -1230,10 +1315,7 @@ void runVst3HostTests()
 		harness.expectTrue(fallbackPassedThrough,
 			"4.1 names fall back cleanly through the default stereo-only component");
 	}
-
-	testMemoryStreamBounds();
 	testRestoreBeyondEditRing(directory);
 	testHostContextDetach(directory);
-
-	harness.report();
+	testEditorEditWithoutZeroSampleFlush(directory);
 }

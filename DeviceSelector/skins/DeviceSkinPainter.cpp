@@ -18,6 +18,7 @@
 #include <QPainterPath>
 
 #include "Editor/skins/shared/SkinPaint.h"
+#include "services/logging/Logging.h"
 
 const DeviceSkinPainter* studioDeviceSkinPainter();
 const DeviceSkinPainter* minimalDeviceSkinPainter();
@@ -39,6 +40,9 @@ const DeviceSkinPainter* DeviceSkinPainter::forSkin(const QString& skinId)
 		return rackDeviceSkinPainter();
 	if (id == QStringLiteral("matrix"))
 		return matrixDeviceSkinPainter();
+	if (id != QStringLiteral("studio"))
+		LogFStatic(L"skin \"%s\" is in the roster but has no DeviceSkinPainter implementation; drawing it as studio",
+			id.toStdWString().c_str());
 	return studioDeviceSkinPainter();
 }
 

@@ -1,0 +1,397 @@
+/*
+	This file is part of EqualizerAPO-XT, a system-wide equalizer forked from Equalizer APO.
+	Copyright (C) 2014 Jonas Thedering (Equalizer APO)
+	Copyright (C) 2026 115dkk
+	SPDX-License-Identifier: GPL-2.0-or-later
+*/
+
+#include "stdafx.h"
+#include "text/WideString.h"
+#include "platform/windows/GuidText.h"
+#include "platform/windows/WindowsPath.h"
+#include "services/registry/RegistryPaths.h"
+#include <mmdeviceapi.h>
+#include <mmreg.h>
+
+#include "DeviceAPOInfo.h"
+#include "VoicemeeterAPOInfo.h"
+#include "DeviceAPOInfoKeys.h"
+#include "ReportedOperation.h"
+#include "AsioEntryWriter.h"
+
+#include "services/logging/Logging.h"
+#include "services/registry/RegistryError.h"
+#include "asio/AsioRegistration.h"
+#include "asio/WrapperRecord.h"
+
+using std::make_shared;
+using std::move;
+using std::shared_ptr;
+using std::vector;
+using std::wstring;
+
+void DeviceAPOInfo::install()
+{
+	runReported(DeviceInstallReport::Operation::Install, [this](RegistryTransaction& plan) {
+		installWithin(plan);
+		applyAsioEntry(plan);
+	});
+}
+
+void DeviceAPOInfo::runReported(DeviceInstallReport::Operation operation,
+	const std::function<void(RegistryTransaction&)>& steps)
+{
+	beginReport(operation);
+	ReportedOperation::run(registry, lastOperationReport, steps);
+}
+
+void DeviceAPOInfo::beginReport(DeviceInstallReport::Operation operation)
+{
+	DeviceInstallReport report;
+	report.operation = operation;
+	report.deviceName = deviceName;
+	report.connectionName = connectionName;
+	report.deviceGuid = deviceGuid;
+	report.input = input;
+
+	// originalApoGuids is what load() found on the endpoint, so it is the record
+	// of the state before this operation - which is exactly what a reader needs
+	// to understand the rest of the report.
+	report.fxPropertiesExisted = hasDriverEffectChain();
+	if (report.fxPropertiesExisted)
+	{
+		for (unsigned i = 0; i < allGuidValueNameCount; i++)
+		{
+			// APOGUID_NOVALUE means the slot was empty, which is not worth a line.
+			if (originalApoGuids[i] != APOGUID_NOVALUE && !originalApoGuids[i].empty())
+				report.driverSlots.push_back(wstring(apoSlotNames[i]) + L" = " + originalApoGuids[i]);
+		}
+	}
+
+	// An uninstall is described by what is on the device now; the other two by
+	// what was asked for.
+	const InstallState& state = operation == DeviceInstallReport::Operation::Uninstall
+		? currentInstallState : selectedInstallState;
+	switch (state.installMode)
+	{
+	case INSTALL_LFX_GFX:
+		report.requestedMode = L"LFX/GFX";
+		break;
+	case INSTALL_SFX_MFX:
+		report.requestedMode = L"SFX/MFX";
+		break;
+	case INSTALL_SFX_EFX:
+		report.requestedMode = L"SFX/EFX";
+		break;
+	}
+	report.installPreMix = state.installPreMix;
+	report.installPostMix = state.installPostMix;
+	report.receiveFromEndpoints = state.receiveFromEndpoints && !input && state.installPostMix;
+
+	lastOperationReport = report;
+}
+
+namespace
+{
+std::vector<wstring> processingModesFor(bool input)
+{
+	if (input)
+		return std::vector<wstring>(std::begin(captureProcessingModeValues), std::end(captureProcessingModeValues));
+	return std::vector<wstring>(std::begin(renderProcessingModeValues), std::end(renderProcessingModeValues));
+}
+}
+
+void DeviceAPOInfo::applyAsioEntry(RegistryTransaction& plan)
+{
+	if (!selectedInstallState.asioEntry || (!selectedInstallState.installPreMix && !selectedInstallState.installPostMix))
+	{
+		removeAsioEntry(plan);
+		return;
+	}
+
+	const wstring installPath = AsioEntryWriter::installDirectory(plan, AsioEntryWriter::DirectoryRequirement::Required);
+
+	const eapo::asio::AsioTarget target = eapo::asio::AsioRegistration::endpointTarget(deviceGuid, connectionName, deviceName);
+	eapo::asio::WrapperRecord record;
+	record.wrapperClsid = eapo::asio::AsioRegistration::wrapperClsidFor(deviceGuid);
+	record.targetKind = eapo::asio::TargetKind::WasapiExclusive;
+	record.targetClsid = deviceGuid;
+	record.targetName = target.name;
+	if (input)
+		record.captureEndpoint = deviceGuid;
+	else
+		record.renderEndpoint = deviceGuid;
+	record.options.processOutput = !input;
+	record.options.processInput = input;
+	AsioEntryWriter::writeEntry(plan, target, record, selectedInstallState.asioEntryOptions, installPath);
+	lastOperationReport.asioEntry = eapo::asio::AsioRegistration::entryNameFor(target.name);
+}
+
+void DeviceAPOInfo::removeAsioEntry(RegistryTransaction& plan)
+{
+	const eapo::asio::AsioTarget target = eapo::asio::AsioRegistration::endpointTarget(deviceGuid, connectionName, deviceName);
+	eapo::asio::WrapperRecord record;
+	record.wrapperClsid = eapo::asio::AsioRegistration::wrapperClsidFor(deviceGuid);
+	record.options.processInput = false;
+	record.options.processOutput = false;
+	AsioEntryWriter::removeEntry(plan, target, record,
+		AsioEntryWriter::installDirectory(plan, AsioEntryWriter::DirectoryRequirement::Optional));
+}
+
+bool DeviceAPOInfo::canHostAsio32() const
+{
+	const wstring installPath = AsioEntryWriter::installDirectory(registry, AsioEntryWriter::DirectoryRequirement::Optional);
+	return eapo::asio::AsioRegistration::wrapper32Shipped(installPath);
+}
+
+void DeviceAPOInfo::installWithin(RegistryTransaction& plan)
+{
+	if (!selectedInstallState.installPreMix && !selectedInstallState.installPostMix)
+		return;
+
+	const bool receive = selectedInstallState.receiveFromEndpoints && !input && selectedInstallState.installPostMix;
+
+	// The mode list a slot we populate gets when the driver left none: every
+	// mode an app can end up in for this direction (DeviceAPOInfoKeys.h). A
+	// list the driver wrote is the driver's decision and stays.
+	const std::vector<wstring> processingModes = processingModesFor(input);
+
+	plan.createKey(childApoPath);
+	plan.createKey(childApoPath L"\\" + deviceGuid);
+
+	wstring keyPath;
+	if (!input)
+		keyPath = renderKeyPath L"\\" + deviceGuid;
+	else
+		keyPath = captureKeyPath L"\\" + deviceGuid;
+
+	if (!plan.keyExists(keyPath + L"\\FxProperties"))
+	{
+		try
+		{
+			plan.createKey(keyPath + L"\\FxProperties");
+		}
+		catch (const RegistryError&)
+		{
+			// Permissions were not sufficient, so change them. This is the one
+			// step the transaction cannot take back; see the note in
+			// DeviceAPOInfo.h on what a failed install leaves behind.
+			plan.takeOwnership(keyPath);
+			plan.makeWritable(keyPath);
+
+			plan.createKey(keyPath + L"\\FxProperties");
+		}
+
+		plan.writeValue(keyPath + L"\\FxProperties", fxTitleValueName, L"Equalizer APO");
+
+		for (int i = 0; i < allGuidValueNameCount; i++)
+		{
+			plan.writeValue(childApoPath L"\\" + deviceGuid, allGuidValueNames[i], APOGUID_NOKEY);
+		}
+	}
+	else
+	{
+		vector<wstring> valuenames;
+
+		for (int i = 0; i < allGuidValueNameCount; i++)
+		{
+			wstring apoGuidString = APOGUID_NOVALUE;
+			if (plan.valueExists(keyPath + L"\\FxProperties", allGuidValueNames[i]))
+			{
+				apoGuidString = plan.readValue(keyPath + L"\\FxProperties", allGuidValueNames[i]);
+				valuenames.push_back(allGuidValueNames[i]);
+			}
+
+			plan.writeValue(childApoPath L"\\" + deviceGuid, allGuidValueNames[i], apoGuidString);
+		}
+
+		if (!valuenames.empty())
+		{
+			wstring backupDirectory = plan.readValue(APP_REGPATH, L"ConfigPath");
+			if (backupDirectory.empty())
+				throw RegistryError(L"ConfigPath is empty; refusing to write a registry backup to the process directory");
+			if (!pathutil::directoryExists(backupDirectory))
+				throw RegistryError(L"The ConfigPath folder " + backupDirectory
+					+ L" does not exist, so the registry backup for this device cannot be written. Point ConfigPath under HKEY_LOCAL_MACHINE\\SOFTWARE\\EqualizerAPO at an existing folder (reinstalling EqualizerAPO-XT does this) and try again.");
+			if (backupDirectory.back() != L'\\' && backupDirectory.back() != L'/')
+				backupDirectory += L"\\";
+			const wstring backupPath = backupDirectory + L"backup_"
+				+ text::replaceIllegalFilenameCharacters(deviceName)
+				+ L"_" + text::replaceIllegalFilenameCharacters(connectionName) + L".reg";
+			plan.saveToFile(keyPath + L"\\FxProperties", valuenames, backupPath);
+			// The one report field the caller cannot derive from the transaction:
+			// this file is what a user needs to put the driver's chain back by
+			// hand, so its path has to survive the operation either way.
+			lastOperationReport.backupPath = backupPath;
+		}
+	}
+
+	wstring preMixValue;
+	wstring postMixValue;
+	if (selectedInstallState.useOriginalAPOPreMix)
+		preMixValue = getOriginalAPOPreMix();
+	if (selectedInstallState.useOriginalAPOPostMix)
+		postMixValue = getOriginalAPOPostMix();
+	plan.writeValue(childApoPath L"\\" + deviceGuid, preMixChildGuidValueName, preMixValue);
+	plan.writeValue(childApoPath L"\\" + deviceGuid, postMixChildGuidValueName, postMixValue);
+
+	plan.writeValue(childApoPath L"\\" + deviceGuid, allowSilentBufferValueName,
+		selectedInstallState.allowSilentBufferModification || receive ? L"true" : L"false");
+	if (receive)
+	{
+		plan.writeValue(childApoPath L"\\" + deviceGuid, receiveFromEndpointsValueName, L"true");
+	}
+	else if (plan.valueExists(childApoPath L"\\" + deviceGuid, receiveFromEndpointsValueName))
+	{
+		plan.deleteValue(childApoPath L"\\" + deviceGuid, receiveFromEndpointsValueName);
+	}
+	if (selectedInstallState.autoAdjust)
+	{
+		if (plan.valueExists(childApoPath L"\\" + deviceGuid, disableAutoAdjustValueName))
+			plan.deleteValue(childApoPath L"\\" + deviceGuid, disableAutoAdjustValueName);
+	}
+	else
+	{
+		plan.writeValue(childApoPath L"\\" + deviceGuid, disableAutoAdjustValueName, L"true");
+	}
+	plan.writeValue(childApoPath L"\\" + deviceGuid, versionValueName, installVersion);
+
+	if (selectedInstallState.installMode == INSTALL_LFX_GFX)
+	{
+		if (selectedInstallState.installPreMix)
+			plan.writeValue(keyPath + L"\\FxProperties", lfxGuidValueName, winutil::guidToString(EQUALIZERAPO_PRE_MIX_GUID));
+		if (selectedInstallState.installPostMix && !input)
+			plan.writeValue(keyPath + L"\\FxProperties", gfxGuidValueName, winutil::guidToString(EQUALIZERAPO_POST_MIX_GUID));
+		if (plan.valueExists(keyPath + L"\\FxProperties", sfxGuidValueName))
+			plan.deleteValue(keyPath + L"\\FxProperties", sfxGuidValueName);
+		if (plan.valueExists(keyPath + L"\\FxProperties", mfxGuidValueName))
+			plan.deleteValue(keyPath + L"\\FxProperties", mfxGuidValueName);
+		if (plan.valueExists(keyPath + L"\\FxProperties", efxGuidValueName))
+			plan.deleteValue(keyPath + L"\\FxProperties", efxGuidValueName);
+	}
+	else if (selectedInstallState.installMode == INSTALL_SFX_MFX)
+	{
+		if (plan.valueExists(keyPath + L"\\FxProperties", lfxGuidValueName))
+			plan.deleteValue(keyPath + L"\\FxProperties", lfxGuidValueName);
+		if (plan.valueExists(keyPath + L"\\FxProperties", gfxGuidValueName))
+			plan.deleteValue(keyPath + L"\\FxProperties", gfxGuidValueName);
+		if (selectedInstallState.installPreMix)
+		{
+			plan.writeValue(keyPath + L"\\FxProperties", sfxGuidValueName, winutil::guidToString(EQUALIZERAPO_PRE_MIX_GUID));
+			if (!plan.valueExists(keyPath + L"\\FxProperties", sfxProcessingModesValueName))
+				plan.writeMultiValue(keyPath + L"\\FxProperties", sfxProcessingModesValueName, processingModes);
+		}
+		if (selectedInstallState.installPostMix && !input)
+		{
+			plan.writeValue(keyPath + L"\\FxProperties", mfxGuidValueName, winutil::guidToString(EQUALIZERAPO_POST_MIX_GUID));
+			if (!plan.valueExists(keyPath + L"\\FxProperties", mfxProcessingModesValueName))
+				plan.writeMultiValue(keyPath + L"\\FxProperties", mfxProcessingModesValueName, processingModes);
+		}
+		// don't change efx
+	}
+	else if (selectedInstallState.installMode == INSTALL_SFX_EFX)
+	{
+		if (plan.valueExists(keyPath + L"\\FxProperties", lfxGuidValueName))
+			plan.deleteValue(keyPath + L"\\FxProperties", lfxGuidValueName);
+		if (plan.valueExists(keyPath + L"\\FxProperties", gfxGuidValueName))
+			plan.deleteValue(keyPath + L"\\FxProperties", gfxGuidValueName);
+		if (selectedInstallState.installPreMix)
+		{
+			plan.writeValue(keyPath + L"\\FxProperties", sfxGuidValueName, winutil::guidToString(EQUALIZERAPO_PRE_MIX_GUID));
+			if (!plan.valueExists(keyPath + L"\\FxProperties", sfxProcessingModesValueName))
+				plan.writeMultiValue(keyPath + L"\\FxProperties", sfxProcessingModesValueName, processingModes);
+		}
+		// don't change mfx
+		if (selectedInstallState.installPostMix && !input)
+		{
+			plan.writeValue(keyPath + L"\\FxProperties", efxGuidValueName, winutil::guidToString(EQUALIZERAPO_POST_MIX_GUID));
+			if (!plan.valueExists(keyPath + L"\\FxProperties", efxProcessingModesValueName))
+				plan.writeMultiValue(keyPath + L"\\FxProperties", efxProcessingModesValueName, processingModes);
+		}
+	}
+
+	// force-enable enhancements
+	if (plan.valueExists(keyPath + L"\\FxProperties", disableEnhancementsValueName))
+		plan.deleteValue(keyPath + L"\\FxProperties", disableEnhancementsValueName);
+}
+
+void DeviceAPOInfo::uninstall()
+{
+	runReported(DeviceInstallReport::Operation::Uninstall, [this](RegistryTransaction& plan) {
+		uninstallWithin(plan);
+		removeAsioEntry(plan);
+	});
+}
+
+void DeviceAPOInfo::uninstallWithin(RegistryTransaction& plan)
+{
+	wstring keyPath;
+	if (!input)
+		keyPath = renderKeyPath L"\\" + deviceGuid;
+	else
+		keyPath = captureKeyPath L"\\" + deviceGuid;
+
+	if (originalApoGuids[0] == APOGUID_NOKEY)
+	{
+		// This installation created FxProperties, but since Windows 11 24H2
+		// (build 26100) the OS puts its own subkeys below it, and
+		// RegDeleteKeyExW refuses to delete a key that has subkeys - a
+		// whole-key delete therefore throws on such systems and the uninstall
+		// leaves the EQ CLSIDs dangling (issue #189). Delete the values this
+		// installation wrote and remove the key itself only when nothing else
+		// lives in it.
+		wstring fxPath = keyPath + L"\\FxProperties";
+		if (plan.keyExists(fxPath))
+		{
+			for (const wchar_t* valueName : ownedFxValueNames)
+			{
+				if (plan.valueExists(fxPath, valueName))
+					plan.deleteValue(fxPath, valueName);
+			}
+
+			if (plan.keyEmpty(fxPath))
+				plan.deleteKey(fxPath);
+		}
+	}
+	else
+	{
+		for (int i = 0; i < allGuidValueNameCount; i++)
+		{
+			if (originalApoGuids[i] == APOGUID_NOVALUE)
+			{
+				if (plan.valueExists(keyPath + L"\\FxProperties", allGuidValueNames[i]))
+					plan.deleteValue(keyPath + L"\\FxProperties", allGuidValueNames[i]);
+			}
+			else if (originalApoGuids[i] != L"")
+			{
+				plan.writeValue(keyPath + L"\\FxProperties", allGuidValueNames[i], originalApoGuids[i]);
+			}
+		}
+	}
+
+	if (plan.keyExists(childApoPath) && plan.valueExists(childApoPath, deviceGuid))
+		plan.deleteValue(childApoPath, deviceGuid);
+
+	if (plan.keyExists(childApoPath L"\\" + deviceGuid))
+		plan.deleteKey(childApoPath L"\\" + deviceGuid);
+
+	if (plan.keyExists(childApoPath) && plan.keyEmpty(childApoPath))
+		plan.deleteKey(childApoPath);
+}
+
+void DeviceAPOInfo::reinstall()
+{
+	// One transaction over all three steps. The reload in the middle is what
+	// makes this more than uninstall-then-install: install() needs the original
+	// APO GUIDs as the driver has them, and uninstall() has just put them back.
+	// load() only reads, but it throws on an installation this build cannot
+	// describe, and before this it threw with the device already uninstalled.
+	runReported(DeviceInstallReport::Operation::Reinstall, [this](RegistryTransaction& plan) {
+		uninstallWithin(plan);
+		const bool wasDefault = defaultDevice;
+		loadFromRegistry(deviceGuid);
+		defaultDevice = wasDefault;
+		installWithin(plan);
+		applyAsioEntry(plan);
+	});
+}

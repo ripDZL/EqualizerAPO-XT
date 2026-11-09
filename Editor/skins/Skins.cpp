@@ -5,6 +5,8 @@
 */
 
 #include "Skins.h"
+
+#include <QIcon>
 #include "shared/SkinSupport.h"
 #include "SkinThemeData.h"
 #include "services/logging/Logging.h"
@@ -118,6 +120,29 @@ public:
 		delegate->paintVstBusFrame(painter, state, tokens);
 	}
 
+	QIcon powerToggleIcon(bool enabled, const SkinTokens& tokens) const override
+	{
+		return delegate->powerToggleIcon(enabled, tokens);
+	}
+
+	QSize vstSlotFillCellSize(const QString& role, const QString& value,
+		const SkinTokens& tokens) const override
+	{
+		return delegate->vstSlotFillCellSize(role, value, tokens);
+	}
+
+	void paintVstSlotFillCell(QPainter& painter, const VstSlotFillCellState& state,
+		const SkinTokens& tokens) const override
+	{
+		delegate->paintVstSlotFillCell(painter, state, tokens);
+	}
+
+	void paintVstSlotFillRail(QPainter& painter, const VstSlotFillRailState& state,
+		const SkinTokens& tokens) const override
+	{
+		delegate->paintVstSlotFillRail(painter, state, tokens);
+	}
+
 	FilterPickerView* createFilterPicker(QWidget* parent, const SkinTokens& tokens) const override
 	{
 		return delegate->createFilterPicker(parent, tokens);
@@ -148,6 +173,11 @@ public:
 	void styleFileDialog(QFileDialog* dialog, const SkinTokens& tokens) const override
 	{
 		delegate->styleFileDialog(dialog, tokens);
+	}
+
+	QAbstractFileIconProvider* fileIconProvider(const SkinTokens& tokens) const override
+	{
+		return delegate->fileIconProvider(tokens);
 	}
 
 private:

@@ -22,6 +22,10 @@ them unset.
 - `EAPO_MOVE_LIMIT_MS` / `EAPO_MOVE_WARN_MS` — the same budget for the
   `--card-move-test` gate (a card move must not rebuild the whole list);
   `Invoke-EditorOffscreenTest.ps1` passes CI's values.
+- `EAPO_PLUGIN_LOAD_GAP_LIMIT_MS` — the longest pause of the UI thread's
+  20 ms timer the `--plugin-load-test` gate accepts while a slow fixture
+  plug-in loads (default 2000); `Invoke-EditorOffscreenTest.ps1` passes CI's
+  value.
 - `EAPO_STALL_SAMPLE_MS` — when a timed operation of the skin-switch or
   card-move gate runs longer than this many milliseconds, the gate samples
   the GUI thread's call stack until it ends and prints a `StallWatch:` report
@@ -37,6 +41,10 @@ them unset.
 - `EAPO_ANALYSIS_LAYOUT_HOLD_MS` — keeps the Editor open that many
   milliseconds (0 to 30000) after the analysis-dock layout test, so the
   window can be captured.
+- `EAPO_FRAME_PROBE_LINGER` — `1` leaves the window of the
+  `--frame-hittest-test` probe open after its checks, with the native child
+  cascade still in place, so the title bar and the edges can be dragged by
+  hand. Never set in CI.
 - `EAPO_GALLERY_LANG` — renders the gallery with a shipped translation
   (for example `ko`) instead of the default untranslated English, to judge
   translated typography.
@@ -79,6 +87,27 @@ Both are kill switches for the field and the control arms of the
 - `EAPO_TEST_VST_METADATA` — makes `TestVst2Plugin` report the synthetic
   metadata variant named by the value, so `HybridConvTests` can exercise
   host-side metadata handling.
+- `EAPO_TEST_VST_HOST_CALLBACKS` — set by `HybridConvTests`
+  (`VstHostTests.cpp`) while it loads `TestVst2Plugin`: the fixture then
+  calls the host's PRODUCT_NAME and SUPPORTS callbacks with null and valid
+  pointers at load and refuses to load if any answer is wrong. Not meant to
+  be set by hand.
+- `EAPO_TEST_VST3_HOST_CONTEXT` — set to `notimpl` by `HybridConvTests`
+  (`Vst3HostTests.cpp`) while it loads a fresh `TestVst3Plugin` bundle: the
+  fixture's factory returns `kNotImplemented` from `setHostContext` without
+  keeping the context, then still creates and initializes its component. Not
+  meant to be set by hand.
+- `EAPO_TEST_VST_EDITOR` — set by `HybridConvTests` (`VstHostTests.cpp`)
+  while it loads `TestVst2Plugin`: `fixed` gives the fixture a 320x200
+  editor that does not take the content scale request, `scaled` one that
+  does, and `late` one that drops a scale request received before its editor
+  opens, as JUCE 6.0.0 to 6.1.2 do. Unset, the fixture has no editor. Not
+  meant to be set by hand.
+- `EAPO_XT_TEST_IMPORT_DIR` / `EAPO_XT_TEST_INCLUDE_DIR` — set by
+  `EditorLogicTests` (`ConfigImportTests.cpp`) and `EngineOrchestrationTests`
+  (`ConfigLoadTests.cpp`) themselves, so a test config can write
+  `Include: %VAR%ile.txt` and check that the Editor import and the
+  engine expand variables in Include paths. Not meant to be set by hand.
 
 ## Build / release
 
@@ -87,3 +116,6 @@ Both are kill switches for the field and the control arms of the
   binaries by the build.
 - `EAPO_REPO_URL` / `EAPO_REPO_SLUG` — compile-time defines from
   `version.h` naming the canonical GitHub repository.
+- `EAPO_CODEQL_MODEL_PACK` — set by `codeql.yml` to the path of
+  `.github/codeql/eapo-models`, so the analyze step can pass the project's
+  CodeQL model pack. Used only inside that workflow.

@@ -11,7 +11,7 @@ Describe "Invoke-EditorOffscreenTest.ps1 planning" {
     }
 
     It "copies the velopack SONAME for every gate" {
-        foreach ($gate in @("selftest-vst", "skin-gallery", "readability-legacy-gallery", "skin-switch", "analysis-layout", "card-move", "card-selection", "power-toggle", "routing-edit")) {
+        foreach ($gate in @("selftest-vst", "skin-gallery", "readability-legacy-gallery", "skin-switch", "analysis-layout", "card-move", "card-selection", "power-toggle", "routing-edit", "frame-hittest")) {
             (PlanFor $gate).VelopackDllSource |
                 Should -Be "C:\ws\deps\velopack_libc\lib\velopack_libc_win_x64_msvc.dll"
         }
@@ -52,11 +52,32 @@ Describe "Invoke-EditorOffscreenTest.ps1 planning" {
         $plan.PostChecks | Should -Contain "analysis-screenshot"
     }
 
+    It "takes the velopack DLL from -DepsRoot when a worktree has no deps of its own" {
+        $plan = & $scriptPath -WorkspaceRoot "C:\wt" -DepsRoot "C:\ws" -Gate selftest-vst -Platform x64 -PlanOnly
+        $plan.EditorExe | Should -Be "C:\wt\build-Editor-x64\release\Editor.exe"
+        $plan.VelopackDllSource | Should -Be "C:\ws\deps\velopack_libc\lib\velopack_libc_win_x64_msvc.dll"
+    }
+
+    It "refuses an empty card selection proof directory" {
+        $plan = PlanFor "card-selection"
+        $plan.Arguments[1] | Should -Be "C:\ws\card-selection"
+        $plan.PostChecks | Should -Contain "card-selection-shots"
+    }
+
     It "captures stderr for the GUI-subsystem gates that log through qWarning" {
-        foreach ($gate in @("skin-gallery", "readability-legacy-gallery", "skin-switch", "analysis-layout", "card-move", "card-selection", "power-toggle", "routing-edit")) {
+        foreach ($gate in @("readability-legacy-gallery", "skin-switch", "analysis-layout", "card-move", "card-selection", "power-toggle", "routing-edit", "frame-hittest")) {
             $plan = PlanFor $gate
             $plan.LogPath | Should -Not -BeNullOrEmpty
             $plan.ExtraEnv["QT_FORCE_STDERR_LOGGING"] | Should -Be "1"
+        }
+    }
+
+    It "runs the frame hit-test probe on real windows and every other gate offscreen" {
+        $plan = PlanFor "frame-hittest"
+        $plan.Arguments | Should -Be @("--frame-hittest-test", "C:\ws\Setup\config\config.txt")
+        $plan.QtPlatform | Should -Be "windows"
+        foreach ($gate in @("selftest-vst", "skin-gallery", "skin-switch", "analysis-layout", "plugin-load", "card-move", "card-selection", "power-toggle", "routing-edit")) {
+            (PlanFor $gate).QtPlatform | Should -Be "offscreen"
         }
     }
 }
@@ -64,14 +85,8 @@ Describe "Invoke-EditorOffscreenTest.ps1 planning" {
 Describe "New-ReleaseChecksums.ps1" {
     BeforeAll {
         $scriptPath = Join-Path $PSScriptRoot "..\New-ReleaseChecksums.ps1"
-        # Dot-source in a scriptblock cannot reach an advanced script's inner
-        # functions; instead run -PlanOnly for the surface, and reproduce the
-        # writer contract through a real invocation of Format-ChecksumLines by
-        # loading the script text's function into scope.
-        $scriptText = Get-Content $scriptPath -Raw
-        $functionText = [regex]::Match($scriptText,
-            'function Format-ChecksumLines \{[\s\S]*?\n\}').Value
-        Invoke-Expression $functionText
+        # The writer lives in ReleaseAssets.psm1, the module the script uses.
+        Import-Module (Join-Path $PSScriptRoot "..\ReleaseAssets.psm1") -Force
     }
 
     It "plans the grammar-derived checksum asset" {

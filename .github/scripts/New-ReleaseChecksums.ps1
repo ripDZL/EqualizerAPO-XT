@@ -9,9 +9,9 @@
     (Installer/AutoInstaller.cpp), so the file must list every *-Setup.exe
     and .msi installer asset
     asset in the exact format the parser reads - and the parser was tested
-    while the writer was not. Format-ChecksumLines is the pure writer half
-    Pester pins: sha256sum-compatible lines, lowercase hex, two spaces, LF,
-    sorted by name, trailing newline.
+    while the writer was not. Format-ChecksumLines (ReleaseAssets.psm1) is
+    the pure writer half Pester pins: sha256sum-compatible lines, lowercase
+    hex, two spaces, LF, sorted by name, trailing newline.
 
     The assets are re-downloaded from the release rather than hashed from
     local build directories so the hashes cover exactly the bytes users get.
@@ -26,17 +26,6 @@ param(
 
 $ErrorActionPreference = "Stop"
 Import-Module (Join-Path $PSScriptRoot "ReleaseAssets.psm1") -Force
-
-function Format-ChecksumLines {
-    param(
-        # Hashtable of asset name -> SHA-256 hex (any case).
-        [Parameter(Mandatory)] [hashtable] $Hashes
-    )
-    $lines = foreach ($name in ($Hashes.Keys | Sort-Object)) {
-        "$($Hashes[$name].ToLowerInvariant())  $name"
-    }
-    (($lines -join "`n") + "`n")
-}
 
 if ($PlanOnly) {
     return [pscustomobject]@{

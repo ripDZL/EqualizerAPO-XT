@@ -19,6 +19,7 @@
 
 #include "stdafx.h"
 #include "platform/windows/GuidText.h"
+#include "runtime/errors/WideError.h"
 #include "services/registry/RegistryPaths.h"
 #include <new>
 #include <string>
@@ -28,6 +29,7 @@
 #include "EqualizerAPO.h"
 #include "ClassFactory.h"
 #include "../services/registry/ClsidRegistration.h"
+#include "../vst/PluginResidency.h"
 #include "../services/registry/WindowsRegistry.h"
 #include "../services/logging/Logging.h"
 
@@ -40,14 +42,19 @@ static HINSTANCE hModule;
 BOOL WINAPI DllMain(HINSTANCE hModule, DWORD dwReason, void* lpReserved)
 {
 	if (dwReason == DLL_PROCESS_ATTACH)
+	{
 		::hModule = hModule;
+		PluginResidency::keepLoadedForProcessLifetime(true);
+	}
 
 	return TRUE;
 }
 
 STDAPI DllCanUnloadNow()
 {
-	if (EqualizerAPO::instCount == 0 && ClassFactory::lockCount == 0)
+	// Retained plugin objects execute code from this DLL, so it must stay mapped.
+	if (EqualizerAPO::instCount == 0 && ClassFactory::lockCount == 0
+		&& !PluginResidency::holdsLoadedModules())
 		return S_OK;
 	else
 		return S_FALSE;
@@ -118,7 +125,7 @@ STDAPI DllRegisterServer()
 			winutil::guidToString(EQUALIZERAPO_PRE_MIX_GUID),
 			L"EqualizerAPO Pre-Mix Class", filename);
 	}
-	catch (const RegistryError& e)
+	catch (const WideError& e)
 	{
 		LogFStatic(L"Could not register the APO class keys: %s", e.getMessage().c_str());
 		UnregisterAPO(EQUALIZERAPO_POST_MIX_GUID);
@@ -138,7 +145,7 @@ STDAPI DllUnregisterServer()
 		ClsidRegistration::unregisterClsidTree(systemRegistry(),
 			winutil::guidToString(EQUALIZERAPO_PRE_MIX_GUID));
 	}
-	catch (const RegistryError& e)
+	catch (const WideError& e)
 	{
 		LogFStatic(L"Could not remove the APO class keys: %s", e.getMessage().c_str());
 		return E_FAIL;

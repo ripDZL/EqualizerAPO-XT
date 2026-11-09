@@ -6,7 +6,7 @@
 
 #include "Editor/helpers/VSTPopupLivePreviewPolicy.h"
 
-void testVSTPopupLivePreviewPolicy()
+TEST_CASE(EditorLogicTests, testVSTPopupLivePreviewPolicy)
 {
 	using VSTPopupLivePreviewPolicy::FeedPath;
 	using VSTPopupLivePreviewPolicy::selectFeedPath;

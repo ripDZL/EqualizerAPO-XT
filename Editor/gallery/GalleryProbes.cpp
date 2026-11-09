@@ -10,110 +10,122 @@
 */
 
 #include "SkinGallery.h"
-#include "Editor/ConfigFileCodec.h"
-#include "Editor/gallery/GallerySupport.h"
+
+#include <algorithm>
+#include <array>
+#include <cstdio>
+#include <cstdlib>
+#include <functional>
+#include <memory>
+
+// For the analysis layout probe, which moved here from main.cpp (audit #275
+// B7).
 #include <numbers>
-// For the two gates moved out of main.cpp (audit #275 B7): the VST
-// round-trip self test and the analysis layout probe.
 #include <optional>
 #include <unordered_map>
+#include "Editor/ConfigFileCodec.h"
+#include "Editor/gallery/GallerySupport.h"
+#include "Editor/guis/VSTPluginFilterGUI.h"
 #include <QBoxLayout>
-#include <QDockWidget>
 #include <QFileInfo>
 #include <QLocale>
 #include <QStyle>
-#include <QTimer>
-#include "filters/VSTPluginFilter.h"
-#include "filters/VSTPluginFilterFactory.h"
-#include "guis/VSTPluginFilterGUI.h"
-#include "widgets/cards/VSTCardEditor.h"
-#include "widgets/cards/VSTSlotFillRail.h"
-#include "MainWindow.h"
-#include "diagnostics/ToolbarPixelProbe.h"
-#include "widgets/MainToolbarKit.h"
-#include "SubwooferRouting/Preset.h"
-#include "SubwooferRouting/StateCodec.h"
-#include "widgets/subwooferrouting/SubwooferRoutingDefaults.h"
 
-#include <array>
-#include <cmath>
-#include <complex>
-#include <cstdio>
-#include <cstdlib>
-#include <memory>
-
+#include <QAction>
 #include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDataStream>
 #include <QDialog>
 #include <QDir>
+#include <QDockWidget>
 #include <QElapsedTimer>
-#include <QEnterEvent>
 #include <QEventLoop>
 #include <QFile>
-#include <QFileDialog>
-#include <QFileInfo>
-#include <QFrame>
-#include <QGraphicsScene>
-#include <QGraphicsView>
-#include <QGridLayout>
-#include <QHBoxLayout>
+#include <QFont>
+#include <QFontDatabase>
+#include <QFontInfo>
 #include <QImage>
-#include <QKeyEvent>
+#include <QKeySequence>
 #include <QLabel>
-#include <QLineEdit>
-#include <QLocale>
-#include <QMainWindow>
-#include <QMenu>
 #include <QMenuBar>
 #include <QMouseEvent>
 #include <QPixmap>
 #include <QPointer>
-#include <QRadioButton>
-#include <QToolButton>
-#include <QScrollArea>
-#include <QScrollBar>
+#include <QRawFont>
 #include <QScreen>
 #include <QSpinBox>
-#include <QString>
 #include <QStringList>
-#include <QTemporaryDir>
 #include <QTimer>
-#include <QToolBar>
-#include <QTranslator>
-#include <QTreeView>
-#include <QUrl>
+#include <QVector>
 
-#define WIN32_LEAN_AND_MEAN
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-
+#include "Editor/AnalysisThread.h"
 #include "Editor/FilterTable.h"
+#include "Editor/MainWindow.h"
+#include "Editor/MainWindowProbe.h"
 #include "Editor/SkinManager.h"
-#include "Editor/guis/CopyFilterGUI.h"
-#include "Editor/helpers/GUIHelper.h"
-#include "Editor/skins/ISkin.h"
-#include "Editor/skins/Skins.h"
-#include "Editor/widgets/AddCardRow.h"
-#include "Editor/widgets/EqGraphView.h"
-#include "Editor/widgets/SegmentedControl.h"
-#include "Editor/analysis/AnalysisMetric.h"
-#include "Editor/analysis/AnalysisResponse.h"
-#include "filters/BiQuad.h"
-#include "Editor/skins/shared/SkinFileIcons.h"
+#include "Editor/skins/SkinThemeData.h"
 #include "Editor/widgets/FilterCardRow.h"
-#include "Editor/widgets/CommandRowFrame.h"
-#include "Editor/widgets/FilterInsertSeam.h"
-#include "Editor/widgets/FilterPickerView.h"
-#include "Editor/widgets/SkinComboBox.h"
-#include "Editor/widgets/TitleBar.h"
-#include "Editor/widgets/UpdateToast.h"
-#include "Editor/widgets/subwooferrouting/SubwooferRoutingEditorDialog.h"
-#include "Editor/widgets/cards/SubwooferRoutingCardEditor.h"
-#include "Editor/widgets/routing/IRoutingRenderer.h"
+#include "Editor/widgets/cards/VSTCardEditor.h"
+#include "Editor/widgets/cards/VSTPluginSession.h"
+
+bool SkinGallery::armPluginLoadProbe(MainWindow& window)
+{
+	struct ProbeState
+	{
+		QElapsedTimer elapsed;
+		qint64 lastTickMs = 0;
+		qint64 maxUiGapMs = 0;
+	};
+	auto state = std::make_shared<ProbeState>();
+	state->elapsed.start();
+
+	QTimer* tickTimer = new QTimer(&window);
+	tickTimer->setInterval(20);
+	QObject::connect(tickTimer, &QTimer::timeout, &window, [state]() {
+		const qint64 now = state->elapsed.elapsed();
+		state->maxUiGapMs = qMax(state->maxUiGapMs, now - state->lastTickMs);
+		state->lastTickMs = now;
+	});
+	tickTimer->start();
+
+	QTimer* checkTimer = new QTimer(&window);
+	checkTimer->setInterval(100);
+	QObject::connect(checkTimer, &QTimer::timeout, &window, [&window, state, tickTimer, checkTimer]() {
+		const qint64 elapsedMs = state->elapsed.elapsed();
+		QList<VSTCardEditor*> cards;
+		bool rowsExist = false;
+		for (FilterTable* table : window.findChildren<FilterTable*>())
+		{
+			rowsExist = rowsExist || !table->findChildren<FilterCardRow*>(
+				QString(), Qt::FindDirectChildrenOnly).isEmpty();
+			cards.append(table->findChildren<VSTCardEditor*>());
+		}
+		if ((!rowsExist || VSTPluginSession::pendingLoads() != 0) && elapsedMs < 60000)
+			return;
+
+		const qint64 finalGap = elapsedMs - state->lastTickMs;
+		state->maxUiGapMs = qMax(state->maxUiGapMs, finalGap);
+		int loaded = 0;
+		for (VSTCardEditor* card : cards)
+			if (card->pluginSession()->instance() != nullptr)
+				loaded++;
+		bool limitOk = false;
+		int limitMs = qEnvironmentVariableIntValue("EAPO_PLUGIN_LOAD_GAP_LIMIT_MS", &limitOk);
+		if (!limitOk || limitMs <= 0)
+			limitMs = 2000;
+		fprintf(stderr, "PLUGIN_LOAD_RESULT {\"maxUiGapMs\":%lld,\"elapsedMs\":%lld,\"cards\":%d,\"loaded\":%d}\n",
+			static_cast<long long>(state->maxUiGapMs), static_cast<long long>(elapsedMs),
+			int(cards.size()), loaded);
+		std::fflush(stderr);
+		tickTimer->stop();
+		checkTimer->stop();
+		QCoreApplication::exit(!cards.isEmpty() && loaded == cards.size()
+			&& state->maxUiGapMs < limitMs ? 0 : 1);
+	});
+	checkTimer->start();
+	return true;
+}
 
 bool SkinGallery::armAnalysisLayoutProbe(MainWindow& window, const QString& screenshotPath)
 {
@@ -250,7 +262,16 @@ bool SkinGallery::armVstPanelFeedProbe(MainWindow& window, const QString& durati
 			std::fflush(nullptr);
 			std::_Exit(1);
 		}
-		if (!QMetaObject::invokeMethod(card, "embedToggled", Qt::DirectConnection, Q_ARG(bool, true)))
+		// The wait pumps events, so anything that rebuilds the rows meanwhile
+		// (a skin switch) deletes the card found above.
+		const QPointer<VSTCardEditor> probedCard = card;
+		if (!VSTPluginSession::waitForPendingLoads(30000) || probedCard.isNull())
+		{
+			fprintf(stderr, "VstPanelFeedProbe: the plug-in load did not finish or its card went away\n");
+			std::fflush(nullptr);
+			std::_Exit(1);
+		}
+		if (!QMetaObject::invokeMethod(probedCard.data(), "embedToggled", Qt::DirectConnection, Q_ARG(bool, true)))
 		{
 			fprintf(stderr, "VstPanelFeedProbe: embed request failed\n");
 			std::fflush(nullptr);
@@ -352,11 +373,6 @@ bool SkinGallery::armVstPanelFeedProbe(MainWindow& window, const QString& durati
 // five skins on the live MainWindow and report the dock's size/minimums and
 // which physical font face serves Korean text in the chrome. Not a gate.
 // ---------------------------------------------------------------------------
-
-#include <QFontDatabase>
-#include <QFontInfo>
-#include <QRawFont>
-#include <QAction>
 
 namespace
 {
@@ -511,8 +527,10 @@ bool SkinGallery::armSkinMetricsProbe(MainWindow& window)
 		window.resizeDocks({ dock }, { vertical ? 170 : 330 }, vertical ? Qt::Vertical : Qt::Horizontal);
 		settle();
 		fprintf(stderr, "  after shrink: dock=%dx%d\n", dock->width(), dock->height());
-		for (const QString& skinId : { QStringLiteral("studio"), QStringLiteral("minimal"),
-			QStringLiteral("soft"), QStringLiteral("rack"), QStringLiteral("matrix"), QStringLiteral("studio") })
+		// Every roster skin, then the first one again after the round trip.
+		QStringList walk = SkinThemeData::ids();
+		walk.append(walk.first());
+		for (const QString& skinId : walk)
 		{
 			QAction* action = findSkinAction(window, skinId);
 			if (action == nullptr)
@@ -538,8 +556,7 @@ bool SkinGallery::armSkinMetricsProbe(MainWindow& window)
 		settle();
 		fprintf(stderr, "  right dock after shrink: dock=%dx%d area=%d\n", dock->width(), dock->height(),
 			int(window.dockWidgetArea(dock)));
-		for (const QString& skinId : { QStringLiteral("studio"), QStringLiteral("minimal"),
-			QStringLiteral("soft"), QStringLiteral("rack"), QStringLiteral("matrix"), QStringLiteral("studio") })
+		for (const QString& skinId : walk)
 		{
 			QAction* action = findSkinAction(window, skinId);
 			if (action == nullptr)
@@ -625,7 +642,7 @@ bool SkinGallery::armWindowShotProbe(MainWindow& window, const QStringList& argu
 		return false;
 	}
 	const QStringList skins = probeOptionValue(arguments, QStringLiteral("--window-shot-skins"),
-		QStringLiteral("studio,minimal,soft,rack,matrix")).split(QLatin1Char(','), Qt::SkipEmptyParts);
+		SkinThemeData::ids().join(QLatin1Char(','))).split(QLatin1Char(','), Qt::SkipEmptyParts);
 	const QStringList modes = probeOptionValue(arguments, QStringLiteral("--window-shot-modes"),
 		QStringLiteral("dark,light")).split(QLatin1Char(','), Qt::SkipEmptyParts);
 	const bool dockRight = probeOptionValue(arguments, QStringLiteral("--window-shot-dock"),
@@ -782,8 +799,9 @@ int SkinGallery::runVst3PanelProbe()
 	}
 
 	fprintf(stderr, "[VST3 panel probe] step=library-create\n");
-	const std::shared_ptr<VSTPluginLibrary> library = VSTPluginLibrary::getInstance(pluginPath.toStdWString());
-	if (library == nullptr || !library->isVST3() || library->initialize() < 0)
+	const auto loaded = VSTPluginLibrary::load(pluginPath.toStdWString());
+	const std::shared_ptr<VSTPluginLibrary>& library = loaded.library;
+	if (loaded.status < 0 || library == nullptr || !library->isVST3())
 	{
 		fprintf(stderr, "[VST3 panel probe] library initialization failed\n");
 		return 1;
@@ -879,6 +897,7 @@ bool SkinGallery::armAnalysisLatencyProbe(MainWindow& window, const QStringList&
 	struct State
 	{
 		MainWindow* window = nullptr;
+		QCheckBox* instantMode = nullptr;
 		FilterTable* table = nullptr;
 		FilterTable::Item* probeItem = nullptr;
 		QString configPath;
@@ -900,9 +919,12 @@ bool SkinGallery::armAnalysisLatencyProbe(MainWindow& window, const QStringList&
 	if (!iterationsOk || iterations <= 0)
 		iterations = 10;
 
-	FilterTable* table = window.currentFilterTable();
+	MainWindow::Probe probe = window.probe();
+	FilterTable* table = probe.currentFilterTable();
 	QDockWidget* dock = window.findChild<QDockWidget*>(QStringLiteral("analysisDockWidget"));
-	if (table == nullptr || dock == nullptr || window.instantModeCheckBox == nullptr)
+	QCheckBox* instantMode = probe.instantModeControl();
+	QComboBox* deviceCombo = probe.deviceControl();
+	if (table == nullptr || dock == nullptr || instantMode == nullptr)
 	{
 		fprintf(stderr, "Analysis latency: loaded table, analysis dock, or instant-mode control is missing\n");
 		return false;
@@ -921,9 +943,9 @@ bool SkinGallery::armAnalysisLatencyProbe(MainWindow& window, const QStringList&
 	state->configPath = table->getConfigPath();
 	state->originalBytes = source.readAll();
 	state->iterations = iterations;
-	state->originalInstantMode = window.instantModeCheckBox->isChecked();
-	window.noSavePreferences = true;
-	window.noSaveFilePreferences = true;
+	state->instantMode = instantMode;
+	state->originalInstantMode = instantMode->isChecked();
+	probe.suppressPreferenceWrites();
 
 	QSpinBox* resolution = window.findChild<QSpinBox*>(QStringLiteral("AnalysisFormSpin"));
 	fprintf(stderr, "Analysis latency: resolution=%d block=%d\n",
@@ -935,7 +957,7 @@ bool SkinGallery::armAnalysisLatencyProbe(MainWindow& window, const QStringList&
 			return;
 		state->finished = true;
 		state->phase = Phase::Done;
-		state->window->instantModeCheckBox->setChecked(state->originalInstantMode);
+		state->instantMode->setChecked(state->originalInstantMode);
 
 		int exitCode = requestedExitCode;
 		const ConfigFileCodec::WriteResult restore = ConfigFileCodec::writeBytes(
@@ -963,9 +985,8 @@ bool SkinGallery::armAnalysisLatencyProbe(MainWindow& window, const QStringList&
 			return;
 		}
 		state->lowValue = !state->lowValue;
-		state->probeItem->text = state->lowValue
-			? QStringLiteral("Preamp: -0.1 dB") : QStringLiteral("Preamp: -0.2 dB");
-		state->table->updateModel();
+		state->table->setLineText(state->probeItem, state->lowValue
+			? QStringLiteral("Preamp: -0.1 dB") : QStringLiteral("Preamp: -0.2 dB"));
 	};
 
 	auto printSummary = [state]() {
@@ -1023,14 +1044,14 @@ bool SkinGallery::armAnalysisLatencyProbe(MainWindow& window, const QStringList&
 		}
 	};
 
-	window.analysisProbeSaveStarted = [state]() {
+	probe.onSaveStarted([state]() {
 		if ((state->phase == Phase::Regular || state->phase == Phase::Burst)
 			&& state->current.saveWaitMs < 0.0)
 		{
 			state->current.saveWaitMs = state->timer.nsecsElapsed() / 1e6;
 		}
-	};
-	window.analysisProbeParametersSet = [state]() {
+	});
+	probe.onAnalysisParametersSet([state]() {
 		if (state->phase == Phase::Warmup)
 		{
 			state->paramsSeen = true;
@@ -1042,8 +1063,8 @@ bool SkinGallery::armAnalysisLatencyProbe(MainWindow& window, const QStringList&
 		state->current.queueWaitMs = state->current.saveWaitMs >= 0.0
 			? nowMs - state->current.saveWaitMs : nowMs;
 		state->paramsSeen = true;
-	};
-	window.analysisProbePanelUpdated = [state, beginRegular, beginBurst, printSummary, finish](
+	});
+	probe.onAnalysisPanelUpdated([state, beginRegular, beginBurst, printSummary, finish](
 		double initializationMs, double processingMs, double panelMs) {
 		if (state->phase == Phase::Warmup)
 		{
@@ -1087,7 +1108,7 @@ bool SkinGallery::armAnalysisLatencyProbe(MainWindow& window, const QStringList&
 			sample.totalMs, sample.saveWaitMs, sample.queueWaitMs,
 			sample.initializationMs, sample.processingMs, sample.panelMs);
 		finish(0);
-	};
+	});
 
 	window.showNormal();
 	dock->show();
@@ -1096,10 +1117,10 @@ bool SkinGallery::armAnalysisLatencyProbe(MainWindow& window, const QStringList&
 	int selectedDevice = -1;
 	if (!deviceSubstring.isEmpty())
 	{
-		for (int i = 0; i < window.deviceComboBox->count(); i++)
+		for (int i = 0; i < deviceCombo->count(); i++)
 		{
-			if (window.deviceComboBox->itemData(i).isValid()
-				&& window.deviceComboBox->itemText(i).contains(deviceSubstring, Qt::CaseInsensitive))
+			if (deviceCombo->itemData(i).isValid()
+				&& deviceCombo->itemText(i).contains(deviceSubstring, Qt::CaseInsensitive))
 			{
 				selectedDevice = i;
 				break;
@@ -1108,9 +1129,9 @@ bool SkinGallery::armAnalysisLatencyProbe(MainWindow& window, const QStringList&
 	}
 	if (selectedDevice < 0)
 	{
-		for (int i = 0; i < window.deviceComboBox->count(); i++)
+		for (int i = 0; i < deviceCombo->count(); i++)
 		{
-			if (window.deviceComboBox->itemData(i).isValid())
+			if (deviceCombo->itemData(i).isValid())
 			{
 				selectedDevice = i;
 				break;
@@ -1126,10 +1147,10 @@ bool SkinGallery::armAnalysisLatencyProbe(MainWindow& window, const QStringList&
 		finish(1);
 		return true;
 	}
-	window.deviceComboBox->setCurrentIndex(selectedDevice);
-	Q_EMIT window.deviceComboBox->activated(selectedDevice);
+	deviceCombo->setCurrentIndex(selectedDevice);
+	Q_EMIT deviceCombo->activated(selectedDevice);
 	fprintf(stderr, "Analysis latency: device='%s'\n",
-		qPrintable(window.deviceComboBox->currentText()));
+		qPrintable(deviceCombo->currentText()));
 
 	QComboBox* startFrom = nullptr;
 	if (QWidget* controls = window.findChild<QWidget*>(QStringLiteral("analysisControlBar")))
@@ -1151,7 +1172,7 @@ bool SkinGallery::armAnalysisLatencyProbe(MainWindow& window, const QStringList&
 	}
 	startFrom->setCurrentIndex(1);
 	Q_EMIT startFrom->activated(1);
-	window.instantModeCheckBox->setChecked(true);
+	instantMode->setChecked(true);
 	window.startAnalysis();
 
 	QTimer::singleShot(180000, &window, [state, finish]() {

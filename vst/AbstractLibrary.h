@@ -37,6 +37,10 @@ public:
 
 	int initialize();
 	int initialize(const JudgedPath& path);
+	bool isLoaded() const;
+	// The UI thread must never block on initMutex while a worker holds it for
+	// seconds inside a plug-in load.
+	bool isLoadedNow() const;
 	virtual std::wstring getLibPath() = 0;
 	virtual std::wstring getLoadPath();
 
@@ -60,5 +64,5 @@ private:
 	// shared (via getInstance) between the GUI thread and the AnalysisThread,
 	// and both call initialize(); without this guard they would race on the
 	// module handle and the LoadLibrary/loadFunctions sequence.
-	std::mutex initMutex;
+	mutable std::mutex initMutex;
 };

@@ -22,6 +22,7 @@
 class ConfigurationFileReader
 {
 public:
+	static bool readBytes(const JudgedPath& path, std::string& bytes);
 	static std::stringstream read(const JudgedPath& path);
 	static ConfigFileReference::Target judgeWithRetry(const std::wstring& configPath, const std::wstring& written,
 		HANDLE cancel = nullptr, DWORD deadlineMilliseconds = 10000);
@@ -37,6 +38,11 @@ public:
 			std::getline(input, encodedLine);
 			if (!encodedLine.empty() && encodedLine.back() == '\r')
 				encodedLine.pop_back();
+			// Notepad's "UTF-8 with BOM" starts the file with EF BB BF. Kept, it decodes
+			// to U+FEFF in front of the first key, which no factory then claims, so the
+			// first command was dropped as prose without a report.
+			if (lines.empty() && encodedLine.starts_with("\xEF\xBB\xBF"))
+				encodedLine.erase(0, 3);
 
 			std::wstring line = wintext::toWideString(encodedLine, CP_UTF8);
 			if (line.find(L'\uFFFD') != std::wstring::npos)

@@ -14,6 +14,397 @@ tags are clean `vX.Y.Z` names. Installers for every version are on the
 
 ## Unreleased
 
+## v2.63.0 — 2026-11-09
+
+- **On a card header, the power switch is the one control with a cap.** The
+  fold arrow, `+`, the bin and `</>` now rest as bare glyphs and show their
+  cap only under the pointer, while pressed, or while the raw editor is open,
+  so the power switch no longer looks like one more action in a row of six
+  identical boxes. The Matrix skin, whose header controls never had caps,
+  shows the power switch as an `ON`/`OFF` key two grid cells wide: `ON` on a
+  sunken cell, `OFF` in muted ink over a dotted rule. In the light themes the
+  power glyph of a running line no longer prints fainter than that of a
+  switched-off one
+  ([#456](https://github.com/115dkk/EqualizerAPO-XT/issues/456), [#458](https://github.com/115dkk/EqualizerAPO-XT/pull/458)).
+
+## v2.62.0 — 2026-11-08
+
+- **A VST2 plug-in whose DLL also carries a VST3 entry point loads again.**
+  Kilohearts ships one binary as both products, so `kHs Delay.dll` exports
+  `VSTPluginMain` and `GetPluginFactory`. Since v2.35.0 the Editor and the
+  engine preferred the VST3 entry point for any such file, and the plug-in's
+  VST3 factory answers "not implemented" when the host offers it a context,
+  so the line failed with "Library could not be loaded" (status -2). When a
+  file exports both, the extension now decides: `.vst3` loads as VST3,
+  `.dll` as VST2, as every DAW treats them. A file with only one entry point
+  still loads by that one, so a VST3 module renamed to `.dll` keeps working.
+  A VST3 factory that declines the host context is no longer refused either;
+  the answer is logged and loading continues
+  ([#455](https://github.com/115dkk/EqualizerAPO-XT/issues/455), [#457](https://github.com/115dkk/EqualizerAPO-XT/pull/457)).
+- **Knobs no longer jump to where you click.** A click on the right edge of
+  the Preamp knob used to set +20 dB at once. A press now grabs the knob
+  where it stands, and the knob turns by the angle you sweep around it, still
+  as a dial and not by dragging up and down. Near the knob a turn through the
+  whole range takes about 200 pixels of hand movement whatever size the knob
+  is drawn at; further out it follows your angle one to one. Hold Shift for
+  a tenth of the speed, and double-click to return to the default (Preamp
+  0 dB, Delay 0 ms, All-pass 100 Hz and Q 0.707). The minimal skin's drum
+  keeps its vertical drag and gains the double-click
+  ([#456](https://github.com/115dkk/EqualizerAPO-XT/issues/456), [#457](https://github.com/115dkk/EqualizerAPO-XT/pull/457)).
+- **The card's remove button is a bin, and a removal offers Undo.** The `-`
+  beside `+` was easy to take for another control. It is now a bin icon, and
+  each header button's tooltip says what a click does from where it stands
+  (the power button tells you a switched-off line stays in the file as a
+  comment). Removing a filter, from the card or with Delete, shows a notice
+  at the bottom of the window with an **Undo** button; undo was always on
+  the toolbar and on Ctrl+Z, but nothing pointed at it when it mattered. Any
+  later edit, undo or tab switch takes the notice down. The power button's
+  shape is unchanged in this round
+  ([#456](https://github.com/115dkk/EqualizerAPO-XT/issues/456), [#457](https://github.com/115dkk/EqualizerAPO-XT/pull/457)).
+- **Device chips name the device as well as the connection.** Two
+  interfaces both offering "Speakers" or "Microphone" looked the same on the
+  Device card. Chips now read the way Windows names an endpoint, for example
+  "Speakers (USB Audio CODEC)"; a very long name ends in an ellipsis and the
+  tooltip shows it whole
+  ([#456](https://github.com/115dkk/EqualizerAPO-XT/issues/456), [#457](https://github.com/115dkk/EqualizerAPO-XT/pull/457)).
+- **One click on `</>` leaves the raw line editor.** Clicking the code
+  button again to go back to the card used to reopen the editor at once:
+  the press closed it by taking the focus away, and the release switched it
+  on again. It now closes on the first click
+  ([#456](https://github.com/115dkk/EqualizerAPO-XT/issues/456), [#457](https://github.com/115dkk/EqualizerAPO-XT/pull/457)).
+
+## v2.61.6 — 2026-11-05
+
+- **Uninstalling no longer leaves the install folder in the registry, and a
+  config folder that no longer exists is replaced on install.** XT and the
+  original Equalizer APO share `HKLM\SOFTWARE\EqualizerAPO`. After
+  uninstalling XT, `InstallPath` still named the removed XT folder, so the
+  original Equalizer APO's installer took it as its install folder and then
+  failed to register devices. After uninstalling the original, `ConfigPath`
+  could still name its deleted config folder; XT's installer treated that as
+  a folder the user chose, and the Device Selector then failed on every
+  install because it saves its registry backup there. Uninstalling now
+  removes `InstallPath`, the migration breadcrumbs, a `ConfigPath` inside the
+  removed folder and a leftover autostart entry for the engine host, while a
+  config folder that survives the uninstall stays recorded. Installing
+  replaces a `ConfigPath` whose folder is gone with the per-user config root,
+  and the Device Selector names the missing folder if it still meets one.
+  The uninstall log now lists every endpoint the APO was removed from
+  ([#451](https://github.com/115dkk/EqualizerAPO-XT/issues/451), [#453](https://github.com/115dkk/EqualizerAPO-XT/pull/453)).
+- **The Send keepalive starts as soon as Send is ticked in the Device
+  Selector.** Ticking **Send** on a playback endpoint registered the engine
+  host to start at the next logon but did not start it, so audio routed with
+  `Send:` to that endpoint stayed silent until the user signed out and back
+  in. The Device Selector now starts the host right after applying the
+  change, and any running host, including one an ASIO application started on
+  demand, keeps a stream running on every receiving endpoint and stays while
+  one receives ([#452](https://github.com/115dkk/EqualizerAPO-XT/issues/452), [#453](https://github.com/115dkk/EqualizerAPO-XT/pull/453)).
+
+## v2.61.5 — 2026-11-04
+
+- **An open comment card shows its note once.** The note appeared twice on an
+  open comment card: in the header next to the "Comment" title and again in
+  the note editor right below. The header now leaves it out while the card is
+  open and shows it only when the card is closed, where it is the only place
+  the note appears ([#449](https://github.com/115dkk/EqualizerAPO-XT/pull/449)).
+
+## v2.61.4 — 2026-11-04
+
+- **The add-filter picker prints a template's description apart from its
+  name in every skin.** Templates named like "Convolution (Convolution with
+  impulse response)" printed the parenthetical as part of the name in the
+  Rack, Matrix and Minimal pickers, and Soft put it in the bold title above
+  its own caption, so long names were cut off. Each picker now prints the
+  name alone and the description in its own secondary type: Rack as a smaller
+  legend at the slot's right end, Matrix as a board annotation at the cell's
+  right edge, Minimal as a second column of the index line, and Soft leaves
+  it out of the title because the caption already describes the template.
+  Studio drew it this way already; the Chinese names, written with full-width
+  parentheses, now split there too. Searching still matches the description
+  ([#450](https://github.com/115dkk/EqualizerAPO-XT/pull/450)).
+
+## v2.61.3 — 2026-10-24
+
+- **Rack's Device and Stage buttons latch in bronze too.** In the dark Rack
+  skin a routed device on the Device card lit its whole button amber, and an
+  engaged insert point on the Stage card wore an amber bar along its top, while
+  the power and pointer buttons and the Copy grid already latch in a calm
+  bronze. Both now latch in the same bronze, with the label in the text colour.
+  The Channel card's seat lamp stays amber, and the light finish is unchanged
+  ([#444](https://github.com/115dkk/EqualizerAPO-XT/pull/444)).
+
+## v2.61.2 — 2026-10-24
+
+- **Bold monospace text is bold again in every skin.** The monospace face
+  (DM Mono) only comes in Light, Regular and Medium, and Qt does not fake a
+  bold for it, so every bold number, readout, card coordinate and caption in
+  monospace printed at the same Medium weight as the text around it. The
+  Editor now bundles SemiBold and Bold faces derived from DM Mono's own design
+  masters, so those places print at the weight each skin asked for. The
+  minimal skin's channel names use the new SemiBold instead of the
+  half-pixel double strike from 2.60.1 ([#434](https://github.com/115dkk/EqualizerAPO-XT/pull/434)).
+
+## v2.61.1 — 2026-10-24
+
+- **VST2 plug-ins built with JUCE 6.0.0 to 6.1.2 follow the monitor scale.**
+  These plug-ins say they can scale themselves, but they ignore a scale sent
+  before their panel exists, so on a 150% monitor they were still drawn at
+  100%. The scale is now sent again once the panel is open
+  ([#442](https://github.com/115dkk/EqualizerAPO-XT/pull/442)).
+
+## v2.61.0 — 2026-10-23
+
+- **VST2 plug-in panels fit high-DPI monitors.** On a monitor scaled above 100%
+  (150%, for example), the frame around a VST2 panel was larger than the
+  plug-in's window by the scale factor, leaving an empty strip on the right and
+  at the bottom, and VST2 plug-ins that can scale themselves (DPF-based ones,
+  for example) were drawn at 100% because they were never told the scale. Such
+  plug-ins now receive the monitor's scale before they lay out, and every VST2
+  panel's frame matches the plug-in's window. Moving the Editor or a panel
+  dialog to a monitor with another scale now re-scales VST2 and VST3 panels
+  ([#441](https://github.com/115dkk/EqualizerAPO-XT/pull/441)).
+- **A VST2 plug-in that reports changed inputs, outputs or latency is no longer
+  answered as if it asked for idle time.** The vendored VST2 interface header
+  gave the idle request the value of the I/O-changed notification, so the host
+  answered that notification by calling back into the plug-in mid-callback
+  ([#441](https://github.com/115dkk/EqualizerAPO-XT/pull/441)).
+
+## v2.60.6 — 2026-10-23
+
+- **A configuration saved as "UTF-8 with BOM" no longer loses its first
+  command.** Notepad's "UTF-8 with BOM" starts the file with a byte order mark.
+  EQ APO XT read the mark as part of the first line, so the first command (a
+  `Preamp:` line, for example) was skipped without an error. The mark is now
+  ignored by the audio engine and the Editor, and the Editor saves such a file
+  back without it ([#440](https://github.com/115dkk/EqualizerAPO-XT/pull/440)).
+
+## v2.60.5 — 2026-10-23
+
+- **VST2 parameter values are saved exactly.** The Editor wrote each VST2
+  parameter value with six significant digits, so a value such as MVerb's
+  default Size came back from `config.txt` as 74.99999 instead of 75 and the
+  saved configuration sounded slightly different from the panel. Values are
+  now written as the shortest decimal that reads back as the same number.
+  Short values such as 0.5 keep their spelling, and the format is unchanged
+  ([#439](https://github.com/115dkk/EqualizerAPO-XT/pull/439)).
+
+## v2.60.4 — 2026-10-23
+
+- **Panel edits of DPF-based VST3 plugins are saved again.** Turning a knob in
+  the panel of a VST3 plugin built with DPF (3 Band EQ, MVerb and the other
+  DPF-Plugins, for example) and pressing OK and Save kept the plugin's
+  previous state in `ChunkData`, so the audio service played the old
+  settings. While no audio runs, the Editor passes a panel edit to the plugin
+  through a process call that DPF ignores. It now passes the edit with one
+  silent frame, which every plugin reads. Saved configurations keep their
+  format ([#437](https://github.com/115dkk/EqualizerAPO-XT/pull/437)).
+
+## v2.60.3 — 2026-10-22
+
+- **Rack's Copy grid latches in bronze like the other buttons.** In the dark
+  Rack skin the header buttons (power, the picker's pointer) latch in a calm
+  bronze, but a routed crosspoint in the Copy grid (also used by
+  MultiConvolution, Send and the subwoofer routing dialog) still lit its whole
+  cap amber. It now latches in the same bronze, with its value and lamp in the
+  text colour. Negative gains keep the red lamp, and the light finish is
+  unchanged ([#435](https://github.com/115dkk/EqualizerAPO-XT/pull/435)).
+
+## v2.60.2 — 2026-10-22
+
+- **The power switch on Matrix cards is visible again in the light theme.**
+  Since Matrix stopped drawing a cell around the switch, the "on" glyph was
+  white on the light card header and almost disappeared, while "off" printed
+  darker than "on". The glyph now uses the board's ink: the text colour when
+  the card is on, the muted colour when it is commented out, in both themes.
+  Other skins are unchanged ([#432](https://github.com/115dkk/EqualizerAPO-XT/pull/432)).
+
+## v2.60.1 — 2026-10-22
+
+- **Channel names in the minimal skin's Copy listing print heavier.** The
+  channel tokens (also used by MultiConvolution, Send, the subwoofer routing
+  dialog and the channel-scope tokens in card headers) tell channels apart by
+  colour alone, and at the Medium weight the darker inks were hard to see. DM
+  Mono has no weight above Medium, so the tokens are now struck twice, half a
+  pixel apart, the way a terminal makes bold text. That adds about as much ink
+  as one step from Medium to SemiBold. Other skins are unchanged ([#431](https://github.com/115dkk/EqualizerAPO-XT/pull/431)).
+
+## v2.60.0 — 2026-10-22
+
+- **Matrix routing grids no longer paint channels in rainbow colours.** The
+  row and column headers of Matrix's Copy grid (also used by MultiConvolution,
+  Send and the subwoofer routing dialog) were pills filled with a different
+  colour per channel, so colour on the grid no longer meant anything. They now
+  print as plain monospace labels, and colour on the grid is left to the cells
+  (green unity, red inversion, accent gains). Virtual channels keep a dashed
+  underline. Other skins are unchanged ([#430](https://github.com/115dkk/EqualizerAPO-XT/pull/430)).
+
+## v2.59.0 — 2026-10-22
+
+- **Matrix cards no longer nest boxes inside boxes.** Almost everything on
+  the Matrix board drew its own 1px border: header buttons, the type mark,
+  value fields, selectors, reference markers and readouts, device, channel
+  and stage chips, comments, the toolbar and the menu bar. A card therefore
+  held two or three layers of boxes. Now the card is the only box; the
+  elements inside it are fills, text or glyphs, and a border appears only
+  on hover, focus or selection. Disabled cells and virtual channels show a
+  dashed underline instead of a dashed box, and channel scopes in a card's
+  header print as monospace text instead of coloured boxes. Other skins are
+  unchanged ([#428](https://github.com/115dkk/EqualizerAPO-XT/pull/428)).
+
+## v2.58.0 — 2026-10-22
+
+- **The title bar drags the window again after a skin switch.** With a VST
+  panel embedded in a card, Qt turned the window's title strip into a separate
+  native window that took clicks as content, so dragging the title bar did not
+  move the window and the side edges did not resize it. Switching skins rebuilt
+  the rows and embedded the panel again, which is why it appeared after a
+  switch. The frame now hands those clicks back to the window. A real-window
+  probe that reproduces the condition (`--frame-hittest-test`) runs in CI
+  ([#427](https://github.com/115dkk/EqualizerAPO-XT/pull/427)).
+- **Tab close buttons show their X again.** Every skin's style sheet removed
+  Qt's close glyph, so hovering a tab's close button showed only a red square.
+  Each tab now has a close button drawn in the skin's ink, with the skin's own
+  hover shape ([#427](https://github.com/115dkk/EqualizerAPO-XT/pull/427)).
+- **Built on Qt 6.12.0 LTS.** The Editor and the Device Selector move from
+  Qt 6.10.1, which is out of support, to Qt 6.12.0. Tab scroll buttons show
+  chevrons in the skin's ink instead of empty boxes, and with Windows'
+  "Animation effects" turned off, the Editor's and the Device Selector's
+  animations jump straight to their end state. Thin dashed outlines (virtual
+  channels, bypassed cards, add-channel fields) now draw as short dashes
+  instead of dots, as Qt 6.12 renders them. aqtinstall cannot read the 6.12
+  repository layout, so local setup and CI now download Qt from Qt's own
+  repository and check every archive against a pinned SHA-256 ([#427](https://github.com/115dkk/EqualizerAPO-XT/pull/427)).
+
+## v2.57.8 — 2026-10-20
+
+- **Legacy semicolon-separated expressions work again.** Configurations such as
+  SECS's `Eval: inL=1;inR=2` failed before the channel mappings were set, leaving
+  FIR and gain correction unapplied. XT now preserves the older Equalizer APO
+  syntax through its shared expression parser. Quoted semicolons, escaping,
+  diagnostic offsets and whole-expression error behavior are preserved.
+  Parser regressions and a real stereo FIR configuration cover the fix
+  ([#426](https://github.com/115dkk/EqualizerAPO-XT/pull/426)).
+
+## v2.57.7 — 2026-10-17
+
+- **Stereo float input takes less time to convert in the SSE2 and ARM64 builds.**
+  A local i5-12600KF measurement of the product's 480-frame SSE2 conversion fell
+  from 217 ns to 120 ns across three runs. ARM64 CI measured 141–142 ns, versus
+  277 ns in an earlier run; the reference was 331 ns in both, but this was not
+  a controlled same-machine comparison. These measurements cover format
+  conversion, not total audio processing. ARM64 now uses native NEON instead
+  of Highway EMU128's stack-based lane assembly, confirmed in the product DLL.
+  Other SIMD read kernels and all write kernels are unchanged. New tests passed
+  on SSE2, AVX2 and ARM64, checking input boundaries, unaligned buffers, short
+  blocks, output bounds, signed zero and quiet NaN payloads against a scalar
+  conversion ([#425](https://github.com/115dkk/EqualizerAPO-XT/pull/425)).
+
+## v2.57.6 — 2026-10-17
+
+- **A switched-off Send, NewChannel, expression Preamp or IIR line keeps its
+  card.** In card mode a line you switch off stays a card, so you can edit it
+  and switch it back on in place. These four commands (seven line shapes in
+  all) fell back to a collapsed row with no editor instead. They now show
+  their card, switched off, like every other filter
+  ([#423](https://github.com/115dkk/EqualizerAPO-XT/pull/423)).
+
+- **The Editor no longer stalls while it reads the audio devices.** Reading
+  each device's format, when the Editor opens and whenever you pick a device,
+  ran on the window's thread, so a slow or unplugged device held the window
+  until it answered. It now runs in the background. While a newly picked
+  device is being read, the format badge is empty instead of showing the
+  previous device's format. A plugin file that does not exist now shows
+  "Loading plugin..." for a moment before "File not found.", as any plugin
+  load does. Not tested here: a device that takes seconds to answer
+  ([#423](https://github.com/115dkk/EqualizerAPO-XT/pull/423)).
+
+- **Closing a tab that was never saved no longer adds a blank entry to the
+  recent files list**
+  ([#423](https://github.com/115dkk/EqualizerAPO-XT/pull/423)).
+
+- **Updates wait for the audio service before registering the equalizer
+  again.** The update steps stopped and started the Windows audio service
+  without waiting for it, so the equalizer could be registered again while
+  the audio engine was still stopping. Each step now waits for the service
+  with a deadline (12 seconds in all, inside the updater's limit) and logs a
+  missed deadline. Device Selector also reports a failed Voicemeeter
+  startup-shortcut change or client launch instead of showing success. Not
+  tested here: a real update with the service changing state
+  ([#423](https://github.com/115dkk/EqualizerAPO-XT/pull/423)).
+
+- **The equalizer no longer addresses buffers it did not allocate on the
+  first block of a stream whose input and output channel counts differ** (for
+  example two inputs and one output). The first configuration took its
+  channel count from a different formula than every later one. New tests
+  cover such first blocks; no crash from this was reported
+  ([#423](https://github.com/115dkk/EqualizerAPO-XT/pull/423)).
+
+- **ASIO wrapper fixes from a code review.** When a driver callback was still
+  running while the host freed its buffers, the wrapper could later write
+  into the host's freed buffer list; it now lets go of that list before it
+  returns. After about 66 days of continuous playback (48 kHz, 64-frame
+  blocks) the block counter wraps, and the wrapper could then hand out a
+  ring slot that was still in use; the counter is now compared across the
+  wrap ([#423](https://github.com/115dkk/EqualizerAPO-XT/pull/423)).
+
+- **Loudness correction hears volume changes from Windows instead of
+  checking every 10 ms.** It no longer wakes a thread a hundred times a
+  second to read the system volume. Not tested here: real hardware volume
+  changes ([#423](https://github.com/115dkk/EqualizerAPO-XT/pull/423)).
+
+- **Device Selector: a highlight no longer jumps when the pointer leaves
+  early.** Moving the pointer off a button, a section header or a device row
+  before its highlight had faded in made it jump brighter before it faded
+  out. It now fades out from where it was
+  ([#423](https://github.com/115dkk/EqualizerAPO-XT/pull/423)).
+
+- **Rack skin: Device Selector's device plates show the same brushed grain
+  as the Editor's rack cards.** Their fine grain lines blurred across two
+  pixel rows, so the plates looked almost flat; the lines are now crisp at
+  the cards' 2 px spacing. The grain behind the Editor's rack filter picker
+  moved by one row. No other screen changed
+  ([#423](https://github.com/115dkk/EqualizerAPO-XT/pull/423)).
+
+## v2.57.5 — 2026-10-10
+
+- **The Editor no longer stops responding while a slow plugin loads.** With a
+  plugin such as Supertone Clear in the config, which takes 3 to 18 seconds
+  to load, the Editor stopped responding for that long when it opened and
+  whenever a plugin path was changed. The plugin now loads in the
+  background: the window opens at once, the plugin's card reads "Loading
+  plugin..." until the load ends, and the panel button waits until then.
+  With a test plugin that takes 4 seconds to load, the window kept answering
+  within about 30 ms the whole time. Not measured: a plugin that is also slow
+  to create its instance after loading (that step still runs on the window's
+  thread), and a machine where a screen reader or a similar tool talks to the
+  Editor window in a way not seen here; either can still freeze the window
+  ([#419](https://github.com/115dkk/EqualizerAPO-XT/pull/419)).
+
+- **The Editor no longer loads a slow plugin again on every skin switch,
+  undo or device change.** Changing the skin or dark mode, undo and redo,
+  pasting several lines, changing the device and the knob range all rebuild
+  the card list, and each rebuild loaded every plugin in the config again;
+  with a plugin such as Supertone Clear, which takes 3 to 18 seconds to
+  load, the window froze that long each time. The Editor now keeps a plugin
+  loaded once it has loaded it. While the Editor is open, the plugin's file
+  stays in use, so a plugin installer cannot replace it until the Editor is
+  closed ([#419](https://github.com/115dkk/EqualizerAPO-XT/pull/419)).
+
+## v2.57.4 — 2026-10-10
+
+- **A plugin that takes seconds to load no longer freezes audio every time
+  a stream starts.** Some plugins, such as Supertone (now Antinode) Clear,
+  spend 3 to 18 seconds loading, and while one loads, the Windows audio
+  engine cannot start a stream on any device. Equalizer APO unloaded a
+  plugin when the last stream using it ended and loaded it again for the
+  next one, so joining a voice chat or opening the Recording tab of the
+  Sound control panel froze audio each time. The audio engine now keeps a
+  plugin loaded once it has loaded it, so only the first stream after the
+  audio service starts waits. Because the plugin file stays in use, a
+  plugin update now needs a restart of the Windows Audio service or of the
+  PC before its installer can replace the file
+  ([#416](https://github.com/115dkk/EqualizerAPO-XT/pull/416)).
+
 ## v2.57.3 — 2026-10-06
 
 - **Fewer lights that mean nothing, and one light colour per part.** The

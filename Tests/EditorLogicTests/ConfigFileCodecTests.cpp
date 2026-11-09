@@ -22,7 +22,7 @@
 #include "Editor/ConfigFileCodec.h"
 #include "platform/windows/Win32Resource.h"
 
-void testConfigFileCodec()
+TEST_CASE(EditorLogicTests, testConfigFileCodec)
 {
 	QList<QString> mixed = ConfigFileCodec::decodeLines(std::string("Preamp: -6 dB\r\nInclude: a.txt\nlast"));
 	requireEqual((int)mixed.size(), 3, "decodeLines splits CRLF and LF terminated lines");
@@ -45,9 +45,17 @@ void testConfigFileCodec()
 	QList<QString> roundTrip = ConfigFileCodec::decodeLines(std::string(encoded.constData(), (size_t)encoded.size()));
 	requireEqual((int)roundTrip.size(), 2, "encodeLines output decodes back to the same line count");
 	expectEqual(roundTrip[1], QString::fromUtf8("caf\xC3\xA9"), "decode(encode(lines)) round-trips non-ASCII text");
+
+	// A file saved as "UTF-8 with BOM" opens with its first command intact and
+	// is saved back without the mark, the form the audio engine reads.
+	QList<QString> marked = ConfigFileCodec::decodeLines(std::string("\xEF\xBB\xBFPreamp: -6 dB\r\nnext"));
+	requireEqual((int)marked.size(), 2, "decodeLines splits a file that starts with a byte order mark");
+	expectEqual(marked[0], "Preamp: -6 dB", "decodeLines drops the byte order mark that starts the file");
+	expectEqual(QString::fromUtf8(ConfigFileCodec::encodeLines(marked)), QString("Preamp: -6 dB\r\nnext"),
+		"encodeLines writes the file back without a byte order mark");
 }
 
-void testConfigFileCodecRetriesAtomicReplaceAfterReaderCloses()
+TEST_CASE(EditorLogicTests, testConfigFileCodecRetriesAtomicReplaceAfterReaderCloses)
 {
 	QTemporaryDir dir;
 	requireTrue(dir.isValid(), "atomic-save retry test creates a temporary directory");
@@ -68,14 +76,28 @@ void testConfigFileCodecRetriesAtomicReplaceAfterReaderCloses()
 		nullptr));
 	requireTrue(static_cast<bool>(reader), "atomic-save retry test holds the engine-style read handle");
 
-	std::thread releaseReader([reader = std::move(reader)]() mutable {
-		Sleep(20);
-		reader.reset();
-	});
-	ConfigFileCodec::WriteResult result = ConfigFileCodec::writeConfig(
-		path, QList<QString>() << "replacement");
-	releaseReader.join();
+	winutil::UniqueChangeNotification directoryChanged(FindFirstChangeNotificationW(
+		dir.path().toStdWString().c_str(), FALSE, FILE_NOTIFY_CHANGE_FILE_NAME));
+	requireTrue(static_cast<bool>(directoryChanged),
+		"atomic-save retry test watches temporary-file creation");
 
+	ConfigFileCodec::WriteResult result;
+	std::thread writer([&] {
+		result = ConfigFileCodec::writeConfig(path, QList<QString>() << "replacement");
+	});
+
+	// QSaveFile creates a sibling temporary file before attempting the atomic
+	// rename. The directory event proves that attempt began before the reader is
+	// released, while the deadline prevents a regression from hanging the suite.
+	// The wait ends as soon as the event fires, so the deadline only bounds a
+	// failure; two seconds was missed once by a stalled AddressSanitizer runner.
+	const bool temporaryFileObserved = WaitForSingleObject(
+		directoryChanged.get(), 15000) == WAIT_OBJECT_0;
+	reader.reset();
+	writer.join();
+
+	expectTrue(temporaryFileObserved,
+		"atomic-save retry test observes temporary-file activity before releasing the reader");
 	expectTrue(result.opened, "writeConfig retries until a short configuration read finishes");
 
 	QFile committed(path);
@@ -84,7 +106,7 @@ void testConfigFileCodecRetriesAtomicReplaceAfterReaderCloses()
 		"the retry atomically commits the complete replacement");
 }
 
-void testConfigFileCodecRetriesAtomicReplaceAfterSlowReaderCloses()
+TEST_CASE(EditorLogicTests, testConfigFileCodecRetriesAtomicReplaceAfterSlowReaderCloses)
 {
 	QTemporaryDir dir;
 	requireTrue(dir.isValid(), "slow atomic-save retry test creates a temporary directory");
@@ -125,7 +147,7 @@ void testConfigFileCodecRetriesAtomicReplaceAfterSlowReaderCloses()
 		"the delayed retry atomically commits the complete replacement");
 }
 
-void testConfigFileCodecPreservesExistingFileWhenAtomicReplaceFails()
+TEST_CASE(EditorLogicTests, testConfigFileCodecPreservesExistingFileWhenAtomicReplaceFails)
 {
 	QTemporaryDir dir;
 	requireTrue(dir.isValid(), "atomic-save test creates a temporary directory");
@@ -158,7 +180,7 @@ void testConfigFileCodecPreservesExistingFileWhenAtomicReplaceFails()
 	expectEqual(QString::fromUtf8(preserved.readAll()), "original", "failed atomic replacement preserves the original contents");
 }
 
-void testConfigFileCodecAtomicByteRestore()
+TEST_CASE(EditorLogicTests, testConfigFileCodecAtomicByteRestore)
 {
 	QTemporaryDir dir;
 	requireTrue(dir.isValid(), "byte restore creates an isolated directory");
@@ -198,7 +220,7 @@ void testConfigFileCodecAtomicByteRestore()
 	expectTrue(contents.readAll() == next, "failed byte restore never truncates the target");
 }
 
-void testConfigFileCodecRejectsPartialRead()
+TEST_CASE(EditorLogicTests, testConfigFileCodecRejectsPartialRead)
 {
 	const std::wstring pipeName = L"\\\\.\\pipe\\EditorLogicTests-ConfigRead-" + std::to_wstring(GetCurrentProcessId());
 	winutil::UniqueHandle pipe(CreateNamedPipeW(

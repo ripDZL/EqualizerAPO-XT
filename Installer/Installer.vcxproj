@@ -51,7 +51,7 @@
          GitHub's stable-only latest redirect cannot select the wrong release. -->
     <InstallerReleaseTag Condition="'$(InstallerReleaseTag)'==''"></InstallerReleaseTag>
   </PropertyGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
@@ -73,7 +73,7 @@
       <AdditionalManifestFiles>$(MSBuildThisFileDirectory)AutoInstaller.exe.manifest</AdditionalManifestFiles>
     </Manifest>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>MaxSpeed</Optimization>

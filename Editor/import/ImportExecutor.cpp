@@ -344,7 +344,7 @@ ExecutionResult ImportExecutor::execute(const ImportManifest& manifest, const QS
     if (configDir.isEmpty())
     {
         result.success = false;
-        result.errors.append(QObject::tr("Import target directory is empty."));
+        result.errors.append(tr("Import target directory is empty."));
         return result;
     }
 
@@ -353,7 +353,7 @@ ExecutionResult ImportExecutor::execute(const ImportManifest& manifest, const QS
         if (!item.exists)
         {
             result.success = false;
-            result.errors.append(QObject::tr("Source missing, skipped: %1").arg(item.sourceAbsolute));
+            result.errors.append(tr("Source missing, skipped: %1").arg(item.sourceAbsolute));
             continue;
         }
 

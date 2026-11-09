@@ -62,6 +62,7 @@ private slots:
 	void busLayoutPicked();
 	void fillToggleClicked(bool checked);
 	void pluginStateChanged();
+	void embedStateChanged();
 	void showStatus();
 
 private:

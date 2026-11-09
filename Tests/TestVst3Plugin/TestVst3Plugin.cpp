@@ -65,12 +65,16 @@ bool rejectProcessMode = false;
 bool optionalProcessingMode = false;
 bool latency512Mode = false;
 bool retainHandlerMode = false;
+bool hostContextNotImplementedMode = false;
+// IgnoreParameterFlush.vst3 mode: like every DPF-based plug-in, a zero-sample
+// process call returns before the parameter changes are read.
+bool ignoreParameterFlushMode = false;
 std::atomic<int> upmixerComponentCount{0};
 std::atomic<int> upmixerProcessCount{0};
 std::atomic<unsigned long long> surround41AcceptedOutputArrangement{
 	static_cast<unsigned long long>(SpeakerArr::kStereo)
 };
-std::atomic<bool> zeroSampleFlushInProgress{false};
+std::atomic<bool> idleFlushInProgress{false};
 // Every parameter change the processor received, over all process calls.
 std::atomic<int> receivedParameterChangeCount{0};
 // RetainHandler.vst3 mode: the component handler kept past the host's
@@ -272,6 +276,14 @@ public:
 	tresult PLUGIN_API setContentScaleFactor(ScaleFactor factor) override
 	{
 		contentScaleFactor = factor;
+		if (window != nullptr)
+		{
+			wchar_t title[96];
+			swprintf_s(title, L"TestVst3Plugin Gain %.2f Scale %.2f Zoom %.2f",
+				state != nullptr ? state->gain : 1.0, contentScaleFactor,
+				privateState != nullptr ? privateState->zoom : 1.0);
+			SetWindowTextW(window, title);
+		}
 		return kResultOk;
 	}
 
@@ -496,7 +508,7 @@ public:
 	tresult PLUGIN_API setProcessing(TBool state) override
 	{
 		if (state != 0 && rejectStartMode) return kResultFalse;
-		if (state != 0 && zeroSampleFlushInProgress.load())
+		if (state != 0 && idleFlushInProgress.load())
 		{
 			HANDLE violation = OpenEventW(EVENT_MODIFY_STATE, FALSE, testvst3::concurrentProcessingEvent);
 			if (violation != nullptr)
@@ -514,6 +526,8 @@ public:
 		if (rejectProcessMode && processedBlocks++ > 0) return kResultFalse;
 		if (!processing.load() || data.symbolicSampleSize != setup.symbolicSampleSize)
 			return kResultFalse;
+		if (ignoreParameterFlushMode && data.numSamples == 0)
+			return kResultOk;
 		if (data.inputParameterChanges != nullptr)
 		{
 			for (int32 parameterIndex = 0; parameterIndex < data.inputParameterChanges->getParameterCount(); ++parameterIndex)
@@ -529,23 +543,26 @@ public:
 					state.gain = value;
 			}
 		}
-		if (data.numSamples == 0 && data.numInputs == 0 && data.numOutputs == 0)
+		// The host's idle parameter flush is the one process call without a
+		// process context; the serialization test holds it here.
+		if (data.processContext == nullptr)
 		{
 			HANDLE entered = OpenEventW(EVENT_MODIFY_STATE, FALSE, testvst3::flushEnteredEvent);
 			HANDLE proceed = OpenEventW(SYNCHRONIZE, FALSE, testvst3::flushContinueEvent);
 			if (entered != nullptr && proceed != nullptr)
 			{
-				zeroSampleFlushInProgress.store(true);
+				idleFlushInProgress.store(true);
 				SetEvent(entered);
 				WaitForSingleObject(proceed, 5000);
-				zeroSampleFlushInProgress.store(false);
+				idleFlushInProgress.store(false);
 			}
 			if (entered != nullptr)
 				CloseHandle(entered);
 			if (proceed != nullptr)
 				CloseHandle(proceed);
-			return kResultOk;
 		}
+		if (data.numSamples == 0 && data.numInputs == 0 && data.numOutputs == 0)
+			return kResultOk;
 		if (data.numInputs != 1 || data.numOutputs != 1 || data.inputs == nullptr || data.outputs == nullptr)
 			return kResultFalse;
 		if (toneGeneratorMode)
@@ -1166,7 +1183,7 @@ public:
 		if (cid == nullptr || iid == nullptr || obj == nullptr)
 			return kInvalidArgument;
 		*obj = nullptr;
-		if (!hostContextSet)
+		if (!hostContextSet && !hostContextNotImplementedMode)
 			return kResultFalse;
 		FUnknown* instance = nullptr;
 		if (FUnknownPrivate::iidEqual(cid, componentCid))
@@ -1234,6 +1251,8 @@ public:
 			hostContextSet = true;
 			return kNotImplemented;
 		}
+		if (hostContextNotImplementedMode)
+			return kNotImplemented;
 		if (hostContextSetCount++ != 0)
 			return kResultFalse;
 		IHostApplication* host = nullptr;
@@ -1290,6 +1309,11 @@ extern "C" __declspec(dllexport) bool InitDll()
 	optionalProcessingMode = wcsstr(modulePath, L"OptionalProcessing.vst3") != nullptr;
 	latency512Mode = wcsstr(modulePath, L"LatencyUpmixer.vst3") != nullptr;
 	retainHandlerMode = wcsstr(modulePath, L"RetainHandler.vst3") != nullptr;
+	wchar_t hostContextMode[32] = {};
+	hostContextNotImplementedMode = GetEnvironmentVariableW(L"EAPO_TEST_VST3_HOST_CONTEXT", hostContextMode,
+		static_cast<DWORD>(sizeof(hostContextMode) / sizeof(hostContextMode[0]))) > 0
+		&& wcscmp(hostContextMode, L"notimpl") == 0;
+	ignoreParameterFlushMode = wcsstr(modulePath, L"IgnoreParameterFlush.vst3") != nullptr;
 	upmixerProcessCount.store(0);
 	surround41AcceptedOutputArrangement.store(
 		static_cast<unsigned long long>(SpeakerArr::kStereo));
@@ -1325,6 +1349,8 @@ extern "C" __declspec(dllexport) bool ExitDll()
 	rejectStartMode = false;
 	rejectProcessMode = false;
 	optionalProcessingMode = false;
+	hostContextNotImplementedMode = false;
+	ignoreParameterFlushMode = false;
 	return true;
 }
 
@@ -1391,4 +1417,11 @@ extern "C" __declspec(dllexport) IPluginFactory* PLUGIN_API GetPluginFactory()
 		return nullptr;
 	factory.addRef();
 	return &factory;
+}
+
+// The same module renamed to .dll must keep its usable VST3 factory even
+// when it also exports a VST2 entry point, as existing saved states expect.
+extern "C" __declspec(dllexport) void* VSTPluginMain(void*)
+{
+	return nullptr;
 }

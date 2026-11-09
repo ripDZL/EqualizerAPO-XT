@@ -21,6 +21,7 @@
 #include "engine/IFilterFactory.h"
 #include "filters/FilterFactoryRegistry.h"
 #include "Tests/FakeRegistry.h"
+#include "Tests/WavFixtures.h"
 
 #include "EngineOrchestrationTestSupport.h"
 
@@ -44,15 +45,41 @@ public:
 class ThrowingSetupFactory : public IFilterFactory
 {
 public:
-	FilterVector createFilter(const std::wstring&, std::wstring& command, std::wstring&) override
+	LineOutcome createFilter(const std::wstring&, std::wstring& command,
+		std::wstring&) override
 	{
 		if (command != L"EapoTestThrowOnSetup")
-			return {};
-		return singleFilter(makeFilter<ThrowingSetupFilter>());
+			return LineOutcome::notMine();
+		return LineOutcome::produced(singleFilter(makeFilter<ThrowingSetupFilter>()));
 	}
 };
 
 REGISTER_FILTER_FACTORY(1000, ThrowingSetupFactory, L"EapoTestThrowOnSetup")
+
+class HookedMalformedFactory : public IFilterFactory
+{
+public:
+	LineOutcome createFilter(const std::wstring&, std::wstring& command,
+		std::wstring&) override
+	{
+		if (command != L"EapoTestHookedMalformed")
+			return LineOutcome::notMine();
+		if (!initialized)
+			return LineOutcome::consumed();
+		return LineOutcome::malformed(L"onInitialize ran before parsing");
+	}
+
+protected:
+	void onInitialize(FilterEngine&) override
+	{
+		initialized = true;
+	}
+
+private:
+	bool initialized = false;
+};
+
+REGISTER_FILTER_FACTORY(1001, HookedMalformedFactory, L"EapoTestHookedMalformed")
 
 struct TraceCollector : ConfigLoadTraceSink
 {
@@ -70,7 +97,7 @@ struct TraceCollector : ConfigLoadTraceSink
 // This pins the whole grammar over one representative config: an Eval, a
 // taken If with a nested false If inside, a short-circuited ElseIf, a dead
 // Else, inline `expression` substitution, and file/line stamping.
-void testConfigLoadTrace(test::Harness& harness)
+TEST_CASE(EngineOrchestrationTests, testConfigLoadTrace)
 {
 	const std::wstring configPath = writeConfig(harness, L"trace.txt",
 		"Eval: x = 2 + 3\n"          // line 1: Eval -> "5"
@@ -121,6 +148,9 @@ void testConfigLoadTrace(test::Harness& harness)
 	// exactly what the downstream factories saw.
 	harness.expect(collector.entries[8].text == L" -5 dB", "inline substitution reports the resolved parameters");
 
+	// Consume the initial publication before asking the single-slot channel to
+	// publish another configuration.
+	processDcBlock(engine, 0.0f, 0.0f, 512);
 	// A second load without a sink must not crash and must add nothing.
 	engine.setLoadTraceSink(nullptr);
 	engine.loadConfig(configPath);
@@ -128,11 +158,74 @@ void testConfigLoadTrace(test::Harness& harness)
 		"detached sink receives nothing on a reload");
 }
 
+TEST_CASE(EngineOrchestrationTests, testLegacySemicolonMappingsApplyStereoFir)
+{
+	testSubdirectory(L"legacy-secs");
+	const std::wstring filterDirectory = testSubdirectory(L"legacy-secs\\filters");
+	const std::vector<std::vector<double>> taps = {{0.5, -0.25, 0.125}, {0.25, 0.125, -0.0625}};
+	for (size_t channel = 0; channel < taps.size(); ++channel)
+	{
+		const std::wstring path = filterDirectory + (channel == 0 ? L"\\left.wav" : L"\\right.wav");
+		trackWrittenFile(path);
+		harness.require(test::writeWavFile(path, 48000, taps[channel]), "write the stereo FIR fixtures");
+	}
+	writeConfig(harness, L"legacy-secs\\filters\\filters.txt",
+		"Channel: VML\nConvolution: left.wav\n"
+		"Channel: VMR\nConvolution: right.wav\n");
+	const std::wstring configPath = writeConfig(harness, L"legacy-secs\\config.txt",
+		"Eval: inL=1;inR=2\nEval: outL=1;outR=2\n"
+		"Copy: VML=0.0 VMR=0.0\n"
+		"If: inL >= 1 && inL <= inputChannelCount\nCopy: VML=`inL`\nEndIf:\n"
+		"If: inR >= 1 && inR <= inputChannelCount\nCopy: VMR=`inR`\nEndIf:\n"
+		"Include: filters\\filters.txt\n"
+		"Copy: `inL`=0.0 `inR`=0.0\n"
+		"If: outL >= 1 && outL <= outputChannelCount\nCopy: `outL`=VML\nEndIf:\n"
+		"If: outR >= 1 && outR <= outputChannelCount\nCopy: `outR`=VMR\nEndIf:\n"
+		"Channel: all\n");
+
+	TraceCollector collector;
+	test::FakeRegistry registry;
+	FilterEngine engine;
+	engine.setLoadTraceSink(&collector);
+	EngineSetup setup = testEngineSetup(48000, 2, 2, 128, configPath);
+	setup.registry = &registry;
+	engine.initialize(setup);
+	for (const ConfigLoadTraceEntry& entry : collector.entries)
+		harness.expectFalse(entry.error, "legacy stereo FIR configuration has no load error");
+
+	constexpr unsigned frames = 1024;
+	const unsigned arrivals[] = {256, 640};
+	std::vector<double> input(frames * 2, 0.0);
+	std::vector<double> output(frames * 2, 0.0);
+	for (size_t channel = 0; channel < taps.size(); ++channel)
+		input[arrivals[channel] * 2 + channel] = 1.0;
+	for (unsigned offset = 0; offset < frames; offset += 128)
+		engine.process(output.data() + offset * 2, input.data() + offset * 2, 128);
+
+	double maxError = 0.0;
+	bool allFinite = true;
+	for (unsigned frame = 0; frame < frames; ++frame)
+	{
+		for (size_t channel = 0; channel < taps.size(); ++channel)
+		{
+			const bool inResponse = frame >= arrivals[channel] && frame - arrivals[channel] < taps[channel].size();
+			const double expected = inResponse ? taps[channel][frame - arrivals[channel]] : 0.0;
+			allFinite = allFinite && std::isfinite(output[frame * 2 + channel]);
+			const double error = std::abs(output[frame * 2 + channel] - expected);
+			if (error > maxError)
+				maxError = error;
+		}
+	}
+	harness.expectTrue(allFinite, "every stereo FIR output sample is finite");
+	harness.expectNear(maxError, 0.0, 1e-8,
+		"every stereo output sample follows its own FIR without bypass or channel leakage");
+}
+
 // The parse-error channel that replaced the engine's guess. What matters is the
 // pair of judgements: a factory's own broken line is reported, and a line no
 // factory claimed is not - because prose and notes are how 1.4.2 configurations
 // carry comments, and reporting those would bury the real diagnostics.
-void testParseErrorsAreReportedPerLineAndProseIsNot(test::Harness& harness)
+TEST_CASE(EngineOrchestrationTests, testParseErrorsAreReportedPerLineAndProseIsNot)
 {
 	const std::wstring configPath = writeConfig(harness, L"parse-errors.txt",
 		"Convolution:\n"                    // line 1: its own command, no path
@@ -177,13 +270,46 @@ void testParseErrorsAreReportedPerLineAndProseIsNot(test::Harness& harness)
 	// The load kept going: half a configuration is still worth running, and a
 	// broken line must not take the working ones below it with it. loadConfig
 	// answers false only when the whole load failed.
+	processDcBlock(engine, 0.0f, 0.0f, 512);
 	harness.expect(engine.loadConfig(configPath),
 		"a configuration with eight unusable lines still loads, because the working lines below them have to run");
 }
 
+// Notepad's "UTF-8 with BOM" puts EF BB BF before the first command. The
+// command must run, not fall through as an unclaimed line.
+TEST_CASE(EngineOrchestrationTests, testByteOrderMarkDoesNotHideTheFirstCommand)
+{
+	const std::wstring configPath = writeConfig(harness, L"byte-order-mark.txt",
+		"\xEF\xBB\xBFPreamp: -6.0206 dB\r\n");
+
+	FilterEngine engine;
+	initializeEngine(engine, 48000, 2, 480, configPath);
+	const std::vector<float> out = processDcBlock(engine, 1.0f, 1.0f, 480);
+	harness.expectNear(out[0], 0.5f, 1e-3f, "the first command after a byte order mark applies");
+}
+
+TEST_CASE(EngineOrchestrationTests, testFactoryInitializationHookKeepsParseReporting)
+{
+	const std::wstring configPath = writeConfig(harness, L"hooked-malformed.txt",
+		"EapoTestHookedMalformed: bad\n");
+	TraceCollector collector;
+	FilterEngine engine;
+	engine.setLoadTraceSink(&collector);
+	initializeEngine(engine, 48000, 2, 512, configPath);
+
+	harness.requireEqual(collector.entries.size(), size_t(1),
+		"a factory with onInitialize still reports its malformed line once");
+	harness.expect(collector.entries[0].kind == ConfigLoadTraceEntry::Kind::ParseError,
+		"the hooked factory outcome becomes a parse error");
+	harness.expect(collector.entries[0].text == L"onInitialize ran before parsing",
+		"onInitialize ran before the factory parsed its line");
+	harness.expectEqual(collector.entries[0].line, 1,
+		"the hooked factory error is stamped on its line");
+}
+
 // Audit #348 TD-18: a filter that throws while being set up rolls the whole
 // load back, as before, and now names the line it came from.
-void testFilterSetupFailureNamesItsLine(test::Harness& harness)
+TEST_CASE(EngineOrchestrationTests, testFilterSetupFailureNamesItsLine)
 {
 	const std::wstring good = writeConfig(harness, L"setup-good.txt", "Preamp: -6.0206 dB\n");
 	const std::wstring bad = writeConfig(harness, L"setup-bad.txt",
@@ -192,6 +318,7 @@ void testFilterSetupFailureNamesItsLine(test::Harness& harness)
 
 	FilterEngine engine;
 	initializeEngine(engine, 48000, 2, 480, good);
+	processDcBlock(engine, 0.0f, 0.0f, 480);
 	TraceCollector collector;
 	engine.setLoadTraceSink(&collector);
 
@@ -210,11 +337,11 @@ void testFilterSetupFailureNamesItsLine(test::Harness& harness)
 		"carrying the reason the filter gave");
 
 	const std::vector<float> after = processDcBlock(engine, 1.0f, 1.0f, 480);
-	harness.expect(std::fabs(after[0] - 0.5f) < 1e-3f, "and the previous configuration keeps running");
+	harness.expectNear(after[0], 0.5f, 1e-3f, "and the previous configuration keeps running");
 }
 
 // Audit #348 TD-18: these reached only the log; now they are on the line.
-void testControlFlowAndStageMistakesAreReported(test::Harness& harness)
+TEST_CASE(EngineOrchestrationTests, testControlFlowAndStageMistakesAreReported)
 {
 	const std::wstring configPath = writeConfig(harness, L"control-mistakes.txt",
 		"Stage: pre-mix premix\n"  // line 1: one unknown stage among known ones
@@ -243,7 +370,7 @@ void testControlFlowAndStageMistakesAreReported(test::Harness& harness)
 	harness.expectEqual(lines[4], 5, "the unclosed If on its own line, where the Editor has a row for it");
 }
 
-void testIncludeRecursionLimitIsReported(test::Harness& harness)
+TEST_CASE(EngineOrchestrationTests, testIncludeRecursionLimitIsReported)
 {
 	const std::wstring configPath = writeConfig(harness, L"self-include.txt", "Include: self-include.txt\n");
 
@@ -261,7 +388,7 @@ void testIncludeRecursionLimitIsReported(test::Harness& harness)
 	harness.expectEqual(reports, size_t(1), "the include that hits the nesting limit is reported once");
 }
 
-void testConfigReferencedRemotePathsAreRefused(test::Harness& harness)
+TEST_CASE(EngineOrchestrationTests, testConfigReferencedRemotePathsAreRefused)
 {
 	writeConfig(harness, L"local-included.txt", "Preamp: -1 dB\n");
 	const std::wstring configPath = writeConfig(harness, L"remote-paths.txt",
@@ -299,6 +426,7 @@ void testConfigReferencedRemotePathsAreRefused(test::Harness& harness)
 			"a remote path refusal identifies the network-share policy");
 	}
 
+	processDcBlock(engine, 0.0f, 0.0f, 512);
 	harness.expect(engine.loadConfig(configPath),
 		"a configuration with refused remote references and working local lines still loads");
 }
@@ -307,7 +435,7 @@ void testConfigReferencedRemotePathsAreRefused(test::Harness& harness)
 // line names shares, so the quotes and %VARIABLES% Convolution always took
 // work here too, and an Include with nothing after it is reported rather
 // than loading the configuration's own folder.
-void testIncludeTakesQuotesAndVariables(test::Harness& harness)
+TEST_CASE(EngineOrchestrationTests, testIncludeTakesQuotesAndVariables)
 {
 	writeConfig(harness, L"included with spaces.txt", "Preamp: -6.0206 dB\n");
 	writeConfig(harness, L"included-by-variable.txt", "Preamp: -6.0206 dB\n");
@@ -323,7 +451,7 @@ void testIncludeTakesQuotesAndVariables(test::Harness& harness)
 	engine.setLoadTraceSink(&collector);
 	initializeEngine(engine, 48000, 2, 480, configPath);
 	const std::vector<float> output = processDcBlock(engine, 1.0f, 1.0f, 480);
-	harness.expect(std::fabs(output[(size_t)478 * 2] - 0.25f) < 1e-3f,
+	harness.expectNear(output[(size_t)478 * 2], 0.25f, 1e-3f,
 		"the quoted include and the include through a variable both applied their -6 dB");
 
 	std::vector<const ConfigLoadTraceEntry*> errors;
@@ -343,7 +471,7 @@ void testIncludeTakesQuotesAndVariables(test::Harness& harness)
 // readRegDWORD here) goes through the injected port, so a config that reads
 // the registry is deterministic under a fake - previously these functions
 // could only ever see the live machine.
-void testConfigRegistryReadsGoThroughThePort(test::Harness& harness)
+TEST_CASE(EngineOrchestrationTests, testConfigRegistryReadsGoThroughThePort)
 {
 	test::FakeRegistry registry;
 	const std::wstring key = L"HKEY_CURRENT_USER\\Software\\EapoPortTest";
@@ -370,11 +498,11 @@ void testConfigRegistryReadsGoThroughThePort(test::Harness& harness)
 
 	const std::vector<float> output = processDcBlock(engine, 1.0f, 1.0f, 16);
 	const float expected = static_cast<float>(std::pow(10.0, -6.0 / 20.0));
-	harness.expect(std::fabs(output[(size_t)15 * 2] - expected) < 1e-4f,
+	harness.expectNear(output[(size_t)15 * 2], expected, 1e-4f,
 		"readRegDWORD resolves through the injected fake registry");
 }
 
-void testAnalysisFreezesDynamicVelvetAndLabelsTheSnapshot(test::Harness& harness)
+TEST_CASE(EngineOrchestrationTests, testAnalysisFreezesDynamicVelvetAndLabelsTheSnapshot)
 {
 	const std::wstring dynamicPath = writeConfig(harness, L"analysis-velvet-dynamic.txt",
 		"Velvet: Mode=Dynamic Amount=100% Length=27.5625ms "
@@ -390,6 +518,7 @@ void testAnalysisFreezesDynamicVelvetAndLabelsTheSnapshot(test::Harness& harness
 	initializeEngine(analysis, 48000, 2, 256, dynamicPath);
 	harness.expect(analysis.usedFrozenDynamicAnalysis(),
 		"analysis freezes Dynamic Velvet to one deterministic kernel and labels the response");
+	processDcBlock(analysis, 0.0f, 0.0f, 256);
 	harness.expect(analysis.loadConfig(staticPath),
 		"analysis can reload a static Velvet configuration");
 	harness.expect(!analysis.usedFrozenDynamicAnalysis(),

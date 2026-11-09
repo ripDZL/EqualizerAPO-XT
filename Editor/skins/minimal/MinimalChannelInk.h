@@ -23,6 +23,11 @@
 	resolves (a virtual VSL prints in SL's ink), not by the identity
 	palette's hex values: keyed by hex, any palette edit silently dropped
 	the edited channel to the computed fallback below.
+
+	The tokens print in EAPO Mono SemiBold. Ink alone tells them apart, so
+	the strokes must be heavy enough to carry a hue, and the Medium every
+	widget gets from the sheet was too thin for the darker inks
+	(Editor/fonts/make-mono-weights.py builds the SemiBold DM Mono lacks).
 */
 
 #pragma once

@@ -54,6 +54,7 @@
 #include "CustomStyle.h"
 #include "MainWindow.h"
 #include "SkinGallery.h"
+#include "diagnostics/FrameHitTestProbe.h"
 #include "diagnostics/SkinSwitchStorm.h"
 #include "SkinManager.h"
 #include "import/LegacyMigration.h"
@@ -62,6 +63,7 @@
 #include "guis/VSTPluginFilterGUI.h"
 #include "vst/VSTPluginInstance.h"
 #include "vst/VSTPluginLibrary.h"
+#include "vst/PluginResidency.h"
 #include "services/logging/Logging.h"
 #include "services/logging/TaggedLogger.h"
 #include "platform/windows/CommandLineQuoting.h"
@@ -70,6 +72,8 @@
 #include "services/registry/WindowsRegistry.h"
 #include "platform/windows/Win32Resource.h"
 #include "platform/windows/WindowsPath.h"
+#include "platform/windows/ElevatedLaunch.h"
+#include "services/install/InstallWaitBudget.h"
 #include "services/security/AudioEngineAccess.h"
 #include "services/diagnostics/InstallDiagnostics.h"
 #include "services/update/UpdateSession.h"
@@ -79,6 +83,9 @@
 #include "platform/qt/QtAppBootstrap.h"
 #include "Editor/helpers/CrashHandler.h"
 #include "Editor/helpers/GUIHelper.h"
+#include "Editor/helpers/BackgroundProbe.h"
+#include "Editor/helpers/PluginLoadQueue.h"
+#include "Editor/helpers/SpinBoxEditFieldFix.h"
 #include "services/settings/EditorSettings.h"
 #include "Editor/skins/SkinThemeData.h"
 #include "Editor/widgets/ThemeEditorDialog.h"
@@ -163,7 +170,7 @@ int relaunchElevatedAndWait()
 		const auto outcome = EqAPO::Import::LegacyMigration::prepareHookStep(pathutil::exeDirectory(), &details);
 		logLine(L"INFO", L"Unelevated migration preparation: %s", outcome.c_str());
 		arguments.push_back(L"--caller-localappdata");
-		arguments.push_back(qEnvironmentVariable("LOCALAPPDATA").toStdWString());
+		arguments.push_back(pathutil::environmentVariable(L"LOCALAPPDATA"));
 		arguments.push_back(L"--caller-migration-outcome");
 		arguments.push_back(outcome);
 		arguments.push_back(L"--caller-migrated-from");
@@ -175,30 +182,21 @@ int relaunchElevatedAndWait()
 	}
 	std::wstring parameters = winutil::joinCommandLineArguments(arguments);
 
-	SHELLEXECUTEINFOW info;
-	ZeroMemory(&info, sizeof(info));
-	info.cbSize = sizeof(info);
-	info.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC;
-	info.lpVerb = L"runas";
-	info.lpFile = exePath.c_str();
-	info.lpParameters = parameters.c_str();
-	info.nShow = SW_HIDE;
-
-	if (!ShellExecuteExW(&info))
+	auto launch = winutil::launchElevated(exePath, parameters, true);
+	if (!launch.started)
 	{
-		DWORD gle = GetLastError();
-		logLine(L"ERR", L"ShellExecuteEx(runas) failed (gle=%lu)", gle);
-		// ERROR_CANCELLED (1223) means the user declined UAC.
-		return gle == ERROR_CANCELLED ? 1223 : 1;
+		logLine(L"ERR", L"ShellExecuteEx(runas) failed (gle=%lu)", launch.error);
+		return launch.error == ERROR_CANCELLED ? 1223 : 1;
 	}
-
-	if (info.hProcess == nullptr)
+	if (!launch.process)
 		return 1;
-
-	winutil::UniqueHandle process(info.hProcess);
-	WaitForSingleObject(process.get(), INFINITE);
+	if (WaitForSingleObject(launch.process.get(), installwait::remaining(INFINITE)) != WAIT_OBJECT_0)
+	{
+		logLine(L"ERR", L"Elevated install hook wait reached its deadline or failed");
+		return 1;
+	}
 	DWORD exitCode = 1;
-	GetExitCodeProcess(process.get(), &exitCode);
+	GetExitCodeProcess(launch.process.get(), &exitCode);
 	return static_cast<int>(exitCode);
 }
 
@@ -216,6 +214,9 @@ int handleVelopackHook(int argc, char* argv[])
 	if (!hookSeen)
 		return -1;
 
+	// Velopack allows about 15 s. All explicit waits in this hook share
+	// 12 s, including services, ACL subprocesses and elevation completion.
+	installwait::Budget waitBudget(12000);
 	if (!AudioEngineAccess::isElevated())
 		return relaunchElevatedAndWait();
 
@@ -230,7 +231,7 @@ int handleVelopackHook(int argc, char* argv[])
 		std::wstring exeDir = pathutil::exeDirectory();
 		if (matchesHook(arg, "--veloapp-install"))
 		{
-			auto rc = ApoRegistration::install(exeDir, systemRegistry(), callerLocalAppData.installGrantsPrepared);
+			auto rc = ApoRegistration::install(exeDir, L"", systemRegistry(), callerLocalAppData.installGrantsPrepared);
 			// The trusted config root: adopt the stable folder, or migrate a
 			// legacy Equalizer APO / volatile current\config tree into it.
 			if (rc == ApoRegistration::Result::Success)
@@ -240,7 +241,7 @@ int handleVelopackHook(int argc, char* argv[])
 		if (matchesHook(arg, "--veloapp-updated"))
 		{
 			ApoRegistration::stopAudioService();
-			auto rc = ApoRegistration::install(exeDir, systemRegistry(), callerLocalAppData.installGrantsPrepared);
+			auto rc = ApoRegistration::install(exeDir, L"", systemRegistry(), callerLocalAppData.installGrantsPrepared);
 			if (rc == ApoRegistration::Result::Success)
 				EqAPO::Import::LegacyMigration::runElevatedHookStep(exeDir, callerLocalAppData);
 			ApoRegistration::startAudioService();
@@ -248,6 +249,8 @@ int handleVelopackHook(int argc, char* argv[])
 		}
 		if (matchesHook(arg, "--veloapp-obsolete"))
 		{
+			// The old version waits for AudioSrv to stop before Velopack replaces
+			// the DLL. Audio returns in the new version's --veloapp-updated hook.
 			ApoRegistration::stopAudioService();
 			return 0;
 		}
@@ -315,6 +318,12 @@ int main(int argc, char* argv[])
 	int hookResult = handleVelopackHook(argc, argv);
 	if (hookResult >= 0)
 		return hookResult;
+
+	// Every full row rebuild (skin or dark switch, undo, device change, paste)
+	// destroys the rows that held a plugin, and a plugin that does seconds of
+	// work while loading would then freeze the window again for each one. See
+	// PluginResidency.h.
+	PluginResidency::keepLoadedForProcessLifetime(true);
 
 	// --diagnose before anything is built, so the report can be produced on a
 	// machine where starting the Editor proper is part of the problem.
@@ -422,6 +431,10 @@ int main(int argc, char* argv[])
 		}
 
 		QApplication application(argc, argv);
+		// Before anything can load a plug-in; see PluginLoadQueue.h.
+		PluginLoadQueue::prepareUiThread();
+		// Qt 6.12.0 only: spin box text placement (QTBUG-151308).
+		SpinBoxEditFieldFix::installIfAffected(application);
 		if (!legacyRowsMode)
 		{
 			application.setStyle(new CustomStyle(QStyleFactory::create(QStringLiteral("Fusion"))));
@@ -531,9 +544,16 @@ int main(int argc, char* argv[])
 		const bool analysisLayoutTestRequested =
 			application.arguments().contains(QStringLiteral("--analysis-layout-test"))
 			|| application.arguments().contains(QStringLiteral("--analysis-latency-test"))
+			|| application.arguments().contains(QStringLiteral("--plugin-load-test"))
+			|| application.arguments().contains(QStringLiteral("--frame-hittest-test"))
 			|| application.arguments().contains(QStringLiteral("--window-shot"));
+		// The constructor reopens tabs and queues their plug-ins; the loader
+		// waits until the shown window has UI Automation running.
+		PluginLoadQueue::holdLoads();
 		MainWindow w(configDir, updateSession.get(), nullptr, analysisLayoutTestRequested);
 		w.show();
+		PluginLoadQueue::startUiAutomation(w.winId());
+		PluginLoadQueue::releaseLoads();
 
 		// One-time notice after the install hook migrated a config tree; a
 		// no-op for everyone else.
@@ -560,6 +580,14 @@ int main(int argc, char* argv[])
 		analysisLatencyDeviceOption.setValueName(QStringLiteral("substring"));
 		analysisLatencyDeviceOption.setFlags(QCommandLineOption::HiddenFromHelp);
 		parser.addOption(analysisLatencyDeviceOption);
+		QCommandLineOption pluginLoadOption(QStringLiteral("plugin-load-test"));
+		pluginLoadOption.setFlags(QCommandLineOption::HiddenFromHelp);
+		parser.addOption(pluginLoadOption);
+		// Real-window probe for the custom frame's hit testing under a native
+		// child cascade (diagnostics/FrameHitTestProbe).
+		QCommandLineOption frameHitTestOption(QStringLiteral("frame-hittest-test"));
+		frameHitTestOption.setFlags(QCommandLineOption::HiddenFromHelp);
+		parser.addOption(frameHitTestOption);
 		// Real-window A/B probe for the panel preview feed (SkinGallery::
 		// armVstPanelFeedProbe); pair it with EAPO_DISABLE_PANEL_FEED=1 for
 		// the control run.
@@ -589,11 +617,19 @@ int main(int argc, char* argv[])
 		if (!analysisLayoutTestRequested && args.isEmpty() && w.isEmpty())
 			args = QStringList("config.txt");
 
+		if (parser.isSet(pluginLoadOption) && !SkinGallery::armPluginLoadProbe(w))
+			return 1;
 		for (const QString& arg : args)
 			w.load(configDir.absoluteFilePath(arg));
 
 		const bool firstRun = !firstRunHandled && VelopackBootstrap::isFirstRun();
-		if (parser.isSet(analysisLayoutOption))
+		if (parser.isSet(pluginLoadOption))
+		{
+			// Armed above, before the positional load, so a library load made
+			// before the event loop starts still counts as a UI gap. Skips
+			// doChecks like the other probes: a modal warning would stall them.
+		}
+		else if (parser.isSet(analysisLayoutOption))
 		{
 			// The probe itself lives with the other offscreen gates in
 			// Editor/gallery/GalleryProbes.cpp (audit #275 B7); it arms the timers and later
@@ -604,6 +640,11 @@ int main(int argc, char* argv[])
 		else if (parser.isSet(analysisLatencyOption))
 		{
 			if (!SkinGallery::armAnalysisLatencyProbe(w, application.arguments()))
+				return 1;
+		}
+		else if (parser.isSet(frameHitTestOption))
+		{
+			if (!FrameHitTestProbe::arm(w))
 				return 1;
 		}
 		else if (parser.isSet(skinMetricsOption))
@@ -650,6 +691,13 @@ int main(int argc, char* argv[])
 		restart = w.shouldRestart();
 	}
 	while (restart);
+
+	// A plug-in load may still be running on the loader thread (closing the
+	// Editor during a slow first load). Let it finish before static
+	// destruction instead of racing it.
+	PluginLoadQueue::shutdown();
+	// The same for an endpoint format probe still running.
+	BackgroundProbe::shutdown();
 
 	// The session owns the download worker. Join it before inspecting staged state so
 	// neither process shutdown nor static destruction can race with its publication.

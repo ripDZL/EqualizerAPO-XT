@@ -38,6 +38,16 @@ public:
 
 	static std::shared_ptr<VSTPluginLibrary> getInstance(const std::wstring& libPath);
 	static std::wstring getDefaultPluginPath();
+	static size_t cachedLibraryCountForTesting();
+	struct LoadResult
+	{
+		std::shared_ptr<VSTPluginLibrary> library;
+		int status = LOADING_FAILED;
+	};
+	// Gets the shared library, initializes it and retains a successful load
+	// according to PluginResidency. A supplied judgment stays pinned by the
+	// caller; otherwise the path is judged here, on the loading thread.
+	static LoadResult load(const std::wstring& libPath, const JudgedPath* path = nullptr);
 
 	std::wstring getLibPath() override;
 	std::wstring getLoadPath() override;
@@ -61,6 +71,9 @@ protected:
 	void customUninitialize() noexcept override;
 
 private:
+	using AbstractLibrary::initialize;
+	static void retainIfKeepingLoaded(const std::shared_ptr<VSTPluginLibrary>& library);
+
 	struct FactoryDeleter
 	{
 		void operator()(Steinberg::IPluginFactory* value) const noexcept
@@ -70,16 +83,20 @@ private:
 		}
 	};
 
-	VSTPluginLibrary(const std::wstring& libPath);
+	VSTPluginLibrary(const std::wstring& libPath, const std::wstring& cacheKey);
+	int initializeVst3Factory();
 	void releasePluginFactory() noexcept;
 	static std::wstring resolveVST3ModulePath(const std::wstring& libPath);
 	static std::unordered_map<std::wstring, std::weak_ptr<VSTPluginLibrary>> instanceMap;
 	static std::wstring defaultPluginPath;
 	std::wstring libPath;
-	std::wstring loadPath;
-	// The extension is used only to resolve a standard .vst3 bundle. Once the
-	// module is loaded, `vst3` is set from its exported ABI entry points.
-	bool vst3PathHint = false;
+	std::wstring cacheKey;
+	// Before loading this is an extension hint for metadata callers. A single
+	// exported ABI replaces it; when both entry points exist, .vst3 selects VST3
+	// and every other extension selects VST2. Vendors such as Kilohearts ship one
+	// binary for both products, DAWs treat its .dll as VST2, and configurations
+	// saved before 8cad1bf0 contain VST2 state for those files. Bundle discovery
+	// is done by ConfigFileReference, independently of this hint.
 	bool vst3 = false;
 	std::unique_ptr<Steinberg::IPluginFactory, FactoryDeleter> factory;
 	// The factory-level host context handed to IPluginFactory3::setHostContext

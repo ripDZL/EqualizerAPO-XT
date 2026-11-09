@@ -10,7 +10,7 @@
 
 #include "Editor/skins/CustomThemeStore.h"
 
-void testCustomThemeStoreRoundTripsTokensAndJson()
+TEST_CASE(EditorLogicTests, testCustomThemeStoreRoundTripsTokensAndJson)
 {
 	QTemporaryDir dir;
 	requireTrue(dir.isValid(), QStringLiteral("custom theme store test has a temporary directory"));

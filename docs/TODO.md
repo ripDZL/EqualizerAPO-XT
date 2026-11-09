@@ -1,6 +1,11 @@
 # TODO
 
-- [ ] User-authorized normal v2.57.3.0 beta commit/push and exact-commit full six-variant workflow dispatch; record SHA/run, then require CI green.
+- [x] Previous v2.57.3.0 beta push 435b4aa6: run38062138458 attempt2 verified green on 2026-11-09. AVX2's first-run theme timing spike did not block the unchanged retry; not proof for v2.63.0.
+- [x] Integrate upstream v2.63.0 locally over beta, resolve conflicts, compile/test native and Qt. No commit/push/install or release authorized.
+- [x] v2.63.0 local Editor gates pass: VST serialization/fill, native fixture panels, routing, power-toggle, and 132/132 skin switches at unchanged 5000 ms limit.
+- [x] Complete v2.63.0 AVX-512 local package; verify 78 payload hashes, Win32 wrapper, system-wide MSI and canonical Program Files default. `artifacts/v2630-avx512-test/VERIFIED-MSI.json`.
+- [x] User reports the installed v2.63.0 candidate works and authorizes beta push. Installed Editor/APO match the packaged build. Do not infer itemized plugin/app, latency, persistence or sustained coverage.
+- [ ] Finish approved v2.63.0 beta push and exact-commit six-channel hosted v145 CI. Main and releases need separate approval.
 - [ ] User's requested couple-of-days test: recording/chat continuity, live-preview stability, save/reopen persistence and errors. Keep working installation/configs unchanged; main/release need separate approval.
 - [x] Post-install v2.57.3 diagnostic Mastering-only mic activity confirmed by user; no live changes. Pro-Q/full-chain/preview/latency and sustained stability remain unaccepted.
 - [x] Pro-Q alone with original saved state reproduces live mic mute; Clear/Mastering alone passed.

@@ -24,11 +24,12 @@
 
 #include <windows.h>
 
+#include "asio/AsioRegistration.h"
 #include "services/install/ApoRegistration.h"
 #include "services/registry/ClsidRegistration.h"
 #include "platform/windows/WindowsPath.h"
 #include "services/registry/WindowsRegistry.h"
-#include "Tests/TestHarness.h"
+#include "../TestHarness.h"
 
 #include "Tests/FakeRegistry.h"
 
@@ -55,7 +56,7 @@ void removeScratchDir(const std::wstring& dir)
 		RemoveDirectoryW(dir.c_str());
 }
 
-void testInstallRegistryWritesTheAppVocabulary(test::Harness& harness)
+TEST_CASE(EngineOrchestrationTests, testInstallRegistryWritesTheAppVocabulary)
 {
 	FakeRegistry registry;
 	registry.seedKey(audioKey);
@@ -83,7 +84,7 @@ void testInstallRegistryWritesTheAppVocabulary(test::Harness& harness)
 	removeScratchDir(configDir);
 }
 
-void testInstallRegistryNeverOverwritesUserValues(test::Harness& harness)
+TEST_CASE(EngineOrchestrationTests, testInstallRegistryNeverOverwritesUserValues)
 {
 	FakeRegistry registry;
 	registry.seedKey(audioKey);
@@ -106,7 +107,7 @@ void testInstallRegistryNeverOverwritesUserValues(test::Harness& harness)
 	removeScratchDir(configDir);
 }
 
-void testCleanupRemovesTheFlagButOnlyEmptyKeys(test::Harness& harness)
+TEST_CASE(EngineOrchestrationTests, testCleanupRemovesTheFlagButOnlyEmptyKeys)
 {
 	FakeRegistry registry;
 	registry.seedKey(audioKey);
@@ -114,7 +115,7 @@ void testCleanupRemovesTheFlagButOnlyEmptyKeys(test::Harness& harness)
 	registry.seedKey(appKey);
 	registry.seedString(appKey, L"ConfigPath", L"D:\\My Configs");
 
-	ApoRegistration::cleanupAppRegistry(registry);
+	ApoRegistration::cleanupAppRegistry(L"C:\\Install\\EqualizerAPO-XT", registry);
 
 	harness.expectFalse(registry.valueExists(audioKey, L"DisableProtectedAudioDG"),
 		"the audiodg flag is removed");
@@ -124,12 +125,63 @@ void testCleanupRemovesTheFlagButOnlyEmptyKeys(test::Harness& harness)
 	FakeRegistry emptyCase;
 	emptyCase.seedKey(audioKey);
 	emptyCase.seedKey(appKey);
-	ApoRegistration::cleanupAppRegistry(emptyCase);
+	ApoRegistration::cleanupAppRegistry(L"C:\\Install\\EqualizerAPO-XT", emptyCase);
 	harness.expectFalse(emptyCase.keyExists(appKey),
 		"an empty app key is removed");
 }
 
-void testClsidTreeRoundTrip(test::Harness& harness)
+TEST_CASE(EngineOrchestrationTests, testCleanupForgetsTheInstallTree)
+{
+	const std::wstring installDir = L"C:\\Install\\EqualizerAPO-XT";
+	const std::wstring runKey = eapo::asio::AsioRegistration::autoStartKey();
+	const std::wstring runName = eapo::asio::AsioRegistration::autoStartValueName();
+	FakeRegistry registry;
+	registry.seedKey(audioKey);
+	registry.seedString(appKey, L"InstallPath", installDir);
+	registry.seedString(appKey, L"ConfigPath", installDir + L"\\config");
+	registry.seedString(appKey, L"EnableTrace", L"false");
+	registry.seedString(appKey, L"MigratedFrom", L"C:\\Program Files\\EqualizerAPO\\config");
+	registry.seedString(appKey, L"MigrationStamp", L"2026-11-05T12:00:00");
+	registry.seedDword(appKey, L"MigratedFiles", 3);
+	registry.seedString(runKey, runName,
+		L"\"C:\\Install\\EqualizerAPO-XT\\EqualizerAPOHost.exe\" --resident");
+
+	ApoRegistration::cleanupAppRegistry(installDir, registry);
+
+	harness.expectFalse(registry.valueExists(appKey, L"InstallPath"),
+		"the removed install path is forgotten");
+	harness.expectFalse(registry.valueExists(appKey, L"ConfigPath"),
+		"a ConfigPath below the removed install tree is forgotten");
+	harness.expectFalse(registry.valueExists(appKey, L"MigratedFrom")
+		|| registry.valueExists(appKey, L"MigrationStamp")
+		|| registry.valueExists(appKey, L"MigratedFiles"),
+		"migration breadcrumbs are forgotten");
+	harness.expectFalse(registry.valueExists(runKey, runName),
+		"an engine host autostart command below the removed install tree is forgotten");
+	harness.expect(registry.readValue(appKey, L"EnableTrace") == L"false",
+		"EnableTrace survives cleanup");
+	harness.expect(registry.keyExists(appKey),
+		"the app key remains while a user setting lives there");
+
+	FakeRegistry external;
+	external.seedKey(audioKey);
+	external.seedString(appKey, L"ConfigPath", L"D:\\My Configs");
+	external.seedString(runKey, runName, L"\"C:\\Elsewhere\\EqualizerAPOHost.exe\" --resident");
+	ApoRegistration::cleanupAppRegistry(installDir, external);
+	harness.expect(external.readValue(appKey, L"ConfigPath") == L"D:\\My Configs",
+		"a ConfigPath outside the install tree survives cleanup");
+	harness.expect(external.valueExists(runKey, runName),
+		"an unrelated engine host autostart command survives cleanup");
+
+	FakeRegistry boundary;
+	boundary.seedKey(audioKey);
+	boundary.seedString(appKey, L"ConfigPath", L"C:\\Install\\EqualizerAPO-XTX\\config");
+	ApoRegistration::cleanupAppRegistry(installDir, boundary);
+	harness.expect(boundary.valueExists(appKey, L"ConfigPath"),
+		"a sibling directory sharing the install prefix survives cleanup");
+}
+
+TEST_CASE(EngineOrchestrationTests, testClsidTreeRoundTrip)
 {
 	FakeRegistry registry;
 	const std::wstring clsid = L"{11111111-2222-3333-4444-555555555555}";
@@ -153,7 +205,7 @@ void testClsidTreeRoundTrip(test::Harness& harness)
 		"unregister removes the whole class tree");
 }
 
-void testClsidTreeFailuresReachTheCallerForRollback(test::Harness& harness)
+TEST_CASE(EngineOrchestrationTests, testClsidTreeFailuresReachTheCallerForRollback)
 {
 	// DllRegisterServer's rollback (unregister both APO GUIDs) only runs if
 	// a failed write escapes as an exception; a swallowed failure would leave
@@ -177,7 +229,57 @@ void testClsidTreeFailuresReachTheCallerForRollback(test::Harness& harness)
 }
 }
 
-void runApoRegistrationTests(test::Harness& harness)
+
+TEST_CASE(EngineOrchestrationTests, testMissingMigrationRootGetsOnePackagedDefault)
+{
+	class CountingRegistry final : public FakeRegistry
+	{
+	public:
+		void writeValue(const std::wstring& key, const std::wstring& name, const std::wstring& value) override
+		{
+			FakeRegistry::writeValue(key, name, value);
+			if (key == appKey && name == L"ConfigPath")
+				++configWrites;
+		}
+		unsigned configWrites = 0;
+	};
+	const auto directory = testDirectory() + L"\\aporeg-fallback";
+	const auto config = directory + L"\\config";
+	CountingRegistry registry;
+	registry.seedKey(audioKey);
+	harness.require(ApoRegistration::writeAppInstallRegistry(directory, L"", registry) == ApoRegistration::Result::Success,
+		"install can defer the migration-owned config root");
+	harness.expectEqual(registry.configWrites, 0u, "install has not written ConfigPath");
+	// Migration returned without publishing a root (missing environment or failed handoff).
+	harness.expect(ApoRegistration::writeMissingConfigFallback(directory, registry) == ApoRegistration::Result::Success,
+		"an absent migration result gets the packaged default");
+	harness.expect(registry.readValue(appKey, L"ConfigPath") == config, "fallback is the install's packaged config directory");
+	harness.expect(pathutil::directoryExists(config), "fallback directory exists before success");
+	harness.expectEqual(registry.configWrites, 1u, "fallback publishes ConfigPath once");
+	ApoRegistration::writeMissingConfigFallback(directory, registry);
+	harness.expectEqual(registry.configWrites, 1u, "repeating fallback does not write the value again");
+
+	CountingRegistry existing;
+	existing.seedString(appKey, L"ConfigPath", L"D:\\My Configs");
+	harness.expect(ApoRegistration::writeMissingConfigFallback(directory, existing) == ApoRegistration::Result::Success,
+		"an existing migration or custom result needs no fallback");
+	harness.expect(existing.readValue(appKey, L"ConfigPath") == L"D:\\My Configs", "existing root is untouched");
+	harness.expectEqual(existing.configWrites, 0u, "existing root is not rewritten");
+	existing.denyRead(appKey);
+	harness.expect(ApoRegistration::writeMissingConfigFallback(directory, existing) == ApoRegistration::Result::RegistryFailed,
+		"an unreadable value is not treated as absent");
+	harness.expectEqual(existing.configWrites, 0u, "unreadable root is not overwritten");
+
+	CountingRegistry wrongType;
+	wrongType.seedDword(appKey, L"ConfigPath", 7);
+	ApoRegistration::writeMissingConfigFallback(directory, wrongType);
+	harness.expectEqual(wrongType.readDWORDValue(appKey, L"ConfigPath"), 7ul, "a value of an unreadable type is retained");
+	harness.expectEqual(wrongType.configWrites, 0u, "a wrong-type value is not replaced");
+	RemoveDirectoryW(config.c_str());
+	RemoveDirectoryW(directory.c_str());
+}
+
+TEST_CASE(EngineOrchestrationTests, runApoRegistrationTests)
 {
 	harness.expect(ApoRegistration::shouldGrantInstallAccess(),
 		"already-elevated install with no hand-off keeps both legacy grants");
@@ -185,9 +287,15 @@ void runApoRegistrationTests(test::Harness& harness)
 		"failed or absent preparation keeps both legacy grants");
 	harness.expectFalse(ApoRegistration::shouldGrantInstallAccess(true),
 		"prepared install skips both elevated recursive grants");
-	testInstallRegistryWritesTheAppVocabulary(harness);
-	testInstallRegistryNeverOverwritesUserValues(harness);
-	testCleanupRemovesTheFlagButOnlyEmptyKeys(harness);
-	testClsidTreeRoundTrip(harness);
-	testClsidTreeFailuresReachTheCallerForRollback(harness);
+	test::FakeRegistry unchecked;
+	unchecked.seedKey(audioKey);
+	const auto missing = ApoRegistration::verify(unchecked, false);
+	harness.expectFalse(missing.valid(), "verification reports missing protection and registration");
+	harness.expectFalse(unchecked.valueExists(audioKey, L"DisableProtectedAudioDG"), "read-only verification does not repair the registry");
+	test::FakeRegistry deferred;
+	deferred.seedKey(audioKey);
+	harness.expect(ApoRegistration::writeAppInstallRegistry(L"C:\\Install", L"", deferred) == ApoRegistration::Result::Success,
+		"migration-owned config root can be deferred");
+	harness.expectFalse(deferred.valueExists(appKey, L"ConfigPath"),
+		"install does not publish a disposable ConfigPath before migration chooses the root");
 }

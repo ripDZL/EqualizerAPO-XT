@@ -19,6 +19,7 @@
 #include <QWidget>
 
 #include "Editor/FilterTable.h"
+#include "Editor/widgets/ChannelFlow.h"
 #include "Editor/widgets/CommandRowFrame.h"
 #include "Editor/widgets/FilterCardModel.h"
 
@@ -59,7 +60,8 @@ protected:
 	bool eventFilter(QObject* watched, QEvent* event) override;
 
 private slots:
-	void updateModel();
+	// The body editor stored its line (IFilterGUI::updateModel).
+	void cardEdited();
 	void addAbove();
 	void removeThis();
 	void editTextToggled(bool checked);
@@ -77,13 +79,14 @@ private:
 	void watchEditorScroll(QScrollArea* scroll);
 	void syncEditorScrollHeight(QScrollArea* scroll);
 	void applyDescriptor();
+	void syncSummaryVisibility();
+	void syncHeaderToolTips();
 	void rebuildSummary();
 	void setEditing(bool editing);
 	// deviceChannels is part of the cache key: the same list judges both
 	// which Copy targets reach the header and which badges are dashed.
 	void buildChannelBadges(const QStringList& channels, const std::vector<std::wstring>& deviceChannels);
 	CommandRowInfo currentRowInfo() const;
-	QString uncommentedLine() const;
 	// Indent units for the outer margin. Branch/tail rows of the If family
 	// (ElseIf/Else/EndIf) follow the active skin's layout policy
 	// (ISkin::logicSiblingsIndentAsMembers): a skin that runs a scope lane
@@ -120,5 +123,11 @@ private:
 	// or not), so a device change redraws them.
 	std::vector<std::wstring> renderedBadgeDeviceChannels;
 	bool editingDone = false;
+	// Set while the event that took the raw editor's focus away is still
+	// being delivered (cleared from the event loop right after). A press on
+	// the raw-line toggle reaches the button only after Qt has moved the
+	// focus, so this tells the toggle that its own press already closed the
+	// editor (#456).
+	bool editorClosedByFocusLoss = false;
 	bool expanded = false;
 };

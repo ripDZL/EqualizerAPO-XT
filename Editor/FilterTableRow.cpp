@@ -33,6 +33,8 @@
 #include "Editor/helpers/GUIHelper.h"
 #include "FilterTableRow.h"
 #include "SkinManager.h"
+#include "FilterTemplate.h"
+#include "IFilterGUI.h"
 #include "ui_FilterTableRow.h"
 
 FilterTableRow::FilterTableRow(FilterTable* table, int number, FilterTable::Item* item, IFilterGUI* gui)
@@ -159,6 +161,9 @@ void FilterTableRow::on_actionAdd_triggered()
 	QRect rect = ui->toolBar->actionGeometry(ui->actionAdd);
 	QPoint p = ui->toolBar->mapToGlobal(QPoint(rect.x(), rect.y() + rect.height()));
 	QAction* action = menu->exec(p);
+	// The menu is parentless (createAddPopupMenu); deleteLater rather than
+	// delete, because the chosen action is the menu's child and is read below.
+	menu->deleteLater();
 	ui->actionAdd->setChecked(false);
 	if (action != nullptr)
 	{
@@ -199,8 +204,7 @@ void FilterTableRow::on_lineEdit_editingFinished()
 		if (ui->lineEdit->text() != item->text)
 		{
 			editingDone = true;
-			item->text = ui->lineEdit->text();
-			table->updateModel();
+			table->setLineText(item, ui->lineEdit->text());
 			// set focus to table so that enter key does not cause scrolling down
 			table->setFocus();
 			table->updateGuis();

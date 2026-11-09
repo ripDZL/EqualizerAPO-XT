@@ -19,10 +19,14 @@
 
 #include "stdafx.h"
 #include "services/registry/RegistryPaths.h"
+#include <algorithm>
+#include <atomic>
 #include <mutex>
+#include <vector>
 #include "services/registry/WindowsRegistry.h"
 #include "services/logging/Logging.h"
 #include "VSTPluginLibrary.h"
+#include "PluginResidency.h"
 #include "VST3HostObjects.h"
 #include "VST3RefCounted.h"
 #include "platform/windows/Win32Resource.h"
@@ -106,32 +110,97 @@ static wstring canonicalAbsolutePath(const wstring& path)
 	return written > 0 && written < length ? wstring(absolute.data(), written) : path;
 }
 
+
+// The policy and the registry behind PluginResidency.h. The registry is
+// guarded by instanceMapMutex and is created on first use and never
+// destroyed: emptying it at process exit would run ExitDll and FreeLibrary
+// from static destruction, under the loader lock.
+static std::atomic<bool> keepPluginsLoaded{false};
+
+static std::vector<std::shared_ptr<VSTPluginLibrary>>& retainedLibraries()
+{
+	static auto* libraries = new std::vector<std::shared_ptr<VSTPluginLibrary>>();
+	return *libraries;
+}
+
+void PluginResidency::keepLoadedForProcessLifetime(bool keep)
+{
+	keepPluginsLoaded.store(keep);
+}
+
+bool PluginResidency::holdsLoadedModules()
+{
+	lock_guard<mutex> lock(instanceMapMutex());
+	return !retainedLibraries().empty();
+}
+
+void VSTPluginLibrary::retainIfKeepingLoaded(const shared_ptr<VSTPluginLibrary>& library)
+{
+	// isLoaded takes the library's own initMutex; it is released again before
+	// instanceMapMutex is taken, so the two locks are never held together.
+	if (!keepPluginsLoaded.load() || library == nullptr || !library->isLoaded())
+		return;
+
+	{
+		lock_guard<mutex> lock(instanceMapMutex());
+		vector<shared_ptr<VSTPluginLibrary>>& retained = retainedLibraries();
+		if (find(retained.begin(), retained.end(), library) != retained.end())
+			return;
+		retained.push_back(library);
+	}
+	TraceFStatic(L"Keeping %s loaded for the life of this process", library->libPath.c_str());
+}
+
+VSTPluginLibrary::LoadResult VSTPluginLibrary::load(const wstring& libPath, const JudgedPath* path)
+{
+	auto library = getInstance(libPath);
+	const int status = path != nullptr ? library->initialize(*path) : library->initialize();
+	if (status >= 0)
+		retainIfKeepingLoaded(library);
+	return {std::move(library), status};
+}
+
 std::shared_ptr<VSTPluginLibrary> VSTPluginLibrary::getInstance(const wstring& libPath)
 {
-	// The picker returns a bundle, but saved configurations may point at the
-	// inner module. Windows loads both as one DLL: they must share InitDll,
-	// the factory host context, and ExitDll too. Keep the original display path.
+	// Bundles and their inner modules share the same loaded DLL and lifecycle.
+	// Keep the original display path; normalize only the cache identity.
 	wstring key = canonicalAbsolutePath(libPath);
 	key = canonicalAbsolutePath(resolveVST3ModulePath(key));
 	CharLowerBuffW(key.data(), static_cast<DWORD>(key.size()));
-	lock_guard<mutex> lock(instanceMapMutex());
 
+	// These owners outlive the lock even when cache insertion throws.
 	shared_ptr<VSTPluginLibrary> ptr;
+	shared_ptr<VSTPluginLibrary> candidate;
+	unique_lock<mutex> lock(instanceMapMutex());
 
 	auto it = instanceMap.find(key);
 	if (it != instanceMap.end())
-	{
-		weak_ptr<VSTPluginLibrary> instance = it->second;
-		ptr = instance.lock();
-	}
+		ptr = it->second.lock();
 
-	if (ptr == NULL)
+	if (ptr == nullptr)
 	{
-		ptr = shared_ptr<VSTPluginLibrary>(new VSTPluginLibrary(libPath));
-		instanceMap[key] = ptr;
+		// shared_ptr construction can delete its argument if allocation of its
+		// control block fails. That destructor also takes instanceMapMutex.
+		lock.unlock();
+		candidate = shared_ptr<VSTPluginLibrary>(new VSTPluginLibrary(libPath, key));
+		lock.lock();
+		it = instanceMap.find(key);
+		if (it != instanceMap.end())
+			ptr = it->second.lock();
+		if (ptr == nullptr)
+		{
+			ptr = candidate;
+			instanceMap[key] = ptr;
+		}
 	}
 
 	return ptr;
+}
+
+size_t VSTPluginLibrary::cachedLibraryCountForTesting()
+{
+	lock_guard<mutex> lock(instanceMapMutex());
+	return instanceMap.size();
 }
 
 wstring VSTPluginLibrary::getDefaultPluginPath()
@@ -198,27 +267,25 @@ const std::string& VSTPluginLibrary::getVST3SubCategories() const
 
 bool VSTPluginLibrary::loadFunctions()
 {
-	// Detect the format from the loaded module, not from its file extension.
-	// A raw VST3 module may be named .dll, and a file named .vst3 is not proof
-	// that it implements the VST3 factory ABI. Prefer VST3 when a module happens
-	// to expose both entry points.
+	// Keep the fork's VST3 ABI for existing dual-export DLL configurations.
+	// Retain the VST2 entry until we know the VST3 factory is usable.
 	GetPluginFactory = (getPluginFactoryFunc)GetProcAddress(module.get(), "GetPluginFactory");
 	VSTPluginMain = (vstPluginMain)GetProcAddress(module.get(), "VSTPluginMain");
-	if (GetPluginFactory != NULL)
+	vst3 = GetPluginFactory != nullptr;
+
+	if (vst3)
 	{
-		vst3 = true;
 		// InitDll/ExitDll are optional in the module ABI; only
 		// GetPluginFactory is mandatory.
 		InitDll = (vst3ModuleEntryFunc)GetProcAddress(module.get(), "InitDll");
 		ExitDll = (vst3ModuleEntryFunc)GetProcAddress(module.get(), "ExitDll");
-		VSTPluginMain = nullptr;
 		return true;
 	}
 
-	vst3 = false;
+	GetPluginFactory = nullptr;
 	InitDll = nullptr;
 	ExitDll = nullptr;
-	return VSTPluginMain != NULL;
+	return VSTPluginMain != nullptr;
 }
 
 int VSTPluginLibrary::customInitialize()
@@ -226,6 +293,31 @@ int VSTPluginLibrary::customInitialize()
 	if (!vst3)
 		return 0;
 
+	const int result = initializeVst3Factory();
+	if (result >= 0)
+	{
+		VSTPluginMain = nullptr;
+		return result;
+	}
+
+	wchar_t extension[_MAX_EXT];
+	_wsplitpath_s(libPath.c_str(), nullptr, 0, nullptr, 0, nullptr, 0, extension, _MAX_EXT);
+	if (VSTPluginMain == nullptr || _wcsicmp(extension, L".dll") != 0)
+		return result;
+
+	// Some dual-export VST2 products expose an empty VST3 factory. Unwind
+	// that attempt before selecting their real VST2 entry point.
+	const auto vst2Entry = VSTPluginMain;
+	releasePluginFactory();
+	InitDll = nullptr;
+	ExitDll = nullptr;
+	VSTPluginMain = vst2Entry;
+	vst3 = false;
+	return 0;
+}
+
+int VSTPluginLibrary::initializeVst3Factory()
+{
 	// Standard Windows VST3 module lifecycle: InitDll before the factory,
 	// ExitDll after the last release. A module that exports InitDll may
 	// legitimately refuse to load. On every failure path below the caller
@@ -246,11 +338,12 @@ int VSTPluginLibrary::customInitialize()
 	{
 		vst3FactoryHostContext = Steinberg::IPtr<Steinberg::FUnknown>::adopt(
 			static_cast<Steinberg::Vst::IHostApplication*>(new VST3FactoryHostContext()));
-		// The factory host context is optional. Factories which explicitly do
-		// not consume it remain valid and can still create usable components.
 		const Steinberg::tresult hostContextResult = factory3->setHostContext(vst3FactoryHostContext.get());
-		if (hostContextResult != Steinberg::kResultOk && hostContextResult != Steinberg::kNotImplemented)
-			return LOADING_FAILED;
+		if (hostContextResult != Steinberg::kResultOk)
+		{
+			LogF(L"IPluginFactory3::setHostContext returned 0x%08X for %s; continuing",
+				static_cast<unsigned int>(hostContextResult), libPath.c_str());
+		}
 	}
 
 	for (Steinberg::int32 i = 0; i < factory->countClasses(); i++)
@@ -302,15 +395,20 @@ VSTPluginLibrary::~VSTPluginLibrary()
 	// destructor returns. Release module-owned VST3 objects while their code is
 	// still resident.
 	releasePluginFactory();
+
+	lock_guard<mutex> lock(instanceMapMutex());
+	const auto it = instanceMap.find(cacheKey);
+	// A concurrent getInstance may already have replaced this expired entry.
+	if (it != instanceMap.end() && it->second.expired())
+		instanceMap.erase(it);
 }
 
-VSTPluginLibrary::VSTPluginLibrary(const wstring& libPath)
-	: libPath(libPath), loadPath(libPath)
+VSTPluginLibrary::VSTPluginLibrary(const wstring& libPath, const wstring& cacheKey)
+	: libPath(libPath), cacheKey(cacheKey)
 {
 	wchar_t extension[_MAX_EXT];
 	_wsplitpath_s(libPath.c_str(), NULL, 0, NULL, 0, NULL, 0, extension, _MAX_EXT);
-	vst3PathHint = _wcsicmp(extension, L".vst3") == 0;
-	vst3 = vst3PathHint;
+	vst3 = _wcsicmp(extension, L".vst3") == 0;
 	// Bundle discovery happens only inside the judged, handle-relative walk.
 }
 

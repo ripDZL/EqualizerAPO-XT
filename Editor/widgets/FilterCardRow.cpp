@@ -10,13 +10,13 @@
 #include <QApplication>
 #include <QEvent>
 #include <QIcon>
+#include <QKeySequence>
 #include <QMenu>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPixmap>
 #include <QPixmapCache>
 #include <QPropertyAnimation>
-#include <QRegularExpression>
 #include <QScrollArea>
 #include <QStyle>
 #include <QTimer>
@@ -24,14 +24,27 @@
 
 #include <utility>
 
+#include "Editor/FilterTemplate.h"
+#include "Editor/IFilterGUI.h"
 #include "Editor/SkinManager.h"
 #include "Editor/helpers/GUIHelper.h"
 #include "Editor/widgets/ChBadge.h"
+#include "Editor/widgets/CommandRowFacts.h"
 #include "Editor/widgets/routing/ChannelIdentity.h"
 #include "Editor/widgets/ElidedLabel.h"
 #include "Editor/widgets/routing/IRoutingRenderer.h"
 #include "Editor/widgets/routing/CopyRoutingAdapter.h"
 #include "filters/MultiConvolutionCommand.h"
+
+// The power toggle's glyph: the active skin's, or the shared one.
+static QIcon powerToggleIcon(bool enabled)
+{
+	const QIcon skinned = SkinManager::instance()->powerToggleIcon(enabled);
+	if (!skinned.isNull())
+		return skinned;
+	return QIcon(enabled ? QStringLiteral(":/icons/power_on.svg") : QStringLiteral(":/icons/power_off.svg"));
+}
+
 
 FilterCardRow::FilterCardRow(FilterTable* table, int number, FilterTable::Item* item, IFilterGUI* gui,
 	FilterCardDescriptor preparedDescriptor, QWidget* parent)
@@ -41,7 +54,8 @@ FilterCardRow::FilterCardRow(FilterTable* table, int number, FilterTable::Item* 
 	setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
 
 	QVBoxLayout* outerLayout = new QVBoxLayout(this);
-	outerLayout->setContentsMargins(8 + rowIndentUnits() * SkinManager::instance()->tokens().channelGroupIndent, 4, 8, 4);
+	outerLayout->setContentsMargins(CommandRowInfo::cardMarginLeft + rowIndentUnits() * SkinManager::instance()->tokens().channelGroupIndent,
+		CommandRowInfo::cardMarginTop, 8, 4);
 	outerLayout->setSpacing(0);
 	// Detach the layout's minimumSize from the children's: the body can contain
 	// legacy filter GUIs with huge content-driven sizeHints (DeviceFilterGUI,
@@ -88,9 +102,13 @@ FilterCardRow::FilterCardRow(FilterTable* table, int number, FilterTable::Item* 
 	// closed.
 	expandButton = new QToolButton(headerWidget);
 	expandButton->setObjectName(QStringLiteral("FilterCardIconButton"));
+	// The header's actions (fold, add, remove, raw edit) rest as bare glyphs
+	// in every skin's sheet and take their cap only under hover, press or
+	// engagement, so the power switch is the one capped control on a card
+	// head (#456: it was told apart from + and the bin by its icon alone).
+	expandButton->setProperty("headerAction", true);
 	expanded = gui != nullptr;
 	expandButton->setText(expanded ? QStringLiteral("v") : QStringLiteral(">"));
-	expandButton->setToolTip(tr("Expand filter card"));
 	connect(expandButton, &QToolButton::clicked, this, [this]() { setExpanded(!expanded); });
 	headerLayout->addWidget(expandButton);
 
@@ -108,29 +126,40 @@ FilterCardRow::FilterCardRow(FilterTable* table, int number, FilterTable::Item* 
 	// the right.
 	enabledButton = new QToolButton(headerWidget);
 	enabledButton->setObjectName(QStringLiteral("FilterCardIconButton"));
+	// Skins may treat "on", every live card's resting state, apart from
+	// the engaged look of the other checkable header button.
+	enabledButton->setProperty("powerToggle", true);
 	enabledButton->setCheckable(true);
-	enabledButton->setToolTip(tr("Enable or comment out this command"));
 	enabledButton->setChecked(descriptor.enabled);
-	enabledButton->setIcon(QIcon(descriptor.enabled ? QStringLiteral(":/icons/power_on.svg") : QStringLiteral(":/icons/power_off.svg")));
-	connect(enabledButton, SIGNAL(toggled(bool)), this, SLOT(enabledToggled(bool)));
+	enabledButton->setIcon(powerToggleIcon(descriptor.enabled));
+	connect(enabledButton, &QToolButton::toggled, this, &FilterCardRow::enabledToggled);
 	headerLayout->addWidget(enabledButton);
 
 	addButton = new QToolButton(headerWidget);
 	addButton->setObjectName(QStringLiteral("FilterCardIconButton"));
+	addButton->setProperty("headerAction", true);
 	addButton->setText(QStringLiteral("+"));
 	addButton->setToolTip(tr("Add filter above this card"));
-	connect(addButton, SIGNAL(clicked()), this, SLOT(addAbove()));
+	connect(addButton, &QToolButton::clicked, this, &FilterCardRow::addAbove);
 	headerLayout->addWidget(addButton);
 
 	removeButton = new QToolButton(headerWidget);
 	removeButton->setObjectName(QStringLiteral("FilterCardIconButton"));
-	removeButton->setText(QStringLiteral("-"));
-	removeButton->setToolTip(tr("Remove filter"));
-	connect(removeButton, SIGNAL(clicked()), this, SLOT(removeThis()));
+	removeButton->setProperty("headerAction", true);
+	// A bin, not "-": beside "+" a minus reads as one step of something, and
+	// a field report (#456) took it for another control and lost a filter it
+	// meant to keep. Same stroke set, size and ink as the code mark below.
+	removeButton->setIcon(GUIHelper::tintedIcon(QStringLiteral(":/icons/modern/trash.svg"),
+		QColor(SkinManager::instance()->tokens().text), 14));
+	removeButton->setAccessibleName(tr("Remove filter"));
+	removeButton->setToolTip(tr("Remove this filter. %1 brings it back.")
+		.arg(QKeySequence(QKeySequence::Undo).toString(QKeySequence::NativeText)));
+	connect(removeButton, &QToolButton::clicked, this, &FilterCardRow::removeThis);
 	headerLayout->addWidget(removeButton);
 
 	editButton = new QToolButton(headerWidget);
 	editButton->setObjectName(QStringLiteral("FilterCardIconButton"));
+	editButton->setProperty("headerAction", true);
 	editButton->setCheckable(true);
 	// A code mark ("</>"), not "..." and not a pencil: the ellipsis promised
 	// an options menu it never opens, and the pencil collided with the
@@ -140,7 +169,7 @@ FilterCardRow::FilterCardRow(FilterTable* table, int number, FilterTable::Item* 
 	editButton->setIcon(GUIHelper::tintedIcon(QStringLiteral(":/icons/modern/code-line.svg"),
 		QColor(SkinManager::instance()->tokens().text), 14));
 	editButton->setToolTip(tr("Edit raw command"));
-	connect(editButton, SIGNAL(toggled(bool)), this, SLOT(editTextToggled(bool)));
+	connect(editButton, &QToolButton::toggled, this, &FilterCardRow::editTextToggled);
 	headerLayout->addWidget(editButton);
 	// A clear break between the control column and the identity (badge
 	// pictogram, title), so the buttons and the pictogram do not read as one
@@ -206,7 +235,7 @@ FilterCardRow::FilterCardRow(FilterTable* table, int number, FilterTable::Item* 
 
 	lineEdit = new QLineEdit(bodyStack);
 	lineEdit->setObjectName(QStringLiteral("FilterCardRawEditor"));
-	connect(lineEdit, SIGNAL(editingFinished()), this, SLOT(lineEditingFinished()));
+	connect(lineEdit, &QLineEdit::editingFinished, this, &FilterCardRow::lineEditingFinished);
 	bodyStack->addWidget(lineEdit);
 
 	// A Copy line with inline `expression` factors must not open the routing
@@ -238,8 +267,8 @@ FilterCardRow::FilterCardRow(FilterTable* table, int number, FilterTable::Item* 
 				SkinManager::instance()->tokens());
 			return routingView;
 		});
-		connect(routingView, SIGNAL(routingChanged()), this, SLOT(routingEdited()));
-		connect(routingView, SIGNAL(routingChanged()), table, SLOT(updateChannels()));
+		connect(routingView, &RoutingView::routingChanged, this, &FilterCardRow::routingEdited);
+		connect(routingView, &RoutingView::routingChanged, table, &FilterTable::updateChannels);
 
 		// The expand default above keys off the gui the body shows; routing
 		// rows are their own editor and start open.
@@ -250,7 +279,7 @@ FilterCardRow::FilterCardRow(FilterTable* table, int number, FilterTable::Item* 
 		mountEditorBody([this](QWidget*) -> QWidget* {
 			return this->gui;
 		});
-		connect(gui, SIGNAL(updateModel()), this, SLOT(updateModel()));
+		connect(gui, &IFilterGUI::updateModel, this, &FilterCardRow::cardEdited);
 	}
 	else
 	{
@@ -320,74 +349,18 @@ void FilterCardRow::setChannelFlow(const ChannelFlowAtLine& flow)
 
 CommandRowInfo FilterCardRow::currentRowInfo() const
 {
-	CommandRowInfo info;
-	info.type = descriptor.type;
-	info.command = descriptor.command.toLower();
-	info.enabled = descriptor.enabled;
-	info.selected = table != nullptr && table->getSelectedItems().contains(item);
-	info.focused = table != nullptr && table->getFocusedItem() == item;
-	info.depth = descriptor.depth;
-	info.logicDepth = descriptor.logicDepth;
-	info.dynamicLine = descriptor.dynamicLine;
-
-	// The lane geometry, resolved here because this widget is what decides it:
-	// rowIndentUnits() is the same call its own layout margin uses, so a skin's
-	// gutter can no longer disagree with the card face it sits beside.
-	info.laneUnit = SkinManager::instance()->tokens().channelGroupIndent;
-	info.laneCount = rowIndentUnits();
-	info.cardLeft = 8 + info.laneCount * info.laneUnit;
-
-	// Fold in the analysis engine's load facts for this line (dynamic
-	// commands): branch truth for the If family, computed values for
-	// Eval/inline expressions, and whether a false branch swallowed the line.
-	// Advisory by contract - facts go stale between an edit and the next
-	// analysis run. When both an Eval result and an inline substitution exist
-	// on one line, the Eval result wins regardless of hash order.
-	if (table != nullptr)
-	{
-		const QList<ConfigLoadTraceEntry> facts = table->loadTraceFactsForRow(rowNumber - 1);
-		for (const ConfigLoadTraceEntry& fact : facts)
-		{
-			switch (fact.kind)
-			{
-			case ConfigLoadTraceEntry::Kind::Condition:
-				info.branchState = fact.result == ConfigLoadTraceEntry::Result::True ? 1
-					: fact.result == ConfigLoadTraceEntry::Result::False ? 0
-					: fact.result == ConfigLoadTraceEntry::Result::Error ? 3 : 2;
-				break;
-			case ConfigLoadTraceEntry::Kind::ElseBranch:
-				info.branchState = fact.active ? 1 : 0;
-				break;
-			case ConfigLoadTraceEntry::Kind::Eval:
-				info.evalText = QString::fromStdWString(fact.text);
-				info.valueError = info.valueError || fact.error;
-				break;
-			case ConfigLoadTraceEntry::Kind::InlineValue:
-				// The engine preserves the space after the colon; trim at
-				// this UI boundary so readouts do not start with a gap.
-				if (info.evalText.isEmpty())
-					info.evalText = QString::fromStdWString(fact.text).trimmed();
-				info.valueError = info.valueError || fact.error;
-				break;
-			case ConfigLoadTraceEntry::Kind::SkippedLine:
-				info.lineSkipped = true;
-				break;
-			case ConfigLoadTraceEntry::Kind::ParseError:
-				// Several can arrive for one line if a factory reports more than
-				// once; the first is the one that stopped it.
-				if (info.parseError.isEmpty())
-					info.parseError = QString::fromStdWString(fact.text);
-				break;
-			case ConfigLoadTraceEntry::Kind::SetupError:
-				// The whole configuration rolled back. The exception text is a
-				// developer's log line and stays in the log; the row only needs
-				// to know that this line is the one that stopped the load.
-				info.setupFailed = true;
-				break;
-			}
-		}
-	}
-	return info;
+	// The derivation is CommandRowFacts' (EditorLogicTests pins it); this
+	// widget only gathers the facts it holds: selection, the active skin's
+	// lane metrics and the analysis engine's load facts for its line.
+	const SkinTokens& tokens = SkinManager::instance()->tokens();
+	CommandRowFacts::RowContext context;
+	context.selected = table != nullptr && table->getSelectedItems().contains(item);
+	context.focused = table != nullptr && table->getFocusedItem() == item;
+	context.laneUnit = tokens.channelGroupIndent;
+	context.rowHeight = tokens.rowHeight;
+	context.logicSiblingsIndentAsMembers = SkinManager::instance()->logicSiblingsIndentAsMembers();
+	return CommandRowFacts::describe(descriptor, context,
+		table != nullptr ? table->loadTraceFactsForRow(rowNumber - 1) : QList<ConfigLoadTraceEntry>());
 }
 
 QRect FilterCardRow::getHeaderRect() const
@@ -432,7 +405,8 @@ void FilterCardRow::updateRowPosition(int rowNumber, FilterCardRowScope scope)
 		descriptor.logicDepth = scope.logic;
 		descriptor.scopeChannels = scope.channels;
 		if (layout() != nullptr)
-			layout()->setContentsMargins(8 + rowIndentUnits() * SkinManager::instance()->tokens().channelGroupIndent, 4, 8, 4);
+			layout()->setContentsMargins(CommandRowInfo::cardMarginLeft + rowIndentUnits() * SkinManager::instance()->tokens().channelGroupIndent,
+				CommandRowInfo::cardMarginTop, 8, 4);
 		applyDescriptor();
 	}
 	else
@@ -601,14 +575,21 @@ bool FilterCardRow::eventFilter(QObject* watched, QEvent* event)
 		break;
 	}
 	case QEvent::MouseButtonPress:
+	case QEvent::MouseButtonDblClick:
 	{
 		QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
-		if (mouseEvent->button() == Qt::LeftButton
+		if (event->type() == QEvent::MouseButtonPress
+			&& mouseEvent->button() == Qt::LeftButton
 			&& mouseEvent->modifiers() == Qt::NoModifier
 			&& table != nullptr && item != nullptr)
 		{
 			table->selectOnlyFromCard(item);
 		}
+		// This press already closed the raw editor by taking its focus
+		// (lineEditingFinished). The toggle must not see it, or its release
+		// switches editing straight back on.
+		if (watched == editButton && editorClosedByFocusLoss && mouseEvent->button() == Qt::LeftButton)
+			return true;
 		break;
 	}
 	case QEvent::Resize:
@@ -632,13 +613,7 @@ bool FilterCardRow::eventFilter(QObject* watched, QEvent* event)
 
 int FilterCardRow::rowIndentUnits() const
 {
-	// Member level is one unit past the branch/tail row's own semantic level
-	// (depth already carries any enclosing channel group, so +1 keeps mixed
-	// Channel x If nesting aligned with the block members).
-	if (descriptor.type == QStringLiteral("if") && descriptor.badge != QStringLiteral("IF")
-		&& SkinManager::instance()->logicSiblingsIndentAsMembers())
-		return descriptor.depth + 1;
-	return descriptor.depth;
+	return CommandRowFacts::indentUnits(descriptor, SkinManager::instance()->logicSiblingsIndentAsMembers());
 }
 
 void FilterCardRow::paintEvent(QPaintEvent*)
@@ -730,14 +705,10 @@ static QPixmap badgePictogram(const QString& resource, const QColor& ink, int si
 
 void FilterCardRow::rebuildSummary()
 {
-	// describeLine() cannot see neighbouring lines, so the If-scope count is
-	// carried over from the previous descriptor (assigned by the constructor /
-	// updateRowPosition from calculateScopes).
-	const int logicDepth = descriptor.logicDepth;
-	const QStringList scopeChannels = descriptor.scopeChannels;
-	descriptor = FilterCardModel::describeLine(item->text, descriptor.depth);
-	descriptor.logicDepth = logicDepth;
-	descriptor.scopeChannels = scopeChannels;
+	// The line alone cannot tell its scope, so the one the row was built
+	// under (constructor / updateRowPosition, from calculateScopes) carries
+	// over.
+	descriptor = FilterCardModel::describeRow(item->text, FilterCardModel::scopeOf(descriptor));
 	applyDescriptor();
 }
 
@@ -792,6 +763,7 @@ void FilterCardRow::applyDescriptor()
 	}
 	titleLabel->setFullText(descriptor.title);
 	summaryLabel->setFullText(descriptor.summary);
+	syncSummaryVisibility();
 	// A line the engine could not use says why on hover. The analysis run is what
 	// produces the reason, so this is empty until one has happened and goes stale
 	// on edit, like every other load fact.
@@ -806,9 +778,10 @@ void FilterCardRow::applyDescriptor()
 		summaryLabel->setToolTip(descriptor.summary);
 	enabledButton->blockSignals(true);
 	enabledButton->setChecked(descriptor.enabled);
-	enabledButton->setIcon(QIcon(descriptor.enabled ? QStringLiteral(":/icons/power_on.svg") : QStringLiteral(":/icons/power_off.svg")));
+	enabledButton->setIcon(powerToggleIcon(descriptor.enabled));
 	enabledButton->blockSignals(false);
 	enabledButton->setVisible(descriptor.canToggleEnabled);
+	syncHeaderToolTips();
 	// Disable only the body editor when the line is commented out. This keeps
 	// the card frame (and its header buttons - including the enable toggle and
 	// the raw-edit affordance) interactive so the user can flip the line back on.
@@ -856,7 +829,7 @@ void FilterCardRow::buildChannelBadges(const QStringList& channels,
 	channelBadgeContainer->setVisible(!channels.isEmpty());
 }
 
-void FilterCardRow::updateModel()
+void FilterCardRow::cardEdited()
 {
 	IFilterGUI* senderGui = qobject_cast<IFilterGUI*>(QObject::sender());
 	if (senderGui == nullptr)
@@ -865,9 +838,8 @@ void FilterCardRow::updateModel()
 	QString command;
 	QString parameters;
 	senderGui->store(command, parameters);
-	item->text = FilterCardModel::assembleLine(command, parameters, item->text);
+	table->replaceLineCommand(item, command, parameters);
 	rebuildSummary();
-	table->updateModel();
 }
 
 void FilterCardRow::routingEdited()
@@ -876,9 +848,8 @@ void FilterCardRow::routingEdited()
 		return;
 
 	const QString parameters = CopyRoutingAdapter::serialize(routingView->assignments());
-	item->text = FilterCardModel::assembleLine(QStringLiteral("Copy"), parameters, item->text);
+	table->replaceLineCommand(item, QStringLiteral("Copy"), parameters);
 	rebuildSummary();
-	table->updateModel();
 }
 
 void FilterCardRow::addAbove()
@@ -927,11 +898,7 @@ void FilterCardRow::setEditing(bool editing)
 		lineEdit->setFocus();
 		lineEdit->selectAll();
 	}
-	else if (gui != nullptr)
-	{
-		bodyStack->setCurrentIndex(1);
-	}
-	else if (bodyStack->count() > 1)
+	else if (gui != nullptr || bodyStack->count() > 1)
 	{
 		bodyStack->setCurrentIndex(1);
 	}
@@ -941,11 +908,17 @@ void FilterCardRow::lineEditingFinished()
 {
 	if (bodyStack->currentWidget() == lineEdit && !editingDone)
 	{
+		// Qt hands the focus to the nearest click-focus ancestor (the list)
+		// before it delivers a press, so a press on the raw-line toggle closes
+		// the editor here first. The flag lives until the event loop runs
+		// again, long enough for the toggle to see that same press and swallow
+		// it; letting it through reopened the editor on release (#456).
+		editorClosedByFocusLoss = true;
+		QTimer::singleShot(0, this, [this]() { editorClosedByFocusLoss = false; });
 		editingDone = true;
 		if (lineEdit->text() != item->text)
 		{
-			item->text = lineEdit->text();
-			table->updateModel();
+			table->setLineText(item, lineEdit->text());
 			editingDone = false;
 			// In-place like the enabled toggle: only this row's card changes
 			// (the rows below re-scope in place), instead of rebuilding every
@@ -962,30 +935,16 @@ void FilterCardRow::lineEditingFinished()
 	}
 }
 
-QString FilterCardRow::uncommentedLine() const
-{
-	QRegularExpression commentPrefix(QStringLiteral("^(\\s*)#\\s?"));
-	QRegularExpressionMatch match = commentPrefix.match(item->text);
-	if (match.hasMatch())
-		return match.captured(1) + item->text.mid(match.capturedEnd(0));
-	return item->text;
-}
-
 void FilterCardRow::enabledToggled(bool checked)
 {
 	if (!descriptor.canToggleEnabled)
 		return;
 
 	if (enabledButton != nullptr)
-		enabledButton->setIcon(QIcon(checked ? QStringLiteral(":/icons/power_on.svg") : QStringLiteral(":/icons/power_off.svg")));
+		enabledButton->setIcon(powerToggleIcon(checked));
+	syncHeaderToolTips();
 
-	QString trimmed = item->text.trimmed();
-	if (checked && trimmed.startsWith('#'))
-		item->text = uncommentedLine();
-	else if (!checked && !trimmed.startsWith('#'))
-		item->text = QStringLiteral("# ") + item->text;
-
-	table->updateModel();
+	table->setLineEnabled(item, checked);
 	FilterTable* targetTable = table;
 	FilterTable::Item* targetItem = item;
 	// In-place refresh: only the toggled row's GUI needs to change. A full
@@ -1003,6 +962,26 @@ void FilterCardRow::setExpanded(bool open)
 	if (!open && table != nullptr && bodyStack->isAncestorOf(QApplication::focusWidget()))
 		table->setFocus(Qt::OtherFocusReason);
 	bodyStack->setVisible(open);
+	syncSummaryVisibility();
+	syncHeaderToolTips();
+}
+
+void FilterCardRow::syncHeaderToolTips()
+{
+	// Each control says what a click does from here, so the power switch
+	// and the fold arrow follow their state.
+	expandButton->setToolTip(expanded ? tr("Collapse filter card") : tr("Expand filter card"));
+	enabledButton->setToolTip(enabledButton->isChecked()
+		? tr("Switch this line off. It stays in the file as a comment.")
+		: tr("Switch this line back on."));
+}
+
+void FilterCardRow::syncSummaryVisibility()
+{
+	// An open comment card shows its note in the body editor right below, so
+	// the header would only say it twice; a closed one keeps the note as its
+	// one readout.
+	summaryLabel->setVisible(!(expanded && descriptor.type == QStringLiteral("comment")));
 }
 
 void FilterCardRow::syncVisualState()

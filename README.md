@@ -14,10 +14,19 @@ The original fork goals are complete: the convolution tail bug is fixed, the eng
 
 Current work areas:
 
-1. Acting on findings from the biweekly automated code audit. The deferred
-   architecture pass now has an owned update-session seam, deeper picker/card
-   bases, and domain modules in place of the root helper junk drawer
-   ([#264](https://github.com/115dkk/EqualizerAPO-XT/pull/264)).
+1. Acting on findings from the biweekly automated code audit. The 2026-10-15
+   audit ([#422](https://github.com/115dkk/EqualizerAPO-XT/issues/422)) was
+   handled in one pull request
+   ([#423](https://github.com/115dkk/EqualizerAPO-XT/pull/423)): compiler
+   warnings now fail the build, copies of the same rule scattered through the
+   engine, ASIO, VST and Editor code now live in one place each, and the rack
+   skin's three brushing recipes are now one. The stereo-read follow-up reduces
+   the SSE2 conversion from 217 ns to 120 ns for 480 frames on a local i5-12600KF.
+   ARM64 CI passed the new boundary tests and measured 141–142 ns, compared with
+   277 ns in an earlier CI run; this was not a controlled same-machine comparison. The matching DLL/PDB confirms native NEON
+   deinterleaving without the old stack-based lane assembly. Other SIMD variants
+   keep their existing read kernels
+   ([#425](https://github.com/115dkk/EqualizerAPO-XT/pull/425)).
 2. Refining the Editor skins from community feedback rounds. The five concrete
    skins now have guarded per-skin modules so visual work stays local while
    behavior remains shared. The latest pass gives a right-docked analysis graph
@@ -38,6 +47,13 @@ Current work areas:
    show one ([#228](https://github.com/115dkk/EqualizerAPO-XT/issues/228),
    [docs/features/phase-and-time.md](docs/features/phase-and-time.md)).
 4. Editors for the programmatic config commands (`If:`/`ElseIf:`/`Else:`/`EndIf:`/`Eval:`) — complete. Each skin presents blocks with its own instrument driven by the analysis run, the picker inserts the vocabulary, custom-coefficient IIR lines have their own card, and lines with inline `` `expression` `` parameters keep their card in a dynamic mode ([#178](https://github.com/115dkk/EqualizerAPO-XT/pull/178), [#182](https://github.com/115dkk/EqualizerAPO-XT/pull/182), [#183](https://github.com/115dkk/EqualizerAPO-XT/pull/183), [#184](https://github.com/115dkk/EqualizerAPO-XT/pull/184)).
+
+   Legacy configurations can keep semicolon-separated expressions such as
+   `Eval: inL=1;inR=2`. This restores compatibility with SECS channel mappings and
+   other configurations written for Equalizer APO's older parser. FIR sample rates
+   must still match the device. See the
+   [reproduction and compatibility notes](docs/architecture/legacy-expression-separators.md)
+   ([#426](https://github.com/115dkk/EqualizerAPO-XT/pull/426)).
 5. Subwoofer routing ([#246](https://github.com/115dkk/EqualizerAPO-XT/issues/246)) — the core feature set is complete: the `SubwooferRouting:` command, the MIT SubwooferRoutingCore DSP library, the standalone VST3 plugin, the 4.1 host-negotiation fix, the Editor card with a per-skin instrument in every skin, and the full editor dialog with both routing matrices and a response view. Remaining follow-ups: writing changes back to a linked profile file (the dialog currently converts the row to inline state), audition/solo overrides, Korean translations for the new strings, and a custom VST3 editor view (hosts show their generic parameter panel).
 6. Explicit VST3 bus layouts ([#216](https://github.com/115dkk/EqualizerAPO-XT/issues/216)) — the backend `VSTPlugin:` `Input`/`Output` syntax and deterministic host tests are complete, including asymmetric layouts, 4.1, strict failure passthrough, and quiet VST2 ignore semantics. The Qt Editor now carries Input/Output selectors beside the plugin name in every skin's own visual language, with a verdict lamp for the actually negotiated bus, VST2 lock/repair handling, and the legacy `StereoInput` migration ([#265](https://github.com/115dkk/EqualizerAPO-XT/pull/265)). The current round adds per-slot channel fill (`InputChannels`/`OutputChannels` place arbitrary config channels into the negotiated slots, untouched channels pass through) and plain Input/Output dropdowns in the legacy row ([#290](https://github.com/115dkk/EqualizerAPO-XT/pull/290)). The fill lists now have their editor in every skin: two rails inside the card with per-slot channel dropdowns that follow the line's `Channel:`/`Copy:` flow, a fold switch when both rails exist, and combo rows in the legacy presentation ([#292](https://github.com/115dkk/EqualizerAPO-XT/pull/292)).
 7. ASIO ([#310](https://github.com/115dkk/EqualizerAPO-XT/issues/310)) —
@@ -146,7 +162,7 @@ User documentation lives in the [GitHub Wiki](https://github.com/115dkk/Equalize
 
 ## Building
 
-The project uses Visual Studio, Qt, Velopack, and a small set of external libraries. Running [setup-build.ps1](setup-build.ps1) provisions all of them for a local build (binary dependencies, header-only checkouts, and Qt 6.10.1). The manual layout is documented in [docs/LocalDependencySetup.md](docs/LocalDependencySetup.md).
+The project uses Visual Studio, Qt, Velopack, and a small set of external libraries. Running [setup-build.ps1](setup-build.ps1) provisions all of them for a local build (binary dependencies, header-only checkouts, and Qt 6.12.0). The manual layout is documented in [docs/LocalDependencySetup.md](docs/LocalDependencySetup.md).
 
 The prebuilt dependencies are downloaded from these repositories, which mirror TheFireKahuna's releases of the same tags byte for byte (`.github/simd-variants.psd1` pins each asset's SHA-256):
 
@@ -195,6 +211,7 @@ Qt tools are built through qmake in CI and in the documented local setup. The Vi
 - **Suites:** `EditorLogicTests` and `HybridConvTests` (unit tests), `EngineOrchestrationTests` (engine routing, config swap, device and registry behavior), `AudioRegressionTests` (engine output compared against committed references, also run across SIMD variants in CI) and `AsioTests` (the ASIO wrapper, host link and engine host).
 - **Fixtures:** `TestVst2Plugin` and `TestVst3Plugin` (self-built plug-ins that exercise the VST2 and VST3 hosts), `FakeAsioDriver` (an ASIO driver for the wrapper tests) and `AsioSupport` (shared test headers).
 - **Probes:** `VstPreviewProbe` (the `vst3-preview-probe` workflow's check of the panel's live-audio preview on a real endpoint), `AsioProbe` (the ASIO probe gate), and `ApoHostProbe` and `CaptureProbe` (the capture gate on a virtual-cable runner).
+- **Panel input gate:** `.github/scripts/Invoke-PanelInputGate.ps1` opens the panels of DPF-Plugins' 3 Band EQ and MVerb (VST2 and VST3, built from pinned sources by `Build-DpfTestPlugins.ps1`) in the Editor, drags their controls with real mouse input, presses OK and Save, and checks the saved state, the reopened panel and what Benchmark renders from the saved line. CI runs it with the shipped Editor and with an Editor built with AddressSanitizer.
 
 Test policy per variant is part of [docs/SimdBuildMatrix.md](docs/SimdBuildMatrix.md).
 
@@ -214,3 +231,22 @@ ASIO is a trademark and software of Steinberg Media Technologies GmbH.
 ## Special Thanks
 
 - **Mephistos (DCinside)** - diagnosed why VST3 plugin panels showed no live meters or graphs in the Editor, built and shared a working WASAPI-loopback patch under the GPL, and provided the Open-XTC plugin used to verify the fix. The panel preview feed (`Editor/helpers/PanelPreviewFeeder`) is derived from that contribution.
+
+## Begging
+
+The developer needs money.\
+If you like this program, spare a coin...
+
+**Current goal:** one EV certificate, $359, once. It lets the driver of a new
+app (personal-BRIR Dolby Atmos on headphones) be signed by Microsoft, so the
+app installs without turning off Secure Boot. ($0 / $359)
+
+**That app is in development right now:** [spatial-audio-softreceiver](https://github.com/115dkk/spatial-audio-softreceiver)
+
+**Anything beyond that goes to:**
+
+- AI subscriptions
+- The hardware keys AI companies keep asking for
+- A tiny dent in the developer's mortgage
+
+[GitHub Sponsors](https://github.com/sponsors/115dkk)

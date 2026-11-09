@@ -20,12 +20,12 @@
 #include <windows.h>
 
 #include "engine/ConfigurationFileReader.h"
-#include "Tests/TestHarness.h"
+#include "../TestHarness.h"
 #include "platform/windows/Win32Resource.h"
 
 #include "EngineOrchestrationTestSupport.h"
 
-void runConfigurationFileReaderTests(test::Harness& harness)
+TEST_CASE(EngineOrchestrationTests, runConfigurationFileReaderTests)
 {
 	const std::vector<std::wstring> mixed = ConfigurationFileReader::decodeLines(
 		std::string("Preamp: -6 dB\r\nInclude: a.txt\nlast"));
@@ -42,6 +42,15 @@ void runConfigurationFileReaderTests(test::Harness& harness)
 		"decodeLines returns one UTF-8 line");
 	harness.expect(unicode[0] == L"# caf\u00e9",
 		"decodeLines decodes valid UTF-8");
+
+	const std::vector<std::wstring> marked = ConfigurationFileReader::decodeLines(
+		std::string("\xEF\xBB\xBFPreamp: -6 dB\r\nInclude: a.txt"));
+	harness.requireEqual(static_cast<int>(marked.size()), 2,
+		"decodeLines splits a file that starts with a byte order mark");
+	harness.expect(marked[0] == L"Preamp: -6 dB",
+		"decodeLines drops the byte order mark that starts the file");
+	harness.expect(marked[1] == L"Include: a.txt",
+		"decodeLines leaves the following lines as they are");
 
 	harness.require(GetFileAttributesW(testDirectory().c_str()) != INVALID_FILE_ATTRIBUTES,
 		"open-failure test has its temporary directory");

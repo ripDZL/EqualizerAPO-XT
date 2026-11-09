@@ -52,7 +52,7 @@ private:
 };
 }
 
-void testVSTPreviewEndpointSelection()
+TEST_CASE(EditorLogicTests, testVSTPreviewEndpointSelection)
 {
 	const std::wstring rawGuid = L"{dddddddd-1111-2222-3333-444444444444}";
 	const VSTPreviewEndpoint inputEndpoint = vstPreviewEndpointFromDeviceGuid(true, rawGuid);

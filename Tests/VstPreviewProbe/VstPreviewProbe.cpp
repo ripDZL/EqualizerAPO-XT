@@ -57,6 +57,9 @@
 
 #include "Editor/helpers/PanelFeedEngine.h"
 #include "platform/windows/ComPtr.h"
+#include "Tests/ProbeSupport/CommandLine.h"
+#include "Tests/ProbeSupport/ToneMeter.h"
+#include "Tests/ProbeSupport/WasapiEndpoint.h"
 #include "vst/VSTPluginInstance.h"
 #include "vst/VSTPluginLibrary.h"
 #include "filters/VSTPluginFilter.h"
@@ -88,6 +91,26 @@ bool isFloat32Format(const WAVEFORMATEX* format)
 // The calls into third-party plugin code, isolated behind SEH so a crash is
 // reported as a probe verdict instead of a process abort. Kept free of
 // objects requiring stack unwinding (MSVC C2712).
+// Wall time of one host step, so a slow plugin load shows which call it
+// spent its time in (LoadLibrary and InitDll, instance creation, setup).
+class StepClock
+{
+public:
+	StepClock() { QueryPerformanceFrequency(&frequency); QueryPerformanceCounter(&start); }
+
+	void lap(const wchar_t* step)
+	{
+		LARGE_INTEGER now;
+		QueryPerformanceCounter(&now);
+		wprintf(L"TIME: %-28s %9.1f ms\n", step, (now.QuadPart - start.QuadPart) * 1000.0 / frequency.QuadPart);
+		start = now;
+	}
+
+private:
+	LARGE_INTEGER frequency{};
+	LARGE_INTEGER start{};
+};
+
 bool processFloatGuarded(VSTPluginInstance* instance, float** input, float** output, int frames) noexcept
 {
 	__try
@@ -117,25 +140,30 @@ bool processDoubleGuarded(VSTPluginInstance* instance, double** input, double** 
 int runPluginProbe(const std::wstring& pluginPath, double seconds, float sampleRate, bool expectNonsilent,
 	int channels, int blockFrames, const std::wstring& state, bool engine)
 {
+	StepClock clock;
 	std::shared_ptr<VSTPluginLibrary> library = VSTPluginLibrary::getInstance(pluginPath);
-	const int libraryResult = library->initialize();
+	const int libraryResult = VSTPluginLibrary::load(library->getLibPath()).status;
+	clock.lap(L"library initialize");
 	if (libraryResult < 0)
 	{
 		wprintf(L"FAIL: library initialize returned %d for %s\n", libraryResult, pluginPath.c_str());
 		return 2;
 	}
 
-	VSTPluginInstance instance(library, 1);
+	auto instanceOwner = VSTPluginInstance::create(library, 1);
+	VSTPluginInstance& instance = *instanceOwner;
 	if (!instance.initialize())
 	{
 		wprintf(L"FAIL: plugin instance initialize failed\n");
 		return 2;
 	}
+	clock.lap(L"instance initialize");
 	wprintf(L"INFO: loaded '%s' (%hs)\n", instance.getName().c_str(), instance.isVST3() ? "VST3" : "VST2");
 
 	const std::vector<std::wstring> channelNames = channels == 1
 		? std::vector<std::wstring>{L"C"} : std::vector<std::wstring>{L"L", L"R"};
 	instance.negotiateChannelCount(channels, channelNames);
+	clock.lap(L"negotiate channels");
 	const int inputChannelCount = engine ? channels : instance.numInputs();
 	const int outputChannelCount = engine ? channels : instance.numOutputs();
 	wprintf(L"INFO: negotiated %d in / %d out\n", inputChannelCount, outputChannelCount);
@@ -190,18 +218,12 @@ int runPluginProbe(const std::wstring& pluginPath, double seconds, float sampleR
 	long long position = 0;
 	while (position < totalFrames)
 	{
-		for (int channel = 0; channel < inputChannelCount; channel++)
-		{
-			for (int i = 0; i < blockFrames; i++)
-			{
-				const double sample = sineAmplitude
-					* std::sin(2.0 * std::numbers::pi_v<double> * sineFrequency * (position + i) / sampleRate);
-				if (useDouble)
-					inputDouble[channel][i] = sample;
-				else
-					inputFloat[channel][i] = static_cast<float>(sample);
-			}
-		}
+		if (useDouble)
+			probesupport::fillPlanarSine(inputDoublePointers.data(), static_cast<size_t>(inputChannelCount), blockFrames,
+				static_cast<uint64_t>(position), sampleRate, sineFrequency, sineAmplitude);
+		else
+			probesupport::fillPlanarSine(inputFloatPointers.data(), static_cast<size_t>(inputChannelCount), blockFrames,
+				static_cast<uint64_t>(position), sampleRate, sineFrequency, sineAmplitude);
 
 		if (filter)
 			filter->process(outputDoublePointers.data(), inputDoublePointers.data(), blockFrames);
@@ -232,12 +254,15 @@ int runPluginProbe(const std::wstring& pluginPath, double seconds, float sampleR
 		}
 		position += blockFrames;
 	}
+	clock.lap(L"process");
 
 	instance.stopProcessing();
+	clock.lap(L"stop processing");
 
 	std::wstring chunkData;
 	std::unordered_map<std::wstring, float> paramMap;
 	instance.readFromEffect(chunkData, paramMap);
+	clock.lap(L"read state");
 	wprintf(L"INFO: processed %lld frames, output peak %.6f, state chunk %zu chars, %zu named params\n",
 		position, outputPeak, chunkData.size(), paramMap.size());
 
@@ -258,9 +283,7 @@ int runPluginProbe(const std::wstring& pluginPath, double seconds, float sampleR
 int runLoopbackProbe(double seconds)
 {
 	ComPtr<IMMDeviceEnumerator> enumerator;
-	HRESULT hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr,
-		CLSCTX_INPROC_SERVER, __uuidof(IMMDeviceEnumerator),
-		reinterpret_cast<void**>(enumerator.put()));
+	HRESULT hr = probesupport::wasapi::createEnumerator(enumerator);
 	if (FAILED(hr) || !enumerator)
 	{
 		wprintf(L"FAIL: device enumerator (hr=0x%08lx)\n", hr);
@@ -268,7 +291,7 @@ int runLoopbackProbe(double seconds)
 	}
 
 	ComPtr<IMMDevice> device;
-	hr = enumerator->GetDefaultAudioEndpoint(eRender, eConsole, device.put());
+	hr = probesupport::wasapi::defaultEndpoint(enumerator.get(), eRender, device);
 	if (FAILED(hr) || !device)
 	{
 		wprintf(L"FAIL: no default render endpoint (hr=0x%08lx)\n", hr);
@@ -276,8 +299,7 @@ int runLoopbackProbe(double seconds)
 	}
 
 	ComPtr<IAudioClient> renderClient;
-	hr = device->Activate(__uuidof(IAudioClient), CLSCTX_INPROC_SERVER, nullptr,
-		reinterpret_cast<void**>(renderClient.put()));
+	hr = probesupport::wasapi::activateAudioClient(device.get(), renderClient);
 	if (FAILED(hr) || !renderClient)
 	{
 		wprintf(L"FAIL: render IAudioClient (hr=0x%08lx)\n", hr);
@@ -320,8 +342,7 @@ int runLoopbackProbe(double seconds)
 	renderClient->GetBufferSize(&renderBufferFrames);
 
 	ComPtr<IAudioClient> captureClient;
-	hr = device->Activate(__uuidof(IAudioClient), CLSCTX_INPROC_SERVER, nullptr,
-		reinterpret_cast<void**>(captureClient.put()));
+	hr = probesupport::wasapi::activateAudioClient(device.get(), captureClient);
 	if (FAILED(hr) || !captureClient)
 	{
 		wprintf(L"FAIL: capture IAudioClient (hr=0x%08lx)\n", hr);
@@ -382,8 +403,8 @@ int runLoopbackProbe(double seconds)
 						// the panel-feed A/B keys on meter movement.
 						const double t = (renderedFrames + i) / sampleRate;
 						const double envelope = std::pow(std::sin(2.0 * std::numbers::pi_v<double> * 1.5 * t / 2.0), 2.0);
-						const float value = static_cast<float>(sineAmplitude * envelope
-							* std::sin(2.0 * std::numbers::pi_v<double> * sineFrequency * t));
+						const float value = static_cast<float>(probesupport::sineSample(
+							sineFrequency, sineAmplitude * envelope, static_cast<uint64_t>(renderedFrames + i), sampleRate));
 						for (UINT32 channel = 0; channel < channelCount; channel++)
 							samples[i * channelCount + channel] = value;
 					}
@@ -455,7 +476,7 @@ struct LoopbackTap
 			return false;
 		}
 		ComPtr<IMMDevice> device;
-		hr = enumerator->GetDefaultAudioEndpoint(eRender, eConsole, device.put());
+		hr = probesupport::wasapi::defaultEndpoint(enumerator.get(), eRender, device);
 		if (FAILED(hr) || !device)
 		{
 			wprintf(L"FAIL: tap has no default render endpoint (hr=0x%08lx)\n", hr);
@@ -532,13 +553,14 @@ constexpr double audiblePeak = 0.01;
 int runMonitorProbe(const std::wstring& pluginPath, double seconds, bool expectLive)
 {
 	std::shared_ptr<VSTPluginLibrary> library = VSTPluginLibrary::getInstance(pluginPath);
-	const int libraryResult = library->initialize();
+	const int libraryResult = VSTPluginLibrary::load(library->getLibPath()).status;
 	if (libraryResult < 0)
 	{
 		wprintf(L"FAIL: library initialize returned %d for %s\n", libraryResult, pluginPath.c_str());
 		return 2;
 	}
-	VSTPluginInstance instance(library, 1);
+	auto instanceOwner = VSTPluginInstance::create(library, 1);
+	VSTPluginInstance& instance = *instanceOwner;
 	if (!instance.initialize())
 	{
 		wprintf(L"FAIL: plugin instance initialize failed\n");
@@ -665,45 +687,51 @@ int wmain(int argc, wchar_t* argv[])
 		L"                       [--monitor <path.vst3|path.dll>] [--expect-live | --expect-static]\n"
 		L"                       [--capture-only] [--expect-audio | --expect-silence]\n";
 
-	for (int i = 1; i < argc; i++)
+	probesupport::CommandLine commandLine;
+	TCLAP::CmdLine& parser = commandLine.parser();
+	probesupport::SetBoolVisitor expectLiveVisitor(expectLive, true);
+	probesupport::SetBoolVisitor expectStaticVisitor(expectLive, false);
+	probesupport::SetBoolVisitor expectAudioVisitor(expectAudio, true);
+	probesupport::SetBoolVisitor expectSilenceVisitor(expectAudio, false);
+	TCLAP::MultiArg<std::string> pluginArg("", "plugin", "", false, "value", parser);
+	TCLAP::MultiArg<std::string> monitorArg("", "monitor", "", false, "value", parser);
+	TCLAP::MultiArg<std::string> secondsArg("", "seconds", "", false, "value", parser);
+	TCLAP::MultiArg<std::string> rateArg("", "rate", "", false, "value", parser);
+	TCLAP::MultiArg<std::string> channelsArg("", "channels", "", false, "value", parser);
+	TCLAP::MultiArg<std::string> blockFramesArg("", "block-frames", "", false, "value", parser);
+	TCLAP::MultiArg<std::string> stateArg("", "state", "", false, "value", parser);
+	TCLAP::MultiSwitchArg engineArg("", "engine", "", parser);
+	TCLAP::MultiSwitchArg expectNonsilentArg("", "expect-nonsilent", "", parser);
+	TCLAP::MultiSwitchArg expectLiveArg("", "expect-live", "", parser, 0, &expectLiveVisitor);
+	TCLAP::MultiSwitchArg expectStaticArg("", "expect-static", "", parser, 0, &expectStaticVisitor);
+	TCLAP::MultiSwitchArg expectAudioArg("", "expect-audio", "", parser, 0, &expectAudioVisitor);
+	TCLAP::MultiSwitchArg expectSilenceArg("", "expect-silence", "", parser, 0, &expectSilenceVisitor);
+	TCLAP::MultiSwitchArg loopbackArg("", "loopback", "", parser);
+	TCLAP::MultiSwitchArg captureOnlyArg("", "capture-only", "", parser);
+	if (!commandLine.parse(argc, argv))
 	{
-		const std::wstring argument = argv[i];
-		if (argument == L"--plugin" && i + 1 < argc)
-			pluginPath = argv[++i];
-		else if (argument == L"--monitor" && i + 1 < argc)
-			monitorPluginPath = argv[++i];
-		else if (argument == L"--seconds" && i + 1 < argc)
-			seconds = _wtof(argv[++i]);
-		else if (argument == L"--rate" && i + 1 < argc)
-			sampleRate = static_cast<float>(_wtof(argv[++i]));
-		else if (argument == L"--channels" && i + 1 < argc)
-			channels = _wtoi(argv[++i]);
-		else if (argument == L"--block-frames" && i + 1 < argc)
-			pluginBlockFrames = _wtoi(argv[++i]);
-		else if (argument == L"--state" && i + 1 < argc)
-			state = argv[++i];
-		else if (argument == L"--engine")
-			engine = true;
-		else if (argument == L"--expect-nonsilent")
-			expectNonsilent = true;
-		else if (argument == L"--expect-live")
-			expectLive = true;
-		else if (argument == L"--expect-static")
-			expectLive = false;
-		else if (argument == L"--expect-audio")
-			expectAudio = true;
-		else if (argument == L"--expect-silence")
-			expectAudio = false;
-		else if (argument == L"--loopback")
-			loopback = true;
-		else if (argument == L"--capture-only")
-			captureOnly = true;
-		else
-		{
-			wprintf(L"%s", usage);
-			return 1;
-		}
+		wprintf(L"%s", usage);
+		return 1;
 	}
+
+	if (pluginArg.isSet())
+		pluginPath = probesupport::lastWide(pluginArg);
+	if (monitorArg.isSet())
+		monitorPluginPath = probesupport::lastWide(monitorArg);
+	if (secondsArg.isSet())
+		seconds = _wtof(probesupport::lastWide(secondsArg).c_str());
+	if (rateArg.isSet())
+		sampleRate = static_cast<float>(_wtof(probesupport::lastWide(rateArg).c_str()));
+	expectNonsilent = expectNonsilentArg.getValue() != 0;
+	loopback = loopbackArg.getValue() != 0;
+	captureOnly = captureOnlyArg.getValue() != 0;
+	if (channelsArg.isSet())
+		channels = _wtoi(probesupport::lastWide(channelsArg).c_str());
+	if (blockFramesArg.isSet())
+		pluginBlockFrames = _wtoi(probesupport::lastWide(blockFramesArg).c_str());
+	if (stateArg.isSet())
+		state = probesupport::lastWide(stateArg);
+	engine = engineArg.getValue() != 0;
 	if ((channels != 1 && channels != 2) || pluginBlockFrames < 1 || pluginBlockFrames > 65536
 		|| !std::isfinite(seconds) || seconds <= 0 || seconds > 3600
 		|| !std::isfinite(sampleRate) || sampleRate < 8000 || sampleRate > 384000

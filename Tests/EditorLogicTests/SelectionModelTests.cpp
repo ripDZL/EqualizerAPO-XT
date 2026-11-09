@@ -24,7 +24,7 @@
 
 #include "EditorLogicTestSupport.h"
 
-void testChannelSelectionModel()
+TEST_CASE(EditorLogicTests, testChannelSelectionModel)
 {
 	// ChannelSelectionModel serialization identity: for equivalent
 	// selections the in-place chip editor must write the same bytes the
@@ -97,7 +97,7 @@ void testChannelSelectionModel()
 	expectEqual(model.serialize(), "LFE", "SUB resolves to the device's LFE chip");
 }
 
-void testDeviceSelectionModel()
+TEST_CASE(EditorLogicTests, testDeviceSelectionModel)
 {
 	// DeviceSelectionModel serialization identity: for equivalent device
 	// selections the in-place chip editor must write the same bytes the
@@ -176,7 +176,31 @@ void testDeviceSelectionModel()
 	expectEqual(model.serialize(), devSpeakers + "; " + devHeadphones, "later picks accumulate as before");
 }
 
-void testStageSelectionModel()
+TEST_CASE(EditorLogicTests, testDeviceChipLabel)
+{
+	// #456: two interfaces both offer "Speakers" and "Microphone", so the
+	// chip names the device too, the way Windows spells an endpoint.
+	auto chip = [](const QString& connection, const QString& name) {
+		DeviceChipInfo info;
+		info.connection = connection;
+		info.name = name;
+		return info;
+	};
+	expectEqual(DeviceSelectionModel::chipLabel(chip("Speakers", "USB Audio CODEC")),
+		QStringLiteral("Speakers (USB Audio CODEC)"), "connection and device read as Windows names the endpoint");
+	expectEqual(DeviceSelectionModel::chipLabel(chip(QStringLiteral("스피커"), "USB Audio CODEC")),
+		QStringLiteral("스피커 (USB Audio CODEC)"), "a localized connection name keeps the device beside it");
+	expectEqual(DeviceSelectionModel::chipLabel(chip("", "USB Audio CODEC")),
+		QStringLiteral("USB Audio CODEC"), "no connection name: the device alone");
+	expectEqual(DeviceSelectionModel::chipLabel(chip("Speakers", "")),
+		QStringLiteral("Speakers"), "no device name: the connection alone");
+	expectEqual(DeviceSelectionModel::chipLabel(chip("Line Out", "line out")),
+		QStringLiteral("Line Out"), "a device name that repeats the connection is not doubled");
+	expectEqual(DeviceSelectionModel::chipLabel(chip(" Speakers ", " USB Audio CODEC ")),
+		QStringLiteral("Speakers (USB Audio CODEC)"), "stray spaces from the registry do not reach the chip");
+}
+
+TEST_CASE(EditorLogicTests, testStageSelectionModel)
 {
 	// StageSelectionModel serialization identity: known stages come back in
 	// the legacy checkbox GUI's canonical order (pre-mix, post-mix,
@@ -206,7 +230,7 @@ void testStageSelectionModel()
 	expectEqual(model.serialize(), "capture", "a single selection writes just its token");
 }
 
-void testNewChannelListModel()
+TEST_CASE(EditorLogicTests, testNewChannelListModel)
 {
 	// The NewChannel card's list: names are parsed and upper-cased by the
 	// engine's own codec, each carries the engine's verdict against the
@@ -248,7 +272,7 @@ void testNewChannelListModel()
 	expectEqual(model.serialize(), "VC", "the remaining name is written");
 }
 
-void testSendCardModel()
+TEST_CASE(EditorLogicTests, testSendCardModel)
 {
 	// The Send card's state: targets exclude the device itself, a target the
 	// machine lacks stays as written, the latency field reads back what it

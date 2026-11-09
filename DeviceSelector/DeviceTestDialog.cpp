@@ -22,6 +22,8 @@
 #include <services/registry/WindowsRegistry.h>
 #include "DeviceTestDialog.h"
 #include "OpacityIconEngine.h"
+#include "platform/qt/MotionPreference.h"
+#include "platform/qt/ScrollBarPolicy.h"
 #include "services/logging/Logging.h"
 
 DeviceTestDialog::DeviceTestDialog(QWidget* parent)
@@ -67,19 +69,24 @@ DeviceTestDialog::DeviceTestDialog(QWidget* parent)
 
 	adjustSize();
 
-	// workaround for Qt 6 to not initially have scrollbars despite correct dialog size
-	ui.deviceTreeWidget->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-	QTimer::singleShot(0, [&] {ui.deviceTreeWidget->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded); });
+	deferScrollBarPolicy(ui.deviceTreeWidget);
 
-	QVariantAnimation* animation = new QVariantAnimation(this);
-	connect(animation, &QVariantAnimation::valueChanged, this, &DeviceTestDialog::animateIcon);
-	animation->setStartValue(qreal(0.2));
-	animation->setKeyValueAt(0.5, qreal(1.0));
-	animation->setEndValue(qreal(0.2));
-	animation->setLoopCount(-1);
-	animation->setDuration(1000);
-	animation->setEasingCurve(QEasingCurve::InOutQuad);
-	animation->start();
+	// The running-test icon pulses until the dialog closes; with reduced
+	// motion it stays at full strength instead of looping forever.
+	if (MotionPreference::reduced())
+		animateIcon(qreal(1.0));
+	else
+	{
+		QVariantAnimation* animation = new QVariantAnimation(this);
+		connect(animation, &QVariantAnimation::valueChanged, this, &DeviceTestDialog::animateIcon);
+		animation->setStartValue(qreal(0.2));
+		animation->setKeyValueAt(0.5, qreal(1.0));
+		animation->setEndValue(qreal(0.2));
+		animation->setLoopCount(-1);
+		animation->setDuration(1000);
+		animation->setEasingCurve(QEasingCurve::InOutQuad);
+		animation->start();
+	}
 
 	qRegisterMetaType<ItemStatusType>();
 

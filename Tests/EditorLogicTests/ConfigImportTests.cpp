@@ -27,7 +27,6 @@
 #include <QTextStream>
 
 #include "Editor/ConfigFileCodec.h"
-#include "Editor/helpers/ConvolutionPathHelper.h"
 #include "Editor/import/ConfigDependencyScanner.h"
 #include "Editor/import/ImportExecutor.h"
 #include "Editor/import/ImportManifest.h"
@@ -36,38 +35,38 @@
 
 #include "EditorLogicTestSupport.h"
 
-void testConvolutionPathHelper()
+TEST_CASE(EditorLogicTests, testLegacyConvolutionPathRules)
 {
 	const QString configPath = "C:/EqualizerAPO/config/config.txt";
 	qputenv("EAPO_XT_TEST_IR_DIR", "C:\\Impulse Responses");
 
 	expectPath(
-		ConvolutionPathHelper::absolutePathForConfig(configPath, "irs/room.wav"),
+		FileReferenceController::absolutePathForConfig(configPath, "irs/room.wav"),
 		"C:/EqualizerAPO/config/irs/room.wav");
 	expectPath(
-		ConvolutionPathHelper::absolutePathForConfig(configPath, "C:/Impulse/room.wav"),
+		FileReferenceController::absolutePathForConfig(configPath, "C:/Impulse/room.wav"),
 		"C:/Impulse/room.wav");
 	expectTrue(
-		ConvolutionPathHelper::absolutePathForConfig(configPath, QString()).isEmpty(),
+		FileReferenceController::absolutePathForConfig(configPath, QString()).isEmpty(),
 		"empty convolution path should remain empty");
 	expectPath(
-		ConvolutionPathHelper::absolutePathForConfig(
+		FileReferenceController::absolutePathForConfig(
 			configPath, "\"%EAPO_XT_TEST_IR_DIR%\\quoted room.wav\""),
 		"C:/Impulse Responses/quoted room.wav");
 
 	expectPath(
-		ConvolutionPathHelper::displayPathForSelection(configPath, "C:/EqualizerAPO/config/irs/room.wav"),
+		FileReferenceController::displayPathForConfigSelection(configPath, "C:/EqualizerAPO/config/irs/room.wav"),
 		"irs/room.wav");
 	// One rule with the cards (maintainer decision 2026-09-25): one level
 	// above the config folder is still written relative.
 	expectPath(
-		ConvolutionPathHelper::displayPathForSelection(configPath, "C:/EqualizerAPO/shared/room.wav"),
+		FileReferenceController::displayPathForConfigSelection(configPath, "C:/EqualizerAPO/shared/room.wav"),
 		"../shared/room.wav");
 	expectPath(
-		ConvolutionPathHelper::displayPathForSelection(configPath, "C:/Other/deep/room.wav"),
+		FileReferenceController::displayPathForConfigSelection(configPath, "C:/Other/deep/room.wav"),
 		"C:/Other/deep/room.wav");
 	expectPath(
-		ConvolutionPathHelper::displayPathForSelection(configPath, "C:/Impulse/room.wav"),
+		FileReferenceController::displayPathForConfigSelection(configPath, "C:/Impulse/room.wav"),
 		"C:/Impulse/room.wav");
 
 }
@@ -76,7 +75,7 @@ void testConvolutionPathHelper()
 // the engine does (ConfigFileReference), so a quoted Include or one through a
 // variable names the same file in all three; and the card's verdict applies
 // the engine's location rule before the ACL.
-void testFileReferencesReadLikeTheEngine()
+TEST_CASE(EditorLogicTests, testFileReferencesReadLikeTheEngine)
 {
 	QTemporaryDir tempDir;
 	requireTrue(tempDir.isValid(), "QTemporaryDir must be valid");
@@ -128,7 +127,7 @@ void testFileReferencesReadLikeTheEngine()
 	qunsetenv("EAPO_XT_TEST_IMPORT_DIR");
 }
 
-void testConfigImport()
+TEST_CASE(EditorLogicTests, testConfigImport)
 {
 	QTemporaryDir tempDir;
 	requireTrue(tempDir.isValid(), "QTemporaryDir must be valid");
@@ -416,7 +415,7 @@ void testConfigImport()
 		"invalid VST3 bundle must not replace an existing working bundle");
 }
 
-void testLegacyMigrationScanAndPolicy()
+TEST_CASE(EditorLogicTests, testLegacyMigrationScanAndPolicy)
 {
 	QTemporaryDir tempDir;
 	requireTrue(tempDir.isValid(), "QTemporaryDir must be valid");
@@ -497,16 +496,20 @@ void testLegacyMigrationScanAndPolicy()
 	expectFalse(Policy::hasLegacyApoFolderName("D:\\my configs"),
 		"unrelated folders carry no legacy name");
 
-	expectTrue(Policy::classify(QString(), stableRoot, false, false) == Policy::Action::AdoptStableRoot,
+	expectTrue(Policy::classify(QString(), stableRoot, false, false, true) == Policy::Action::AdoptStableRoot,
 		"no ConfigPath adopts the stable root");
-	expectTrue(Policy::classify("c:\\users\\me\\appdata\\local\\equalizerapo-xt\\CONFIG", stableRoot, false, false)
+	expectTrue(Policy::classify("c:\\users\\me\\appdata\\local\\equalizerapo-xt\\CONFIG", stableRoot, false, false, false)
 		== Policy::Action::AlreadyOurs, "case-insensitive match on the stable root");
-	expectTrue(Policy::classify("C:\\Program Files\\EqualizerAPO\\config", stableRoot, true, false)
+	expectTrue(Policy::classify("C:\\Program Files\\EqualizerAPO\\config", stableRoot, true, false, true)
 		== Policy::Action::MigrateLegacy, "legacy markers trigger the import");
 	expectTrue(Policy::classify("C:\\Users\\me\\AppData\\Local\\EqualizerAPO-XT-x64-avx2\\current\\config",
-		stableRoot, false, true) == Policy::Action::MigrateVolatileXt, "volatile XT dir is rescued");
-	expectTrue(Policy::classify("D:\\my configs", stableRoot, false, false) == Policy::Action::RespectCustom,
+		stableRoot, false, true, true) == Policy::Action::MigrateVolatileXt, "volatile XT dir is rescued");
+	expectTrue(Policy::classify("D:\\my configs", stableRoot, false, false, true) == Policy::Action::RespectCustom,
 		"a user-chosen folder is left alone");
+	expectTrue(Policy::classify("C:\\Program Files\\EqualizerAPO\\config", stableRoot, true, false, false)
+		== Policy::Action::AdoptStableRoot, "a missing non-empty ConfigPath adopts the stable root");
+	expectTrue(Policy::classify(stableRoot, stableRoot, false, false, false) == Policy::Action::AlreadyOurs,
+		"the stable root remains ours before its directory is created");
 
 	// Saved open/recent file paths remap into the stable root after a
 	// migration; anything outside the migrated folder stays untouched.

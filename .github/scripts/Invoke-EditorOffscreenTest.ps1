@@ -16,18 +16,27 @@
 
     The plan phase is pure: -PlanOnly answers which arguments, environment
     additions and post-checks a gate would run with, for Pester.
+
+    One gate is not offscreen: frame-hittest asks real Win32 windows for
+    WM_NCHITTEST answers, so it runs on the windows platform plugin (QtPlatform
+    in its entry). It sends the messages itself and never needs the desktop
+    pointer, so other windows on the runner's desktop cannot disturb it.
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)] [string] $WorkspaceRoot,
     [Parameter(Mandatory)]
-    [ValidateSet("selftest-vst", "skin-gallery", "readability-legacy-gallery", "skin-switch", "analysis-layout", "card-move", "card-selection", "power-toggle", "routing-edit")]
+    [ValidateSet("selftest-vst", "skin-gallery", "readability-legacy-gallery", "skin-switch", "analysis-layout", "plugin-load", "card-move", "card-selection", "power-toggle", "routing-edit", "frame-hittest")]
     [string] $Gate,
     [string] $Platform = "x64",
+    # Where deps\ lives; a git worktree has none of its own. Defaults to the
+    # workspace root, which is the layout CI and setup-build.ps1 create.
+    [string] $DepsRoot,
     [switch] $PlanOnly
 )
 
 $ErrorActionPreference = "Stop"
+if (-not $DepsRoot) { $DepsRoot = $WorkspaceRoot }
 
 $buildDir = Join-Path $WorkspaceRoot "build-Editor-$Platform\release"
 $editorExe = Join-Path $buildDir "Editor.exe"
@@ -87,6 +96,15 @@ $gates = @{
         LogPath    = Join-Path $WorkspaceRoot "analysis-layout\analysis-layout-test.log"
         PostChecks = @("analysis-screenshot")
     }
+    "plugin-load" = [pscustomobject]@{
+        Arguments  = @("--plugin-load-test", (Join-Path $WorkspaceRoot "plugin-load\config.txt"))
+        ExtraEnv   = @{
+            QT_FORCE_STDERR_LOGGING         = "1"
+            EAPO_PLUGIN_LOAD_GAP_LIMIT_MS   = "2000"
+        }
+        LogPath    = Join-Path $WorkspaceRoot "plugin-load\plugin-load-test.log"
+        PostChecks = @()
+    }
     "card-move" = [pscustomobject]@{
         Arguments  = @("--card-move-test")
         # The limit sits below the measured full-rebuild cost on the hosted
@@ -104,7 +122,7 @@ $gates = @{
         Arguments  = @("--card-selection-test", (Join-Path $WorkspaceRoot "card-selection"))
         ExtraEnv   = @{ QT_FORCE_STDERR_LOGGING = "1" }
         LogPath    = Join-Path $WorkspaceRoot "card-selection\card-selection-test.log"
-        PostChecks = @()
+        PostChecks = @("card-selection-shots")
     }
     "power-toggle" = [pscustomobject]@{
         Arguments  = @("--power-toggle-test")
@@ -118,6 +136,16 @@ $gates = @{
         LogPath    = Join-Path $WorkspaceRoot "routing-edit-test.log"
         PostChecks = @()
     }
+    # The custom frame under a native child cascade (an embedded VST panel
+    # turns the chrome host into a child HWND): caption and edges must stay
+    # draggable (diagnostics/FrameHitTestProbe).
+    "frame-hittest" = [pscustomobject]@{
+        Arguments  = @("--frame-hittest-test", (Join-Path $WorkspaceRoot "Setup\config\config.txt"))
+        ExtraEnv   = @{ QT_FORCE_STDERR_LOGGING = "1" }
+        QtPlatform = "windows"
+        LogPath    = Join-Path $WorkspaceRoot "frame-hittest-test.log"
+        PostChecks = @()
+    }
 }
 
 $spec = $gates[$Gate]
@@ -128,10 +156,11 @@ $plan = [pscustomobject]@{
     ExtraEnv   = $spec.ExtraEnv
     LogPath    = $spec.LogPath
     PostChecks = @($spec.PostChecks)
+    QtPlatform = if ($spec.PSObject.Properties["QtPlatform"]) { $spec.QtPlatform } else { "offscreen" }
     # The import lib embeds the SONAME velopack_libc.dll (see Package-
     # Artifacts); the gates run from the build dir, so the renamed DLL must
     # sit next to Editor.exe. Idempotent, so every gate does it.
-    VelopackDllSource = Join-Path $WorkspaceRoot "deps\velopack_libc\lib\velopack_libc_win_${Platform}_msvc.dll".ToLowerInvariant()
+    VelopackDllSource = Join-Path $DepsRoot "deps\velopack_libc\lib\velopack_libc_win_${Platform}_msvc.dll".ToLowerInvariant()
 }
 if ($PlanOnly) {
     return $plan
@@ -139,6 +168,19 @@ if ($PlanOnly) {
 
 if (-not (Test-Path $editorExe)) {
     throw "Editor executable not found at $editorExe"
+}
+
+if ($Gate -eq "plugin-load") {
+    $pluginLoadDir = Join-Path $WorkspaceRoot "plugin-load"
+    New-Item -ItemType Directory -Force -Path $pluginLoadDir | Out-Null
+    $fixture = Join-Path $WorkspaceRoot "Tests\TestVst2Plugin\$Platform\Release\TestVst2Plugin.dll"
+    if (-not (Test-Path $fixture)) {
+        throw "VST load fixture not found: $fixture"
+    }
+    $slowPlugin = Join-Path $pluginLoadDir "TestVst2Plugin.SlowLoad4000.dll"
+    Copy-Item $fixture -Destination $slowPlugin -Force
+    Set-Content -LiteralPath (Join-Path $pluginLoadDir "config.txt") `
+        -Value "VSTPlugin: Library `"$slowPlugin`"" -Encoding utf8NoBOM
 }
 
 Copy-Item $plan.VelopackDllSource -Destination (Join-Path $buildDir "velopack_libc.dll") -Force
@@ -149,7 +191,7 @@ Copy-Item $plan.VelopackDllSource -Destination (Join-Path $buildDir "velopack_li
 # plugin fails to load and Qt parks a fatal-error dialog forever.
 $env:PATH = "$env:FFTW_LIB;$env:LIBSNDFILE_LIB;$env:QT_ROOT\bin;$env:PATH"
 $env:QT_QPA_PLATFORM_PLUGIN_PATH = "$env:QT_ROOT\plugins\platforms"
-$env:QT_QPA_PLATFORM = "offscreen"
+$env:QT_QPA_PLATFORM = $plan.QtPlatform
 foreach ($name in $spec.ExtraEnv.Keys) {
     Set-Item -Path "env:$name" -Value $spec.ExtraEnv[$name]
 }
@@ -220,6 +262,16 @@ foreach ($check in $plan.PostChecks) {
             $shot = $plan.Arguments[1]
             if (-not (Test-Path $shot)) {
                 throw "Analysis dock layout test produced no screenshot"
+            }
+        }
+        "card-selection-shots" {
+            # Audit #422 TD-41: the gate exits 0 after its own checks, but an
+            # empty proof directory must not pass as a proof.
+            $outDir = $plan.Arguments[1]
+            $pngs = @(Get-ChildItem $outDir -Filter *_card-selection.png -ErrorAction SilentlyContinue)
+            Write-Host "Card selection wrote $($pngs.Count) PNGs"
+            if ($pngs.Count -lt 1) {
+                throw "Card selection test produced no screenshots"
             }
         }
     }

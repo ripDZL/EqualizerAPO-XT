@@ -752,7 +752,7 @@ namespace
 	}
 }
 
-void runSendRingTests(test::Harness& harness)
+TEST_CASE(EngineOrchestrationTests, runSendRingTests)
 {
 	checkCursorPublicationIsBounded(harness);
 	checkTakeoverDuringCursorPublication(harness);

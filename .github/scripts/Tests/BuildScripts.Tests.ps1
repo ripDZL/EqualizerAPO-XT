@@ -53,6 +53,52 @@ Describe "extracted build script decisions" {
         }
     }
 
+    It "pins the external DPF plugins and software OpenGL inputs" {
+        $plan = & (Join-Path $PSScriptRoot "..\Build-DpfTestPlugins.ps1") `
+            -WorkspaceRoot $root -PlanOnly
+        @($plan.Sources | ForEach-Object Name) | Should -Be @("DPF", "DPF-Plugins")
+        foreach ($source in $plan.Sources) {
+            $source.Commit | Should -Match "^[0-9a-f]{40}$"
+        }
+        $plan.Sources[0].Submodules | Should -Be @("dgl/src/pugl-upstream")
+        $plan.Sources[1].Submodules | Should -BeNullOrEmpty
+        $plan.Mesa.Url | Should -Match "^https://github\.com/pal1000/mesa-dist-win/releases/download/"
+        $plan.Mesa.Sha256 | Should -Match "^[0-9A-F]{64}$"
+        $plan.Mesa.Files | Should -Be @("x64/opengl32.dll", "x64/libgallium_wgl.dll")
+        @($plan.Plugins.Keys) | Should -Be @("EQ_VST2", "EQ_VST3", "MVERB_VST2", "MVERB_VST3")
+        $plan.ManifestName | Should -Be "dpf-plugins.json"
+    }
+
+    It "plans an ASan Editor build without changing the regular Qt app set" {
+        $script = Join-Path $PSScriptRoot "..\Build-QtApps.ps1"
+        $arguments = @{
+            WorkspaceRoot = $root
+            Platform = "x64"
+            SimdVariant = "avx2"
+            QtArchFlag = "/arch:AVX2"
+            MsvcDevPlatform = "amd64"
+            PlanOnly = $true
+        }
+        $regular = & $script @arguments
+        $regular.Apps | Should -Be @("Editor", "DeviceSelector")
+        @($regular.BuildDirectories.Keys) | Should -Be @("Editor", "DeviceSelector")
+        $regular.BuildDirectories.Editor | Should -Be "build-Editor-x64"
+        $regular.BuildDirectories.DeviceSelector | Should -Be "build-DeviceSelector-x64"
+        $regular.ExtraQmakeArguments | Should -BeNullOrEmpty
+
+        $asan = & $script @arguments -AddressSanitizer
+        $asan.Apps | Should -Be @("Editor")
+        @($asan.BuildDirectories.Keys) | Should -Be @("Editor")
+        $asan.BuildDirectories.Editor | Should -Be "build-Editor-x64-asan"
+        $asan.ExtraQmakeArguments | Should -Be @(
+            "QMAKE_CFLAGS+=/fsanitize=address",
+            "QMAKE_CXXFLAGS+=/fsanitize=address",
+            "DEFINES+=_DISABLE_STRING_ANNOTATION",
+            "DEFINES+=_DISABLE_VECTOR_ANNOTATION",
+            "QMAKE_LFLAGS+=/INCREMENTAL:NO"
+        )
+    }
+
     It "runs the ASIO suite where the variant executes and lists the ASIO projects" {
         $avx2 = & (Join-Path $PSScriptRoot "..\Build-Solution.ps1") `
             -WorkspaceRoot $root -Platform x64 -SimdVariant avx2 -ArchFlag AdvancedVectorExtensions2 -PlanOnly
@@ -117,6 +163,10 @@ Describe "extracted build script decisions" {
 
     It "plans the capture gate over a pinned virtual cable with the preamp measured three ways" {
         $plan = & (Join-Path $PSScriptRoot "..\Invoke-CaptureGate.ps1") -WorkspaceRoot $root -PlanOnly
+        # CI runs every measured phase; -Phases narrows a manual run.
+        $plan.Phases | Should -Be @("rounds", "plugin-load", "low-latency", "asio-entry")
+        (& (Join-Path $PSScriptRoot "..\Invoke-CaptureGate.ps1") -WorkspaceRoot $root -Phases plugin-load -PlanOnly).Phases |
+            Should -Be @("plugin-load")
         $plan.VbCableSha256 | Should -Match "^[0-9A-F]{64}$"
         $plan.VbCableUrl | Should -Match "^https://download\.vb-audio\.com/"
         $plan.RenderConnection | Should -Be "CABLE Input"
@@ -340,5 +390,62 @@ Describe "extracted build script decisions" {
 
         $variant = & $script -WorkspaceRoot $workspace -Platform x64 -SimdVariant sse2 -Regenerate -PlanOnly
         $variant.Mode | Should -Be "RecordVariant"
+    }
+}
+
+Describe "BuildModel.psm1" {
+    BeforeAll {
+        Import-Module (Join-Path $PSScriptRoot "..\BuildModel.psm1") -Force
+        $script:root = Join-Path $PSScriptRoot "..\..\.."
+    }
+
+    It "lists every project once, and every listed project exists" {
+        $graph = @(Get-EapoProjectGraph)
+        ($graph.Path | Select-Object -Unique).Count | Should -Be $graph.Count
+        foreach ($project in $graph) {
+            Join-Path $script:root $project.Path | Should -Exist
+        }
+    }
+
+    It "orders each project after the projects it references" {
+        $graph = @(Get-EapoProjectGraph)
+        $position = @{}
+        for ($i = 0; $i -lt $graph.Count; $i++) { $position[$graph[$i].Path] = $i }
+        foreach ($project in $graph) {
+            $file = Join-Path $script:root $project.Path
+            $xml = [xml](Get-Content -LiteralPath $file -Raw)
+            $refs = @($xml.Project.ItemGroup.ProjectReference | Where-Object { $_ } | ForEach-Object { $_.Include })
+            foreach ($ref in $refs) {
+                $full = [System.IO.Path]::GetFullPath((Join-Path (Split-Path $file -Parent) $ref))
+                $relative = [System.IO.Path]::GetRelativePath([System.IO.Path]::GetFullPath($script:root), $full)
+                if ($position.ContainsKey($relative)) {
+                    $position[$relative] | Should -BeLessThan $position[$project.Path] -Because "$($project.Name) references $relative"
+                }
+            }
+        }
+    }
+
+    It "selects by tag in graph order" {
+        @(Get-EapoProjectGraph -Tag engine).Name | Should -Be @("SubwooferRoutingCore", "Common")
+        @(Get-EapoProjectGraph -Tag win32).Name | Should -Be @("EqualizerAPOAsio", "FakeAsioDriver")
+        @(Get-EapoProjectGraph -Tag installer).Path | Should -Be @("Installer\Installer.vcxproj")
+    }
+
+    It "passes a dependency path only when its variable is set" {
+        $saved = $env:VST3_SDK
+        try {
+            $env:VST3_SDK = ""
+            Get-EapoMsBuildArguments -Platform x64 | Where-Object { $_ -like "/p:VST3_SDK=*" } | Should -BeNullOrEmpty
+            $env:VST3_SDK = "C:\deps\vst3sdk"
+            Get-EapoMsBuildArguments -Platform x64 | Should -Contain "/p:VST3_SDK=C:\deps\vst3sdk"
+            Get-EapoMsBuildArguments -Platform x64 -Dependencies None | Where-Object { $_ -like "/p:VST3_SDK=*" } | Should -BeNullOrEmpty
+        } finally { $env:VST3_SDK = $saved }
+    }
+
+    It "adds the arch flag on x64 only" {
+        Get-EapoMsBuildArguments -Platform x64 -ArchFlag AdvancedVectorExtensions2 |
+            Should -Contain "/p:EnableEnhancedInstructionSet=AdvancedVectorExtensions2"
+        Get-EapoMsBuildArguments -Platform ARM64 -ArchFlag AdvancedVectorExtensions2 |
+            Where-Object { $_ -like "/p:EnableEnhancedInstructionSet=*" } | Should -BeNullOrEmpty
     }
 }

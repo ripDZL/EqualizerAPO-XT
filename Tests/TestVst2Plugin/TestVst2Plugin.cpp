@@ -1,13 +1,13 @@
 /*
 	This file is part of EqualizerAPO-XT, a system-wide equalizer.
 
-	A minimal, self-contained VST 2.4 plugin built only against the project's
-	vendored VST2 ABI header (vst/aeffectx.h). It exists so VstHostTests
-	(in Tests/HybridConvTests) can drive the engine's VST host classes
-	(VSTPluginLibrary / VSTPluginInstance) against a real
-	binary at runtime. Because it is compiled from our own source for each
-	target, it always matches the host architecture - the load/state test runs
-	on x64 and ARM64 without an architecture skip.
+	A minimal, self-contained VST 2.4 plugin that also exports a zero-class
+	IPluginFactory3. Vendors such as Kilohearts ship the same dual-export binary
+	as their VST2 .dll product, so VstHostTests uses this fixture to keep the
+	engine's format-selection rule covered as well as driving VSTPluginLibrary /
+	VSTPluginInstance against a real binary at runtime. Because it is compiled
+	from our own source for each target, it always matches the host architecture
+	- the load/state test runs on x64 and ARM64 without an architecture skip.
 
 	Behaviour, kept deliberately deterministic so the host test can assert on it:
 	  - 2 inputs / 2 outputs, 2 float parameters (param 0 = "Gain", param 1 =
@@ -16,19 +16,26 @@
 	  - processReplacing / processDoubleReplacing copy input to output scaled by
 	    Gain, unless Bypass >= 0.5 in which case input is passed through unscaled.
 	  - flags advertise canReplacing (float), canDoubleReplacing (double) and
-	    programChunks (chunk-based state).
+	    programChunks (chunk-based state). EAPO_TEST_VST_EDITOR selects a fixed,
+	    DPI-scaled or late-scaling editor persona; unset keeps the plugin editorless.
 	  - The chunk is a fixed little-endian blob: a 4-byte magic 'TVP2', a uint32
 	    version, then the two float parameters. getChunk emits it; setChunk
 	    restores the parameters from it. This lets the host round-trip parameter
 	    state through readFromEffect/writeToEffect, which (per the engine) use the
 	    chunk path whenever the programChunks flag is set.
 
-	No engine headers, no Qt, no CRT surprises: just <cstring>/<cstdint> and the
-	ABI header. The exported entry point is VSTPluginMain (the symbol
-	VSTPluginLibrary::loadFunctions resolves), with a legacy `main` alias for
-	hosts that fall back to it.
+	A copy whose file name contains SlowLoad followed immediately by decimal
+	digits becomes the loader-lock timing persona. For example,
+	TestVst2Plugin.SlowLoad4000.dll sleeps for 4 seconds while loading. The
+	ordinary TestVst2Plugin.dll has no added delay.
+
+	No engine headers and no Qt are used. The module exports VSTPluginMain for
+	its working VST2 product and GetPluginFactory for the deliberately unusable
+	VST3 side of the dual-export fixture.
 */
 
+#include <atomic>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 
@@ -36,6 +43,43 @@
 #include <windows.h>
 
 #include "vst/aeffectx.h"
+
+#define INIT_CLASS_IID
+#include "pluginterfaces/base/ipluginbase.h"
+
+BOOL WINAPI DllMain(HINSTANCE hModule, DWORD reason, LPVOID)
+{
+	if (reason == DLL_PROCESS_ATTACH)
+	{
+		DisableThreadLibraryCalls(hModule);
+		wchar_t path[MAX_PATH] = {};
+		const DWORD length = GetModuleFileNameW(hModule, path, MAX_PATH);
+		if (length > 0 && length < MAX_PATH)
+		{
+			const wchar_t* fileName = wcsrchr(path, L'\\');
+			fileName = fileName != nullptr ? fileName + 1 : path;
+			const wchar_t* marker = fileName;
+			while ((marker = wcsstr(marker, L"SlowLoad")) != nullptr)
+			{
+				marker += 8;
+				if (*marker < L'0' || *marker > L'9')
+					continue;
+				DWORD milliseconds = 0;
+				while (*marker >= L'0' && *marker <= L'9')
+				{
+					const DWORD digit = static_cast<DWORD>(*marker - L'0');
+					milliseconds = milliseconds > (60000 - digit) / 10 ? 60000 : milliseconds * 10 + digit;
+					marker++;
+				}
+				// This sleep deliberately holds the loader lock to imitate a plugin
+				// whose process-attach work blocks every loader-dependent thread.
+				Sleep(milliseconds);
+				break;
+			}
+		}
+	}
+	return TRUE;
+}
 
 namespace
 {
@@ -73,11 +117,26 @@ struct ChunkBlob
 // so a host may (in principle) create more than one instance. The chunk buffer
 // lives here too because effGetChunk hands the host a pointer it reads after we
 // return.
+enum class EditorPersona
+{
+	none,
+	fixed,
+	scaled,
+	late
+};
+
 struct PluginState
 {
-	float params[kNumParams] = {};
-	ChunkBlob chunkScratch = {};
 	vst_host_callback_t host = nullptr;
+	float params[kNumParams]{};
+	ChunkBlob chunkScratch{};
+	vst_rect_t rect{};
+	EditorPersona editorPersona = EditorPersona::none;
+	double scale = 1.0;
+	bool rectQueried = false;
+	bool editorOpen = false;
+	bool dispatcherActive = false;
+	bool editorFailed = false;
 	int32_t lastHostProcessLevel = 0;
 	int32_t lastTimeFlags = 0;
 	double lastTimeSamplePos = 0.0;
@@ -178,9 +237,12 @@ void copyName(void* dst, const char* text, size_t bufSize)
 
 intptr_t VST_FUNCTION_INTERFACE dispatcher(vst_effect_t* effect, int32_t opcode, int32_t index, intptr_t value, void* ptr, float opt)
 {
-	(void)value;
-	(void)opt;
 	PluginState* state = stateOf(effect);
+	if (state != nullptr && state->dispatcherActive)
+	{
+		state->editorFailed = true;
+		return 0;
+	}
 
 	switch (opcode)
 	{
@@ -193,6 +255,12 @@ intptr_t VST_FUNCTION_INTERFACE dispatcher(vst_effect_t* effect, int32_t opcode,
 		return 0;
 
 	case VST_EFFECT_OPCODE_DESTROY: // effClose
+		// The host must detach caller closures before entering plug-in teardown.
+		if (state != nullptr && state->host != nullptr)
+		{
+			state->host(effect, VST_HOST_OPCODE_AUTOMATE, 0, 0, nullptr, 0.0f);
+			state->host(effect, VST_HOST_OPCODE_EDITOR_RESIZE, 400, 300, nullptr, 0.0f);
+		}
 		delete state;
 		if (effect != nullptr)
 			effect->effect_internal = nullptr;
@@ -246,6 +314,9 @@ intptr_t VST_FUNCTION_INTERFACE dispatcher(vst_effect_t* effect, int32_t opcode,
 		const char* feature = static_cast<const char*>(ptr);
 		if (feature != nullptr && std::strcmp(feature, "bypass") == 0)
 			return 1;
+		if (feature != nullptr && std::strcmp(feature, vst_effect_supports.supportsViewDpiScaling) == 0)
+			return state != nullptr && (state->editorPersona == EditorPersona::scaled
+				|| state->editorPersona == EditorPersona::late) ? 1 : 0;
 		return 0;
 	}
 
@@ -278,10 +349,93 @@ intptr_t VST_FUNCTION_INTERFACE dispatcher(vst_effect_t* effect, int32_t opcode,
 		return 1;
 	}
 
-	// Editor / GUI opcodes: this plugin has no editor.
+	case VST_EFFECT_OPCODE_CUSTOM:
+		if (state != nullptr && index == VST_EFFECT_CONTENT_SCALE_INDEX
+			&& value == VST_EFFECT_CONTENT_SCALE_VALUE)
+		{
+			if (state->editorPersona == EditorPersona::fixed)
+			{
+				state->editorFailed = true;
+				return 0;
+			}
+			if (state->editorPersona == EditorPersona::late && !state->editorOpen)
+				return 1;
+			if ((state->editorPersona == EditorPersona::scaled
+				|| state->editorPersona == EditorPersona::late)
+				&& (!state->rectQueried || state->editorOpen))
+			{
+				const short oldWidth = static_cast<short>(state->rect.right - state->rect.left);
+				const short oldHeight = static_cast<short>(state->rect.bottom - state->rect.top);
+				const double oldScale = state->scale;
+				state->scale = opt;
+				const short newWidth = static_cast<short>(std::lround(320.0 * state->scale));
+				const short newHeight = static_cast<short>(std::lround(200.0 * state->scale));
+				if (state->editorOpen && state->host != nullptr)
+				{
+					state->dispatcherActive = true;
+					const intptr_t accepted = state->host(effect, VST_HOST_OPCODE_EDITOR_RESIZE,
+						newWidth, newHeight, nullptr, 0.0f);
+					state->dispatcherActive = false;
+					if (accepted != 1)
+					{
+						state->scale = oldScale;
+						state->rect.right = oldWidth;
+						state->rect.bottom = oldHeight;
+						return 0;
+					}
+				}
+				state->rect.right = newWidth;
+				state->rect.bottom = newHeight;
+			}
+		}
+		return 0;
+
 	case VST_EFFECT_OPCODE_EDITOR_GET_RECT:
+		if (state == nullptr || ptr == nullptr || state->editorPersona == EditorPersona::none)
+			return 0;
+		state->rect.left = 0;
+		state->rect.top = 0;
+		if (state->editorFailed)
+		{
+			state->rect.right = 1;
+			state->rect.bottom = 1;
+		}
+		else if (state->editorPersona == EditorPersona::fixed)
+		{
+			state->rect.right = 320;
+			state->rect.bottom = 200;
+		}
+		else
+		{
+			state->rect.right = static_cast<short>(std::lround(320.0 * state->scale));
+			state->rect.bottom = static_cast<short>(std::lround(200.0 * state->scale));
+		}
+		*static_cast<vst_rect_t**>(ptr) = &state->rect;
+		state->rectQueried = true;
+		return 1;
+
 	case VST_EFFECT_OPCODE_EDITOR_OPEN:
+		if (state == nullptr || state->editorPersona == EditorPersona::none)
+			return 0;
+		state->editorOpen = true;
+		if ((state->editorPersona == EditorPersona::scaled
+			|| state->editorPersona == EditorPersona::late) && state->host != nullptr)
+		{
+			state->dispatcherActive = true;
+			const intptr_t modified = state->host(effect, VST_HOST_OPCODE_IO_MODIFIED, 0, 0, nullptr, 0.0f);
+			const intptr_t idle = state->host(effect, VST_HOST_OPCODE_IO_NEED_IDLE, 0, 0, nullptr, 0.0f);
+			state->dispatcherActive = false;
+			if (modified != 0 || idle != 0)
+				state->editorFailed = true;
+		}
+		return 1;
+
 	case VST_EFFECT_OPCODE_EDITOR_CLOSE:
+		if (state != nullptr)
+		{
+			state->editorOpen = false;
+			state->rectQueried = false;
+		}
 		return 0;
 
 	default:
@@ -289,12 +443,12 @@ intptr_t VST_FUNCTION_INTERFACE dispatcher(vst_effect_t* effect, int32_t opcode,
 	}
 }
 
-vst_effect_t* createEffect(vst_host_callback_t host)
+vst_effect_t* createEffect(vst_host_callback_t callback)
 {
 	PluginState* state = new PluginState();
+	state->host = callback;
 	state->params[kParamGain] = 1.0f;
 	state->params[kParamBypass] = 0.0f;
-	state->host = host;
 	std::memset(&state->chunkScratch, 0, sizeof(state->chunkScratch));
 
 	vst_effect_t* effect = new vst_effect_t();
@@ -321,6 +475,20 @@ vst_effect_t* createEffect(vst_host_callback_t host)
 	effect->process_float = &processReplacing;
 	effect->process_double = &processDoubleReplacing;
 
+	wchar_t editorMode[32] = {};
+	if (GetEnvironmentVariableW(L"EAPO_TEST_VST_EDITOR", editorMode,
+		static_cast<DWORD>(sizeof(editorMode) / sizeof(editorMode[0]))) > 0)
+	{
+		if (wcscmp(editorMode, L"fixed") == 0)
+			state->editorPersona = EditorPersona::fixed;
+		else if (wcscmp(editorMode, L"scaled") == 0)
+			state->editorPersona = EditorPersona::scaled;
+		else if (wcscmp(editorMode, L"late") == 0)
+			state->editorPersona = EditorPersona::late;
+		if (state->editorPersona != EditorPersona::none)
+			effect->flags |= VST_EFFECT_FLAG_EDITOR;
+	}
+
 	// Host robustness tests select malformed metadata before creating an
 	// instance. Normal test runs leave the variable unset and retain the fixed
 	// two-channel contract documented above.
@@ -346,18 +514,104 @@ vst_effect_t* createEffect(vst_host_callback_t host)
 
 	return effect;
 }
+
+// Deliberately advertises no VST3 classes and refuses host-context setup, as
+// Kilohearts' dual-export VST2 DLL does. Selecting this factory instead of
+// VSTPluginMain therefore makes the fixture fail at library initialization.
+class EmptyVst3Factory final : public Steinberg::IPluginFactory3
+{
+public:
+	Steinberg::tresult PLUGIN_API queryInterface(const Steinberg::TUID iid, void** obj) override
+	{
+		if (obj == nullptr)
+			return Steinberg::kInvalidArgument;
+		if (Steinberg::FUnknownPrivate::iidEqual(iid, Steinberg::FUnknown::iid)
+			|| Steinberg::FUnknownPrivate::iidEqual(iid, Steinberg::IPluginFactory::iid))
+			*obj = static_cast<Steinberg::IPluginFactory*>(this);
+		else if (Steinberg::FUnknownPrivate::iidEqual(iid, Steinberg::IPluginFactory2::iid))
+			*obj = static_cast<Steinberg::IPluginFactory2*>(this);
+		else if (Steinberg::FUnknownPrivate::iidEqual(iid, Steinberg::IPluginFactory3::iid))
+			*obj = static_cast<Steinberg::IPluginFactory3*>(this);
+		else
+		{
+			*obj = nullptr;
+			return Steinberg::kNoInterface;
+		}
+		addRef();
+		return Steinberg::kResultOk;
+	}
+
+	Steinberg::uint32 PLUGIN_API addRef() override { return ++refCount; }
+	Steinberg::uint32 PLUGIN_API release() override
+	{
+		const Steinberg::uint32 remaining = --refCount;
+		if (remaining == 0)
+			delete this;
+		return remaining;
+	}
+
+	Steinberg::tresult PLUGIN_API getFactoryInfo(Steinberg::PFactoryInfo* info) override
+	{
+		if (info == nullptr)
+			return Steinberg::kInvalidArgument;
+		*info = Steinberg::PFactoryInfo("EqualizerAPO-XT Tests", "https://example.invalid",
+			"test@example.invalid", Steinberg::PFactoryInfo::kNoFlags);
+		return Steinberg::kResultOk;
+	}
+	Steinberg::int32 PLUGIN_API countClasses() override { return 0; }
+	Steinberg::tresult PLUGIN_API getClassInfo(Steinberg::int32, Steinberg::PClassInfo*) override
+	{
+		return Steinberg::kInvalidArgument;
+	}
+	Steinberg::tresult PLUGIN_API createInstance(Steinberg::FIDString, Steinberg::FIDString, void** obj) override
+	{
+		if (obj != nullptr)
+			*obj = nullptr;
+		return Steinberg::kNotImplemented;
+	}
+	Steinberg::tresult PLUGIN_API getClassInfo2(Steinberg::int32, Steinberg::PClassInfo2*) override
+	{
+		return Steinberg::kInvalidArgument;
+	}
+	Steinberg::tresult PLUGIN_API getClassInfoUnicode(Steinberg::int32, Steinberg::PClassInfoW*) override
+	{
+		return Steinberg::kInvalidArgument;
+	}
+	Steinberg::tresult PLUGIN_API setHostContext(Steinberg::FUnknown*) override
+	{
+		return Steinberg::kNotImplemented;
+	}
+
+private:
+	~EmptyVst3Factory() = default;
+	std::atomic<Steinberg::uint32> refCount{1};
+};
 } // namespace
 
 // VST 2.x entry point. VSTPluginLibrary::loadFunctions resolves exactly this
 // symbol via GetProcAddress(module, "VSTPluginMain"); the callback lets the
-// plugin query the host but this plugin needs nothing from it, so we ignore it
-// after the create.
+// plugin query the host, including during teardown.
 //
-// The engine's loader only ever looks up "VSTPluginMain", never the legacy
-// `main`/`MAIN` aliases, so no alias export is added here. Adding one would not
-// be reached by this host and exporting a function literally named `main` from
-// a DLL is needless surface area.
+// The dual-export regression fixture also exposes GetPluginFactory below. For
+// a .dll, the host must still choose this working VSTPluginMain entry point.
+// The legacy `main`/`MAIN` aliases are not part of the host's lookup contract.
 extern "C" __declspec(dllexport) vst_effect_t* VST_FUNCTION_INTERFACE VSTPluginMain(vst_host_callback_t callback)
 {
+	wchar_t probe[2] = {};
+	if (GetEnvironmentVariableW(L"EAPO_TEST_VST_HOST_CALLBACKS", probe, 2) != 0)
+	{
+		char product[64] = {};
+		if (callback(nullptr, VST_HOST_OPCODE_PRODUCT_NAME, 0, 0, nullptr, 0.0f) != 0
+			|| callback(nullptr, VST_HOST_OPCODE_PRODUCT_NAME, 0, 0, product, 0.0f) != 1
+			|| strcmp(product, "Equalizer APO") != 0
+			|| callback(nullptr, VST_HOST_OPCODE_SUPPORTS, 0, 0, nullptr, 0.0f) != 0
+			|| callback(nullptr, VST_HOST_OPCODE_SUPPORTS, 0, 0, "sizeWindow", 0.0f) != 1)
+			return nullptr;
+	}
 	return createEffect(callback);
+}
+
+extern "C" __declspec(dllexport) Steinberg::IPluginFactory* PLUGIN_API GetPluginFactory()
+{
+	return new EmptyVst3Factory();
 }

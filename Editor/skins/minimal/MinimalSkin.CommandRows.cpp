@@ -97,10 +97,11 @@ bool MinimalSkin::paintChannelBadge(QPainter& painter, const QRect& rect, const 
 	// channel-scope tokens follow the Copy listing's grammar - the designed
 	// console ink on bare ground, uppercase mono, no pill chrome. Virtual
 	// channels keep the dashed frame (the unverified-token dash grammar).
+	// SemiBold like the listing's tokens (MinimalChannelInk.h).
 	const QColor ink = minimalChannelInk(channel, skinIsDark(tokens));
 	QFont font(tokens.monoFontFamily);
 	font.setPointSizeF(9.5);
-	font.setBold(true);
+	font.setWeight(QFont::DemiBold);
 	painter.setFont(font);
 	painter.setPen(ink);
 	painter.drawText(rect, Qt::AlignCenter, channel);
@@ -229,9 +230,14 @@ void MinimalSkin::paintCardChrome(QPainter& painter, const QRect& rect, const Co
 // The If-block scope in the gutter is a code editor's indent guide:
 // one crisp 1px border-ink hairline per scope level, antialiasing off.
 // The channel-group level is drawn by the same rule. Branch rows keep
-// their semantic indentation (logicSiblingsIndentAsMembers stays
+// their semantic indentation (logicSiblingsIndentAsMembers answers
 // false), so the innermost guide pauses on their line the way an
 // editor's guides do.
+bool MinimalSkin::logicSiblingsIndentAsMembers() const
+{
+	return false;
+}
+
 bool MinimalSkin::paintScopeGutter(QPainter& painter, const QSize& size, const CommandRowInfo& info, const SkinTokens& tokens) const
 {
 	// An unindented row has no gutter; leave the (empty) default path.
