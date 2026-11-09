@@ -45,10 +45,8 @@ env:
 jobs:
   version-bump:
     # Run on every main push EXCEPT:
-    #   • pushes the bump job itself made — those carry [skip ci], which stops
-    #     GitHub from triggering a new workflow (the push uses a deploy key,
-    #     which would otherwise start one), but we guard explicitly in case
-    #     that behaviour ever changes.
+    #   • pushes the bump job itself made — those carry [skip ci], including
+    #     when checkout authenticates the push with an optional deploy key.
     #   • manual `chore(version):` commits — when a maintainer sets a specific
     #     version we keep their value and just build/release with it.
     if: |
@@ -57,10 +55,10 @@ jobs:
       && !contains(github.event.head_commit.message, '[skip ci]')
       && !startsWith(github.event.head_commit.message, 'chore(version):')
     runs-on: windows-2025-vs2026
-    # The bump push authenticates with the RELEASE_DEPLOY_KEY deploy key, not
-    # the workflow token, so the token only needs to read.
+    # This main-only job must be able to push the version commit even when
+    # the optional deploy key is absent. Other jobs keep their own scopes.
     permissions:
-      contents: read
+      contents: write
     outputs:
       bumped_sha: ${{ steps.commit.outputs.sha }}
       base_version: ${{ steps.commit.outputs.base_version }}
@@ -75,14 +73,8 @@ jobs:
       uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       with:
         fetch-depth: 0
-        # The bump is pushed over SSH with this write deploy key: main's
-        # "Required checks" ruleset requires every PR check and lets only
-        # deploy keys through, and the bump commit has no checks of its own
-        # (GitHub does not accept GitHub Actions as a ruleset bypass actor on a
-        # personal repository). A deploy-key push would start workflows, which
-        # the [skip ci] in the bump commit message prevents; the build and
-        # release still run in this same workflow run (downstream jobs check
-        # out bumped_sha).
+        # Use an optional SSH deploy key when configured. Otherwise checkout
+        # persists this job's write-capable GITHUB_TOKEN for the bump push.
         ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
         persist-credentials: true
 

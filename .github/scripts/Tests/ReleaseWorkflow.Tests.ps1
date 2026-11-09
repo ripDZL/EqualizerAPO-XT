@@ -15,6 +15,18 @@ Describe "release workflow target commit" {
         [regex]::IsMatch($workflow, $pattern) | Should -BeTrue
     }
 
+    It "allows the main-only version bump to push without widening the default token" {
+        $rootPermissions = [regex]::Match($workflow, '(?ms)^permissions:\r?\n.*?(?=^[^ \r\n]|\z)')
+        $rootPermissions.Success | Should -BeTrue
+        $rootPermissions.Value | Should -Match '(?m)^  contents: read[ \t]*\r?$'
+
+        $bumpJob = [regex]::Match($workflow, '(?ms)^  version-bump:\r?\n.*?(?=^  [A-Za-z0-9_-]+:|\z)')
+        $bumpJob.Success | Should -BeTrue
+        $bumpJob.Value | Should -Match "(?m)^      github\.event_name == 'push'\r?$"
+        $bumpJob.Value | Should -Match "(?m)^      && github\.ref == 'refs/heads/main'\r?$"
+        $bumpJob.Value | Should -Match '(?m)^    permissions:\r?\n      contents: write[ \t]*\r?$'
+    }
+
     It "allows a manually versioned main build to publish after a skipped version bump" {
         $releaseBlock = [regex]::Match($workflow, "(?ms)^\s{2}create-release:.*?^\s{4}permissions:")
         $releaseBlock.Success | Should -BeTrue
